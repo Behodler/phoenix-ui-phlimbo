@@ -1,0 +1,84 @@
+export type Tab = "Deposit" | "Withdraw" | "Stake" | "Unstake";
+
+export interface VaultFormData {
+  amount: string;
+  autoStake: boolean;
+  slippageBps: number;
+}
+
+export interface VaultConstants {
+  dolaToAutoDolaRate: number;
+  gasFeeUsd: number;
+}
+
+export interface TokenInfo {
+  name: string;
+  balance: number;
+  balanceUsd: number;
+  icon?: string;
+}
+
+export interface PositionInfo {
+  value: number;
+  valueUsd: number;
+  isStaked: boolean;
+}
+
+export interface HeaderProps {
+  onConnect: () => void;
+  isConnected?: boolean;
+}
+
+export interface TabNavigationProps {
+  tabs: readonly Tab[];
+  activeTab: Tab;
+  onTabChange: (tab: Tab) => void;
+}
+
+export interface DepositFormProps {
+  formData: VaultFormData;
+  onFormChange: (data: Partial<VaultFormData>) => void;
+  constants: VaultConstants;
+  tokenInfo: TokenInfo;
+  onDeposit: () => void;
+}
+
+export interface PositionCardProps {
+  position: PositionInfo;
+  onClaim: () => void;
+  onUnstake: () => void;
+  onViewPortfolio: () => void;
+}
+
+export interface AmountDisplayProps {
+  amount: number;
+}
+
+export interface TokenRowProps {
+  token: TokenInfo;
+  onMaxClick: () => void;
+}
+
+export interface AmountInputProps {
+  amount: string;
+  onAmountChange: (amount: string) => void;
+  onMaxClick: () => void;
+}
+
+export interface AutoStakeToggleProps {
+  autoStake: boolean;
+  onToggle: (enabled: boolean) => void;
+}
+
+export interface RateInfoProps {
+  constants: VaultConstants;
+  slippageBps: number;
+  onSlippageChange: (bps: number) => void;
+  minReceived: number;
+}
+
+export interface ActionButtonProps {
+  disabled: boolean;
+  onAction: () => void;
+  label: string;
+}
