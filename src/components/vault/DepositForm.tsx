@@ -2,7 +2,6 @@ import type { DepositFormProps } from '../../types/vault';
 import AmountDisplay from '../ui/AmountDisplay';
 import TokenRow from '../ui/TokenRow';
 import AmountInput from '../ui/AmountInput';
-import AutoStakeToggle from '../ui/AutoStakeToggle';
 import RateInfo from '../ui/RateInfo';
 import ActionButton from '../ui/ActionButton';
 
@@ -45,11 +44,6 @@ export default function DepositForm({
         amount={formData.amount}
         onAmountChange={handleAmountChange}
         onMaxClick={handleMaxClick}
-      />
-
-      <AutoStakeToggle
-        autoStake={formData.autoStake}
-        onToggle={handleAutoStakeToggle}
       />
 
       <RateInfo
