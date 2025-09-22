@@ -10,7 +10,7 @@ export default function Header() {
             src={phoenixLogo}
             alt="Phoenix Logo"
             className="rounded-xl object-cover"
-            width={"80px"}
+            width={"90px"}
           />
           <div>
             <div className="text-xl  leading-tight">Phoenix</div>
