@@ -7,8 +7,8 @@ import PositionCard from '../components/vault/PositionCard';
 import TabPlaceholder from '../components/ui/TabPlaceholder';
 
 export default function VaultPage() {
-  const tabs = ["Deposit", "Withdraw", "Stake", "Unstake"] as const;
-  const [activeTab, setActiveTab] = useState<Tab>("Deposit");
+  const tabs = ["Deposit to Mint", "Burn to Withdraw"] as const;
+  const [activeTab, setActiveTab] = useState<Tab>("Deposit to Mint");
 
   // Form state
   const [formData, setFormData] = useState<VaultFormData>({
@@ -75,7 +75,7 @@ export default function VaultPage() {
             />
 
             {/* Tab content */}
-            {activeTab === "Deposit" ? (
+            {activeTab === "Deposit to Mint" ? (
               <DepositForm
                 formData={formData}
                 onFormChange={handleFormChange}

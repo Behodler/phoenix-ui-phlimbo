@@ -8,8 +8,8 @@ export default function Header({ }: HeaderProps) {
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-yellow-400" />
           <div>
-            <div className="text-sm text-neutral-400 leading-tight">Tokemak</div>
-            <div className="text-lg font-semibold">autoDOLA Vault</div>
+            <div className="text-sm text-neutral-400 leading-tight">Phoenix</div>
+            <div className="text-lg font-semibold">pxUSD minter (Behodler 3 technology)</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
