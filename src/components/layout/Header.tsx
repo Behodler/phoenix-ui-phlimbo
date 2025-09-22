@@ -9,11 +9,13 @@ export default function Header() {
           <img
             src={phoenixLogo}
             alt="Phoenix Logo"
-            className="h-10 w-10 rounded-xl object-cover"
+            className="rounded-xl object-cover"
+            width={"80px"}
           />
           <div>
-            <div className="text-sm text-neutral-400 leading-tight">Phoenix</div>
-            <div className="text-lg font-semibold">pxUSD minter (Behodler 3 technology)</div>
+            <div className="text-xl  leading-tight">Phoenix</div>
+            <div className="text-sm font-semibold">pxUSD minter</div>
+            <div className="text-sm text-neutral-400 italic">Behodler 3 technology</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
