@@ -40,10 +40,6 @@ export default function VaultPage() {
     setFormData(prev => ({ ...prev, ...data }));
   };
 
-  const handleConnect = () => {
-    console.log('Connect wallet clicked');
-  };
-
   const handleDeposit = () => {
     console.log('Deposit clicked with data:', formData);
   };
@@ -62,7 +58,7 @@ export default function VaultPage() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 antialiased">
-      <Header onConnect={handleConnect} />
+      <Header />
 
       <main className="mx-auto max-w-5xl px-4 py-8 grid lg:grid-cols-3 gap-6">
         {/* Left: Main card */}
