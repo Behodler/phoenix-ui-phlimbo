@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
+import { useWallet, useTokenBalance, useTransaction } from '../hooks';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
@@ -10,6 +11,12 @@ export default function VaultPage() {
   const tabs = ["Deposit to Mint", "Burn to Withdraw"] as const;
   const [activeTab, setActiveTab] = useState<Tab>("Deposit to Mint");
 
+  // Blockchain hooks
+  const { isConnected, connect } = useWallet();
+  const dolaBalance = useTokenBalance('DOLA');
+  const pxUSDBalance = useTokenBalance('pxUSD');
+  const { executeDeposit, isLoading: isTransacting, error: transactionError } = useTransaction();
+
   // Form state
   const [formData, setFormData] = useState<VaultFormData>({
     amount: "",
@@ -17,21 +24,22 @@ export default function VaultPage() {
     slippageBps: 10, // 0.10%
   });
 
-  // Mock data - these would come from hooks/API calls in real implementation
+  // Constants - these could also come from hooks in a real implementation
   const constants: VaultConstants = {
     dolaToAutoDolaRate: 0.9642,
     gasFeeUsd: 0.27,
   };
 
+  // Convert blockchain balance to TokenInfo format for components
   const tokenInfo: TokenInfo = {
     name: "DOLA",
-    balance: 0.00,
-    balanceUsd: 0.00,
+    balance: dolaBalance.balance?.balance ?? 0,
+    balanceUsd: dolaBalance.balance?.balanceUsd ?? 0,
   };
 
   const positionInfo: PositionInfo = {
-    value: 50.1043,
-    valueUsd: 49.88,
+    value: pxUSDBalance.balance?.balance ?? 0,
+    valueUsd: pxUSDBalance.balance?.balanceUsd ?? 0,
     isStaked: true,
   };
 
@@ -40,8 +48,44 @@ export default function VaultPage() {
     setFormData(prev => ({ ...prev, ...data }));
   };
 
-  const handleDeposit = () => {
-    console.log('Deposit clicked with data:', formData);
+  const handleDeposit = async () => {
+    if (!isConnected) {
+      try {
+        await connect();
+      } catch (error) {
+        console.error('Failed to connect wallet:', error);
+        return;
+      }
+    }
+
+    const amount = parseFloat(formData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      console.error('Invalid amount');
+      return;
+    }
+
+    if (!dolaBalance.balance || !pxUSDBalance.balance) {
+      console.error('Token balances not available');
+      return;
+    }
+
+    if (amount > dolaBalance.balance.balance) {
+      console.error('Insufficient DOLA balance');
+      return;
+    }
+
+    try {
+      const transaction = await executeDeposit(
+        amount,
+        dolaBalance.balance,
+        pxUSDBalance.balance
+      );
+      console.log('Deposit successful:', transaction);
+      // Clear form after successful transaction
+      setFormData(prev => ({ ...prev, amount: "" }));
+    } catch (error) {
+      console.error('Deposit failed:', error);
+    }
   };
 
   const handleClaim = () => {
@@ -56,9 +100,17 @@ export default function VaultPage() {
     console.log('View portfolio clicked');
   };
 
+  const handleConnect = async () => {
+    try {
+      await connect();
+    } catch (error) {
+      console.error('Failed to connect wallet:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground antialiased">
-      <Header />
+      <Header onConnect={handleConnect} isConnected={isConnected} />
 
       <main className="mx-auto max-w-5xl px-4 py-8 grid lg:grid-cols-3 gap-6">
         {/* Left: Main card */}
@@ -99,7 +151,17 @@ export default function VaultPage() {
       {/* Footer */}
       <footer className="mx-auto max-w-5xl px-4 pb-10 text-xs text-muted-foreground">
         <div className="border-t border-border pt-6">
-          This is a static mockup for development. Replace wired values with live data and handlers.
+          Mock blockchain functionality enabled. Transactions simulate 1-3 second delays with realistic gas fees and balance updates.
+          {transactionError && (
+            <div className="mt-2 text-red-500">
+              Transaction Error: {transactionError}
+            </div>
+          )}
+          {isTransacting && (
+            <div className="mt-2 text-blue-500">
+              Transaction processing...
+            </div>
+          )}
         </div>
       </footer>
     </div>

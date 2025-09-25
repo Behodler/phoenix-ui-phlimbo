@@ -1,8 +1,8 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useState, useEffect } from 'react';
+import type { HeaderProps } from '../../types/vault';
 import phoenixLogo from '../../assets/phoenix-logo.png';
 
-export default function Header() {
+export default function Header({ onConnect, isConnected = false }: HeaderProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
   useEffect(() => {
@@ -46,7 +46,12 @@ export default function Header() {
           <button className="phoenix-btn-ghost text-sm">
             FAQ
           </button>
-          <ConnectButton />
+          <button
+            onClick={onConnect}
+            className={`phoenix-btn text-sm ${isConnected ? 'phoenix-btn-secondary' : 'phoenix-btn-primary'}`}
+          >
+            {isConnected ? 'Connected' : 'Connect Wallet'}
+          </button>
         </div>
       </div>
     </header>
