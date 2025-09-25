@@ -7,51 +7,51 @@ export default function PositionCard({
   onViewPortfolio
 }: PositionCardProps) {
   return (
-    <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 ring-1 ring-white/5">
+    <div className="phoenix-card p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold">Your Position</h2>
+        <h2 className="text-base font-semibold text-card-foreground">Your Position</h2>
         <button
           onClick={onViewPortfolio}
-          className="text-lime-400 text-sm hover:underline"
+          className="text-primary text-sm hover:underline transition-colors"
         >
           View Portfolio
         </button>
       </div>
 
       <div className="space-y-4">
-        <div className="text-xs uppercase tracking-wide text-neutral-400">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">
           Position
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex h-2.5 w-2.5 rounded-full bg-lime-400" />
-          <div className="font-medium">autoDOLA</div>
+          <span className="inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+          <div className="font-medium text-card-foreground">autoDOLA</div>
           {position.isStaked && (
-            <span className="ml-auto rounded-full bg-lime-400/10 px-2 py-0.5 text-[11px] text-lime-300">
+            <span className="ml-auto rounded-full bg-accent/10 px-2 py-0.5 text-[11px] text-accent">
               Staked
             </span>
           )}
         </div>
 
-        <div className="h-px w-full bg-neutral-800" />
+        <div className="h-px w-full bg-border" />
 
         <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="text-neutral-400">Value</div>
+          <div className="text-muted-foreground">Value</div>
           <div className="text-right">
-            <div className="font-semibold">{position.value.toFixed(4)} DOLA</div>
-            <div className="text-neutral-400">${position.valueUsd.toFixed(2)}</div>
+            <div className="font-semibold text-card-foreground">{position.value.toFixed(4)} DOLA</div>
+            <div className="text-muted-foreground">${position.valueUsd.toFixed(2)}</div>
           </div>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-2">
           <button
             onClick={onClaim}
-            className="rounded-xl border border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-800"
+            className="phoenix-btn-ghost text-sm"
           >
             Claim
           </button>
           <button
             onClick={onUnstake}
-            className="rounded-xl border border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-800"
+            className="phoenix-btn-ghost text-sm"
           >
             Unstake
           </button>

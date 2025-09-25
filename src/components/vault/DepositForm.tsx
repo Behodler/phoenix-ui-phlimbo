@@ -20,10 +20,6 @@ export default function DepositForm({
     onFormChange({ amount });
   };
 
-  const handleAutoStakeToggle = (autoStake: boolean) => {
-    onFormChange({ autoStake });
-  };
-
   const handleSlippageChange = (slippageBps: number) => {
     onFormChange({ slippageBps });
   };
@@ -36,7 +32,7 @@ export default function DepositForm({
     <div className="p-6">
       <AmountDisplay amount={parsedAmount} />
 
-      <div className="h-px w-full bg-neutral-800 mb-6" />
+      <div className="h-px w-full bg-border mb-6" />
 
       <TokenRow token={tokenInfo} onMaxClick={handleMaxClick} />
 

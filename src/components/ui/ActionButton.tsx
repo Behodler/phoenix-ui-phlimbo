@@ -6,11 +6,11 @@ export default function ActionButton({ disabled, onAction, label }: ActionButton
       <button
         disabled={disabled}
         onClick={onAction}
-        className="w-full rounded-xl bg-lime-400 px-4 py-3 font-semibold text-neutral-900 disabled:opacity-40"
+        className="w-full phoenix-btn-primary"
       >
         {label}
       </button>
-      <div className="mt-3 text-xs text-neutral-500">
+      <div className="mt-3 text-xs text-muted-foreground">
         Withdraw and unstake at any time • 0% Deposit Fee
       </div>
     </div>

@@ -4,32 +4,32 @@ export default function RateInfo({ constants, slippageBps, onSlippageChange, min
   return (
     <div className="space-y-3 text-sm">
       <div className="flex items-center justify-between">
-        <span className="text-neutral-400">1 DOLA</span>
-        <span className="font-medium">≈ {constants.dolaToAutoDolaRate} autoDOLA</span>
+        <span className="text-muted-foreground">1 DOLA</span>
+        <span className="font-medium text-foreground">≈ {constants.dolaToAutoDolaRate} autoDOLA</span>
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-neutral-400">Gas est.</span>
-        <span>${constants.gasFeeUsd.toFixed(2)}</span>
+        <span className="text-muted-foreground">Gas est.</span>
+        <span className="text-foreground">${constants.gasFeeUsd.toFixed(2)}</span>
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-neutral-400">Max Slippage</span>
+        <span className="text-muted-foreground">Max Slippage</span>
         <div className="flex items-center gap-2">
           <input
             type="number"
             min={0}
-            className="w-20 rounded-md border border-neutral-700 bg-neutral-950 px-2 py-1 text-right"
+            className="w-20 rounded-md border border-input bg-card px-2 py-1 text-right text-card-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             value={(slippageBps / 100).toFixed(2)}
             onChange={(e) => {
               const val = Number(e.target.value);
               if (!isNaN(val)) onSlippageChange(Math.max(0, Math.round(val * 100)));
             }}
           />
-          <span>%</span>
+          <span className="text-muted-foreground">%</span>
         </div>
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-neutral-400">Receive at least</span>
-        <span className="font-medium">
+        <span className="text-muted-foreground">Receive at least</span>
+        <span className="font-medium text-foreground">
           {minReceived > 0 ? minReceived.toFixed(6) : "-"} autoDOLA
         </span>
       </div>

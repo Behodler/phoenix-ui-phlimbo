@@ -57,13 +57,13 @@ export default function VaultPage() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 antialiased">
+    <div className="min-h-screen bg-background text-foreground antialiased">
       <Header />
 
       <main className="mx-auto max-w-5xl px-4 py-8 grid lg:grid-cols-3 gap-6">
         {/* Left: Main card */}
         <section className="lg:col-span-2">
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-0 overflow-hidden shadow-2xl shadow-black/40 ring-1 ring-white/5">
+          <div className="phoenix-card p-0 overflow-hidden">
             <TabNavigation
               tabs={tabs}
               activeTab={activeTab}
@@ -97,8 +97,8 @@ export default function VaultPage() {
       </main>
 
       {/* Footer */}
-      <footer className="mx-auto max-w-5xl px-4 pb-10 text-xs text-neutral-500">
-        <div className="border-t border-neutral-800 pt-6">
+      <footer className="mx-auto max-w-5xl px-4 pb-10 text-xs text-muted-foreground">
+        <div className="border-t border-border pt-6">
           This is a static mockup for development. Replace wired values with live data and handlers.
         </div>
       </footer>
