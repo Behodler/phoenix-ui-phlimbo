@@ -56,7 +56,7 @@ export default function ActionButton({
         {label}
       </button>
       <div className="mt-3 text-xs text-muted-foreground">
-        Withdraw and unstake at any time • 0% Deposit Fee
+        Withdraw at any time • 0% Deposit Fee
       </div>
     </div>
   );

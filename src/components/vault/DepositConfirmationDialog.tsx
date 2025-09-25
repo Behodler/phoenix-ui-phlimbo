@@ -6,7 +6,6 @@ interface DepositConfirmationData {
   outputAmount: number;
   outputToken: string;
   priceImpact: number;
-  gasFeeUsd: number;
   slippage: number;
 }
 
@@ -86,10 +85,7 @@ export default function DepositConfirmationDialog({
             <span className="text-muted-foreground">Maximum Slippage</span>
             <span>{formatPercent(data.slippage / 10000)}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Network Fee</span>
-            <span>${formatNumber(data.gasFeeUsd, 2)}</span>
-          </div>
+
           <div className="flex justify-between">
             <span className="text-muted-foreground">Minimum Received</span>
             <span>{formatNumber(data.outputAmount * (1 - data.slippage / 10000))} {data.outputToken}</span>

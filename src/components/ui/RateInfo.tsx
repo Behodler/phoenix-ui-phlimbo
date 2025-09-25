@@ -5,11 +5,7 @@ export default function RateInfo({ constants, slippageBps, onSlippageChange, min
     <div className="space-y-3 text-sm">
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground">1 DOLA</span>
-        <span className="font-medium text-foreground">≈ {constants.dolaToAutoDolaRate} autoDOLA</span>
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground">Gas est.</span>
-        <span className="text-foreground">${constants.gasFeeUsd.toFixed(2)}</span>
+        <span className="font-medium text-foreground">≈ {constants.dolaToPxUSDRate} pxUSD</span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground">Max Slippage</span>
@@ -30,7 +26,7 @@ export default function RateInfo({ constants, slippageBps, onSlippageChange, min
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground">Receive at least</span>
         <span className="font-medium text-foreground">
-          {minReceived > 0 ? minReceived.toFixed(6) : "-"} autoDOLA
+          {minReceived > 0 ? minReceived.toFixed(6) : "-"} pxUSD
         </span>
       </div>
     </div>

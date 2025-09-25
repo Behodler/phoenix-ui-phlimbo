@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { HeaderProps } from '../../types/vault';
-import phoenixLogo from '../../assets/phoenix-logo.png';
+//import phoenixLogo from '../../assets/phoenix-logok.png';
+import phoenixLogo from '../../assets/pxUSD-detailed.png';
 
 export default function Header({ onConnect, isConnected = false }: HeaderProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');

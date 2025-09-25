@@ -33,8 +33,7 @@ export default function VaultPage() {
 
   // Constants - these could also come from hooks in a real implementation
   const constants: VaultConstants = {
-    dolaToAutoDolaRate: 0.998, // Updated to match mock blockchain exchange rate (0.2% slippage)
-    gasFeeUsd: 0.27,
+    dolaToPxUSDRate: 1.33, // Updated to match mock blockchain exchange rate (0.2% slippage)
   };
 
   // Convert blockchain balance to TokenInfo format for components

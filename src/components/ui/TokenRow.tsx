@@ -12,15 +12,6 @@ export default function TokenRow({ token, onMaxClick }: TokenRowProps) {
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">MAX</span>
-        <button
-          onClick={onMaxClick}
-          className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted transition-colors"
-        >
-          0%
-        </button>
-      </div>
     </div>
   );
 }

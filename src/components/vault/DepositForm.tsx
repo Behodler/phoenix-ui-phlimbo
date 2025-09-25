@@ -21,8 +21,8 @@ export default function DepositForm({
   const [isApproving, setIsApproving] = useState(false);
 
   const parsedAmount = Number(formData.amount) || 0;
-  const estAutoDola = parsedAmount * constants.dolaToAutoDolaRate;
-  const minReceived = estAutoDola * (1 - formData.slippageBps / 10000);
+  const estPxUSD = parsedAmount * constants.dolaToPxUSDRate;
+  const minReceived = estPxUSD * (1 - formData.slippageBps / 10000);
 
   // Calculate price impact (mock calculation for demonstration)
   const priceImpact = Math.min(parsedAmount / 10000, 0.1); // Simple price impact based on amount
@@ -126,10 +126,10 @@ export default function DepositForm({
         data={{
           inputAmount: parsedAmount,
           inputToken: 'DOLA',
-          outputAmount: estAutoDola,
+          outputAmount: estPxUSD,
           outputToken: 'pxUSD',
           priceImpact: priceImpact,
-          gasFeeUsd: constants.gasFeeUsd,
+
           slippage: formData.slippageBps,
         }}
       />
