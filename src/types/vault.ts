@@ -41,6 +41,9 @@ export interface DepositFormProps {
   constants: VaultConstants;
   tokenInfo: TokenInfo;
   onDeposit: () => void;
+  isTransacting?: boolean;
+  needsApproval?: boolean;
+  onApprove?: () => void;
 }
 
 export interface PositionCardProps {
@@ -81,4 +84,6 @@ export interface ActionButtonProps {
   disabled: boolean;
   onAction: () => void;
   label: string;
+  isLoading?: boolean;
+  variant?: 'primary' | 'approve';
 }

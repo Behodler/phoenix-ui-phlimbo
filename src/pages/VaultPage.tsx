@@ -24,6 +24,9 @@ export default function VaultPage() {
     slippageBps: 10, // 0.10%
   });
 
+  // Approval state - in real app this would come from contract state
+  const [isApproved, setIsApproved] = useState(false);
+
   // Constants - these could also come from hooks in a real implementation
   const constants: VaultConstants = {
     dolaToAutoDolaRate: 0.9642,
@@ -46,6 +49,45 @@ export default function VaultPage() {
   // Event handlers
   const handleFormChange = (data: Partial<VaultFormData>) => {
     setFormData(prev => ({ ...prev, ...data }));
+
+    // Reset approval when amount changes (in real app, check if new amount exceeds allowance)
+    if (data.amount !== undefined) {
+      const newAmount = parseFloat(data.amount || '0');
+      // Mock logic: require approval for amounts > 100
+      if (newAmount > 100 && isApproved) {
+        setIsApproved(false);
+      }
+    }
+  };
+
+  const handleApprove = async (): Promise<void> => {
+    if (!isConnected) {
+      try {
+        await connect();
+      } catch (error) {
+        console.error('Failed to connect wallet:', error);
+        return;
+      }
+    }
+
+    // Mock approval transaction with delay
+    try {
+      await new Promise((resolve, reject) => {
+        setTimeout(() => {
+          // Simulate occasional approval failures
+          if (Math.random() > 0.95) {
+            reject(new Error('Approval failed: Transaction rejected'));
+          } else {
+            resolve(null);
+          }
+        }, 1500); // 1.5 second delay
+      });
+
+      setIsApproved(true);
+      console.log('Approval successful');
+    } catch (error) {
+      console.error('Approval failed:', error);
+    }
   };
 
   const handleDeposit = async () => {
@@ -130,6 +172,9 @@ export default function VaultPage() {
                 constants={constants}
                 tokenInfo={tokenInfo}
                 onDeposit={handleDeposit}
+                isTransacting={isTransacting}
+                needsApproval={parseFloat(formData.amount || '0') > 100 && !isApproved}
+                onApprove={handleApprove}
               />
             ) : (
               <TabPlaceholder activeTab={activeTab} />
