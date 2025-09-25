@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useWallet, useTokenBalance, useTransaction } from '../hooks';
+import { useToast } from '../components/ui/ToastProvider';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
@@ -17,6 +18,9 @@ export default function VaultPage() {
   const pxUSDBalance = useTokenBalance('pxUSD');
   const { executeDeposit, isLoading: isTransacting, error: transactionError } = useTransaction();
 
+  // Toast notifications
+  const { addToast } = useToast();
+
   // Form state
   const [formData, setFormData] = useState<VaultFormData>({
     amount: "",
@@ -29,7 +33,7 @@ export default function VaultPage() {
 
   // Constants - these could also come from hooks in a real implementation
   const constants: VaultConstants = {
-    dolaToAutoDolaRate: 0.9642,
+    dolaToAutoDolaRate: 0.998, // Updated to match mock blockchain exchange rate (0.2% slippage)
     gasFeeUsd: 0.27,
   };
 
@@ -66,6 +70,11 @@ export default function VaultPage() {
         await connect();
       } catch (error) {
         console.error('Failed to connect wallet:', error);
+        addToast({
+          type: 'error',
+          title: 'Wallet Connection Failed',
+          description: 'Could not connect to wallet. Please try again.',
+        });
         return;
       }
     }
@@ -84,9 +93,18 @@ export default function VaultPage() {
       });
 
       setIsApproved(true);
-      console.log('Approval successful');
+      addToast({
+        type: 'success',
+        title: 'Approval Successful',
+        description: 'DOLA spending has been approved. You can now deposit.',
+      });
     } catch (error) {
       console.error('Approval failed:', error);
+      addToast({
+        type: 'error',
+        title: 'Approval Failed',
+        description: 'The approval transaction was rejected. Please try again.',
+      });
     }
   };
 
@@ -96,23 +114,40 @@ export default function VaultPage() {
         await connect();
       } catch (error) {
         console.error('Failed to connect wallet:', error);
+        addToast({
+          type: 'error',
+          title: 'Wallet Connection Failed',
+          description: 'Could not connect to wallet. Please try again.',
+        });
         return;
       }
     }
 
     const amount = parseFloat(formData.amount);
     if (isNaN(amount) || amount <= 0) {
-      console.error('Invalid amount');
+      addToast({
+        type: 'error',
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount greater than 0.',
+      });
       return;
     }
 
     if (!dolaBalance.balance || !pxUSDBalance.balance) {
-      console.error('Token balances not available');
+      addToast({
+        type: 'error',
+        title: 'Balance Error',
+        description: 'Token balances are not available. Please refresh and try again.',
+      });
       return;
     }
 
     if (amount > dolaBalance.balance.balance) {
-      console.error('Insufficient DOLA balance');
+      addToast({
+        type: 'error',
+        title: 'Insufficient Balance',
+        description: `You only have ${dolaBalance.balance.balance} DOLA available.`,
+      });
       return;
     }
 
@@ -123,10 +158,27 @@ export default function VaultPage() {
         pxUSDBalance.balance
       );
       console.log('Deposit successful:', transaction);
+
+      // Calculate the output amount based on exchange rate from mock blockchain (0.998 with slippage)
+      const outputAmount = (amount * 0.998).toFixed(4);
+
+      // Show success toast
+      addToast({
+        type: 'success',
+        title: 'Deposit Successful',
+        description: `Deposited ${amount} DOLA and received ${outputAmount} pxUSD`,
+        duration: 6000,
+      });
+
       // Clear form after successful transaction
       setFormData(prev => ({ ...prev, amount: "" }));
     } catch (error) {
       console.error('Deposit failed:', error);
+      addToast({
+        type: 'error',
+        title: 'Deposit Failed',
+        description: 'The deposit transaction failed. Please try again.',
+      });
     }
   };
 
