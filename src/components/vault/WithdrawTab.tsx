@@ -105,16 +105,16 @@ export default function WithdrawTab({
 
         {/* Fee Information Display */}
         {parsedAmount > 0 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 sm:p-4 mb-4">
             <div className="text-sm font-medium text-orange-800 mb-2">Withdrawal Fee</div>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-orange-700">Fee ({(withdrawalFeeRate * 100).toFixed(1)}%)</span>
-                <span className="font-medium text-red-600">{feeAmount.toFixed(4)} {pxUSDTokenInfo.name}</span>
+            <div className="space-y-2 text-xs sm:text-sm">
+              <div className="flex justify-between items-start">
+                <span className="text-orange-700 flex-shrink-0">Fee ({(withdrawalFeeRate * 100).toFixed(1)}%)</span>
+                <span className="font-medium text-red-600 text-right ml-2">{feeAmount.toFixed(4)} {pxUSDTokenInfo.name}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-orange-700">You'll receive</span>
-                <span className="font-medium text-green-600">{estDOLA.toFixed(4)} DOLA</span>
+              <div className="flex justify-between items-start">
+                <span className="text-orange-700 flex-shrink-0">You'll receive</span>
+                <span className="font-medium text-green-600 text-right ml-2">{estDOLA.toFixed(4)} DOLA</span>
               </div>
             </div>
           </div>
