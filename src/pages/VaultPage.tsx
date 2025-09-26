@@ -19,7 +19,7 @@ export default function VaultPage() {
   const { executeDeposit, executeWithdraw, isLoading: isTransacting, error: transactionError } = useTransaction();
 
   // Toast notifications
-  const { addToast } = useToast();
+  const { addToast, removeToast } = useToast();
 
   // Form state
   const [formData, setFormData] = useState<VaultFormData>({
@@ -228,13 +228,29 @@ export default function VaultPage() {
     }
 
     if (amount > pxUSDBalance.balance.balance) {
+      const feeAmount = (amount * 0.02).toFixed(4);
+      const dolaReceived = (amount * 0.98).toFixed(4);
       addToast({
         type: 'error',
-        title: 'Insufficient Balance',
-        description: `You only have ${pxUSDBalance.balance.balance} pxUSD available.`,
+        title: 'Insufficient pxUSD Balance',
+        description: `Attempting to withdraw ${amount} pxUSD (fee: ${feeAmount}, receive: ${dolaReceived} DOLA) but you only have ${pxUSDBalance.balance.balance.toFixed(4)} pxUSD available.`,
+        duration: 8000,
       });
       return;
     }
+
+    // Calculate fee information
+    const feeRate = 0.02; // 2% withdrawal fee
+    const feeAmount = (amount * feeRate).toFixed(4);
+    const expectedOutput = (amount * (1 - feeRate)).toFixed(4);
+
+    // Show processing notification with fee reminder
+    const processingToastId = addToast({
+      type: 'info',
+      title: 'Processing Withdrawal...',
+      description: `Burning ${amount} pxUSD with ${(feeRate * 100).toFixed(0)}% fee (${feeAmount} pxUSD). You'll receive ${expectedOutput} DOLA.`,
+      duration: 0, // Don't auto-dismiss while processing
+    });
 
     try {
       const transaction = await executeWithdraw(
@@ -242,27 +258,45 @@ export default function VaultPage() {
         pxUSDBalance.balance,
         dolaBalance.balance
       );
+
+      // Remove processing notification
+      setTimeout(() => removeToast(processingToastId), 1000);
       console.log('Withdraw successful:', transaction);
 
-      // Calculate the output amount based on the 2% fee (0.98 factor)
-      const outputAmount = (amount * 0.98).toFixed(4);
-
-      // Show success toast
+      // Show enhanced success toast with fee details
       addToast({
         type: 'success',
-        title: 'Withdraw Successful',
-        description: `Burned ${amount} pxUSD and received ${outputAmount} DOLA`,
-        duration: 6000,
+        title: 'Withdrawal Completed Successfully',
+        description: `Burned ${amount} pxUSD • Fee: ${feeAmount} pxUSD (${(feeRate * 100).toFixed(0)}%) • Received: ${expectedOutput} DOLA`,
+        duration: 8000,
+        action: {
+          label: 'View Transaction',
+          onClick: () => console.log('View transaction:', transaction.id)
+        }
       });
 
       // Clear form after successful transaction
       setFormData(prev => ({ ...prev, amount: "" }));
     } catch (error) {
+      // Remove processing notification on error
+      removeToast(processingToastId);
+
       console.error('Withdraw failed:', error);
+
+      // Enhanced error notification with more context
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
         type: 'error',
-        title: 'Withdraw Failed',
-        description: 'The withdraw transaction failed. Please try again.',
+        title: 'Withdrawal Failed',
+        description: `Transaction could not be completed: ${errorMessage}. Please check your balance and try again.`,
+        duration: 10000,
+        action: {
+          label: 'Retry',
+          onClick: () => {
+            // User can click to retry the same transaction
+            handleWithdraw();
+          }
+        }
       });
     }
   };
