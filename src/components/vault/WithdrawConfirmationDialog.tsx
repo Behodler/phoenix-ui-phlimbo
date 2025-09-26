@@ -7,6 +7,9 @@ interface WithdrawConfirmationData {
   outputToken: string;
   priceImpact: number;
   slippage: number;
+  feeAmount: number;
+  feeRate: number;
+  amountAfterFee: number;
 }
 
 interface WithdrawConfirmationDialogProps {
@@ -70,6 +73,27 @@ export default function WithdrawConfirmationDialog({
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">{formatNumber(data.outputAmount)} {data.outputToken}</span>
             <span className="text-sm text-muted-foreground">${formatNumber(data.outputAmount)}</span>
+          </div>
+        </div>
+
+        {/* Fee Breakdown */}
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <div className="text-sm font-medium text-orange-800 mb-2">Fee Breakdown</div>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-orange-700">Withdraw Amount</span>
+              <span className="font-medium">{formatNumber(data.inputAmount)} {data.inputToken}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-orange-700">Withdrawal Fee ({formatPercent(data.feeRate)})</span>
+              <span className="font-medium text-red-600">-{formatNumber(data.feeAmount)} {data.inputToken}</span>
+            </div>
+            <div className="border-t border-orange-300 pt-2">
+              <div className="flex justify-between font-medium">
+                <span className="text-orange-800">Amount After Fee</span>
+                <span className="text-orange-800">{formatNumber(data.amountAfterFee)} {data.inputToken}</span>
+              </div>
+            </div>
           </div>
         </div>
 

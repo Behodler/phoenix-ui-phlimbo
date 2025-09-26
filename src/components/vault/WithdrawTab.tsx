@@ -22,7 +22,13 @@ export default function WithdrawTab({
   // For withdraw, we burn pxUSD to get DOLA
   // The rate should be inverse of deposit (pxUSD to DOLA)
   const pxUSDToDolaRate = 1 / constants.dolaToPxUSDRate;
-  const estDOLA = parsedAmount * pxUSDToDolaRate;
+
+  // Calculate 2% withdrawal fee
+  const withdrawalFeeRate = 0.02;
+  const feeAmount = parsedAmount * withdrawalFeeRate;
+  const amountAfterFee = parsedAmount - feeAmount;
+
+  const estDOLA = amountAfterFee * pxUSDToDolaRate;
   const minReceived = estDOLA * (1 - formData.slippageBps / 10000);
 
   // Calculate price impact (mock calculation for demonstration)
@@ -37,6 +43,8 @@ export default function WithdrawTab({
   };
 
   const handleMaxClick = () => {
+    // Set max amount to the full available balance
+    // User will see the fee deduction in the confirmation
     onFormChange({ amount: positionInfo.value.toString() });
   };
 
@@ -54,6 +62,7 @@ export default function WithdrawTab({
   };
 
   // Determine button state and properties
+  // Validate that user has sufficient balance for the withdrawal amount (fee is deducted from output)
   const isAmountValid = parsedAmount > 0 && parsedAmount <= positionInfo.value;
   const buttonDisabled = !isAmountValid || isTransacting;
 
@@ -62,12 +71,14 @@ export default function WithdrawTab({
   let buttonAction = handleInitiateWithdraw;
   let buttonLoading = false;
 
-  if (!isAmountValid && parsedAmount > 0) {
-    buttonLabel = "Insufficient pxUSD Balance";
-  } else if (isAmountValid) {
-    buttonLabel = "Withdraw";
-    buttonAction = handleInitiateWithdraw;
-    buttonLoading = isTransacting;
+  if (parsedAmount > 0) {
+    if (parsedAmount > positionInfo.value) {
+      buttonLabel = "Insufficient pxUSD Balance";
+    } else if (isAmountValid) {
+      buttonLabel = "Withdraw";
+      buttonAction = handleInitiateWithdraw;
+      buttonLoading = isTransacting;
+    }
   }
 
   // Create token info for pxUSD (the token being withdrawn)
@@ -91,6 +102,23 @@ export default function WithdrawTab({
           onAmountChange={handleAmountChange}
           onMaxClick={handleMaxClick}
         />
+
+        {/* Fee Information Display */}
+        {parsedAmount > 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+            <div className="text-sm font-medium text-orange-800 mb-2">Withdrawal Fee</div>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-orange-700">Fee ({(withdrawalFeeRate * 100).toFixed(1)}%)</span>
+                <span className="font-medium text-red-600">{feeAmount.toFixed(4)} {pxUSDTokenInfo.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-orange-700">You'll receive</span>
+                <span className="font-medium text-green-600">{estDOLA.toFixed(4)} DOLA</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <RateInfo
           constants={{
@@ -122,6 +150,9 @@ export default function WithdrawTab({
           outputToken: 'DOLA',
           priceImpact: priceImpact,
           slippage: formData.slippageBps,
+          feeAmount: feeAmount,
+          feeRate: withdrawalFeeRate,
+          amountAfterFee: amountAfterFee,
         }}
       />
     </>
