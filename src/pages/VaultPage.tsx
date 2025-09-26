@@ -16,7 +16,7 @@ export default function VaultPage() {
   const { isConnected, connect } = useWallet();
   const dolaBalance = useTokenBalance('DOLA');
   const pxUSDBalance = useTokenBalance('pxUSD');
-  const { executeDeposit, isLoading: isTransacting, error: transactionError } = useTransaction();
+  const { executeDeposit, executeWithdraw, isLoading: isTransacting, error: transactionError } = useTransaction();
 
   // Toast notifications
   const { addToast } = useToast();
@@ -237,29 +237,17 @@ export default function VaultPage() {
     }
 
     try {
-      // Mock withdraw transaction with delay
-      await new Promise((resolve, reject) => {
-        setTimeout(() => {
-          // Simulate occasional withdrawal failures
-          if (Math.random() > 0.95) {
-            reject(new Error('Withdraw failed: Transaction rejected'));
-          } else {
-            resolve(null);
-          }
-        }, 2000); // 2 second delay
-      });
+      const transaction = await executeWithdraw(
+        amount,
+        pxUSDBalance.balance,
+        dolaBalance.balance
+      );
+      console.log('Withdraw successful:', transaction);
 
-      // Calculate the output amount based on exchange rate (inverse of deposit rate)
-      const pxUSDToDolaRate = 1 / constants.dolaToPxUSDRate;
-      const outputAmount = (amount * pxUSDToDolaRate * 0.998).toFixed(4); // Apply slippage
+      // Calculate the output amount based on the 2% fee (0.98 factor)
+      const outputAmount = (amount * 0.98).toFixed(4);
 
-      // Update mock balances (this would be handled by the blockchain in reality)
-      // Decrease pxUSD balance, increase DOLA balance
-      pxUSDBalance.balance.balance -= amount;
-      pxUSDBalance.balance.balanceUsd -= amount;
-      dolaBalance.balance.balance += parseFloat(outputAmount);
-      dolaBalance.balance.balanceUsd += parseFloat(outputAmount);
-
+      // Show success toast
       addToast({
         type: 'success',
         title: 'Withdraw Successful',

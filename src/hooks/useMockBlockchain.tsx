@@ -190,6 +190,40 @@ export function MockBlockchainProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        // Handle withdraw transactions
+        if (transaction.type === 'withdraw' && transaction.tokenIn && transaction.tokenOut) {
+          // For withdraw: decrease input token (pxUSD), increase output token (DOLA)
+          const inputBalance = state.balances[transaction.tokenIn.symbol];
+          const outputBalance = state.balances[transaction.tokenOut.symbol];
+
+          if (inputBalance && outputBalance) {
+            // Decrease input token balance
+            dispatch({
+              type: 'UPDATE_BALANCE',
+              payload: {
+                symbol: transaction.tokenIn.symbol,
+                balance: {
+                  balance: Math.max(0, inputBalance.balance - transaction.amount),
+                  balanceUsd: Math.max(0, inputBalance.balanceUsd - transaction.amount),
+                },
+              },
+            });
+
+            // For withdraw: apply 2% fee as per story requirements
+            const outputAmount = transaction.amount * 0.98; // 2% fee deduction
+            dispatch({
+              type: 'UPDATE_BALANCE',
+              payload: {
+                symbol: transaction.tokenOut.symbol,
+                balance: {
+                  balance: outputBalance.balance + outputAmount,
+                  balanceUsd: outputBalance.balanceUsd + outputAmount,
+                },
+              },
+            });
+          }
+        }
+
         const successTransaction = { ...transaction, status: 'success' as const };
         dispatch({ type: 'TRANSACTION_SUCCESS', payload: successTransaction });
         resolve(successTransaction);
