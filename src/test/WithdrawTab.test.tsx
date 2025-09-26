@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import WithdrawTab from '../components/vault/WithdrawTab';
 import type { WithdrawFormProps } from '../types/vault';
@@ -351,7 +352,6 @@ describe('WithdrawTab Component', () => {
     });
 
     it('should pass loading state to confirmation dialog', async () => {
-      const user = userEvent.setup();
       const props = { ...defaultProps };
       props.formData.amount = '100';
       props.isTransacting = true;

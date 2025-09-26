@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import { MockBlockchainProvider, useMockBlockchain } from '../hooks/useMockBlockchain';
 import type { ReactNode } from 'react';
@@ -12,8 +13,8 @@ function WithdrawTestApp() {
     await blockchain.executeTransaction({
       type: 'withdraw',
       amount: amount,
-      tokenIn: { symbol: 'pxUSD', amount: amount },
-      tokenOut: { symbol: 'DOLA', amount: amount * 0.98 }, // 2% fee
+      tokenIn: { symbol: 'pxUSD', balance: amount, balanceUsd: amount },
+      tokenOut: { symbol: 'DOLA', balance: amount * 0.98, balanceUsd: amount * 0.98 }, // 2% fee
     });
   };
 
@@ -326,8 +327,6 @@ describe('End-to-End Withdraw Functionality Integration Tests', () => {
         { amount: 250.5, expectedPxUSDLeft: 649.5, expectedDOLAReceived: 343.49 }, // 98 + 245.49
       ];
 
-      let currentDOLABalance = 0;
-
       for (const scenario of withdrawalScenarios) {
         if (scenario.amount === 100) {
           await user.click(screen.getByTestId('withdraw-100-button'));
@@ -335,16 +334,10 @@ describe('End-to-End Withdraw Functionality Integration Tests', () => {
           await user.click(screen.getByTestId('withdraw-250-button'));
         }
 
-        currentDOLABalance = scenario.expectedDOLAReceived;
-
         await waitFor(() => {
           expect(screen.getByTestId('pxusd-balance')).toHaveTextContent(scenario.expectedPxUSDLeft.toString());
           expect(screen.getByTestId('dola-balance')).toHaveTextContent(scenario.expectedDOLAReceived.toString());
         }, { timeout: 5000 });
-
-        // Verify 2% fee was applied
-        const feeAmount = scenario.amount * 0.02;
-        const receivedAmount = scenario.amount * 0.98;
 
         // The DOLA balance should reflect the accumulated received amounts
         // For first withdrawal: 0 + 98 = 98

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import { MockBlockchainProvider, useMockBlockchain } from '../hooks/useMockBlockchain';
 
@@ -12,8 +13,8 @@ function WithdrawTestComponent() {
       await blockchain.executeTransaction({
         type: 'withdraw',
         amount: amount,
-        tokenIn: { symbol: 'pxUSD', amount: amount },
-        tokenOut: { symbol: 'DOLA', amount: amount * 0.98 }, // 2% fee
+        tokenIn: { symbol: 'pxUSD', balance: amount, balanceUsd: amount },
+        tokenOut: { symbol: 'DOLA', balance: amount * 0.98, balanceUsd: amount * 0.98 }, // 2% fee
       });
     } catch (error) {
       // Handle transaction failure

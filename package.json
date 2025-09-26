@@ -17,6 +17,7 @@
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.8",
     "@tanstack/react-query": "^5.89.0",
+    "@testing-library/dom": "^10.4.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.544.0",

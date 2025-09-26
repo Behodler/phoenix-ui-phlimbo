@@ -4,11 +4,9 @@ import { MockBlockchainProvider, useMockBlockchain } from '../hooks/useMockBlock
 import type { ReactNode } from 'react';
 
 // Wrapper component for testing hooks
-const createWrapper = () => {
-  return ({ children }: { children: ReactNode }) => (
-    <MockBlockchainProvider>{children}</MockBlockchainProvider>
-  );
-};
+const createWrapper = ({ children }: { children: ReactNode }) => (
+  <MockBlockchainProvider>{children}</MockBlockchainProvider>
+);
 
 describe('Mock Blockchain Withdraw Functionality', () => {
   beforeEach(() => {
@@ -19,7 +17,7 @@ describe('Mock Blockchain Withdraw Functionality', () => {
   describe('Withdraw Transaction Processing', () => {
     it('should process withdraw transaction with 2% fee deduction', async () => {
       const { result } = renderHook(() => useMockBlockchain(), {
-        wrapper: createWrapper()
+        wrapper: createWrapper
       });
 
       // Initial state - user has pxUSD to withdraw
@@ -37,8 +35,8 @@ describe('Mock Blockchain Withdraw Functionality', () => {
         return result.current.executeTransaction({
           type: 'withdraw',
           amount: withdrawAmount,
-          tokenIn: { symbol: 'pxUSD', amount: withdrawAmount },
-          tokenOut: { symbol: 'DOLA', amount: withdrawAmount * 0.98 }, // Expected after fee
+          tokenIn: { symbol: 'pxUSD', balance: withdrawAmount, balanceUsd: withdrawAmount },
+          tokenOut: { symbol: 'DOLA', balance: withdrawAmount * 0.98, balanceUsd: withdrawAmount * 0.98 }, // Expected after fee
         });
       });
 
@@ -75,8 +73,8 @@ describe('Mock Blockchain Withdraw Functionality', () => {
           await result.current.executeTransaction({
             type: 'withdraw',
             amount: amount,
-            tokenIn: { symbol: 'pxUSD', amount: amount },
-            tokenOut: { symbol: 'DOLA', amount: amount * 0.98 },
+            tokenIn: { symbol: 'pxUSD', balance: amount, balanceUsd: amount },
+            tokenOut: { symbol: 'DOLA', balance: amount * 0.98, balanceUsd: amount * 0.98 },
           });
         });
 
@@ -110,8 +108,8 @@ describe('Mock Blockchain Withdraw Functionality', () => {
         await result.current.executeTransaction({
           type: 'withdraw',
           amount: withdrawAmount,
-          tokenIn: { symbol: 'pxUSD', amount: withdrawAmount },
-          tokenOut: { symbol: 'DOLA', amount: withdrawAmount * 0.98 },
+          tokenIn: { symbol: 'pxUSD', balance: withdrawAmount, balanceUsd: withdrawAmount },
+          tokenOut: { symbol: 'DOLA', balance: withdrawAmount * 0.98, balanceUsd: withdrawAmount * 0.98 },
         });
       });
 
@@ -141,8 +139,8 @@ describe('Mock Blockchain Withdraw Functionality', () => {
         await result.current.executeTransaction({
           type: 'withdraw',
           amount: maxBalance,
-          tokenIn: { symbol: 'pxUSD', amount: maxBalance },
-          tokenOut: { symbol: 'DOLA', amount: maxBalance * 0.98 },
+          tokenIn: { symbol: 'pxUSD', balance: maxBalance, balanceUsd: maxBalance },
+          tokenOut: { symbol: 'DOLA', balance: maxBalance * 0.98, balanceUsd: maxBalance * 0.98 },
         });
       });
 
@@ -184,8 +182,8 @@ describe('Mock Blockchain Withdraw Functionality', () => {
           await result.current.executeTransaction({
             type: 'withdraw',
             amount: attemptedWithdraw,
-            tokenIn: { symbol: 'pxUSD', amount: attemptedWithdraw },
-            tokenOut: { symbol: 'DOLA', amount: attemptedWithdraw * 0.98 },
+            tokenIn: { symbol: 'pxUSD', balance: attemptedWithdraw, balanceUsd: attemptedWithdraw },
+            tokenOut: { symbol: 'DOLA', balance: attemptedWithdraw * 0.98, balanceUsd: attemptedWithdraw * 0.98 },
           });
         });
       }
@@ -212,8 +210,8 @@ describe('Mock Blockchain Withdraw Functionality', () => {
         await result.current.executeTransaction({
           type: 'withdraw',
           amount: oversizedAmount,
-          tokenIn: { symbol: 'pxUSD', amount: oversizedAmount },
-          tokenOut: { symbol: 'DOLA', amount: oversizedAmount * 0.98 },
+          tokenIn: { symbol: 'pxUSD', balance: oversizedAmount, balanceUsd: oversizedAmount },
+          tokenOut: { symbol: 'DOLA', balance: oversizedAmount * 0.98, balanceUsd: oversizedAmount * 0.98 },
         });
       });
 
@@ -237,8 +235,8 @@ describe('Mock Blockchain Withdraw Functionality', () => {
         return result.current.executeTransaction({
           type: 'withdraw',
           amount: withdrawAmount,
-          tokenIn: { symbol: 'pxUSD', amount: withdrawAmount },
-          tokenOut: { symbol: 'DOLA', amount: withdrawAmount * 0.98 },
+          tokenIn: { symbol: 'pxUSD', balance: withdrawAmount, balanceUsd: withdrawAmount },
+          tokenOut: { symbol: 'DOLA', balance: withdrawAmount * 0.98, balanceUsd: withdrawAmount * 0.98 },
         });
       });
 
@@ -278,8 +276,8 @@ describe('Mock Blockchain Withdraw Functionality', () => {
           await result.current.executeTransaction({
             type: 'withdraw',
             amount: 100,
-            tokenIn: { symbol: 'pxUSD', amount: 100 },
-            tokenOut: { symbol: 'DOLA', amount: 98 },
+            tokenIn: { symbol: 'pxUSD', balance: 100, balanceUsd: 100 },
+            tokenOut: { symbol: 'DOLA', balance: 98, balanceUsd: 98 },
           });
         });
       } catch (error) {
@@ -312,8 +310,8 @@ describe('Mock Blockchain Withdraw Functionality', () => {
         await result.current.executeTransaction({
           type: 'withdraw',
           amount: 0,
-          tokenIn: { symbol: 'pxUSD', amount: 0 },
-          tokenOut: { symbol: 'DOLA', amount: 0 },
+          tokenIn: { symbol: 'pxUSD', balance: 0, balanceUsd: 0 },
+          tokenOut: { symbol: 'DOLA', balance: 0, balanceUsd: 0 },
         });
       });
 
@@ -342,8 +340,8 @@ describe('Mock Blockchain Withdraw Functionality', () => {
           await result.current.executeTransaction({
             type: 'withdraw',
             amount: amount,
-            tokenIn: { symbol: 'pxUSD', amount: amount },
-            tokenOut: { symbol: 'DOLA', amount: amount * 0.98 },
+            tokenIn: { symbol: 'pxUSD', balance: amount, balanceUsd: amount },
+            tokenOut: { symbol: 'DOLA', balance: amount * 0.98, balanceUsd: amount * 0.98 },
           });
         });
 
