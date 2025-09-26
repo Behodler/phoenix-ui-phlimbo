@@ -18,7 +18,7 @@ export default function TabNavigation({ tabs, activeTab, onTabChange }: TabNavig
         </button>
       ))}
       <div className="ml-auto px-4 py-3 text-sm text-muted-foreground">
-        You're depositing
+        {activeTab === "Deposit to Mint" ? "You're depositing" : "You're withdrawing"}
       </div>
     </div>
   );

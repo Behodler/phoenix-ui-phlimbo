@@ -5,8 +5,8 @@ import { useToast } from '../components/ui/ToastProvider';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
+import WithdrawTab from '../components/vault/WithdrawTab';
 import PositionCard from '../components/vault/PositionCard';
-import TabPlaceholder from '../components/ui/TabPlaceholder';
 
 export default function VaultPage() {
   const tabs = ["Deposit to Mint", "Burn to Withdraw"] as const;
@@ -193,6 +193,92 @@ export default function VaultPage() {
     console.log('View portfolio clicked');
   };
 
+  const handleWithdraw = async () => {
+    if (!isConnected) {
+      try {
+        await connect();
+      } catch (error) {
+        console.error('Failed to connect wallet:', error);
+        addToast({
+          type: 'error',
+          title: 'Wallet Connection Failed',
+          description: 'Could not connect to wallet. Please try again.',
+        });
+        return;
+      }
+    }
+
+    const amount = parseFloat(formData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      addToast({
+        type: 'error',
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount greater than 0.',
+      });
+      return;
+    }
+
+    if (!pxUSDBalance.balance || !dolaBalance.balance) {
+      addToast({
+        type: 'error',
+        title: 'Balance Error',
+        description: 'Token balances are not available. Please refresh and try again.',
+      });
+      return;
+    }
+
+    if (amount > pxUSDBalance.balance.balance) {
+      addToast({
+        type: 'error',
+        title: 'Insufficient Balance',
+        description: `You only have ${pxUSDBalance.balance.balance} pxUSD available.`,
+      });
+      return;
+    }
+
+    try {
+      // Mock withdraw transaction with delay
+      await new Promise((resolve, reject) => {
+        setTimeout(() => {
+          // Simulate occasional withdrawal failures
+          if (Math.random() > 0.95) {
+            reject(new Error('Withdraw failed: Transaction rejected'));
+          } else {
+            resolve(null);
+          }
+        }, 2000); // 2 second delay
+      });
+
+      // Calculate the output amount based on exchange rate (inverse of deposit rate)
+      const pxUSDToDolaRate = 1 / constants.dolaToPxUSDRate;
+      const outputAmount = (amount * pxUSDToDolaRate * 0.998).toFixed(4); // Apply slippage
+
+      // Update mock balances (this would be handled by the blockchain in reality)
+      // Decrease pxUSD balance, increase DOLA balance
+      pxUSDBalance.balance.balance -= amount;
+      pxUSDBalance.balance.balanceUsd -= amount;
+      dolaBalance.balance.balance += parseFloat(outputAmount);
+      dolaBalance.balance.balanceUsd += parseFloat(outputAmount);
+
+      addToast({
+        type: 'success',
+        title: 'Withdraw Successful',
+        description: `Burned ${amount} pxUSD and received ${outputAmount} DOLA`,
+        duration: 6000,
+      });
+
+      // Clear form after successful transaction
+      setFormData(prev => ({ ...prev, amount: "" }));
+    } catch (error) {
+      console.error('Withdraw failed:', error);
+      addToast({
+        type: 'error',
+        title: 'Withdraw Failed',
+        description: 'The withdraw transaction failed. Please try again.',
+      });
+    }
+  };
+
   const handleConnect = async () => {
     try {
       await connect();
@@ -228,7 +314,14 @@ export default function VaultPage() {
                 onApprove={handleApprove}
               />
             ) : (
-              <TabPlaceholder activeTab={activeTab} />
+              <WithdrawTab
+                formData={formData}
+                onFormChange={handleFormChange}
+                constants={constants}
+                positionInfo={positionInfo}
+                onWithdraw={handleWithdraw}
+                isTransacting={isTransacting}
+              />
             )}
           </div>
         </section>

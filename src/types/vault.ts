@@ -86,3 +86,12 @@ export interface ActionButtonProps {
   isLoading?: boolean;
   variant?: 'primary' | 'approve';
 }
+
+export interface WithdrawFormProps {
+  formData: VaultFormData;
+  onFormChange: (data: Partial<VaultFormData>) => void;
+  constants: VaultConstants;
+  positionInfo: PositionInfo;
+  onWithdraw: () => void;
+  isTransacting?: boolean;
+}
