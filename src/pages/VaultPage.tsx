@@ -7,10 +7,14 @@ import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
 import WithdrawTab from '../components/vault/WithdrawTab';
 import BondingCurveBox from '../components/vault/BondingCurveBox';
+import FAQ from '../components/vault/FAQ';
 
 export default function VaultPage() {
   const tabs = ["Deposit to Mint", "Burn to Withdraw"] as const;
   const [activeTab, setActiveTab] = useState<Tab>("Deposit to Mint");
+
+  // FAQ testing state - for manual testing during development
+  const [faqComponent, setFaqComponent] = useState<string | undefined>("BondingCurveBox");
 
   // Blockchain hooks
   const { isConnected, connect } = useWallet();
@@ -38,9 +42,9 @@ export default function VaultPage() {
 
   // Bonding curve data - these would come from smart contract in real implementation
   const bondingCurveData = {
-    startPrice: 0.50,
-    endPrice: 2.00,
-    currentPrice: 1.25, // Current price in the bonding curve progression
+    startPrice: 0.74,
+    endPrice: 1.00,
+    currentPrice: 0.89, // Current price in the bonding curve progression
   };
 
   // Convert blockchain balance to TokenInfo format for components
@@ -344,13 +348,79 @@ export default function VaultPage() {
           </div>
         </section>
 
-        {/* Right: Bonding Curve Box */}
-        <aside className="lg:col-span-1">
+        {/* Right: Bonding Curve Box and FAQ */}
+        <aside className="lg:col-span-1 space-y-6">
           <BondingCurveBox
             startPrice={bondingCurveData.startPrice}
             endPrice={bondingCurveData.endPrice}
             currentPrice={bondingCurveData.currentPrice}
           />
+
+          {/* FAQ Component - with manual testing controls */}
+          <div className="space-y-4">
+            {/* Manual Testing Controls - temporary for development */}
+            <div className="phoenix-card p-4">
+              <h3 className="text-sm font-semibold text-card-foreground mb-3">FAQ Testing Controls</h3>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setFaqComponent("BondingCurveBox")}
+                  className={`px-3 py-1 text-xs rounded border ${
+                    faqComponent === "BondingCurveBox"
+                      ? "bg-accent text-accent-foreground border-accent"
+                      : "bg-card border-border text-muted-foreground hover:bg-accent/5"
+                  }`}
+                >
+                  BondingCurveBox
+                </button>
+                <button
+                  onClick={() => setFaqComponent("DepositForm")}
+                  className={`px-3 py-1 text-xs rounded border ${
+                    faqComponent === "DepositForm"
+                      ? "bg-accent text-accent-foreground border-accent"
+                      : "bg-card border-border text-muted-foreground hover:bg-accent/5"
+                  }`}
+                >
+                  DepositForm
+                </button>
+                <button
+                  onClick={() => setFaqComponent("WithdrawTab")}
+                  className={`px-3 py-1 text-xs rounded border ${
+                    faqComponent === "WithdrawTab"
+                      ? "bg-accent text-accent-foreground border-accent"
+                      : "bg-card border-border text-muted-foreground hover:bg-accent/5"
+                  }`}
+                >
+                  WithdrawTab
+                </button>
+                <button
+                  onClick={() => setFaqComponent("InvalidComponent")}
+                  className={`px-3 py-1 text-xs rounded border ${
+                    faqComponent === "InvalidComponent"
+                      ? "bg-accent text-accent-foreground border-accent"
+                      : "bg-card border-border text-muted-foreground hover:bg-accent/5"
+                  }`}
+                >
+                  Invalid
+                </button>
+                <button
+                  onClick={() => setFaqComponent(undefined)}
+                  className={`px-3 py-1 text-xs rounded border ${
+                    faqComponent === undefined
+                      ? "bg-accent text-accent-foreground border-accent"
+                      : "bg-card border-border text-muted-foreground hover:bg-accent/5"
+                  }`}
+                >
+                  None
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Current: {faqComponent || "None"}
+                {faqComponent && !["BondingCurveBox", "DepositForm", "WithdrawTab"].includes(faqComponent) && " (should not render)"}
+              </p>
+            </div>
+
+            <FAQ componentName={faqComponent} />
+          </div>
         </aside>
       </main>
 

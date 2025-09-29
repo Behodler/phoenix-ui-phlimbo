@@ -95,3 +95,17 @@ export interface BondingCurveBoxProps {
   endPrice: number;
   currentPrice: number;
 }
+
+export interface FAQItem {
+  title: string;
+  body: string;
+}
+
+export interface FAQData {
+  componentName: string;
+  items: FAQItem[];
+}
+
+export interface FAQProps {
+  componentName?: string;
+}
