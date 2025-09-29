@@ -1,8 +1,15 @@
+import { useEffect } from 'react'
 import { MockBlockchainProvider } from './hooks'
 import { ToastProvider } from './components/ui/ToastProvider'
 import VaultPage from './pages/VaultPage'
 
 export default function App() {
+  // Force dark mode always
+  useEffect(() => {
+    document.documentElement.classList.add('dark')
+    document.documentElement.setAttribute('data-theme', 'dark')
+  }, [])
+
   return (
     <MockBlockchainProvider>
       <ToastProvider>
