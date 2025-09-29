@@ -45,12 +45,6 @@ export interface DepositFormProps {
   onApprove?: () => void;
 }
 
-export interface PositionCardProps {
-  position: PositionInfo;
-  onClaim: () => void;
-  onUnstake: () => void;
-  onViewPortfolio: () => void;
-}
 
 export interface AmountDisplayProps {
   amount: number;
@@ -94,4 +88,10 @@ export interface WithdrawFormProps {
   positionInfo: PositionInfo;
   onWithdraw: () => void;
   isTransacting?: boolean;
+}
+
+export interface BondingCurveBoxProps {
+  startPrice: number;
+  endPrice: number;
+  currentPrice: number;
 }

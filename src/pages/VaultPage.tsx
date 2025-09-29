@@ -6,7 +6,7 @@ import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
 import WithdrawTab from '../components/vault/WithdrawTab';
-import PositionCard from '../components/vault/PositionCard';
+import BondingCurveBox from '../components/vault/BondingCurveBox';
 
 export default function VaultPage() {
   const tabs = ["Deposit to Mint", "Burn to Withdraw"] as const;
@@ -34,6 +34,13 @@ export default function VaultPage() {
   // Constants - these could also come from hooks in a real implementation
   const constants: VaultConstants = {
     dolaToPxUSDRate: 1.33, // Updated to match mock blockchain exchange rate (0.2% slippage)
+  };
+
+  // Bonding curve data - these would come from smart contract in real implementation
+  const bondingCurveData = {
+    startPrice: 0.50,
+    endPrice: 2.00,
+    currentPrice: 1.25, // Current price in the bonding curve progression
   };
 
   // Convert blockchain balance to TokenInfo format for components
@@ -181,17 +188,6 @@ export default function VaultPage() {
     }
   };
 
-  const handleClaim = () => {
-    console.log('Claim clicked');
-  };
-
-  const handleUnstake = () => {
-    console.log('Unstake clicked');
-  };
-
-  const handleViewPortfolio = () => {
-    console.log('View portfolio clicked');
-  };
 
   const handleWithdraw = async () => {
     if (!isConnected) {
@@ -348,13 +344,12 @@ export default function VaultPage() {
           </div>
         </section>
 
-        {/* Right: Position card */}
+        {/* Right: Bonding Curve Box */}
         <aside className="lg:col-span-1">
-          <PositionCard
-            position={positionInfo}
-            onClaim={handleClaim}
-            onUnstake={handleUnstake}
-            onViewPortfolio={handleViewPortfolio}
+          <BondingCurveBox
+            startPrice={bondingCurveData.startPrice}
+            endPrice={bondingCurveData.endPrice}
+            currentPrice={bondingCurveData.currentPrice}
           />
         </aside>
       </main>
