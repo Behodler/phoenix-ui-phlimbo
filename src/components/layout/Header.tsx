@@ -17,7 +17,7 @@ export default function Header({ onConnect, isConnected = false }: HeaderProps) 
           <div>
             <div className="text-xl leading-tight text-pxusd-white">Phoenix</div>
             <div className="text-sm font-semibold text-pxusd-white">pxUSD minter</div>
-            <div className="text-sm text-muted-foreground italic hidden sm:block">Behodler 3 technology</div>
+            <div className="text-sm text-muted-foreground italic block sm:hidden">Behodler 3 technology</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
