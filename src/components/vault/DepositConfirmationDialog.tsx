@@ -94,8 +94,8 @@ export default function DepositConfirmationDialog({
 
         {/* Warning if high price impact */}
         {data.priceImpact > 0.05 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <div className="text-red-800 text-sm">
+          <div className="bg-pxusd-teal-700 border border-pxusd-pink-400 rounded-lg p-3">
+            <div className="text-pxusd-pink-400 text-sm">
               ⚠️ High price impact detected. Consider reducing your deposit amount.
             </div>
           </div>
