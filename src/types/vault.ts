@@ -58,7 +58,7 @@ export interface AmountDisplayProps {
 
 export interface TokenRowProps {
   token: TokenInfo;
-  onMaxClick: () => void;
+  onMaxClick?: () => void;
 }
 
 export interface AmountInputProps {

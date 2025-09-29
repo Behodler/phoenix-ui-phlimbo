@@ -95,7 +95,7 @@ export default function WithdrawTab({
 
         <div className="h-px w-full bg-border mb-6" />
 
-        <TokenRow token={pxUSDTokenInfo} onMaxClick={handleMaxClick} />
+        <TokenRow token={pxUSDTokenInfo} />
 
         <AmountInput
           amount={formData.amount}

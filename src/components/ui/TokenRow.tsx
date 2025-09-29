@@ -12,12 +12,14 @@ export default function TokenRow({ token, onMaxClick }: TokenRowProps) {
           </div>
         </div>
       </div>
-      <button
-        onClick={onMaxClick}
-        className="px-3 py-1 text-xs font-medium text-phoenix-accent border border-phoenix-accent rounded hover:bg-phoenix-accent hover:text-white transition-colors"
-      >
-        MAX
-      </button>
+      {onMaxClick && (
+        <button
+          onClick={onMaxClick}
+          className="px-3 py-1 text-xs font-medium text-phoenix-accent border border-phoenix-accent rounded hover:bg-phoenix-accent hover:text-white transition-colors"
+        >
+          MAX
+        </button>
+      )}
     </div>
   );
 }
