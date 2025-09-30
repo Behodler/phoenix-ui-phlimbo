@@ -49,7 +49,7 @@ export default function WithdrawConfirmationDialog({
     >
       <div className="space-y-4">
         {/* Withdraw Summary */}
-        <div className="bg-secondary-foreground rounded-lg p-4">
+        <div className="bg-pxusd-teal-700 rounded-lg p-4">
           <div className="text-sm text-muted-foreground mb-2">You're withdrawing</div>
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">{formatNumber(data.inputAmount)} {data.inputToken}</span>
@@ -68,7 +68,7 @@ export default function WithdrawConfirmationDialog({
         </div>
 
         {/* Receive Summary */}
-        <div className="bg-secondary-foreground rounded-lg p-4">
+        <div className="bg-pxusd-teal-700 rounded-lg p-4">
           <div className="text-sm text-muted-foreground mb-2">You'll receive</div>
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">{formatNumber(data.outputAmount)} {data.outputToken}</span>
