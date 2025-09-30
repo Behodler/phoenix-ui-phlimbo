@@ -46,7 +46,7 @@ export default function DepositConfirmationDialog({
     >
       <div className="space-y-4">
         {/* Deposit Summary */}
-        <div className="bg-muted rounded-lg p-4">
+        <div className="bg-secondary-foreground rounded-lg p-4">
           <div className="text-sm text-muted-foreground mb-2">You're depositing</div>
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">{formatNumber(data.inputAmount)} {data.inputToken}</span>
@@ -65,7 +65,7 @@ export default function DepositConfirmationDialog({
         </div>
 
         {/* Receive Summary */}
-        <div className="bg-muted rounded-lg p-4">
+        <div className="bg-secondary-foreground rounded-lg p-4">
           <div className="text-sm text-muted-foreground mb-2">You'll receive</div>
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">{formatNumber(data.outputAmount)} {data.outputToken}</span>
