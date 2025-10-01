@@ -14,7 +14,7 @@ export interface TokenInfo {
   name: string;
   balance: number;
   balanceUsd: number;
-  icon?: string;
+  icon: string;
 }
 
 export interface PositionInfo {
@@ -45,12 +45,6 @@ export interface DepositFormProps {
   onApprove?: () => void;
 }
 
-export interface PositionCardProps {
-  position: PositionInfo;
-  onClaim: () => void;
-  onUnstake: () => void;
-  onViewPortfolio: () => void;
-}
 
 export interface AmountDisplayProps {
   amount: number;
@@ -58,7 +52,7 @@ export interface AmountDisplayProps {
 
 export interface TokenRowProps {
   token: TokenInfo;
-  onMaxClick: () => void;
+  onMaxClick?: () => void;
 }
 
 export interface AmountInputProps {
@@ -94,4 +88,24 @@ export interface WithdrawFormProps {
   positionInfo: PositionInfo;
   onWithdraw: () => void;
   isTransacting?: boolean;
+}
+
+export interface BondingCurveBoxProps {
+  startPrice: number;
+  endPrice: number;
+  currentPrice: number;
+}
+
+export interface FAQItem {
+  title: string;
+  body: string;
+}
+
+export interface FAQData {
+  componentName: string;
+  items: FAQItem[];
+}
+
+export interface FAQProps {
+  componentName?: string;
 }

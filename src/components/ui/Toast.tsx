@@ -30,17 +30,17 @@ const typeIcons = {
 };
 
 const typeStyles = {
-  success: 'bg-green-50 border-green-200 text-green-900 dark:bg-green-900/20 dark:border-green-800 dark:text-green-100',
-  error: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-900/20 dark:border-red-800 dark:text-red-100',
-  warning: 'bg-yellow-50 border-yellow-200 text-yellow-900 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-100',
-  info: 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-100',
+  success: 'bg-pxusd-teal-700 border-pxusd-yellow-400 text-pxusd-yellow-400',
+  error: 'bg-pxusd-teal-700 border-pxusd-pink-400 text-pxusd-pink-400',
+  warning: 'bg-pxusd-teal-700 border-pxusd-orange-300 text-pxusd-orange-300',
+  info: 'bg-pxusd-teal-700 border-pxusd-teal-400 text-foreground',
 };
 
 const iconStyles = {
-  success: 'text-green-500 dark:text-green-400',
-  error: 'text-red-500 dark:text-red-400',
-  warning: 'text-yellow-500 dark:text-yellow-400',
-  info: 'text-blue-500 dark:text-blue-400',
+  success: 'text-pxusd-yellow-400',
+  error: 'text-pxusd-pink-400',
+  warning: 'text-pxusd-orange-300',
+  info: 'text-pxusd-teal-400',
 };
 
 export default function Toast({ toast, onRemove }: ToastProps) {
@@ -82,7 +82,7 @@ export default function Toast({ toast, onRemove }: ToastProps) {
         </div>
         <button
           onClick={() => onRemove(toast.id)}
-          className="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          className="flex-shrink-0 ml-2 text-muted-foreground hover:text-foreground"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

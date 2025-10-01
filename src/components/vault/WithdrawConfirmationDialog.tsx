@@ -49,7 +49,7 @@ export default function WithdrawConfirmationDialog({
     >
       <div className="space-y-4">
         {/* Withdraw Summary */}
-        <div className="bg-muted rounded-lg p-4">
+        <div className="bg-pxusd-teal-700 rounded-lg p-4">
           <div className="text-sm text-muted-foreground mb-2">You're withdrawing</div>
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">{formatNumber(data.inputAmount)} {data.inputToken}</span>
@@ -68,7 +68,7 @@ export default function WithdrawConfirmationDialog({
         </div>
 
         {/* Receive Summary */}
-        <div className="bg-muted rounded-lg p-4">
+        <div className="bg-pxusd-teal-700 rounded-lg p-4">
           <div className="text-sm text-muted-foreground mb-2">You'll receive</div>
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">{formatNumber(data.outputAmount)} {data.outputToken}</span>
@@ -77,21 +77,21 @@ export default function WithdrawConfirmationDialog({
         </div>
 
         {/* Fee Breakdown */}
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-          <div className="text-sm font-medium text-orange-800 mb-2">Fee Breakdown</div>
+        <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4">
+          <div className="text-sm font-medium text-pxusd-orange-300 mb-2">Fee Breakdown</div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-orange-700">Withdraw Amount</span>
+              <span className="text-foreground">Withdraw Amount</span>
               <span className="font-medium">{formatNumber(data.inputAmount)} {data.inputToken}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-orange-700">Withdrawal Fee ({formatPercent(data.feeRate)})</span>
-              <span className="font-medium text-red-600">-{formatNumber(data.feeAmount)} {data.inputToken}</span>
+              <span className="text-foreground">Withdrawal Fee ({formatPercent(data.feeRate)})</span>
+              <span className="font-medium text-pxusd-pink-400">-{formatNumber(data.feeAmount)} {data.inputToken}</span>
             </div>
-            <div className="border-t border-orange-300 pt-2">
+            <div className="border-t border-pxusd-teal-600 pt-2">
               <div className="flex justify-between font-medium">
-                <span className="text-orange-800">Amount After Fee</span>
-                <span className="text-orange-800">{formatNumber(data.amountAfterFee)} {data.inputToken}</span>
+                <span className="text-pxusd-orange-300">Amount After Fee</span>
+                <span className="text-pxusd-orange-300">{formatNumber(data.amountAfterFee)} {data.inputToken}</span>
               </div>
             </div>
           </div>
@@ -118,8 +118,8 @@ export default function WithdrawConfirmationDialog({
 
         {/* Warning if high price impact */}
         {data.priceImpact > 0.05 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <div className="text-red-800 text-sm">
+          <div className="bg-pxusd-teal-700 border border-pxusd-pink-400 rounded-lg p-3">
+            <div className="text-pxusd-pink-400 text-sm">
               ⚠️ High price impact detected. Consider reducing your withdrawal amount.
             </div>
           </div>

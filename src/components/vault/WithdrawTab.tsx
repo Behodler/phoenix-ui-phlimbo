@@ -6,6 +6,7 @@ import AmountInput from '../ui/AmountInput';
 import RateInfo from '../ui/RateInfo';
 import ActionButton from '../ui/ActionButton';
 import WithdrawConfirmationDialog from './WithdrawConfirmationDialog';
+import phUSD from "../../assets/phUSD.png"
 
 export default function WithdrawTab({
   formData,
@@ -83,9 +84,10 @@ export default function WithdrawTab({
 
   // Create token info for pxUSD (the token being withdrawn)
   const pxUSDTokenInfo = {
-    name: "pxUSD",
+    name: "phUSD",
     balance: positionInfo.value,
     balanceUsd: positionInfo.valueUsd,
+    icon:phUSD
   };
 
   return (
@@ -95,7 +97,7 @@ export default function WithdrawTab({
 
         <div className="h-px w-full bg-border mb-6" />
 
-        <TokenRow token={pxUSDTokenInfo} onMaxClick={handleMaxClick} />
+        <TokenRow token={pxUSDTokenInfo} />
 
         <AmountInput
           amount={formData.amount}
@@ -105,16 +107,16 @@ export default function WithdrawTab({
 
         {/* Fee Information Display */}
         {parsedAmount > 0 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 sm:p-4 mb-4">
-            <div className="text-sm font-medium text-orange-800 mb-2">Withdrawal Fee</div>
+          <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-3 sm:p-4 mb-4">
+            <div className="text-sm font-medium text-pxusd-orange-300 mb-2">Withdrawal Fee</div>
             <div className="space-y-2 text-xs sm:text-sm">
               <div className="flex justify-between items-start">
-                <span className="text-orange-700 flex-shrink-0">Fee ({(withdrawalFeeRate * 100).toFixed(1)}%)</span>
-                <span className="font-medium text-red-600 text-right ml-2">{feeAmount.toFixed(4)} {pxUSDTokenInfo.name}</span>
+                <span className="text-foreground flex-shrink-0">Fee ({(withdrawalFeeRate * 100).toFixed(1)}%)</span>
+                <span className="font-medium text-pxusd-pink-400 text-right ml-2">{feeAmount.toFixed(4)} {pxUSDTokenInfo.name}</span>
               </div>
               <div className="flex justify-between items-start">
-                <span className="text-orange-700 flex-shrink-0">You'll receive</span>
-                <span className="font-medium text-green-600 text-right ml-2">{estDOLA.toFixed(4)} DOLA</span>
+                <span className="text-foreground flex-shrink-0">You'll receive</span>
+                <span className="font-medium text-pxusd-yellow-400 text-right ml-2">{estDOLA.toFixed(4)} DOLA</span>
               </div>
             </div>
           </div>

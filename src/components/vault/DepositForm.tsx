@@ -94,7 +94,7 @@ export default function DepositForm({
 
         <div className="h-px w-full bg-border mb-6" />
 
-        <TokenRow token={tokenInfo} onMaxClick={handleMaxClick} />
+        <TokenRow token={tokenInfo} />
 
         <AmountInput
           amount={formData.amount}

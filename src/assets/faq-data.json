@@ -1,0 +1,57 @@
+{
+  "BondingCurveBox": {
+    "componentName": "BondingCurveBox",
+    "items": [
+      {
+        "title": "What is the Ignition Phase?",
+        "body": "The Ignition Phase is the initial stage of the bonding curve where early participants can get the best prices. As more people participate, the price increases along the curve until it reaches the target end price."
+      },
+      {
+        "title": "How does the bonding curve work?",
+        "body": "The bonding curve determines token price based on supply. When you deposit DOLA, you mint pxUSD at the current curve price. The price increases as more tokens are minted, creating an incentive for early participation."
+      },
+      {
+        "title": "What does the progress percentage mean?",
+        "body": "The progress shows how far along the bonding curve we are between the start price ($0.74) and end price ($1.00). Higher progress means higher current price and less opportunity for early-bird pricing."
+      },
+      {
+        "title": "Why is the current price changing?",
+        "body": "The current price moves along the bonding curve as more pxUSD tokens are minted. Each deposit increases the price slightly, following the mathematical curve that ensures fair price discovery."
+      }
+    ]
+  },
+  "DepositForm": {
+    "componentName": "DepositForm",
+    "items": [
+      {
+        "title": "What happens when I deposit DOLA?",
+        "body": "When you deposit DOLA, it's converted to pxUSD at the current bonding curve price. The auto-stake option allows you to automatically stake your pxUSD for additional rewards."
+      },
+      {
+        "title": "Why do I need to approve my tokens?",
+        "body": "Token approval is a security feature that allows the smart contract to spend your DOLA tokens on your behalf. You only need to approve once for amounts above a certain threshold."
+      },
+      {
+        "title": "What is slippage tolerance?",
+        "body": "Slippage tolerance protects you from price changes during transaction processing. If the price moves beyond your tolerance, the transaction will fail to protect you from unfavorable rates."
+      }
+    ]
+  },
+  "WithdrawTab": {
+    "componentName": "WithdrawTab",
+    "items": [
+      {
+        "title": "What is the withdrawal fee?",
+        "body": "There's a 2% fee on withdrawals that helps maintain the protocol's stability and provides value to remaining token holders. This fee is clearly displayed before you confirm any transaction."
+      },
+      {
+        "title": "How long do withdrawals take?",
+        "body": "Withdrawals are processed immediately on-chain, typically taking 1-3 seconds to complete. The actual time depends on network congestion and gas prices."
+      },
+      {
+        "title": "Can I withdraw partial amounts?",
+        "body": "Yes, you can withdraw any amount up to your total pxUSD balance. Use the 'Max' button to quickly select your full balance for withdrawal."
+      }
+    ]
+  }
+}

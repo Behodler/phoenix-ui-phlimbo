@@ -46,7 +46,7 @@ export default function DepositConfirmationDialog({
     >
       <div className="space-y-4">
         {/* Deposit Summary */}
-        <div className="bg-muted rounded-lg p-4">
+        <div className="bg-pxusd-teal-700 rounded-lg p-4">
           <div className="text-sm text-muted-foreground mb-2">You're depositing</div>
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">{formatNumber(data.inputAmount)} {data.inputToken}</span>
@@ -65,7 +65,7 @@ export default function DepositConfirmationDialog({
         </div>
 
         {/* Receive Summary */}
-        <div className="bg-muted rounded-lg p-4">
+        <div className="bg-pxusd-teal-700 rounded-lg p-4">
           <div className="text-sm text-muted-foreground mb-2">You'll receive</div>
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">{formatNumber(data.outputAmount)} {data.outputToken}</span>
@@ -94,8 +94,8 @@ export default function DepositConfirmationDialog({
 
         {/* Warning if high price impact */}
         {data.priceImpact > 0.05 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <div className="text-red-800 text-sm">
+          <div className="bg-pxusd-teal-700 border border-pxusd-pink-400 rounded-lg p-3">
+            <div className="text-pxusd-pink-400 text-sm">
               ⚠️ High price impact detected. Consider reducing your deposit amount.
             </div>
           </div>

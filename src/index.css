@@ -22,24 +22,24 @@
   --grad-hero: linear-gradient(180deg, var(--pxusd-teal-950) 0%, var(--pxusd-teal-900) 60%, var(--pxusd-teal-800) 100%);
   --grad-accent: linear-gradient(135deg, var(--pxusd-pink-400) 0%, var(--pxusd-orange-400) 45%, var(--pxusd-yellow-400) 100%);
 
-  /* Light theme surfaces & text */
-  --background: var(--pxusd-cream);
-  --foreground: var(--pxusd-teal-900);
-  --card: #E9EEF1;
-  --card-foreground: var(--pxusd-teal-900);
-  --primary: var(--pxusd-orange-500);
+  /* Default theme is dark - Light mode no longer supported */
+  --background: var(--pxusd-teal-950);
+  --foreground: #F3F7FA;
+  --card: var(--pxusd-teal-800);
+  --card-foreground: var(--pxusd-white);
+  --primary: var(--pxusd-orange-400);
   --primary-foreground: var(--pxusd-white);
-  --secondary: var(--pxusd-teal-700);
+  --secondary: var(--pxusd-teal-600);
   --secondary-foreground: var(--pxusd-white);
-  --muted: rgba(22,51,67,0.75);
-  --muted-foreground: var(--pxusd-teal-600);
+  --muted: rgba(240,245,248,0.75);
+  --muted-foreground: rgba(240,245,248,0.6);
   --accent: var(--pxusd-pink-400);
   --accent-foreground: var(--pxusd-white);
-  --destructive: #DC2626;
+  --destructive: #EF4444;
   --destructive-foreground: var(--pxusd-white);
-  --border: rgba(0,0,0,0.08);
-  --input: rgba(0,0,0,0.08);
-  --ring: var(--pxusd-orange-500);
+  --border: rgba(255,255,255,0.12);
+  --input: rgba(255,255,255,0.12);
+  --ring: var(--pxusd-orange-400);
   --radius: 0.875rem;
 }
 
@@ -105,21 +105,21 @@
 }
 
 .phoenix-btn-secondary {
-  background: var(--secondary);
-  color: var(--secondary-foreground);
+  background: linear-gradient(135deg, var(--pxusd-teal-400) 0%, var(--pxusd-orange-400) 100%);
+  color: var(--pxusd-white);
   border: none;
   border-radius: 14px;
   padding: 0.75rem 1.4rem;
   font-weight: 700;
   letter-spacing: 0.3px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transition: transform 0.15s ease, opacity 0.25s ease;
+  box-shadow: 0 10px 25px rgba(31,90,115,0.35);
+  transition: transform 0.15s ease, filter 0.25s ease;
   cursor: pointer;
 }
 
 .phoenix-btn-secondary:hover {
   transform: translateY(-2px);
-  opacity: 0.9;
+  filter: brightness(1.1);
 }
 
 .phoenix-btn-secondary:active {
@@ -129,6 +129,7 @@
 .phoenix-btn-secondary:disabled {
   opacity: 0.4;
   transform: none;
+  filter: none;
   cursor: not-allowed;
 }
 
@@ -163,9 +164,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-[data-theme="light"] .phoenix-nav {
-  background: rgba(255,255,255,0.75);
-}
 
 .phoenix-card {
   background: var(--card);
