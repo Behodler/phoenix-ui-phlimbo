@@ -6,6 +6,7 @@ import AmountInput from '../ui/AmountInput';
 import RateInfo from '../ui/RateInfo';
 import ActionButton from '../ui/ActionButton';
 import WithdrawConfirmationDialog from './WithdrawConfirmationDialog';
+import phUSD from "../../assets/phUSD.png"
 
 export default function WithdrawTab({
   formData,
@@ -86,6 +87,7 @@ export default function WithdrawTab({
     name: "phUSD",
     balance: positionInfo.value,
     balanceUsd: positionInfo.valueUsd,
+    icon:phUSD
   };
 
   return (
