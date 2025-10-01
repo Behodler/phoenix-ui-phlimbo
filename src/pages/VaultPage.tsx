@@ -8,6 +8,7 @@ import DepositForm from '../components/vault/DepositForm';
 import WithdrawTab from '../components/vault/WithdrawTab';
 import BondingCurveBox from '../components/vault/BondingCurveBox';
 import FAQ from '../components/vault/FAQ';
+import DOLA from "../assets/sDOLA.png";
 
 export default function VaultPage() {
   const tabs = ["Deposit to Mint", "Burn to Withdraw"] as const;
@@ -52,6 +53,7 @@ export default function VaultPage() {
     name: "DOLA",
     balance: dolaBalance.balance?.balance ?? 0,
     balanceUsd: dolaBalance.balance?.balanceUsd ?? 0,
+    icon: DOLA
   };
 
   const positionInfo: PositionInfo = {
