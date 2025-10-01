@@ -1,6 +1,6 @@
 import type { HeaderProps } from '../../types/vault';
 //import phoenixLogo from '../../assets/phoenix-logok.png';
-import phoenixLogo from '../../assets/pxUSD-detailed.png';
+import phoenixLogo from '../../assets/phUSD-nobackground.png';
 
 export default function Header({ onConnect, isConnected = false }: HeaderProps) {
 

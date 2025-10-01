@@ -83,7 +83,7 @@ export default function WithdrawTab({
 
   // Create token info for pxUSD (the token being withdrawn)
   const pxUSDTokenInfo = {
-    name: "pxUSD",
+    name: "phUSD",
     balance: positionInfo.value,
     balanceUsd: positionInfo.valueUsd,
   };
