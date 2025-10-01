@@ -14,7 +14,7 @@ export interface TokenInfo {
   name: string;
   balance: number;
   balanceUsd: number;
-  icon?: string;
+  icon: string;
 }
 
 export interface PositionInfo {
