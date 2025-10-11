@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
+import { useContractAddresses } from '../contexts/ContractAddressContext';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
@@ -19,6 +20,9 @@ export default function VaultPage() {
 
   // Wagmi hooks for wallet connection
   const { isConnected } = useAccount();
+
+  // Contract addresses context
+  const { addresses, loading: addressesLoading, error: addressesError, networkType } = useContractAddresses();
 
   // Mock balances for now - these will be replaced with real contract reads later
   const dolaBalance = { balance: { balance: 1000.0, balanceUsd: 1000.0 } };
@@ -405,8 +409,28 @@ export default function VaultPage() {
 
       {/* Footer */}
       <footer className="mx-auto max-w-5xl px-4 pb-10 text-xs text-muted-foreground">
-        <div className="border-t border-border pt-6">
-          RainbowKit wallet integration enabled. Connect your wallet to interact with Phoenix contracts.
+        <div className="border-t border-border pt-6 space-y-3">
+          <p>RainbowKit wallet integration enabled. Connect your wallet to interact with Phoenix contracts.</p>
+
+          {/* Contract Addresses Debug Info */}
+          <div className="border-t border-border pt-3">
+            <p className="font-semibold mb-1">Network & Contract Addresses:</p>
+            <div className="space-y-1">
+              <p>Network Type: <span className="text-accent">{networkType}</span></p>
+              {addressesLoading && <p className="text-blue-400">Loading contract addresses...</p>}
+              {addressesError && <p className="text-red-400">Error: {addressesError}</p>}
+              {addresses && (
+                <div className="space-y-1 mt-2">
+                  <p>DOLA Token: <code className="text-accent">{addresses.dolaToken}</code></p>
+                  <p>TOKE Token: <code className="text-accent">{addresses.tokeToken}</code></p>
+                  <p>AutoDola Vault: <code className="text-accent">{addresses.autoDolaVault}</code></p>
+                  <p>Tokemak Main Rewarder: <code className="text-accent">{addresses.tokemakMainRewarder}</code></p>
+                  <p>Bonding Token: <code className="text-accent">{addresses.bondingToken}</code></p>
+                </div>
+              )}
+            </div>
+          </div>
+
           {transactionError && (
             <div className="mt-2 text-red-500">
               Transaction Error: {transactionError}
