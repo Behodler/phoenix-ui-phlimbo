@@ -221,6 +221,11 @@
     viem "^2.31.7"
     zustand "5.0.3"
 
+"@behodler/wagmi-hooks@^0.1.0":
+  version "0.1.0"
+  resolved "https://npm.pkg.github.com/download/@behodler/wagmi-hooks/0.1.0/3f041e0de6c56d63372870c905e7c7e52c8afefa#3f041e0de6c56d63372870c905e7c7e52c8afefa"
+  integrity sha512-ViNHgV1sjpa+DEzkactcCveRUQGpiSBHgowz9z1+0q6pQWWlycpCJBH+4RoTyiNlS+CrifEF+6Md/KuVInhUXw==
+
 "@coinbase/wallet-sdk@4.3.6":
   version "4.3.6"
   resolved "https://registry.npmjs.org/@coinbase/wallet-sdk/-/wallet-sdk-4.3.6.tgz"

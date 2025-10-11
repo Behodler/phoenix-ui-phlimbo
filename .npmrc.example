@@ -1,0 +1,2 @@
+@behodler:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=<Github access token that has read package rights>
