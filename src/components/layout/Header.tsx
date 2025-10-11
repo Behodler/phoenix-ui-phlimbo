@@ -1,9 +1,7 @@
-import type { HeaderProps } from '../../types/vault';
-//import phoenixLogo from '../../assets/phoenix-logok.png';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import phoenixLogo from '../../assets/phUSD-nobackground.png';
 
-export default function Header({ onConnect, isConnected = false }: HeaderProps) {
-
+export default function Header() {
   return (
     <header className="phoenix-nav">
       <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
@@ -21,12 +19,7 @@ export default function Header({ onConnect, isConnected = false }: HeaderProps) 
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={onConnect}
-            className={`phoenix-btn text-sm ${isConnected ? 'phoenix-btn-secondary' : 'phoenix-btn-primary'}`}
-          >
-            {isConnected ? 'Connected' : 'Connect Wallet'}
-          </button>
+          <ConnectButton />
         </div>
       </div>
     </header>

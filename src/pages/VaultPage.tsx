@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import { useAccount } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
-import { useWallet, useTokenBalance, useTransaction } from '../hooks';
 import { useToast } from '../components/ui/ToastProvider';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
@@ -17,11 +17,14 @@ export default function VaultPage() {
   // FAQ testing state - for manual testing during development
   const [faqComponent, setFaqComponent] = useState<string | undefined>("BondingCurveBox");
 
-  // Blockchain hooks
-  const { isConnected, connect } = useWallet();
-  const dolaBalance = useTokenBalance('DOLA');
-  const pxUSDBalance = useTokenBalance('pxUSD');
-  const { executeDeposit, executeWithdraw, isLoading: isTransacting, error: transactionError } = useTransaction();
+  // Wagmi hooks for wallet connection
+  const { isConnected } = useAccount();
+
+  // Mock balances for now - these will be replaced with real contract reads later
+  const dolaBalance = { balance: { balance: 1000.0, balanceUsd: 1000.0 } };
+  const pxUSDBalance = { balance: { balance: 0.0, balanceUsd: 0.0 } };
+  const isTransacting = false;
+  const transactionError: string | undefined = undefined;
 
   // Toast notifications
   const { addToast, removeToast } = useToast();
@@ -78,17 +81,12 @@ export default function VaultPage() {
 
   const handleApprove = async (): Promise<void> => {
     if (!isConnected) {
-      try {
-        await connect();
-      } catch (error) {
-        console.error('Failed to connect wallet:', error);
-        addToast({
-          type: 'error',
-          title: 'Wallet Connection Failed',
-          description: 'Could not connect to wallet. Please try again.',
-        });
-        return;
-      }
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet using the button in the header.',
+      });
+      return;
     }
 
     // Mock approval transaction with delay
@@ -122,17 +120,12 @@ export default function VaultPage() {
 
   const handleDeposit = async () => {
     if (!isConnected) {
-      try {
-        await connect();
-      } catch (error) {
-        console.error('Failed to connect wallet:', error);
-        addToast({
-          type: 'error',
-          title: 'Wallet Connection Failed',
-          description: 'Could not connect to wallet. Please try again.',
-        });
-        return;
-      }
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet using the button in the header.',
+      });
+      return;
     }
 
     const amount = parseFloat(formData.amount);
@@ -164,12 +157,9 @@ export default function VaultPage() {
     }
 
     try {
-      const transaction = await executeDeposit(
-        amount,
-        dolaBalance.balance,
-        pxUSDBalance.balance
-      );
-      console.log('Deposit successful:', transaction);
+      // TODO: Implement actual deposit using wagmi hooks
+      // const transaction = await executeDeposit(amount, dolaBalance.balance, pxUSDBalance.balance);
+      console.log('Deposit transaction would be executed here:', amount);
 
       // Calculate the output amount based on exchange rate from mock blockchain (0.998 with slippage)
       const outputAmount = (amount * 0.998).toFixed(4);
@@ -197,17 +187,12 @@ export default function VaultPage() {
 
   const handleWithdraw = async () => {
     if (!isConnected) {
-      try {
-        await connect();
-      } catch (error) {
-        console.error('Failed to connect wallet:', error);
-        addToast({
-          type: 'error',
-          title: 'Wallet Connection Failed',
-          description: 'Could not connect to wallet. Please try again.',
-        });
-        return;
-      }
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet using the button in the header.',
+      });
+      return;
     }
 
     const amount = parseFloat(formData.amount);
@@ -255,15 +240,15 @@ export default function VaultPage() {
     });
 
     try {
-      const transaction = await executeWithdraw(
-        amount,
-        pxUSDBalance.balance,
-        dolaBalance.balance
-      );
+      // TODO: Implement actual withdrawal using wagmi hooks
+      // const transaction = await executeWithdraw(amount, pxUSDBalance.balance, dolaBalance.balance);
+      console.log('Withdrawal transaction would be executed here:', amount);
+
+      // Simulate transaction delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Remove processing notification
       setTimeout(() => removeToast(processingToastId), 1000);
-      console.log('Withdraw successful:', transaction);
 
       // Show enhanced success toast with fee details
       addToast({
@@ -273,7 +258,7 @@ export default function VaultPage() {
         duration: 8000,
         action: {
           label: 'View Transaction',
-          onClick: () => console.log('View transaction:', transaction.id)
+          onClick: () => console.log('View transaction')
         }
       });
 
@@ -303,17 +288,9 @@ export default function VaultPage() {
     }
   };
 
-  const handleConnect = async () => {
-    try {
-      await connect();
-    } catch (error) {
-      console.error('Failed to connect wallet:', error);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground antialiased">
-      <Header onConnect={handleConnect} isConnected={isConnected} />
+      <Header />
 
       <main className="mx-auto max-w-5xl px-4 py-8 grid lg:grid-cols-3 gap-6">
         {/* Left: Main card */}
@@ -429,7 +406,7 @@ export default function VaultPage() {
       {/* Footer */}
       <footer className="mx-auto max-w-5xl px-4 pb-10 text-xs text-muted-foreground">
         <div className="border-t border-border pt-6">
-          Mock blockchain functionality enabled. Transactions simulate 1-3 second delays with realistic gas fees and balance updates.
+          RainbowKit wallet integration enabled. Connect your wallet to interact with Phoenix contracts.
           {transactionError && (
             <div className="mt-2 text-red-500">
               Transaction Error: {transactionError}
