@@ -48,12 +48,12 @@ export function useAutoDolaVault() {
 /**
  * Hook for reading balance from AutoDolaVault
  */
-export function useVaultBalance(address: Address | undefined, token: Address) {
+export function useVaultBalance(address: Address | undefined, token: Address | undefined) {
   const { data, isError, isLoading } = useReadContract({
     address: CONTRACTS.autoDolaVault,
     abi: autoDolaVaultAbi,
     functionName: 'balanceOf',
-    args: address ? [token, address] : undefined,
+    args: address && token ? [token, address] : undefined,
   })
 
   return {

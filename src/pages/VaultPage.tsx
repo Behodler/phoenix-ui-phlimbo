@@ -3,6 +3,8 @@ import { useAccount } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
+import { useVaultBalance } from '../hooks/useContractInteractions';
+import { formatUnits } from 'viem';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
@@ -19,13 +21,35 @@ export default function VaultPage() {
   const [faqComponent, setFaqComponent] = useState<string | undefined>("BondingCurveBox");
 
   // Wagmi hooks for wallet connection
-  const { isConnected } = useAccount();
+  const { isConnected, address: walletAddress } = useAccount();
 
   // Contract addresses context
   const { addresses, loading: addressesLoading, error: addressesError, networkType } = useContractAddresses();
 
-  // Mock balances for now - these will be replaced with real contract reads later
-  const dolaBalance = { balance: { balance: 1000.0, balanceUsd: 1000.0 } };
+  // Fetch DOLA balance from AutoDolaVault contract using wagmi hooks
+  const {
+    balance: dolaBalanceRaw,
+    isLoading: dolaBalanceLoading,
+    isError: dolaBalanceError
+  } = useVaultBalance(
+    walletAddress,
+    addresses?.dolaToken as `0x${string}` | undefined
+  );
+
+  // Convert bigint balance to decimal number (DOLA uses 18 decimals)
+  const dolaBalanceDecimal = dolaBalanceRaw
+    ? parseFloat(formatUnits(dolaBalanceRaw, 18))
+    : 0;
+
+  // Format balance data for components (assuming 1:1 USD ratio for DOLA)
+  const dolaBalance = {
+    balance: {
+      balance: dolaBalanceDecimal,
+      balanceUsd: dolaBalanceDecimal
+    }
+  };
+
+  // Mock pxUSD balance - will be implemented in future story
   const pxUSDBalance = { balance: { balance: 0.0, balanceUsd: 0.0 } };
   const isTransacting = false;
   const transactionError: string | undefined = undefined;
@@ -411,6 +435,19 @@ export default function VaultPage() {
       <footer className="mx-auto max-w-5xl px-4 pb-10 text-xs text-muted-foreground">
         <div className="border-t border-border pt-6 space-y-3">
           <p>RainbowKit wallet integration enabled. Connect your wallet to interact with Phoenix contracts.</p>
+
+          {/* Balance Loading/Error Status */}
+          <div className="border-t border-border pt-3">
+            <p className="font-semibold mb-1">Balance Status:</p>
+            <div className="space-y-1">
+              {dolaBalanceLoading && <p className="text-blue-400">Loading DOLA balance...</p>}
+              {dolaBalanceError && <p className="text-red-400">Error loading DOLA balance. Please check your connection.</p>}
+              {!walletAddress && <p className="text-yellow-400">Connect wallet to view balance</p>}
+              {walletAddress && !dolaBalanceLoading && !dolaBalanceError && (
+                <p className="text-green-400">DOLA Balance: {dolaBalanceDecimal.toFixed(4)} DOLA (${dolaBalanceDecimal.toFixed(2)} USD)</p>
+              )}
+            </div>
+          </div>
 
           {/* Contract Addresses Debug Info */}
           <div className="border-t border-border pt-3">
