@@ -1,5 +1,6 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { autoDolaVaultAbi, behodler3TokenlaunchAbi } from '../generated/wagmi'
+import { erc20Abi } from 'viem'
 import type { Address } from 'viem'
 
 // For now, using placeholder addresses - these should be loaded from deployment server
@@ -46,14 +47,15 @@ export function useAutoDolaVault() {
 }
 
 /**
- * Hook for reading balance from AutoDolaVault
+ * Hook for reading wallet's ERC20 token balance
+ * This reads the balance directly from the token contract, not from the vault
  */
 export function useVaultBalance(address: Address | undefined, token: Address | undefined) {
   const { data, isError, isLoading } = useReadContract({
-    address: CONTRACTS.autoDolaVault,
-    abi: autoDolaVaultAbi,
+    address: token,
+    abi: erc20Abi,
     functionName: 'balanceOf',
-    args: address && token ? [token, address] : undefined,
+    args: address ? [address] : undefined,
   })
 
   return {
