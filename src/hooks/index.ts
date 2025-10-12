@@ -1,2 +1,2 @@
 // Contract interaction hooks
-export { useAutoDolaVault, useVaultBalance, useBondingCurve } from './useContractInteractions';
+export { useAutoDolaVault, useTokenBalance, useBondingCurve } from './useContractInteractions';

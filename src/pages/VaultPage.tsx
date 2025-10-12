@@ -3,7 +3,7 @@ import { useAccount } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
-import { useVaultBalance } from '../hooks/useContractInteractions';
+import { useTokenBalance } from '../hooks/useContractInteractions';
 import { formatUnits } from 'viem';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
@@ -26,12 +26,12 @@ export default function VaultPage() {
   // Contract addresses context
   const { addresses, loading: addressesLoading, error: addressesError, networkType } = useContractAddresses();
 
-  // Fetch DOLA balance from AutoDolaVault contract using wagmi hooks
+  // Fetch DOLA balance from wallet's ERC20 token balance
   const {
     balance: dolaBalanceRaw,
     isLoading: dolaBalanceLoading,
     isError: dolaBalanceError
-  } = useVaultBalance(
+  } = useTokenBalance(
     walletAddress,
     addresses?.dolaToken as `0x${string}` | undefined
   );

@@ -48,9 +48,9 @@ export function useAutoDolaVault() {
 
 /**
  * Hook for reading wallet's ERC20 token balance
- * This reads the balance directly from the token contract, not from the vault
+ * This is a generic hook for reading any ERC20 token balance from a wallet address
  */
-export function useVaultBalance(address: Address | undefined, token: Address | undefined) {
+export function useTokenBalance(address: Address | undefined, token: Address | undefined) {
   const { data, isError, isLoading } = useReadContract({
     address: token,
     abi: erc20Abi,
