@@ -18,9 +18,9 @@ export interface ContractAddresses {
  * Response structure from local development address server
  * GET http://localhost:3001/contracts
  *
- * Note: Server sends Behodler3TokenLaunch (the actual contract name),
+ * Note: Server sends behodler3Tokenlaunch (lowercase 'b', lowercase 'l'),
  *       which gets mapped to bondingCurve internally for cleaner naming.
- *       Behodler3TokenLaunch is the minter contract that accepts DOLA deposits,
+ *       behodler3Tokenlaunch is the minter contract that accepts DOLA deposits,
  *       bondingToken is the ERC20 token it produces.
  */
 export interface LocalAddressServerResponse {
@@ -34,7 +34,7 @@ export interface LocalAddressServerResponse {
     mockAutoDolaVault: string
     mockMainRewarder: string
     bondingToken: string
-    Behodler3TokenLaunch: string
+    behodler3Tokenlaunch: string
   }
 }
 
