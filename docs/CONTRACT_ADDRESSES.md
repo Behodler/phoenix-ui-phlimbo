@@ -113,7 +113,12 @@ The `addresses` object contains:
 - `tokeToken` - TOKE token contract address
 - `autoDolaVault` - AutoDola vault contract address
 - `tokemakMainRewarder` - Tokemak main rewarder contract address
-- `bondingToken` - Bonding token contract address
+- `bondingToken` - Bonding token (ERC20) contract address
+- `bondingCurve` - Behodler3Tokenlaunch contract address (mints bonding tokens)
+
+**CRITICAL DISTINCTION**:
+- `bondingCurve` is the **Behodler3Tokenlaunch contract** that **MINTS** bonding tokens (the factory/minter)
+- `bondingToken` is the **ERC20 token** that is **PRODUCED** by the bonding curve (the product)
 
 ### 4. Context State Properties
 
@@ -147,7 +152,8 @@ When running on local Anvil, you need to start the address server:
     "tokeToken": "0x...",
     "mockAutoDolaVault": "0x...",
     "mockMainRewarder": "0x...",
-    "bondingToken": "0x..."
+    "bondingToken": "0x...",
+    "bondingCurve": "0x..."
   }
 }
 ```
@@ -219,7 +225,7 @@ The VaultPage footer displays current network and contract addresses for debuggi
 - Network Type (mainnet/local/unsupported)
 - Loading state indicator
 - Error messages (if any)
-- All five contract addresses when loaded
+- All six contract addresses when loaded (including bondingCurve)
 
 ## Pre-Production Checklist
 

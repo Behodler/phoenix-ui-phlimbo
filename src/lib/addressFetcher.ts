@@ -27,12 +27,14 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
 
     // Map local contract addresses to unified structure
     // Note: Local server uses "mockAutoDolaVault" and "mockMainRewarder"
+    // CRITICAL: bondingCurve is Behodler3Tokenlaunch (minter), bondingToken is the ERC20 it produces
     const addresses: ContractAddresses = {
       dolaToken: data.contracts.dolaToken,
       tokeToken: data.contracts.tokeToken,
       autoDolaVault: data.contracts.mockAutoDolaVault,
       tokemakMainRewarder: data.contracts.mockMainRewarder,
       bondingToken: data.contracts.bondingToken,
+      bondingCurve: data.contracts.bondingCurve,
     }
 
     // Validate all addresses are present

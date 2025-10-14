@@ -1,5 +1,9 @@
 /**
  * Contract addresses structure shared across mainnet and local development
+ *
+ * IMPORTANT DISTINCTION:
+ * - bondingCurve: The Behodler3Tokenlaunch contract that MINTS bonding tokens (the factory/minter)
+ * - bondingToken: The ERC20 token PRODUCED by the bonding curve (the product)
  */
 export interface ContractAddresses {
   dolaToken: string
@@ -7,11 +11,15 @@ export interface ContractAddresses {
   autoDolaVault: string
   tokemakMainRewarder: string
   bondingToken: string
+  bondingCurve: string
 }
 
 /**
  * Response structure from local development address server
  * GET http://localhost:3001/contracts
+ *
+ * Note: bondingCurve is the Behodler3Tokenlaunch contract (minter),
+ *       bondingToken is the ERC20 token it produces
  */
 export interface LocalAddressServerResponse {
   networkId: number
@@ -24,6 +32,7 @@ export interface LocalAddressServerResponse {
     mockAutoDolaVault: string
     mockMainRewarder: string
     bondingToken: string
+    bondingCurve: string
   }
 }
 
