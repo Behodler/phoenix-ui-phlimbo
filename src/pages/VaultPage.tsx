@@ -127,7 +127,7 @@ export default function VaultPage() {
     },
     {
       onSuccess: (hash) => {
-        console.log('[VaultPage] onSuccess callback triggered with hash:', hash);
+
         addToast({
           type: 'success',
           title: 'Approval Successful',
@@ -150,10 +150,9 @@ export default function VaultPage() {
         console.error('Approval failed:', error);
       },
       onStatusChange: (status) => {
-        console.log('[VaultPage] Transaction status changed to:', status);
+
         // Handle status changes with appropriate toast notifications
         if (status === 'PENDING_SIGNATURE') {
-          console.log('[VaultPage] Showing "Confirm in Wallet" toast');
           addToast({
             type: 'info',
             title: 'Confirm in Wallet',
@@ -161,7 +160,6 @@ export default function VaultPage() {
             duration: 0, // Don't auto-dismiss
           });
         } else if (status === 'PENDING_CONFIRMATION') {
-          console.log('[VaultPage] Showing "Transaction Submitted" toast');
           addToast({
             type: 'info',
             title: 'Transaction Submitted',
@@ -189,12 +187,10 @@ export default function VaultPage() {
 
   // Handle approval button click
   const handleApprove = async (): Promise<void> => {
-    console.log('[VaultPage] handleApprove called');
-    console.log('[VaultPage] Wallet connected:', isConnected);
-    console.log('[VaultPage] Addresses:', addresses);
+
 
     if (!isConnected) {
-      console.log('[VaultPage] Wallet not connected, showing error');
+
       addToast({
         type: 'error',
         title: 'Wallet Not Connected',
@@ -204,7 +200,6 @@ export default function VaultPage() {
     }
 
     if (!addresses?.dolaToken || !addresses?.bondingCurve) {
-      console.log('[VaultPage] Contract addresses not loaded, showing error');
       addToast({
         type: 'error',
         title: 'Contract Addresses Not Loaded',
@@ -213,12 +208,9 @@ export default function VaultPage() {
       return;
     }
 
-    console.log('[VaultPage] About to execute approval transaction');
     try {
       await approvalTransaction.execute();
-      console.log('[VaultPage] Approval transaction execute() completed');
     } catch (error) {
-      console.log('[VaultPage] Approval transaction execute() threw error:', error);
       // Error handling is done in the transaction hook's onError callback
       // But we can add an additional toast here if needed
       if (approvalTransaction.state.error) {
@@ -278,7 +270,7 @@ export default function VaultPage() {
     try {
       // TODO: Implement actual deposit using wagmi hooks
       // const transaction = await executeDeposit(amount, dolaBalance.balance, pxUSDBalance.balance);
-      console.log('Deposit transaction would be executed here:', amount);
+
 
       // Calculate the output amount based on exchange rate from mock blockchain (0.998 with slippage)
       const outputAmount = (amount * 0.998).toFixed(4);
@@ -361,7 +353,6 @@ export default function VaultPage() {
     try {
       // TODO: Implement actual withdrawal using wagmi hooks
       // const transaction = await executeWithdraw(amount, pxUSDBalance.balance, dolaBalance.balance);
-      console.log('Withdrawal transaction would be executed here:', amount);
 
       // Simulate transaction delay
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -377,7 +368,7 @@ export default function VaultPage() {
         duration: 8000,
         action: {
           label: 'View Transaction',
-          onClick: () => console.log('View transaction')
+          onClick: () => {}
         }
       });
 

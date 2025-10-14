@@ -38,7 +38,7 @@ export interface UseTransactionConfig {
  *     })
  *   },
  *   {
- *     onSuccess: (hash) => console.log('Success!', hash),
+ *     onSuccess: (hash) => ,
  *     onError: (error) => console.error('Failed', error)
  *   }
  * )
@@ -76,34 +76,18 @@ export function useTransaction(
     }
   }, [isReceiptError, receiptError])
 
-  // Debug logging for wagmi hook state
-  useEffect(() => {
-    console.log('[useTransaction] Wagmi hook state:', {
-      hash: state.hash,
-      enabled: !!state.hash,
-      isConfirming,
-      isSuccess,
-      currentStatus: state.status,
-    })
-  }, [state.hash, isConfirming, isSuccess, state.status])
-
+ 
   // Update state when confirmation status changes
   useEffect(() => {
-    console.log('[useTransaction] Confirmation effect triggered:', {
-      hasHash: !!state.hash,
-      hash: state.hash,
-      isConfirming,
-      isSuccess,
-      currentStatus: state.status,
-    })
+
 
     if (!state.hash) {
-      console.log('[useTransaction] No hash, skipping confirmation check')
+      
       return
     }
 
     if (isConfirming && state.status !== 'PENDING_CONFIRMATION') {
-      console.log('[useTransaction] Setting state to PENDING_CONFIRMATION')
+      
       setState(prev => ({
         ...prev,
         status: 'PENDING_CONFIRMATION',
@@ -114,7 +98,7 @@ export function useTransaction(
     }
 
     if (isSuccess && state.status !== 'SUCCESS') {
-      console.log('[useTransaction] Transaction confirmed! Setting state to SUCCESS')
+      
       setState(prev => ({
         ...prev,
         status: 'SUCCESS',
@@ -132,7 +116,7 @@ export function useTransaction(
    */
   const execute = useCallback(async () => {
     try {
-      console.log('[useTransaction] Execute called - waiting for signature')
+      
       // Set to pending signature state
       setState({
         status: 'PENDING_SIGNATURE',
@@ -144,9 +128,9 @@ export function useTransaction(
       config?.onStatusChange?.('PENDING_SIGNATURE')
 
       // Execute the transaction
-      console.log('[useTransaction] Calling transaction function...')
+      
       const hash = await transactionFn()
-      console.log('[useTransaction] Transaction submitted! Hash:', hash)
+      
 
       // Transaction submitted - now waiting for confirmation
       setState(prev => ({
@@ -156,10 +140,10 @@ export function useTransaction(
         isPending: false,
         isConfirming: true,
       }))
-      console.log('[useTransaction] State updated with hash, waiting for confirmation')
+      
       config?.onStatusChange?.('PENDING_CONFIRMATION')
     } catch (error) {
-      console.log('[useTransaction] Transaction error:', error)
+      
       const parsedError = parseTransactionError(error as Error)
 
       // Determine if it was a cancellation or error
