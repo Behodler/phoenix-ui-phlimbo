@@ -57,12 +57,24 @@ export function useTransaction(
   })
 
   // Watch for transaction receipt
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+  const receiptResult = useWaitForTransactionReceipt({
     hash: state.hash,
     query: {
       enabled: !!state.hash,
+      // Retry configuration to handle transient RPC errors
+      retry: 3,
+      retryDelay: 1000,
     },
   })
+
+  const { isLoading: isConfirming, isSuccess, isError: isReceiptError, error: receiptError } = receiptResult
+
+  // Log receipt errors
+  useEffect(() => {
+    if (isReceiptError && receiptError) {
+      console.error('[useTransaction] Receipt watching error:', receiptError)
+    }
+  }, [isReceiptError, receiptError])
 
   // Debug logging for wagmi hook state
   useEffect(() => {

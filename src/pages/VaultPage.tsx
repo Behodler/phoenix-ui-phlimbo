@@ -38,14 +38,6 @@ export default function VaultPage() {
     addresses?.dolaToken as `0x${string}` | undefined
   );
 
-  // Debug logging for balance reading
-  console.log('🔍 DOLA Balance Debug:', {
-    walletAddress,
-    dolaTokenAddress: addresses?.dolaToken,
-    dolaBalanceRaw: dolaBalanceRaw?.toString(),
-    dolaBalanceLoading,
-    dolaBalanceError,
-  });
 
   // Fetch DOLA allowance for bonding curve contract
   const {
