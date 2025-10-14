@@ -3,7 +3,9 @@ import { useAccount } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
-import { useTokenBalance, useTokenAllowance } from '../hooks/useContractInteractions';
+import { useTokenBalance, useTokenAllowance, useTokenApproval } from '../hooks/useContractInteractions';
+import { useApprovalTransaction } from '../hooks/useTransaction';
+import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
 import { formatUnits } from 'viem';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
@@ -82,15 +84,15 @@ export default function VaultPage() {
   // Toast notifications
   const { addToast, removeToast } = useToast();
 
+  // Token approval hook
+  const { approve } = useTokenApproval();
+
   // Form state
   const [formData, setFormData] = useState<VaultFormData>({
     amount: "",
     autoStake: false,
     slippageBps: 10, // 0.10%
   });
-
-  // Approval state - in real app this would come from contract state
-  const [isApproved, setIsApproved] = useState(false);
 
   // Constants - these could also come from hooks in a real implementation
   const constants: VaultConstants = {
@@ -118,20 +120,78 @@ export default function VaultPage() {
     isStaked: true,
   };
 
+  // Approval transaction state management
+  const approvalTransaction = useApprovalTransaction(
+    async () => {
+      // Execute the approval with addresses from context
+      if (!addresses?.dolaToken || !addresses?.bondingCurve) {
+        throw new Error('Contract addresses not loaded');
+      }
+      return approve(
+        addresses.dolaToken as `0x${string}`,
+        addresses.bondingCurve as `0x${string}`
+        // Using default maxUint256 for unlimited approval
+      );
+    },
+    {
+      onSuccess: (hash) => {
+        addToast({
+          type: 'success',
+          title: 'Approval Successful',
+          description: 'DOLA spending has been approved. You can now deposit.',
+          action: {
+            label: 'View Transaction',
+            onClick: () => {
+              const explorerUrl = networkType === 'mainnet'
+                ? `https://etherscan.io/tx/${hash}`
+                : `https://sepolia.etherscan.io/tx/${hash}`;
+              window.open(explorerUrl, '_blank');
+            }
+          }
+        });
+        // Note: We're not setting isApproved flag anymore since approval is tracked
+        // via allowance from the blockchain. After successful approval, the allowance
+        // hook will automatically refresh and show the new allowance.
+      },
+      onError: (error) => {
+        console.error('Approval failed:', error);
+      },
+      onStatusChange: (status) => {
+        // Handle status changes with appropriate toast notifications
+        if (status === 'PENDING_SIGNATURE') {
+          addToast({
+            type: 'info',
+            title: 'Confirm in Wallet',
+            description: 'Please confirm the approval transaction in your wallet.',
+            duration: 0, // Don't auto-dismiss
+          });
+        } else if (status === 'PENDING_CONFIRMATION') {
+          addToast({
+            type: 'info',
+            title: 'Transaction Submitted',
+            description: 'Waiting for blockchain confirmation...',
+            duration: 0, // Don't auto-dismiss
+          });
+        }
+      }
+    }
+  );
+
   // Event handlers
   const handleFormChange = (data: Partial<VaultFormData>) => {
     setFormData(prev => ({ ...prev, ...data }));
 
-    // Reset approval when amount changes and exceeds allowance
+    // Reset approval transaction state when amount changes and exceeds allowance
     if (data.amount !== undefined) {
       const newAmount = parseFloat(data.amount || '0');
-      // Real logic: require approval when amount exceeds allowance
-      if (newAmount > dolaAllowanceDecimal && isApproved) {
-        setIsApproved(false);
+      // Reset transaction state if amount exceeds current allowance
+      if (newAmount > dolaAllowanceDecimal && approvalTransaction.state.isSuccess) {
+        approvalTransaction.reset();
       }
     }
   };
 
+  // Handle approval button click
   const handleApprove = async (): Promise<void> => {
     if (!isConnected) {
       addToast({
@@ -142,32 +202,33 @@ export default function VaultPage() {
       return;
     }
 
-    // Mock approval transaction with delay
-    try {
-      await new Promise((resolve, reject) => {
-        setTimeout(() => {
-          // Simulate occasional approval failures
-          if (Math.random() > 0.95) {
-            reject(new Error('Approval failed: Transaction rejected'));
-          } else {
-            resolve(null);
-          }
-        }, 1500); // 1.5 second delay
-      });
-
-      setIsApproved(true);
-      addToast({
-        type: 'success',
-        title: 'Approval Successful',
-        description: 'DOLA spending has been approved. You can now deposit.',
-      });
-    } catch (error) {
-      console.error('Approval failed:', error);
+    if (!addresses?.dolaToken || !addresses?.bondingCurve) {
       addToast({
         type: 'error',
-        title: 'Approval Failed',
-        description: 'The approval transaction was rejected. Please try again.',
+        title: 'Contract Addresses Not Loaded',
+        description: 'Please wait for contract addresses to load and try again.',
       });
+      return;
+    }
+
+    try {
+      await approvalTransaction.execute();
+    } catch (error) {
+      // Error handling is done in the transaction hook's onError callback
+      // But we can add an additional toast here if needed
+      if (approvalTransaction.state.error) {
+        const { error: txError } = approvalTransaction.state;
+        addToast({
+          type: 'error',
+          title: getErrorTitle(txError.type),
+          description: txError.message,
+          duration: 8000,
+          action: shouldOfferRetry(txError.type) ? {
+            label: 'Retry',
+            onClick: () => approvalTransaction.retry()
+          } : undefined
+        });
+      }
     }
   };
 
@@ -363,8 +424,8 @@ export default function VaultPage() {
                 constants={constants}
                 tokenInfo={tokenInfo}
                 onDeposit={handleDeposit}
-                isTransacting={isTransacting}
-                needsApproval={parseFloat(formData.amount || '0') > dolaAllowanceDecimal && !isApproved}
+                isTransacting={isTransacting || approvalTransaction.state.isPending || approvalTransaction.state.isConfirming}
+                needsApproval={parseFloat(formData.amount || '0') > dolaAllowanceDecimal && !approvalTransaction.state.isSuccess}
                 onApprove={handleApprove}
                 isAllowanceLoading={dolaAllowanceLoading}
               />
