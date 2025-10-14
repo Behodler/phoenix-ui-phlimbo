@@ -483,7 +483,8 @@ export default function VaultPage() {
                   <p>TOKE Token: <code className="text-accent">{addresses.tokeToken}</code></p>
                   <p>AutoDola Vault: <code className="text-accent">{addresses.autoDolaVault}</code></p>
                   <p>Tokemak Main Rewarder: <code className="text-accent">{addresses.tokemakMainRewarder}</code></p>
-                  <p>Bonding Token: <code className="text-accent">{addresses.bondingToken}</code></p>
+                  <p>Bonding Token (ERC20): <code className="text-accent">{addresses.bondingToken}</code></p>
+                  <p>Bonding Curve (Minter): <code className="text-accent">{addresses.bondingCurve}</code></p>
                 </div>
               )}
             </div>
