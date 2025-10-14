@@ -3,7 +3,7 @@ import { useAccount } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
-import { useTokenBalance } from '../hooks/useContractInteractions';
+import { useTokenBalance, useTokenAllowance } from '../hooks/useContractInteractions';
 import { formatUnits } from 'viem';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
@@ -36,9 +36,25 @@ export default function VaultPage() {
     addresses?.dolaToken as `0x${string}` | undefined
   );
 
+  // Fetch DOLA allowance for bonding curve contract
+  const {
+    allowance: dolaAllowanceRaw,
+    isLoading: dolaAllowanceLoading,
+    isError: dolaAllowanceError
+  } = useTokenAllowance(
+    walletAddress,
+    addresses?.bondingToken as `0x${string}` | undefined,
+    addresses?.dolaToken as `0x${string}` | undefined
+  );
+
   // Convert bigint balance to decimal number (DOLA uses 18 decimals)
   const dolaBalanceDecimal = dolaBalanceRaw
     ? parseFloat(formatUnits(dolaBalanceRaw, 18))
+    : 0;
+
+  // Convert bigint allowance to decimal number (DOLA uses 18 decimals)
+  const dolaAllowanceDecimal = dolaAllowanceRaw
+    ? parseFloat(formatUnits(dolaAllowanceRaw, 18))
     : 0;
 
   // Format balance data for components (assuming 1:1 USD ratio for DOLA)
@@ -97,11 +113,11 @@ export default function VaultPage() {
   const handleFormChange = (data: Partial<VaultFormData>) => {
     setFormData(prev => ({ ...prev, ...data }));
 
-    // Reset approval when amount changes (in real app, check if new amount exceeds allowance)
+    // Reset approval when amount changes and exceeds allowance
     if (data.amount !== undefined) {
       const newAmount = parseFloat(data.amount || '0');
-      // Mock logic: require approval for amounts > 100
-      if (newAmount > 100 && isApproved) {
+      // Real logic: require approval when amount exceeds allowance
+      if (newAmount > dolaAllowanceDecimal && isApproved) {
         setIsApproved(false);
       }
     }
@@ -339,7 +355,7 @@ export default function VaultPage() {
                 tokenInfo={tokenInfo}
                 onDeposit={handleDeposit}
                 isTransacting={isTransacting}
-                needsApproval={parseFloat(formData.amount || '0') > 100 && !isApproved}
+                needsApproval={parseFloat(formData.amount || '0') > dolaAllowanceDecimal && !isApproved}
                 onApprove={handleApprove}
               />
             ) : (
@@ -436,15 +452,20 @@ export default function VaultPage() {
         <div className="border-t border-border pt-6 space-y-3">
           <p>RainbowKit wallet integration enabled. Connect your wallet to interact with Phoenix contracts.</p>
 
-          {/* Balance Loading/Error Status */}
+          {/* Balance and Allowance Loading/Error Status */}
           <div className="border-t border-border pt-3">
-            <p className="font-semibold mb-1">Balance Status:</p>
+            <p className="font-semibold mb-1">Balance & Allowance Status:</p>
             <div className="space-y-1">
               {dolaBalanceLoading && <p className="text-blue-400">Loading DOLA balance...</p>}
               {dolaBalanceError && <p className="text-red-400">Error loading DOLA balance. Please check your connection.</p>}
-              {!walletAddress && <p className="text-yellow-400">Connect wallet to view balance</p>}
+              {dolaAllowanceLoading && <p className="text-blue-400">Loading DOLA allowance...</p>}
+              {dolaAllowanceError && <p className="text-red-400">Error loading DOLA allowance. Please check your connection.</p>}
+              {!walletAddress && <p className="text-yellow-400">Connect wallet to view balance and allowance</p>}
               {walletAddress && !dolaBalanceLoading && !dolaBalanceError && (
                 <p className="text-green-400">DOLA Balance: {dolaBalanceDecimal.toFixed(4)} DOLA (${dolaBalanceDecimal.toFixed(2)} USD)</p>
+              )}
+              {walletAddress && !dolaAllowanceLoading && !dolaAllowanceError && (
+                <p className="text-green-400">DOLA Allowance: {dolaAllowanceDecimal.toFixed(4)} DOLA (approved for bonding curve)</p>
               )}
             </div>
           </div>

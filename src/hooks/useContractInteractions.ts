@@ -66,6 +66,29 @@ export function useTokenBalance(address: Address | undefined, token: Address | u
 }
 
 /**
+ * Hook for reading ERC20 token allowance
+ * Returns the amount of tokens that an owner has approved for a spender to use
+ */
+export function useTokenAllowance(
+  owner: Address | undefined,
+  spender: Address | undefined,
+  token: Address | undefined
+) {
+  const { data, isError, isLoading } = useReadContract({
+    address: token,
+    abi: erc20Abi,
+    functionName: 'allowance',
+    args: owner && spender ? [owner, spender] : undefined,
+  })
+
+  return {
+    allowance: data as bigint | undefined,
+    isError,
+    isLoading,
+  }
+}
+
+/**
  * Hook for interacting with Behodler3Tokenlaunch (bonding curve)
  */
 export function useBondingCurve() {
