@@ -18,8 +18,10 @@ export interface ContractAddresses {
  * Response structure from local development address server
  * GET http://localhost:3001/contracts
  *
- * Note: bondingCurve is the Behodler3Tokenlaunch contract (minter),
- *       bondingToken is the ERC20 token it produces
+ * Note: Server sends Behodler3TokenLaunch (the actual contract name),
+ *       which gets mapped to bondingCurve internally for cleaner naming.
+ *       Behodler3TokenLaunch is the minter contract that accepts DOLA deposits,
+ *       bondingToken is the ERC20 token it produces.
  */
 export interface LocalAddressServerResponse {
   networkId: number
@@ -32,7 +34,7 @@ export interface LocalAddressServerResponse {
     mockAutoDolaVault: string
     mockMainRewarder: string
     bondingToken: string
-    bondingCurve: string
+    Behodler3TokenLaunch: string
   }
 }
 

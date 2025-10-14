@@ -15,7 +15,8 @@ export default function DepositForm({
   onDeposit,
   isTransacting = false,
   needsApproval = false,
-  onApprove
+  onApprove,
+  isAllowanceLoading = false
 }: DepositFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
@@ -65,7 +66,7 @@ export default function DepositForm({
 
   // Determine button state and properties
   const isAmountValid = parsedAmount > 0 && parsedAmount <= tokenInfo.balance;
-  const buttonDisabled = !isAmountValid || isTransacting || isApproving;
+  const buttonDisabled = !isAmountValid || isTransacting || isApproving || isAllowanceLoading;
 
   let buttonLabel = "Enter Amount";
   let buttonVariant: 'primary' | 'approve' = 'primary';

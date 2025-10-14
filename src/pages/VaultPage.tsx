@@ -43,7 +43,7 @@ export default function VaultPage() {
     isError: dolaAllowanceError
   } = useTokenAllowance(
     walletAddress,
-    addresses?.bondingToken as `0x${string}` | undefined,
+    addresses?.bondingCurve as `0x${string}` | undefined,
     addresses?.dolaToken as `0x${string}` | undefined
   );
 
@@ -357,6 +357,7 @@ export default function VaultPage() {
                 isTransacting={isTransacting}
                 needsApproval={parseFloat(formData.amount || '0') > dolaAllowanceDecimal && !isApproved}
                 onApprove={handleApprove}
+                isAllowanceLoading={dolaAllowanceLoading}
               />
             ) : (
               <WithdrawTab

@@ -43,6 +43,7 @@ export interface DepositFormProps {
   isTransacting?: boolean;
   needsApproval?: boolean;
   onApprove?: () => void;
+  isAllowanceLoading?: boolean;
 }
 
 
