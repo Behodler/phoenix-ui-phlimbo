@@ -16,7 +16,12 @@ const CONTRACTS = {
  */
 export function useAutoDolaVault() {
   const { data: hash, writeContract, isPending } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    query: {
+      enabled: !!hash,
+    },
+  })
 
   const deposit = async (amount: bigint, recipient: Address) => {
     return writeContract({

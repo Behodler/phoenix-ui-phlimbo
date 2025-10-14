@@ -59,6 +59,9 @@ export function useTransaction(
   // Watch for transaction receipt
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash: state.hash,
+    query: {
+      enabled: !!state.hash,
+    },
   })
 
   // Update state when confirmation status changes
