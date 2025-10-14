@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently --kill-others --names \"SERVER,UI\" -c \"blue,green\" \"bash scripts/dev-wrapper.sh\" \"wait-on -t 60000 http://localhost:3001/contracts && vite || (echo 'WARNING: Deployment server not ready, starting UI anyway...' && vite)\"",
+    "dev:ui": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -41,6 +42,7 @@
     "@vitejs/plugin-react": "^5.0.0",
     "@wagmi/cli": "^2.5.1",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
     "eslint": "^9.33.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
@@ -53,6 +55,7 @@
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.39.1",
     "vite": "^7.1.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wait-on": "^9.0.1"
   }
 }
