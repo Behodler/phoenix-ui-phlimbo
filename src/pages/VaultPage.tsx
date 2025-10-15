@@ -59,7 +59,8 @@ export default function VaultPage() {
   const {
     allowance: dolaAllowanceRaw,
     isLoading: dolaAllowanceLoading,
-    isError: dolaAllowanceError
+    isError: dolaAllowanceError,
+    refetch: refetchAllowance
   } = useTokenAllowance(
     walletAddress,
     addresses?.bondingCurve as `0x${string}` | undefined,
@@ -141,7 +142,9 @@ export default function VaultPage() {
       );
     },
     {
-      onSuccess: (hash) => {
+      onSuccess: async (hash) => {
+        // Refetch the allowance to update the UI immediately after approval transaction
+        await refetchAllowance();
 
         addToast({
           type: 'success',
@@ -157,9 +160,6 @@ export default function VaultPage() {
             }
           }
         });
-        // Note: We're not setting isApproved flag anymore since approval is tracked
-        // via allowance from the blockchain. After successful approval, the allowance
-        // hook will automatically refresh and show the new allowance.
       },
       onError: (error) => {
         console.error('Approval failed:', error);

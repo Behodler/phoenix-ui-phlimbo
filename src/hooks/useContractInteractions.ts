@@ -79,7 +79,7 @@ export function useTokenAllowance(
   spender: Address | undefined,
   token: Address | undefined
 ) {
-  const { data, isError, isLoading } = useReadContract({
+  const { data, isError, isLoading, refetch } = useReadContract({
     address: token,
     abi: erc20Abi,
     functionName: 'allowance',
@@ -90,6 +90,7 @@ export function useTokenAllowance(
     allowance: data as bigint | undefined,
     isError,
     isLoading,
+    refetch,
   }
 }
 
