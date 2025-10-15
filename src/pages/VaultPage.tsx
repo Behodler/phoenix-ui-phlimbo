@@ -3,7 +3,7 @@ import { useAccount } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
-import { useTokenBalance, useTokenAllowance, useTokenApproval } from '../hooks/useContractInteractions';
+import { useTokenBalance, useTokenAllowance, useTokenApproval, useBondingCurve } from '../hooks/useContractInteractions';
 import { useApprovalTransaction } from '../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
 import { formatUnits } from 'viem';
@@ -27,6 +27,22 @@ export default function VaultPage() {
 
   // Contract addresses context
   const { addresses, loading: addressesLoading, error: addressesError, networkType } = useContractAddresses();
+
+  // Fetch bonding curve prices
+  const {
+    currentPrice: currentPriceRaw,
+    initialPrice: initialPriceRaw,
+    finalPrice: finalPriceRaw,
+    isLoading: bondingCurveLoading,
+    isError: bondingCurveError
+  } = useBondingCurve(addresses?.bondingCurve as `0x${string}` | undefined);
+
+  // Convert prices from wei (18 decimals) to decimal format
+  const bondingCurveData = {
+    startPrice: initialPriceRaw ? parseFloat(formatUnits(initialPriceRaw, 18)) : 0.74, // Fallback to mock
+    endPrice: finalPriceRaw ? parseFloat(formatUnits(finalPriceRaw, 18)) : 1.00, // Fallback to mock
+    currentPrice: currentPriceRaw ? parseFloat(formatUnits(currentPriceRaw, 18)) : 0.89, // Fallback to mock
+  };
 
   // Fetch DOLA balance from wallet's ERC20 token balance
   const {
@@ -89,13 +105,6 @@ export default function VaultPage() {
   // Constants - these could also come from hooks in a real implementation
   const constants: VaultConstants = {
     dolaToPxUSDRate: 1.33, // Updated to match mock blockchain exchange rate (0.2% slippage)
-  };
-
-  // Bonding curve data - these would come from smart contract in real implementation
-  const bondingCurveData = {
-    startPrice: 0.74,
-    endPrice: 1.00,
-    currentPrice: 0.89, // Current price in the bonding curve progression
   };
 
   // Convert blockchain balance to TokenInfo format for components
@@ -444,6 +453,8 @@ export default function VaultPage() {
             startPrice={bondingCurveData.startPrice}
             endPrice={bondingCurveData.endPrice}
             currentPrice={bondingCurveData.currentPrice}
+            isLoading={bondingCurveLoading}
+            isError={bondingCurveError}
           />
 
           {/* FAQ Component - with manual testing controls */}

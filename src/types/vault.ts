@@ -95,6 +95,8 @@ export interface BondingCurveBoxProps {
   startPrice: number;
   endPrice: number;
   currentPrice: number;
+  isLoading?: boolean;
+  isError?: boolean;
 }
 
 export interface FAQItem {

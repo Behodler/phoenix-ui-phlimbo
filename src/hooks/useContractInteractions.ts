@@ -96,22 +96,57 @@ export function useTokenAllowance(
 /**
  * Hook for interacting with Behodler3Tokenlaunch (bonding curve)
  */
-export function useBondingCurve() {
-  const { data: currentPrice } = useReadContract({
-    address: CONTRACTS.behodler3Tokenlaunch,
+export function useBondingCurve(bondingCurveAddress: Address | undefined) {
+  // Fetch current marginal price
+  const { data: currentPrice, isLoading: isLoadingCurrent, isError: isErrorCurrent } = useReadContract({
+    address: bondingCurveAddress,
     abi: behodler3TokenlaunchAbi,
     functionName: 'getCurrentMarginalPrice',
+    query: {
+      enabled: !!bondingCurveAddress,
+    },
+  })
+
+  // Fetch initial marginal price (start price)
+  const { data: initialPrice, isLoading: isLoadingInitial, isError: isErrorInitial } = useReadContract({
+    address: bondingCurveAddress,
+    abi: behodler3TokenlaunchAbi,
+    functionName: 'getInitialMarginalPrice',
+    query: {
+      enabled: !!bondingCurveAddress,
+    },
+  })
+
+  // Fetch final marginal price (end price)
+  const { data: finalPrice, isLoading: isLoadingFinal, isError: isErrorFinal } = useReadContract({
+    address: bondingCurveAddress,
+    abi: behodler3TokenlaunchAbi,
+    functionName: 'getFinalMarginalPrice',
+    query: {
+      enabled: !!bondingCurveAddress,
+    },
   })
 
   const { data: totalRaised } = useReadContract({
-    address: CONTRACTS.behodler3Tokenlaunch,
+    address: bondingCurveAddress,
     abi: behodler3TokenlaunchAbi,
     functionName: 'getTotalRaised',
+    query: {
+      enabled: !!bondingCurveAddress,
+    },
   })
+
+  // Aggregate loading and error states
+  const isLoading = isLoadingCurrent || isLoadingInitial || isLoadingFinal
+  const isError = isErrorCurrent || isErrorInitial || isErrorFinal
 
   return {
     currentPrice: currentPrice as bigint | undefined,
+    initialPrice: initialPrice as bigint | undefined,
+    finalPrice: finalPrice as bigint | undefined,
     totalRaised: totalRaised as bigint | undefined,
+    isLoading,
+    isError,
   }
 }
 

@@ -3,7 +3,9 @@ import type { BondingCurveBoxProps } from '../../types/vault';
 export default function BondingCurveBox({
   startPrice,
   endPrice,
-  currentPrice
+  currentPrice,
+  isLoading = false,
+  isError = false
 }: BondingCurveBoxProps) {
   // Calculate the progress percentage (0-100) based on current price position
   const progress = Math.max(0, Math.min(100, ((currentPrice - startPrice) / (endPrice - startPrice)) * 100));
@@ -37,6 +39,24 @@ export default function BondingCurveBox({
             Bonding Curve state
           </p>
         </div>
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-sm text-muted-foreground">Loading bonding curve data...</div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {isError && !isLoading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-sm text-red-400">Failed to load bonding curve data. Please try again.</div>
+          </div>
+        )}
+
+        {/* Main Content - only show when not loading and no error */}
+        {!isLoading && !isError && (
+          <>
 
         {/* Bonding Curve Visualization */}
         <div className="relative overflow-hidden">
@@ -155,6 +175,8 @@ export default function BondingCurveBox({
             </div>
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );
