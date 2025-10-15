@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Phoenix UI now uses a comprehensive theme system based on the Phoenix pxUSD palette, featuring dark/light mode support and consistent color management across all components.
+The Phoenix UI now uses a comprehensive theme system based on the Phoenix phUSD palette, featuring dark/light mode support and consistent color management across all components.
 
 ## Palette Colors
 

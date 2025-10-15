@@ -85,8 +85,8 @@ export default function VaultPage() {
     }
   };
 
-  // Mock pxUSD balance - will be implemented in future story
-  const pxUSDBalance = { balance: { balance: 0.0, balanceUsd: 0.0 } };
+  // Mock phUSD balance - will be implemented in future story
+  const phUSDBalance = { balance: { balance: 0.0, balanceUsd: 0.0 } };
   const isTransacting = false;
   const transactionError: string | undefined = undefined;
 
@@ -104,14 +104,17 @@ export default function VaultPage() {
   });
 
   // Convert current price from bonding curve (wei) to decimal rate
-  // currentPriceRaw is in 1e18 format where > 1e18 means 1 DOLA buys more than 1 pxUSD
-  const dolaToPxUSDRate = currentPriceRaw
+  // getCurrentMarginalPrice() returns the price of 1 phUSD in terms of DOLA (scaled by 1e18)
+  // If dolaToPhUSDRate = 0.81, it means 1 phUSD costs 0.81 DOLA
+  // For DOLA → phUSD (deposit): phUSDAmount = dolaAmount / dolaToPhUSDRate
+  // For phUSD → DOLA (withdraw): dolaAmount = phUSDAmount * dolaToPhUSDRate
+  const dolaToPhUSDRate = currentPriceRaw
     ? parseFloat(formatUnits(currentPriceRaw, 18))
     : 0; // 0 signals loading/error state to child components
 
   // Constants object for backward compatibility with existing components
   const constants: VaultConstants = {
-    dolaToPxUSDRate,
+    dolaToPhUSDRate,
   };
 
   // Convert blockchain balance to TokenInfo format for components
@@ -123,8 +126,8 @@ export default function VaultPage() {
   };
 
   const positionInfo: PositionInfo = {
-    value: pxUSDBalance.balance?.balance ?? 0,
-    valueUsd: pxUSDBalance.balance?.balanceUsd ?? 0,
+    value: phUSDBalance.balance?.balance ?? 0,
+    valueUsd: phUSDBalance.balance?.balanceUsd ?? 0,
     isStaked: true,
   };
 
@@ -257,7 +260,7 @@ export default function VaultPage() {
       return;
     }
 
-    if (!dolaBalance.balance || !pxUSDBalance.balance) {
+    if (!dolaBalance.balance || !phUSDBalance.balance) {
       addToast({
         type: 'error',
         title: 'Balance Error',
@@ -277,7 +280,7 @@ export default function VaultPage() {
 
     try {
       // TODO: Implement actual deposit using wagmi hooks
-      // const transaction = await executeDeposit(amount, dolaBalance.balance, pxUSDBalance.balance);
+      // const transaction = await executeDeposit(amount, dolaBalance.balance, phUSDBalance.balance);
 
 
       // Calculate the output amount based on exchange rate from mock blockchain (0.998 with slippage)
@@ -287,7 +290,7 @@ export default function VaultPage() {
       addToast({
         type: 'success',
         title: 'Deposit Successful',
-        description: `Deposited ${amount} DOLA and received ${outputAmount} pxUSD`,
+        description: `Deposited ${amount} DOLA and received ${outputAmount} phUSD`,
         duration: 6000,
       });
 
@@ -324,7 +327,7 @@ export default function VaultPage() {
       return;
     }
 
-    if (!pxUSDBalance.balance || !dolaBalance.balance) {
+    if (!phUSDBalance.balance || !dolaBalance.balance) {
       addToast({
         type: 'error',
         title: 'Balance Error',
@@ -333,13 +336,13 @@ export default function VaultPage() {
       return;
     }
 
-    if (amount > pxUSDBalance.balance.balance) {
+    if (amount > phUSDBalance.balance.balance) {
       const feeAmount = (amount * 0.02).toFixed(4);
       const dolaReceived = (amount * 0.98).toFixed(4);
       addToast({
         type: 'error',
-        title: 'Insufficient pxUSD Balance',
-        description: `Attempting to withdraw ${amount} pxUSD (fee: ${feeAmount}, receive: ${dolaReceived} DOLA) but you only have ${pxUSDBalance.balance.balance.toFixed(4)} pxUSD available.`,
+        title: 'Insufficient phUSD Balance',
+        description: `Attempting to withdraw ${amount} phUSD (fee: ${feeAmount}, receive: ${dolaReceived} DOLA) but you only have ${phUSDBalance.balance.balance.toFixed(4)} phUSD available.`,
         duration: 8000,
       });
       return;
@@ -354,13 +357,13 @@ export default function VaultPage() {
     const processingToastId = addToast({
       type: 'info',
       title: 'Processing Withdrawal...',
-      description: `Burning ${amount} pxUSD with ${(feeRate * 100).toFixed(0)}% fee (${feeAmount} pxUSD). You'll receive ${expectedOutput} DOLA.`,
+      description: `Burning ${amount} phUSD with ${(feeRate * 100).toFixed(0)}% fee (${feeAmount} phUSD). You'll receive ${expectedOutput} DOLA.`,
       duration: 0, // Don't auto-dismiss while processing
     });
 
     try {
       // TODO: Implement actual withdrawal using wagmi hooks
-      // const transaction = await executeWithdraw(amount, pxUSDBalance.balance, dolaBalance.balance);
+      // const transaction = await executeWithdraw(amount, phUSDBalance.balance, dolaBalance.balance);
 
       // Simulate transaction delay
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -372,7 +375,7 @@ export default function VaultPage() {
       addToast({
         type: 'success',
         title: 'Withdrawal Completed Successfully',
-        description: `Burned ${amount} pxUSD • Fee: ${feeAmount} pxUSD (${(feeRate * 100).toFixed(0)}%) • Received: ${expectedOutput} DOLA`,
+        description: `Burned ${amount} phUSD • Fee: ${feeAmount} phUSD (${(feeRate * 100).toFixed(0)}%) • Received: ${expectedOutput} DOLA`,
         duration: 8000,
         action: {
           label: 'View Transaction',

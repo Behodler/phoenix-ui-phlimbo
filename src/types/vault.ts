@@ -7,7 +7,7 @@ export interface VaultFormData {
 }
 
 export interface VaultConstants {
-  dolaToPxUSDRate: number;
+  dolaToPhUSDRate: number;
 }
 
 export interface TokenInfo {

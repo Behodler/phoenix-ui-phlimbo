@@ -104,10 +104,10 @@ describe('WithdrawTab Component', () => {
     },
     onFormChange: vi.fn(),
     constants: {
-      dolaToPxUSDRate: 1.1 // DOLA to pxUSD rate
+      dolaToPhUSDRate: 1.1 // DOLA to phUSD rate
     },
     positionInfo: {
-      value: 1000, // pxUSD balance
+      value: 1000, // phUSD balance
       valueUsd: 1000,
       isStaked: false
     },
@@ -131,7 +131,7 @@ describe('WithdrawTab Component', () => {
       // Should show fee information
       expect(screen.getByText(/Withdrawal Fee/)).toBeInTheDocument();
       expect(screen.getByText(/Fee \(2\.0%\)/)).toBeInTheDocument();
-      expect(screen.getByText(/2\.0000 pxUSD/)).toBeInTheDocument(); // 2% of 100
+      expect(screen.getByText(/2\.0000 phUSD/)).toBeInTheDocument(); // 2% of 100
       expect(screen.getByText(/89\.0909 DOLA/)).toBeInTheDocument(); // 98 / 1.1 rate
     });
 
@@ -142,7 +142,7 @@ describe('WithdrawTab Component', () => {
       render(<WithdrawTab {...props} />);
 
       expect(screen.getByText(/Fee \(2\.0%\)/)).toBeInTheDocument();
-      expect(screen.getByText(/1\.0000 pxUSD/)).toBeInTheDocument(); // 2% of 50 = 1
+      expect(screen.getByText(/1\.0000 phUSD/)).toBeInTheDocument(); // 2% of 50 = 1
       expect(screen.getByText(/44\.5455 DOLA/)).toBeInTheDocument(); // 49 / 1.1 rate
     });
 
@@ -153,7 +153,7 @@ describe('WithdrawTab Component', () => {
       render(<WithdrawTab {...props} />);
 
       expect(screen.getByText(/Fee \(2\.0%\)/)).toBeInTheDocument();
-      expect(screen.getByText(/5\.0100 pxUSD/)).toBeInTheDocument(); // 2% of 250.5 = 5.01
+      expect(screen.getByText(/5\.0100 phUSD/)).toBeInTheDocument(); // 2% of 250.5 = 5.01
       expect(screen.getByText(/223\.1727 DOLA/)).toBeInTheDocument(); // 245.49 / 1.1 rate (more precise)
     });
 
@@ -164,7 +164,7 @@ describe('WithdrawTab Component', () => {
       render(<WithdrawTab {...props} />);
 
       expect(screen.getByText(/Fee \(2\.0%\)/)).toBeInTheDocument();
-      expect(screen.getByText(/20\.0000 pxUSD/)).toBeInTheDocument(); // 2% of 1000 = 20
+      expect(screen.getByText(/20\.0000 phUSD/)).toBeInTheDocument(); // 2% of 1000 = 20
       expect(screen.getByText(/890.9091 DOLA/)).toBeInTheDocument(); // 980 / 1.1 rate
     });
 
@@ -175,7 +175,7 @@ describe('WithdrawTab Component', () => {
       render(<WithdrawTab {...props} />);
 
       expect(screen.getByText(/Fee \(2\.0%\)/)).toBeInTheDocument();
-      expect(screen.getByText(/0\.0020 pxUSD/)).toBeInTheDocument(); // 2% of 0.1 = 0.002
+      expect(screen.getByText(/0\.0020 phUSD/)).toBeInTheDocument(); // 2% of 0.1 = 0.002
       expect(screen.getByText(/0\.0891 DOLA/)).toBeInTheDocument(); // 0.098 / 1.1 rate
     });
   });
@@ -212,7 +212,7 @@ describe('WithdrawTab Component', () => {
 
       render(<WithdrawTab {...props} />);
 
-      expect(screen.getByTestId('action-button')).toHaveTextContent('Insufficient pxUSD Balance');
+      expect(screen.getByTestId('action-button')).toHaveTextContent('Insufficient phUSD Balance');
       expect(screen.getByTestId('action-button')).toBeDisabled();
     });
 
@@ -223,7 +223,7 @@ describe('WithdrawTab Component', () => {
 
       render(<WithdrawTab {...props} />);
 
-      expect(screen.getByText(/20\.0000 pxUSD/)).toBeInTheDocument(); // 2% fee
+      expect(screen.getByText(/20\.0000 phUSD/)).toBeInTheDocument(); // 2% fee
       expect(screen.getByText(/890.9091 DOLA/)).toBeInTheDocument(); // After fee conversion
       expect(screen.getByTestId('action-button')).toHaveTextContent('Withdraw');
       expect(screen.getByTestId('action-button')).not.toBeDisabled();

@@ -22,8 +22,14 @@ export default function DepositForm({
   const [isApproving, setIsApproving] = useState(false);
 
   const parsedAmount = Number(formData.amount) || 0;
-  const estPxUSD = parsedAmount * constants.dolaToPxUSDRate;
-  const minReceived = estPxUSD * (1 - formData.slippageBps / 10000);
+  // For deposit: DOLA → phUSD conversion
+  // getCurrentMarginalPrice() returns price of 1 phUSD in DOLA
+  // If price = 0.81, then 1 phUSD costs 0.81 DOLA
+  // To get phUSD from DOLA: phUSD = DOLA / price
+  const estPhUSD = constants.dolaToPhUSDRate > 0
+    ? parsedAmount / constants.dolaToPhUSDRate
+    : 0;
+  const minReceived = estPhUSD * (1 - formData.slippageBps / 10000);
 
   // Calculate price impact (mock calculation for demonstration)
   const priceImpact = Math.min(parsedAmount / 10000, 0.1); // Simple price impact based on amount
@@ -127,8 +133,8 @@ export default function DepositForm({
         data={{
           inputAmount: parsedAmount,
           inputToken: 'DOLA',
-          outputAmount: estPxUSD,
-          outputToken: 'pxUSD',
+          outputAmount: estPhUSD,
+          outputToken: 'phUSD',
           priceImpact: priceImpact,
 
           slippage: formData.slippageBps,

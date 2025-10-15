@@ -2,8 +2,8 @@ import type { RateInfoProps } from '../../types/vault';
 
 export default function RateInfo({ constants, slippageBps, onSlippageChange, minReceived }: RateInfoProps) {
   // Price of 0 indicates loading or error state
-  const isLoadingPrice = constants.dolaToPxUSDRate === 0;
-  const displayPrice = isLoadingPrice ? "Loading..." : `≈ ${constants.dolaToPxUSDRate.toFixed(6)} pxUSD`;
+  const isLoadingPrice = constants.dolaToPhUSDRate === 0;
+  const displayPrice = isLoadingPrice ? "Loading..." : `≈ ${constants.dolaToPhUSDRate.toFixed(6)} phUSD`;
 
   return (
     <div className="space-y-3 text-sm">
@@ -30,7 +30,7 @@ export default function RateInfo({ constants, slippageBps, onSlippageChange, min
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground">Receive at least</span>
         <span className="font-medium text-foreground">
-          {minReceived > 0 ? minReceived.toFixed(6) : "-"} pxUSD
+          {minReceived > 0 ? minReceived.toFixed(6) : "-"} phUSD
         </span>
       </div>
     </div>

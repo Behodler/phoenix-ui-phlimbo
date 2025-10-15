@@ -8,7 +8,7 @@
       },
       {
         "title": "How does the bonding curve work?",
-        "body": "The bonding curve determines token price based on supply. When you deposit DOLA, you mint pxUSD at the current curve price. The price increases as more tokens are minted, creating an incentive for early participation."
+        "body": "The bonding curve determines token price based on supply. When you deposit DOLA, you mint phUSD at the current curve price. The price increases as more tokens are minted, creating an incentive for early participation."
       },
       {
         "title": "What does the progress percentage mean?",
@@ -16,7 +16,7 @@
       },
       {
         "title": "Why is the current price changing?",
-        "body": "The current price moves along the bonding curve as more pxUSD tokens are minted. Each deposit increases the price slightly, following the mathematical curve that ensures fair price discovery."
+        "body": "The current price moves along the bonding curve as more phUSD tokens are minted. Each deposit increases the price slightly, following the mathematical curve that ensures fair price discovery."
       }
     ]
   },
@@ -25,7 +25,7 @@
     "items": [
       {
         "title": "What happens when I deposit DOLA?",
-        "body": "When you deposit DOLA, it's converted to pxUSD at the current bonding curve price. The auto-stake option allows you to automatically stake your pxUSD for additional rewards."
+        "body": "When you deposit DOLA, it's converted to phUSD at the current bonding curve price. The auto-stake option allows you to automatically stake your phUSD for additional rewards."
       },
       {
         "title": "Why do I need to approve my tokens?",
@@ -50,7 +50,7 @@
       },
       {
         "title": "Can I withdraw partial amounts?",
-        "body": "Yes, you can withdraw any amount up to your total pxUSD balance. Use the 'Max' button to quickly select your full balance for withdrawal."
+        "body": "Yes, you can withdraw any amount up to your total phUSD balance. Use the 'Max' button to quickly select your full balance for withdrawal."
       }
     ]
   }

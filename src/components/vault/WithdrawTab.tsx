@@ -20,19 +20,16 @@ export default function WithdrawTab({
 
   const parsedAmount = Number(formData.amount) || 0;
 
-  // For withdraw, we burn pxUSD to get DOLA
-  // The rate should be inverse of deposit (pxUSD to DOLA)
-  // Handle edge case where price might be 0 (loading/error)
-  const pxUSDToDolaRate = constants.dolaToPxUSDRate > 0
-    ? 1 / constants.dolaToPxUSDRate
-    : 0;
-
+  // For withdraw: phUSD → DOLA conversion
+  // getCurrentMarginalPrice() returns price of 1 phUSD in DOLA
+  // If price = 0.81, then 1 phUSD costs 0.81 DOLA
+  // To get DOLA from phUSD: DOLA = phUSD * price
   // Calculate 2% withdrawal fee
   const withdrawalFeeRate = 0.02;
   const feeAmount = parsedAmount * withdrawalFeeRate;
   const amountAfterFee = parsedAmount - feeAmount;
 
-  const estDOLA = amountAfterFee * pxUSDToDolaRate;
+  const estDOLA = amountAfterFee * constants.dolaToPhUSDRate;
   const minReceived = estDOLA * (1 - formData.slippageBps / 10000);
 
   // Calculate price impact (mock calculation for demonstration)
@@ -77,7 +74,7 @@ export default function WithdrawTab({
 
   if (parsedAmount > 0) {
     if (parsedAmount > positionInfo.value) {
-      buttonLabel = "Insufficient pxUSD Balance";
+      buttonLabel = "Insufficient phUSD Balance";
     } else if (isAmountValid) {
       buttonLabel = "Withdraw";
       buttonAction = handleInitiateWithdraw;
@@ -85,8 +82,8 @@ export default function WithdrawTab({
     }
   }
 
-  // Create token info for pxUSD (the token being withdrawn)
-  const pxUSDTokenInfo = {
+  // Create token info for phUSD (the token being withdrawn)
+  const phUSDTokenInfo = {
     name: "phUSD",
     balance: positionInfo.value,
     balanceUsd: positionInfo.valueUsd,
@@ -100,7 +97,7 @@ export default function WithdrawTab({
 
         <div className="h-px w-full bg-border mb-6" />
 
-        <TokenRow token={pxUSDTokenInfo} />
+        <TokenRow token={phUSDTokenInfo} />
 
         <AmountInput
           amount={formData.amount}
@@ -115,7 +112,7 @@ export default function WithdrawTab({
             <div className="space-y-2 text-xs sm:text-sm">
               <div className="flex justify-between items-start">
                 <span className="text-foreground flex-shrink-0">Fee ({(withdrawalFeeRate * 100).toFixed(1)}%)</span>
-                <span className="font-medium text-pxusd-pink-400 text-right ml-2">{feeAmount.toFixed(4)} {pxUSDTokenInfo.name}</span>
+                <span className="font-medium text-pxusd-pink-400 text-right ml-2">{feeAmount.toFixed(4)} {phUSDTokenInfo.name}</span>
               </div>
               <div className="flex justify-between items-start">
                 <span className="text-foreground flex-shrink-0">You'll receive</span>
@@ -126,9 +123,7 @@ export default function WithdrawTab({
         )}
 
         <RateInfo
-          constants={{
-            dolaToPxUSDRate: pxUSDToDolaRate, // Use inverse rate for withdraw
-          }}
+          constants={constants}
           slippageBps={formData.slippageBps}
           onSlippageChange={handleSlippageChange}
           minReceived={minReceived}
@@ -150,7 +145,7 @@ export default function WithdrawTab({
         isLoading={isTransacting}
         data={{
           inputAmount: parsedAmount,
-          inputToken: 'pxUSD',
+          inputToken: 'phUSD',
           outputAmount: estDOLA,
           outputToken: 'DOLA',
           priceImpact: priceImpact,
