@@ -1,11 +1,15 @@
 import type { RateInfoProps } from '../../types/vault';
 
 export default function RateInfo({ constants, slippageBps, onSlippageChange, minReceived }: RateInfoProps) {
+  // Price of 0 indicates loading or error state
+  const isLoadingPrice = constants.dolaToPxUSDRate === 0;
+  const displayPrice = isLoadingPrice ? "Loading..." : `≈ ${constants.dolaToPxUSDRate.toFixed(6)} pxUSD`;
+
   return (
     <div className="space-y-3 text-sm">
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground">1 DOLA</span>
-        <span className="font-medium text-foreground">≈ {constants.dolaToPxUSDRate} pxUSD</span>
+        <span className="font-medium text-foreground">{displayPrice}</span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground">Max Slippage</span>

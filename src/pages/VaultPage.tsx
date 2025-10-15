@@ -102,9 +102,15 @@ export default function VaultPage() {
     slippageBps: 10, // 0.10%
   });
 
-  // Constants - these could also come from hooks in a real implementation
+  // Convert current price from bonding curve (wei) to decimal rate
+  // currentPriceRaw is in 1e18 format where > 1e18 means 1 DOLA buys more than 1 pxUSD
+  const dolaToPxUSDRate = currentPriceRaw
+    ? parseFloat(formatUnits(currentPriceRaw, 18))
+    : 0; // 0 signals loading/error state to child components
+
+  // Constants object for backward compatibility with existing components
   const constants: VaultConstants = {
-    dolaToPxUSDRate: 1.33, // Updated to match mock blockchain exchange rate (0.2% slippage)
+    dolaToPxUSDRate,
   };
 
   // Convert blockchain balance to TokenInfo format for components

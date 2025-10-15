@@ -22,7 +22,10 @@ export default function WithdrawTab({
 
   // For withdraw, we burn pxUSD to get DOLA
   // The rate should be inverse of deposit (pxUSD to DOLA)
-  const pxUSDToDolaRate = 1 / constants.dolaToPxUSDRate;
+  // Handle edge case where price might be 0 (loading/error)
+  const pxUSDToDolaRate = constants.dolaToPxUSDRate > 0
+    ? 1 / constants.dolaToPxUSDRate
+    : 0;
 
   // Calculate 2% withdrawal fee
   const withdrawalFeeRate = 0.02;
