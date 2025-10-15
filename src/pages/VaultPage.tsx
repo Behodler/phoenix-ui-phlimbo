@@ -189,15 +189,8 @@ export default function VaultPage() {
   // Event handlers
   const handleFormChange = (data: Partial<VaultFormData>) => {
     setFormData(prev => ({ ...prev, ...data }));
-
-    // Reset approval transaction state when amount changes and exceeds allowance
-    if (data.amount !== undefined) {
-      const newAmount = parseFloat(data.amount || '0');
-      // Reset transaction state if amount exceeds current allowance
-      if (newAmount > dolaAllowanceDecimal && approvalTransaction.state.isSuccess) {
-        approvalTransaction.reset();
-      }
-    }
+    // No need to reset approval transaction state - the blockchain allowance
+    // (dolaAllowanceDecimal) is the source of truth and updates automatically
   };
 
   // Handle approval button click
@@ -436,7 +429,7 @@ export default function VaultPage() {
                 tokenInfo={tokenInfo}
                 onDeposit={handleDeposit}
                 isTransacting={isTransacting || approvalTransaction.state.isPending || approvalTransaction.state.isConfirming}
-                needsApproval={parseFloat(formData.amount || '0') > dolaAllowanceDecimal && !approvalTransaction.state.isSuccess}
+                needsApproval={parseFloat(formData.amount || '0') > dolaAllowanceDecimal}
                 onApprove={handleApprove}
                 isAllowanceLoading={dolaAllowanceLoading}
               />
