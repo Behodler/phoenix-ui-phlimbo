@@ -136,8 +136,8 @@ export default function DepositForm({
           outputAmount: estPhUSD,
           outputToken: 'phUSD',
           priceImpact: priceImpact,
-
           slippage: formData.slippageBps,
+          marginalPrice: constants.dolaToPhUSDRate, // Current marginal price from bonding curve
         }}
       />
     </>

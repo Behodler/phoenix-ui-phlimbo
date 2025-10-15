@@ -7,6 +7,7 @@ interface DepositConfirmationData {
   outputToken: string;
   priceImpact: number;
   slippage: number;
+  marginalPrice: number; // Price of 1 phUSD in DOLA (e.g., 0.81 means 1 phUSD = 0.81 DOLA)
 }
 
 interface DepositConfirmationDialogProps {
@@ -69,7 +70,12 @@ export default function DepositConfirmationDialog({
           <div className="text-sm text-muted-foreground mb-2">You'll receive</div>
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">{formatNumber(data.outputAmount)} {data.outputToken}</span>
-            <span className="text-sm text-muted-foreground">${formatNumber(data.outputAmount)}</span>
+            {/* Calculate dollar value: phUSD quantity × marginal price (price of 1 phUSD in DOLA)
+                Since DOLA ≈ $1, this gives us the USD value of the phUSD received.
+                Example: 123.45 phUSD × 0.81 DOLA/phUSD = 100 DOLA ≈ $100 USD
+                Note: This uses the current marginal price, which is an approximation.
+                The actual post-trade price may differ due to slippage. */}
+            <span className="text-sm text-muted-foreground">${formatNumber(data.outputAmount * data.marginalPrice)}</span>
           </div>
         </div>
 
