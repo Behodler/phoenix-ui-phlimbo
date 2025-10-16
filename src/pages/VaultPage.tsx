@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
@@ -11,12 +11,24 @@ import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
 import WithdrawTab from '../components/vault/WithdrawTab';
+import TestnetFaucet from '../components/vault/TestnetFaucet';
 import BondingCurveBox from '../components/vault/BondingCurveBox';
 import FAQ from '../components/vault/FAQ';
 import DOLA from "../assets/sDOLA.png";
 
 export default function VaultPage() {
-  const tabs = ["Deposit to Mint", "Burn to Withdraw"] as const;
+  // Detect chain ID to determine if Testnet Faucet should be shown
+  const chainId = useChainId();
+  const isMainnet = chainId === 1;
+
+  // State to track if component has mounted (prevents flickering)
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Determine tabs based on network - hide faucet on mainnet
+  const tabs = isMounted && !isMainnet
+    ? (["Deposit to Mint", "Burn to Withdraw", "Testnet Faucet"] as const)
+    : (["Deposit to Mint", "Burn to Withdraw"] as const);
+
   const [activeTab, setActiveTab] = useState<Tab>("Deposit to Mint");
 
   // FAQ testing state - for manual testing during development
@@ -24,6 +36,11 @@ export default function VaultPage() {
 
   // Wagmi hooks for wallet connection
   const { isConnected, address: walletAddress } = useAccount();
+
+  // Set mounted state after initial render to prevent flickering
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Contract addresses context
   const { addresses, loading: addressesLoading, error: addressesError, networkType } = useContractAddresses();
@@ -528,7 +545,7 @@ export default function VaultPage() {
                 onApprove={handleApprove}
                 isAllowanceLoading={dolaAllowanceLoading}
               />
-            ) : (
+            ) : activeTab === "Burn to Withdraw" ? (
               <WithdrawTab
                 formData={formData}
                 onFormChange={handleFormChange}
@@ -537,6 +554,8 @@ export default function VaultPage() {
                 onWithdraw={handleWithdraw}
                 isTransacting={isTransacting}
               />
+            ) : (
+              <TestnetFaucet />
             )}
           </div>
         </section>
