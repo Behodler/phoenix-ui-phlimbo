@@ -1,5 +1,9 @@
 import { useState } from 'react';
+import { useReadContract } from 'wagmi';
+import { parseUnits, formatUnits } from 'viem';
 import type { DepositFormProps } from '../../types/vault';
+import { behodler3TokenlaunchAbi } from '../../generated/wagmi';
+import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import AmountDisplay from '../ui/AmountDisplay';
 import TokenRow from '../ui/TokenRow';
 import AmountInput from '../ui/AmountInput';
@@ -21,18 +25,52 @@ export default function DepositForm({
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
 
-  const parsedAmount = Number(formData.amount) || 0;
-  // For deposit: DOLA → phUSD conversion
-  // getCurrentMarginalPrice() returns price of 1 phUSD in DOLA
-  // If price = 0.81, then 1 phUSD costs 0.81 DOLA
-  // To get phUSD from DOLA: phUSD = DOLA / price
-  const estPhUSD = constants.dolaToPhUSDRate > 0
-    ? parsedAmount / constants.dolaToPhUSDRate
-    : 0;
-  const minReceived = estPhUSD * (1 - formData.slippageBps / 10000);
+  // Get contract addresses for bonding curve
+  const { addresses } = useContractAddresses();
 
-  // Calculate price impact (mock calculation for demonstration)
-  const priceImpact = Math.min(parsedAmount / 10000, 0.1); // Simple price impact based on amount
+  const parsedAmount = Number(formData.amount) || 0;
+
+  // Convert input amount to wei for contract call
+  const inputAmountWei = parsedAmount > 0 ? parseUnits(parsedAmount.toString(), 18) : 0n;
+
+  // Fetch expected bonding tokens output from bonding curve contract
+  const { data: expectedOutputWei, isLoading: isQuoteLoading } = useReadContract({
+    address: addresses?.bondingCurve as `0x${string}` | undefined,
+    abi: behodler3TokenlaunchAbi,
+    functionName: 'quoteAddLiquidity',
+    args: [inputAmountWei],
+    query: {
+      enabled: !!addresses?.bondingCurve && parsedAmount > 0,
+    },
+  });
+
+  // Calculate estimated phUSD and price impact using real contract data
+  let estPhUSD: number;
+  let priceImpact: number;
+
+  if (expectedOutputWei && parsedAmount > 0 && constants.dolaToPhUSDRate > 0) {
+    // Convert contract output from wei to decimal
+    estPhUSD = parseFloat(formatUnits(expectedOutputWei, 18));
+
+    // Calculate price impact:
+    // 1. Calculate what we WOULD get at current marginal price (no slippage)
+    const theoreticalOutput = parsedAmount / constants.dolaToPhUSDRate;
+
+    // 2. Compare actual output from bonding curve to theoretical output
+    // Price impact = (theoretical - actual) / theoretical
+    priceImpact = (theoreticalOutput - estPhUSD) / theoreticalOutput;
+
+    // Ensure price impact is non-negative and capped at 100%
+    priceImpact = Math.max(0, Math.min(priceImpact, 1.0));
+  } else {
+    // Fallback calculation when contract data not available
+    estPhUSD = constants.dolaToPhUSDRate > 0
+      ? parsedAmount / constants.dolaToPhUSDRate
+      : 0;
+    priceImpact = 0; // No price impact data available
+  }
+
+  const minReceived = estPhUSD * (1 - formData.slippageBps / 10000);
 
   const handleAmountChange = (amount: string) => {
     onFormChange({ amount });
