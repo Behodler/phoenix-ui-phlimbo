@@ -36,8 +36,9 @@ export default function DepositConfirmationDialog({
   // 1. Price impact from the trade size
   // 2. Current market conditions
   // 3. Bonding curve mechanics
-  const actualSlippageRequired = data.priceImpact * 100; // Convert to percentage
-  const userSlippagePercent = slippageBps / 10000 * 100;
+  // Both values are kept as decimals for accurate comparison (0.01 = 1%)
+  const actualSlippageRequired = data.priceImpact; // Keep as decimal
+  const userSlippagePercent = slippageBps / 10000; // Convert bps to decimal (50 bps = 0.005 = 0.5%)
   const isSlippageInsufficient = userSlippagePercent < actualSlippageRequired;
 
   // Sync with parent data when dialog opens
@@ -173,7 +174,7 @@ export default function DepositConfirmationDialog({
         {isSlippageInsufficient && (
           <div className="bg-pxusd-teal-700 border border-pxusd-pink-400 rounded-lg p-3">
             <div className="text-pxusd-pink-400 text-sm">
-              ⚠️ Slippage tolerance too low. The current price impact of {actualSlippageRequired.toFixed(2)}% requires at least {actualSlippageRequired.toFixed(2)}% slippage tolerance. Please increase your slippage tolerance to continue.
+              ⚠️ Slippage tolerance too low. The current price impact of {(actualSlippageRequired * 100).toFixed(2)}% requires at least {(actualSlippageRequired * 100).toFixed(2)}% slippage tolerance. Please increase your slippage tolerance to continue.
             </div>
           </div>
         )}
