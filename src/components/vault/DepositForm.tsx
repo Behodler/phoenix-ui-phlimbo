@@ -61,7 +61,11 @@ export default function DepositForm({
     setShowConfirmation(true);
   };
 
-  const handleConfirmDeposit = async () => {
+  const handleConfirmDeposit = async (slippageBps: number) => {
+    // Update the slippage in form data if it changed
+    if (slippageBps !== formData.slippageBps) {
+      onFormChange({ slippageBps });
+    }
     setShowConfirmation(false);
     onDeposit();
   };

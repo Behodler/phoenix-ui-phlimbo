@@ -186,3 +186,53 @@ export function useTokenApproval() {
     approve,
   }
 }
+
+/**
+ * Hook for adding liquidity to the bonding curve
+ * Calls the addLiquidity function on the Behodler3Tokenlaunch contract
+ *
+ * @param bondingCurveAddress - Address of the bonding curve contract
+ * @returns Object containing addLiquidity function and transaction state
+ */
+export function useAddLiquidity(bondingCurveAddress: Address | undefined) {
+  const { data: hash, writeContractAsync, isPending } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
+    hash,
+    query: {
+      enabled: !!hash,
+    },
+  })
+
+  /**
+   * Add liquidity to the bonding curve
+   *
+   * @param inputAmount - Amount of DOLA to deposit (in wei, scaled by 1e18)
+   * @param minBondingTokens - Minimum bonding tokens to receive (in wei, scaled by 1e18)
+   * @returns Promise that resolves to the transaction hash
+   */
+  const addLiquidity = async (
+    inputAmount: bigint,
+    minBondingTokens: bigint
+  ): Promise<Hash> => {
+    if (!bondingCurveAddress) {
+      throw new Error('Bonding curve address not available')
+    }
+
+    const hash = await writeContractAsync({
+      address: bondingCurveAddress,
+      abi: behodler3TokenlaunchAbi,
+      functionName: 'addLiquidity',
+      args: [inputAmount, minBondingTokens],
+    })
+    return hash
+  }
+
+  return {
+    addLiquidity,
+    isPending,
+    isConfirming,
+    isSuccess,
+    hash,
+    receipt,
+  }
+}

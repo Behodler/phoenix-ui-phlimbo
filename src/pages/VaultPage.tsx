@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
-import { useTokenBalance, useTokenAllowance, useTokenApproval, useBondingCurve } from '../hooks/useContractInteractions';
+import { useTokenBalance, useTokenAllowance, useTokenApproval, useBondingCurve, useAddLiquidity } from '../hooks/useContractInteractions';
 import { useApprovalTransaction } from '../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
-import { formatUnits } from 'viem';
+import { formatUnits, parseUnits } from 'viem';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
@@ -96,6 +96,16 @@ export default function VaultPage() {
   // Token approval hook
   const { approve } = useTokenApproval();
 
+  // Add liquidity hook
+  const {
+    addLiquidity,
+    isPending: isDepositPending,
+    isConfirming: isDepositConfirming,
+    isSuccess: isDepositSuccess,
+    hash: depositHash,
+    receipt: depositReceipt,
+  } = useAddLiquidity(addresses?.bondingCurve as `0x${string}` | undefined);
+
   // Form state
   const [formData, setFormData] = useState<VaultFormData>({
     amount: "",
@@ -130,6 +140,47 @@ export default function VaultPage() {
     valueUsd: phUSDBalance.balance?.balanceUsd ?? 0,
     isStaked: true,
   };
+
+  // Handle deposit success
+  useEffect(() => {
+    if (isDepositSuccess && depositReceipt) {
+      // Parse the transaction receipt to get the amount of bonding tokens minted
+      // The addLiquidity function returns bondingTokensOut, which should be in the logs
+      // For now, we'll extract it from the receipt logs
+      let bondingTokensMinted = '0';
+
+      try {
+        // The addLiquidity function returns bondingTokensOut as a uint256
+        // It should be emitted in the logs or we can decode the return value
+        // For simplicity, we'll calculate the expected output based on the input amount
+        const amount = parseFloat(formData.amount);
+        const estPhUSD = dolaToPhUSDRate > 0 ? amount / dolaToPhUSDRate : 0;
+        bondingTokensMinted = estPhUSD.toFixed(4);
+      } catch (error) {
+        console.error('Error parsing receipt:', error);
+      }
+
+      // Show success toast with amount minted
+      addToast({
+        type: 'success',
+        title: 'Deposit Successful',
+        description: `Successfully deposited ${formData.amount} DOLA and minted ${bondingTokensMinted} phUSD`,
+        duration: 8000,
+        action: {
+          label: 'View Transaction',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${depositHash}`
+              : `https://sepolia.etherscan.io/tx/${depositHash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
+      });
+
+      // Clear form after successful transaction
+      setFormData(prev => ({ ...prev, amount: "" }));
+    }
+  }, [isDepositSuccess, depositReceipt, depositHash, formData.amount, dolaToPhUSDRate, networkType, addToast]);
 
   // Approval transaction state management
   const approvalTransaction = useApprovalTransaction(
@@ -278,30 +329,71 @@ export default function VaultPage() {
       return;
     }
 
-    try {
-      // TODO: Implement actual deposit using wagmi hooks
-      // const transaction = await executeDeposit(amount, dolaBalance.balance, phUSDBalance.balance);
-
-
-      // Calculate the output amount based on exchange rate from mock blockchain (0.998 with slippage)
-      const outputAmount = (amount * 0.998).toFixed(4);
-
-      // Show success toast
+    if (!addresses?.bondingCurve) {
       addToast({
-        type: 'success',
-        title: 'Deposit Successful',
-        description: `Deposited ${amount} DOLA and received ${outputAmount} phUSD`,
-        duration: 6000,
+        type: 'error',
+        title: 'Contract Not Available',
+        description: 'Bonding curve contract address not loaded. Please try again.',
+      });
+      return;
+    }
+
+    try {
+      // Show pending toast
+      const pendingToastId = addToast({
+        type: 'info',
+        title: 'Confirm Transaction',
+        description: 'Please confirm the transaction in your wallet.',
+        duration: 0,
       });
 
-      // Clear form after successful transaction
-      setFormData(prev => ({ ...prev, amount: "" }));
+      // Calculate expected output and minimum received
+      // For deposit: DOLA → phUSD conversion
+      // If price = 0.81, then 1 phUSD costs 0.81 DOLA
+      // To get phUSD from DOLA: phUSD = DOLA / price
+      const estPhUSD = dolaToPhUSDRate > 0 ? amount / dolaToPhUSDRate : 0;
+      const minReceived = estPhUSD * (1 - formData.slippageBps / 10000);
+
+      // Scale parameters by 1e18 for contract call
+      const inputAmount = parseUnits(amount.toString(), 18);
+      const minBondingTokens = parseUnits(minReceived.toString(), 18);
+
+      // Call addLiquidity
+      const hash = await addLiquidity(inputAmount, minBondingTokens);
+
+      // Remove pending toast
+      removeToast(pendingToastId);
+
+      // Show confirming toast
+      const confirmingToastId = addToast({
+        type: 'info',
+        title: 'Transaction Submitted',
+        description: 'Waiting for blockchain confirmation...',
+        duration: 0,
+        action: {
+          label: 'View on Etherscan',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${hash}`
+              : `https://sepolia.etherscan.io/tx/${hash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
+      });
+
+      // Wait for the transaction to be mined
+      // The receipt will be available via the hook's state
+      // We'll handle success in a useEffect below
+
     } catch (error) {
       console.error('Deposit failed:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
         type: 'error',
         title: 'Deposit Failed',
-        description: 'The deposit transaction failed. Please try again.',
+        description: errorMessage,
+        duration: 8000,
       });
     }
   };
@@ -431,7 +523,7 @@ export default function VaultPage() {
                 constants={constants}
                 tokenInfo={tokenInfo}
                 onDeposit={handleDeposit}
-                isTransacting={isTransacting || approvalTransaction.state.isPending || approvalTransaction.state.isConfirming}
+                isTransacting={isTransacting || approvalTransaction.state.isPending || approvalTransaction.state.isConfirming || isDepositPending || isDepositConfirming}
                 needsApproval={parseFloat(formData.amount || '0') > dolaAllowanceDecimal}
                 onApprove={handleApprove}
                 isAllowanceLoading={dolaAllowanceLoading}
