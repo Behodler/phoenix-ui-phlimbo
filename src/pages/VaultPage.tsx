@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccount, useChainId } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
@@ -131,6 +131,10 @@ export default function VaultPage() {
     slippageBps: 10, // 0.10%
   });
 
+  // Store the deposit amount when transaction is initiated to prevent duplicate toasts
+  // This ref captures the amount before form reset, avoiding useEffect re-trigger
+  const lastDepositAmountRef = useRef<string>("");
+
   // Convert current price from bonding curve (wei) to decimal rate
   // getCurrentMarginalPrice() returns the price of 1 phUSD in terms of DOLA (scaled by 1e18)
   // If dolaToPhUSDRate = 0.81, it means 1 phUSD costs 0.81 DOLA
@@ -161,7 +165,7 @@ export default function VaultPage() {
 
   // Handle deposit success
   useEffect(() => {
-    if (isDepositSuccess && depositReceipt) {
+    if (isDepositSuccess && depositReceipt && lastDepositAmountRef.current) {
       // Parse the transaction receipt to get the amount of bonding tokens minted
       // The addLiquidity function returns bondingTokensOut, which should be in the logs
       // For now, we'll extract it from the receipt logs
@@ -171,7 +175,8 @@ export default function VaultPage() {
         // The addLiquidity function returns bondingTokensOut as a uint256
         // It should be emitted in the logs or we can decode the return value
         // For simplicity, we'll calculate the expected output based on the input amount
-        const amount = parseFloat(formData.amount);
+        // Use the ref value instead of formData.amount to prevent duplicate toasts
+        const amount = parseFloat(lastDepositAmountRef.current);
         const estPhUSD = dolaToPhUSDRate > 0 ? amount / dolaToPhUSDRate : 0;
         bondingTokensMinted = estPhUSD.toFixed(4);
       } catch (error) {
@@ -182,7 +187,7 @@ export default function VaultPage() {
       addToast({
         type: 'success',
         title: 'Deposit Successful',
-        description: `Successfully deposited ${formData.amount} DOLA and minted ${bondingTokensMinted} phUSD`,
+        description: `Successfully deposited ${lastDepositAmountRef.current} DOLA and minted ${bondingTokensMinted} phUSD`,
         duration: 8000,
         action: {
           label: 'View Transaction',
@@ -197,8 +202,11 @@ export default function VaultPage() {
 
       // Clear form after successful transaction
       setFormData(prev => ({ ...prev, amount: "" }));
+
+      // Clear the ref after successful toast display
+      lastDepositAmountRef.current = "";
     }
-  }, [isDepositSuccess, depositReceipt, depositHash, formData.amount, dolaToPhUSDRate, networkType, addToast]);
+  }, [isDepositSuccess, depositReceipt, depositHash, dolaToPhUSDRate, networkType, addToast]);
 
   // Approval transaction state management
   const approvalTransaction = useApprovalTransaction(
@@ -357,6 +365,9 @@ export default function VaultPage() {
     }
 
     try {
+      // Capture the deposit amount before transaction to prevent duplicate toasts
+      lastDepositAmountRef.current = formData.amount;
+
       // Show pending toast
       const pendingToastId = addToast({
         type: 'info',
