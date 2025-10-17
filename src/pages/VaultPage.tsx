@@ -43,6 +43,16 @@ export default function VaultPage() {
     setIsMounted(true);
   }, []);
 
+  // Form state - separate amounts for deposit and withdraw to prevent cross-tab persistence
+  // MUST be declared before useEffect that depends on these values to avoid TDZ errors
+  const [depositAmount, setDepositAmount] = useState<string>("");
+  const [withdrawAmount, setWithdrawAmount] = useState<string>("");
+  const [formData, setFormData] = useState<VaultFormData>({
+    amount: "", // This will be overridden by depositAmount or withdrawAmount depending on active tab
+    autoStake: false,
+    slippageBps: 10, // 0.10%
+  });
+
   // Sync formData.amount with the appropriate state variable when tab changes
   useEffect(() => {
     if (activeTab === "Deposit to Mint") {
@@ -170,15 +180,6 @@ export default function VaultPage() {
     hash: withdrawHash,
     receipt: withdrawReceipt,
   } = useRemoveLiquidity(addresses?.bondingCurve as `0x${string}` | undefined);
-
-  // Form state - separate amounts for deposit and withdraw to prevent cross-tab persistence
-  const [depositAmount, setDepositAmount] = useState<string>("");
-  const [withdrawAmount, setWithdrawAmount] = useState<string>("");
-  const [formData, setFormData] = useState<VaultFormData>({
-    amount: "", // This will be overridden by depositAmount or withdrawAmount depending on active tab
-    autoStake: false,
-    slippageBps: 10, // 0.10%
-  });
 
   // Store the deposit amount when transaction is initiated to prevent duplicate toasts
   // This ref captures the amount before form reset, avoiding useEffect re-trigger
