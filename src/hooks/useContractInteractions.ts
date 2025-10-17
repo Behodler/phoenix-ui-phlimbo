@@ -56,7 +56,7 @@ export function useAutoDolaVault() {
  * This is a generic hook for reading any ERC20 token balance from a wallet address
  */
 export function useTokenBalance(address: Address | undefined, token: Address | undefined) {
-  const { data, isError, isLoading } = useReadContract({
+  const { data, isError, isLoading, refetch } = useReadContract({
     address: token,
     abi: erc20Abi,
     functionName: 'balanceOf',
@@ -67,6 +67,7 @@ export function useTokenBalance(address: Address | undefined, token: Address | u
     balance: data as bigint | undefined,
     isError,
     isLoading,
+    refetch, // Expose refetch to allow manual balance updates after transactions
   }
 }
 
@@ -99,7 +100,7 @@ export function useTokenAllowance(
  */
 export function useBondingCurve(bondingCurveAddress: Address | undefined) {
   // Fetch current marginal price
-  const { data: currentPrice, isLoading: isLoadingCurrent, isError: isErrorCurrent } = useReadContract({
+  const { data: currentPrice, isLoading: isLoadingCurrent, isError: isErrorCurrent, refetch: refetchCurrent } = useReadContract({
     address: bondingCurveAddress,
     abi: behodler3TokenlaunchAbi,
     functionName: 'getCurrentMarginalPrice',
@@ -109,7 +110,7 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
   })
 
   // Fetch initial marginal price (start price)
-  const { data: initialPrice, isLoading: isLoadingInitial, isError: isErrorInitial } = useReadContract({
+  const { data: initialPrice, isLoading: isLoadingInitial, isError: isErrorInitial, refetch: refetchInitial } = useReadContract({
     address: bondingCurveAddress,
     abi: behodler3TokenlaunchAbi,
     functionName: 'getInitialMarginalPrice',
@@ -119,7 +120,7 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
   })
 
   // Fetch final marginal price (end price)
-  const { data: finalPrice, isLoading: isLoadingFinal, isError: isErrorFinal } = useReadContract({
+  const { data: finalPrice, isLoading: isLoadingFinal, isError: isErrorFinal, refetch: refetchFinal } = useReadContract({
     address: bondingCurveAddress,
     abi: behodler3TokenlaunchAbi,
     functionName: 'getFinalMarginalPrice',
@@ -128,7 +129,7 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
     },
   })
 
-  const { data: totalRaised } = useReadContract({
+  const { data: totalRaised, refetch: refetchTotalRaised } = useReadContract({
     address: bondingCurveAddress,
     abi: behodler3TokenlaunchAbi,
     functionName: 'getTotalRaised',
@@ -141,6 +142,17 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
   const isLoading = isLoadingCurrent || isLoadingInitial || isLoadingFinal
   const isError = isErrorCurrent || isErrorInitial || isErrorFinal
 
+  // Aggregate refetch function to update all bonding curve data at once
+  // This is called after transactions that affect the bonding curve state
+  const refetch = async () => {
+    await Promise.all([
+      refetchCurrent(),
+      refetchInitial(),
+      refetchFinal(),
+      refetchTotalRaised(),
+    ])
+  }
+
   return {
     currentPrice: currentPrice as bigint | undefined,
     initialPrice: initialPrice as bigint | undefined,
@@ -148,6 +160,7 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
     totalRaised: totalRaised as bigint | undefined,
     isLoading,
     isError,
+    refetch, // Expose aggregate refetch to update all bonding curve data after transactions
   }
 }
 
