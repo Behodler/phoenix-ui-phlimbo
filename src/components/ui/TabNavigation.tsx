@@ -1,6 +1,14 @@
 import type { TabNavigationProps } from '../../types/vault';
 
 export default function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationProps) {
+  // Get description text based on active tab
+  const getTabDescription = () => {
+    if (activeTab === "Deposit to Mint") return "You're depositing";
+    if (activeTab === "Burn to Withdraw") return "You're withdrawing";
+    if (activeTab === "Testnet Faucet") return "You're minting test tokens";
+    return "";
+  };
+
   return (
     <div className="flex border-b border-border">
       {tabs.map((tab) => (
@@ -18,7 +26,7 @@ export default function TabNavigation({ tabs, activeTab, onTabChange }: TabNavig
         </button>
       ))}
       <div className="ml-auto px-4 py-3 text-sm text-muted-foreground">
-        {activeTab === "Deposit to Mint" ? "You're depositing" : "You're withdrawing"}
+        {getTabDescription()}
       </div>
     </div>
   );
