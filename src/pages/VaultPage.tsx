@@ -52,7 +52,8 @@ export default function VaultPage() {
     initialPrice: initialPriceRaw,
     finalPrice: finalPriceRaw,
     isLoading: bondingCurveLoading,
-    isError: bondingCurveError
+    isError: bondingCurveError,
+    refetch: refetchBondingCurve
   } = useBondingCurve(addresses?.bondingCurve as `0x${string}` | undefined);
 
   // Convert prices from wei (18 decimals) to decimal format
@@ -66,7 +67,8 @@ export default function VaultPage() {
   const {
     balance: dolaBalanceRaw,
     isLoading: dolaBalanceLoading,
-    isError: dolaBalanceError
+    isError: dolaBalanceError,
+    refetch: refetchDolaBalance
   } = useTokenBalance(
     walletAddress,
     addresses?.dolaToken as `0x${string}` | undefined
@@ -200,13 +202,24 @@ export default function VaultPage() {
         }
       });
 
+      // Refetch all affected blockchain data to update UI immediately
+      // This fixes the bug where balances and bonding curve didn't update after transaction
+      const refetchData = async () => {
+        await Promise.all([
+          refetchDolaBalance(), // User's DOLA balance decreased
+          refetchBondingCurve(), // Bonding curve state changed (price, total raised)
+          refetchAllowance(), // Allowance may have been consumed during transaction
+        ]);
+      };
+      refetchData();
+
       // Clear form after successful transaction
       setFormData(prev => ({ ...prev, amount: "" }));
 
       // Clear the ref after successful toast display
       lastDepositAmountRef.current = "";
     }
-  }, [isDepositSuccess, depositReceipt, depositHash, dolaToPhUSDRate, networkType, addToast]);
+  }, [isDepositSuccess, depositReceipt, depositHash, dolaToPhUSDRate, networkType, addToast, refetchDolaBalance, refetchBondingCurve, refetchAllowance]);
 
   // Approval transaction state management
   const approvalTransaction = useApprovalTransaction(
