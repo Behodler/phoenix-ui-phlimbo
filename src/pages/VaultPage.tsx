@@ -43,6 +43,15 @@ export default function VaultPage() {
     setIsMounted(true);
   }, []);
 
+  // Sync formData.amount with the appropriate state variable when tab changes
+  useEffect(() => {
+    if (activeTab === "Deposit to Mint") {
+      setFormData(prev => ({ ...prev, amount: depositAmount }));
+    } else if (activeTab === "Burn to Withdraw") {
+      setFormData(prev => ({ ...prev, amount: withdrawAmount }));
+    }
+  }, [activeTab, depositAmount, withdrawAmount]);
+
   // Contract addresses context
   const { addresses, loading: addressesLoading, error: addressesError, networkType } = useContractAddresses();
 
@@ -162,9 +171,11 @@ export default function VaultPage() {
     receipt: withdrawReceipt,
   } = useRemoveLiquidity(addresses?.bondingCurve as `0x${string}` | undefined);
 
-  // Form state
+  // Form state - separate amounts for deposit and withdraw to prevent cross-tab persistence
+  const [depositAmount, setDepositAmount] = useState<string>("");
+  const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [formData, setFormData] = useState<VaultFormData>({
-    amount: "",
+    amount: "", // This will be overridden by depositAmount or withdrawAmount depending on active tab
     autoStake: false,
     slippageBps: 10, // 0.10%
   });
@@ -253,7 +264,8 @@ export default function VaultPage() {
       };
       refetchData();
 
-      // Clear form after successful transaction
+      // Clear deposit amount after successful transaction
+      setDepositAmount("");
       setFormData(prev => ({ ...prev, amount: "" }));
 
       // Clear the ref after successful toast display
@@ -313,7 +325,8 @@ export default function VaultPage() {
       };
       refetchData();
 
-      // Clear form after successful transaction
+      // Clear withdraw amount after successful transaction
+      setWithdrawAmount("");
       setFormData(prev => ({ ...prev, amount: "" }));
 
       // Clear the ref after successful toast display
@@ -382,6 +395,15 @@ export default function VaultPage() {
   // Event handlers
   const handleFormChange = (data: Partial<VaultFormData>) => {
     setFormData(prev => ({ ...prev, ...data }));
+
+    // Update the appropriate amount state based on active tab
+    if (data.amount !== undefined) {
+      if (activeTab === "Deposit to Mint") {
+        setDepositAmount(data.amount);
+      } else if (activeTab === "Burn to Withdraw") {
+        setWithdrawAmount(data.amount);
+      }
+    }
     // No need to reset approval transaction state - the blockchain allowance
     // (dolaAllowanceDecimal) is the source of truth and updates automatically
   };
