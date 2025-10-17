@@ -1,5 +1,9 @@
 import { useState } from 'react';
+import { useReadContract } from 'wagmi';
+import { parseUnits, formatUnits } from 'viem';
 import type { WithdrawFormProps } from '../../types/vault';
+import { behodler3TokenlaunchAbi } from '../../generated/wagmi';
+import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import AmountDisplay from '../ui/AmountDisplay';
 import TokenRow from '../ui/TokenRow';
 import AmountInput from '../ui/AmountInput';
@@ -19,21 +23,57 @@ export default function WithdrawTab({
 }: WithdrawFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
 
+  // Get contract addresses for bonding curve
+  const { addresses } = useContractAddresses();
+
   const parsedAmount = Number(formData.amount) || 0;
 
-  // For withdraw: phUSD → DOLA conversion
-  // getCurrentMarginalPrice() returns price of 1 phUSD in DOLA
-  // If price = 0.81, then 1 phUSD costs 0.81 DOLA
-  // To get DOLA from phUSD: DOLA = phUSD * price
   // Calculate withdrawal fee (using dynamic rate from contract)
   const feeAmount = parsedAmount * withdrawalFeeRate;
   const amountAfterFee = parsedAmount - feeAmount;
 
-  const estDOLA = amountAfterFee * constants.dolaToPhUSDRate;
-  const minReceived = estDOLA * (1 - formData.slippageBps / 10000);
+  // Convert phUSD amount after fee to wei for contract call
+  const inputAmountWei = amountAfterFee > 0 ? parseUnits(amountAfterFee.toString(), 18) : 0n;
 
-  // Calculate price impact (mock calculation for demonstration)
-  const priceImpact = Math.min(parsedAmount / 10000, 0.1); // Simple price impact based on amount
+  // Fetch expected DOLA output from bonding curve contract
+  const { data: expectedOutputWei, isLoading: isQuoteLoading } = useReadContract({
+    address: addresses?.bondingCurve as `0x${string}` | undefined,
+    abi: behodler3TokenlaunchAbi,
+    functionName: 'quoteRemoveLiquidity',
+    args: [inputAmountWei],
+    query: {
+      enabled: !!addresses?.bondingCurve && amountAfterFee > 0,
+    },
+  });
+
+  // Calculate estimated DOLA and price impact using real contract data
+  let estDOLA: number;
+  let priceImpact: number;
+
+  if (expectedOutputWei && amountAfterFee > 0 && constants.dolaToPhUSDRate > 0) {
+    // Convert contract output from wei to decimal
+    estDOLA = parseFloat(formatUnits(expectedOutputWei, 18));
+
+    // Calculate price impact:
+    // 1. Calculate what we WOULD get at current marginal price (no slippage)
+    // For withdraw: phUSD amount × marginal price = theoretical DOLA output
+    const theoreticalOutput = amountAfterFee * constants.dolaToPhUSDRate;
+
+    // 2. Compare actual output from bonding curve to theoretical output
+    // Price impact = (theoretical - actual) / theoretical
+    priceImpact = (theoreticalOutput - estDOLA) / theoreticalOutput;
+
+    // Ensure price impact is non-negative and capped at 100%
+    priceImpact = Math.max(0, Math.min(priceImpact, 1.0));
+  } else {
+    // Fallback calculation when contract data not available
+    estDOLA = constants.dolaToPhUSDRate > 0
+      ? amountAfterFee * constants.dolaToPhUSDRate
+      : 0;
+    priceImpact = 0; // No price impact data available
+  }
+
+  const minReceived = estDOLA * (1 - formData.slippageBps / 10000);
 
   const handleAmountChange = (amount: string) => {
     onFormChange({ amount });
@@ -155,6 +195,7 @@ export default function WithdrawTab({
           feeAmount: feeAmount,
           feeRate: withdrawalFeeRate,
           amountAfterFee: amountAfterFee,
+          marginalPrice: constants.dolaToPhUSDRate, // Current marginal price from bonding curve
         }}
       />
     </>

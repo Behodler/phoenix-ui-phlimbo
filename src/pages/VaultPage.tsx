@@ -3,7 +3,7 @@ import { useAccount, useChainId } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
-import { useTokenBalance, useTokenAllowance, useTokenApproval, useBondingCurve, useAddLiquidity } from '../hooks/useContractInteractions';
+import { useTokenBalance, useTokenAllowance, useTokenApproval, useBondingCurve, useAddLiquidity, useRemoveLiquidity } from '../hooks/useContractInteractions';
 import { useApprovalTransaction } from '../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
 import { formatUnits, parseUnits } from 'viem';
@@ -152,6 +152,16 @@ export default function VaultPage() {
     receipt: depositReceipt,
   } = useAddLiquidity(addresses?.bondingCurve as `0x${string}` | undefined);
 
+  // Remove liquidity hook
+  const {
+    removeLiquidity,
+    isPending: isWithdrawPending,
+    isConfirming: isWithdrawConfirming,
+    isSuccess: isWithdrawSuccess,
+    hash: withdrawHash,
+    receipt: withdrawReceipt,
+  } = useRemoveLiquidity(addresses?.bondingCurve as `0x${string}` | undefined);
+
   // Form state
   const [formData, setFormData] = useState<VaultFormData>({
     amount: "",
@@ -162,6 +172,9 @@ export default function VaultPage() {
   // Store the deposit amount when transaction is initiated to prevent duplicate toasts
   // This ref captures the amount before form reset, avoiding useEffect re-trigger
   const lastDepositAmountRef = useRef<string>("");
+
+  // Store the withdraw amount when transaction is initiated to prevent duplicate toasts
+  const lastWithdrawAmountRef = useRef<string>("");
 
   // Convert current price from bonding curve (wei) to decimal rate
   // getCurrentMarginalPrice() returns the price of 1 phUSD in terms of DOLA (scaled by 1e18)
@@ -247,6 +260,66 @@ export default function VaultPage() {
       lastDepositAmountRef.current = "";
     }
   }, [isDepositSuccess, depositReceipt, depositHash, dolaToPhUSDRate, networkType, addToast, refetchDolaBalance, refetchPhUSDBalance, refetchBondingCurve, refetchAllowance]);
+
+  // Handle withdraw success
+  useEffect(() => {
+    if (isWithdrawSuccess && withdrawReceipt && lastWithdrawAmountRef.current) {
+      // Parse the transaction receipt to get the amount of DOLA received
+      let dolaReceived = '0';
+      let phUSDBurnt = '0';
+      let feeAmount = '0';
+
+      try {
+        // Use the ref value instead of formData.amount to prevent duplicate toasts
+        const amount = parseFloat(lastWithdrawAmountRef.current);
+        phUSDBurnt = amount.toFixed(4);
+
+        // Calculate fee and amount after fee
+        const fee = amount * withdrawalFeeRate;
+        feeAmount = fee.toFixed(4);
+        const amountAfterFee = amount - fee;
+
+        // Calculate DOLA received using bonding curve rate
+        const estDOLA = dolaToPhUSDRate > 0 ? amountAfterFee * dolaToPhUSDRate : 0;
+        dolaReceived = estDOLA.toFixed(4);
+      } catch (error) {
+        console.error('Error parsing receipt:', error);
+      }
+
+      // Show success toast with actual amounts burnt and redeemed
+      addToast({
+        type: 'success',
+        title: 'Withdrawal Successful',
+        description: `Burned ${phUSDBurnt} phUSD • Fee: ${feeAmount} phUSD (${(withdrawalFeeRate * 100).toFixed(1)}%) • Received: ${dolaReceived} DOLA`,
+        duration: 8000,
+        action: {
+          label: 'View Transaction',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${withdrawHash}`
+              : `https://sepolia.etherscan.io/tx/${withdrawHash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
+      });
+
+      // Refetch all affected blockchain data to update UI immediately
+      const refetchData = async () => {
+        await Promise.all([
+          refetchDolaBalance(), // User's DOLA balance increased
+          refetchPhUSDBalance(), // User's phUSD balance decreased
+          refetchBondingCurve(), // Bonding curve state changed (price, total raised, fee)
+        ]);
+      };
+      refetchData();
+
+      // Clear form after successful transaction
+      setFormData(prev => ({ ...prev, amount: "" }));
+
+      // Clear the ref after successful toast display
+      lastWithdrawAmountRef.current = "";
+    }
+  }, [isWithdrawSuccess, withdrawReceipt, withdrawHash, dolaToPhUSDRate, withdrawalFeeRate, networkType, addToast, refetchDolaBalance, refetchPhUSDBalance, refetchBondingCurve]);
 
   // Approval transaction state management
   const approvalTransaction = useApprovalTransaction(
@@ -498,8 +571,9 @@ export default function VaultPage() {
     }
 
     if (amount > phUSDBalance.balance.balance) {
-      const feeAmount = (amount * 0.02).toFixed(4);
-      const dolaReceived = (amount * 0.98).toFixed(4);
+      const feeAmount = (amount * withdrawalFeeRate).toFixed(4);
+      const amountAfterFee = amount - (amount * withdrawalFeeRate);
+      const dolaReceived = (amountAfterFee * dolaToPhUSDRate).toFixed(4);
       addToast({
         type: 'error',
         title: 'Insufficient phUSD Balance',
@@ -509,63 +583,78 @@ export default function VaultPage() {
       return;
     }
 
-    // Calculate fee information
-    const feeRate = 0.02; // 2% withdrawal fee
-    const feeAmount = (amount * feeRate).toFixed(4);
-    const expectedOutput = (amount * (1 - feeRate)).toFixed(4);
-
-    // Show processing notification with fee reminder
-    const processingToastId = addToast({
-      type: 'info',
-      title: 'Processing Withdrawal...',
-      description: `Burning ${amount} phUSD with ${(feeRate * 100).toFixed(0)}% fee (${feeAmount} phUSD). You'll receive ${expectedOutput} DOLA.`,
-      duration: 0, // Don't auto-dismiss while processing
-    });
+    if (!addresses?.bondingCurve) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Available',
+        description: 'Bonding curve contract address not loaded. Please try again.',
+      });
+      return;
+    }
 
     try {
-      // TODO: Implement actual withdrawal using wagmi hooks
-      // const transaction = await executeWithdraw(amount, phUSDBalance.balance, dolaBalance.balance);
+      // Capture the withdraw amount before transaction to prevent duplicate toasts
+      lastWithdrawAmountRef.current = formData.amount;
 
-      // Simulate transaction delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Show pending toast
+      const pendingToastId = addToast({
+        type: 'info',
+        title: 'Confirm Transaction',
+        description: 'Please confirm the transaction in your wallet.',
+        duration: 0,
+      });
 
-      // Remove processing notification
-      setTimeout(() => removeToast(processingToastId), 1000);
+      // Calculate fee and amount after fee
+      const feeAmount = amount * withdrawalFeeRate;
+      const amountAfterFee = amount - feeAmount;
 
-      // Show enhanced success toast with fee details
+      // Calculate expected output and minimum received
+      // For withdraw: phUSD → DOLA conversion
+      // If price = 0.81, then 1 phUSD = 0.81 DOLA
+      // To get DOLA from phUSD: DOLA = phUSD × price
+      const estDOLA = dolaToPhUSDRate > 0 ? amountAfterFee * dolaToPhUSDRate : 0;
+      const minReceived = estDOLA * (1 - formData.slippageBps / 10000);
+
+      // Scale parameters by 1e18 for contract call
+      const bondingTokenAmount = parseUnits(amount.toString(), 18);
+      const minInputTokens = parseUnits(minReceived.toString(), 18);
+
+      // Call removeLiquidity
+      const hash = await removeLiquidity(bondingTokenAmount, minInputTokens);
+
+      // Remove pending toast
+      removeToast(pendingToastId);
+
+      // Show confirming toast
       addToast({
-        type: 'success',
-        title: 'Withdrawal Completed Successfully',
-        description: `Burned ${amount} phUSD • Fee: ${feeAmount} phUSD (${(feeRate * 100).toFixed(0)}%) • Received: ${expectedOutput} DOLA`,
-        duration: 8000,
+        type: 'info',
+        title: 'Transaction Submitted',
+        description: 'Waiting for blockchain confirmation...',
+        duration: 0,
         action: {
-          label: 'View Transaction',
-          onClick: () => {}
+          label: 'View on Etherscan',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${hash}`
+              : `https://sepolia.etherscan.io/tx/${hash}`;
+            window.open(explorerUrl, '_blank');
+          }
         }
       });
 
-      // Clear form after successful transaction
-      setFormData(prev => ({ ...prev, amount: "" }));
-    } catch (error) {
-      // Remove processing notification on error
-      removeToast(processingToastId);
+      // Wait for the transaction to be mined
+      // The receipt will be available via the hook's state
+      // We'll handle success in the useEffect above
 
+    } catch (error) {
       console.error('Withdraw failed:', error);
 
-      // Enhanced error notification with more context
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
         type: 'error',
         title: 'Withdrawal Failed',
-        description: `Transaction could not be completed: ${errorMessage}. Please check your balance and try again.`,
-        duration: 10000,
-        action: {
-          label: 'Retry',
-          onClick: () => {
-            // User can click to retry the same transaction
-            handleWithdraw();
-          }
-        }
+        description: errorMessage,
+        duration: 8000,
       });
     }
   };
@@ -604,7 +693,7 @@ export default function VaultPage() {
                 constants={constants}
                 positionInfo={positionInfo}
                 onWithdraw={handleWithdraw}
-                isTransacting={isTransacting}
+                isTransacting={isTransacting || isWithdrawPending || isWithdrawConfirming}
                 withdrawalFeeRate={withdrawalFeeRate}
               />
             ) : (

@@ -261,3 +261,53 @@ export function useAddLiquidity(bondingCurveAddress: Address | undefined) {
     receipt,
   }
 }
+
+/**
+ * Hook for removing liquidity from the bonding curve
+ * Calls the removeLiquidity function on the Behodler3Tokenlaunch contract
+ *
+ * @param bondingCurveAddress - Address of the bonding curve contract
+ * @returns Object containing removeLiquidity function and transaction state
+ */
+export function useRemoveLiquidity(bondingCurveAddress: Address | undefined) {
+  const { data: hash, writeContractAsync, isPending } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
+    hash,
+    query: {
+      enabled: !!hash,
+    },
+  })
+
+  /**
+   * Remove liquidity from the bonding curve
+   *
+   * @param bondingTokenAmount - Amount of phUSD to burn (in wei, scaled by 1e18)
+   * @param minInputTokens - Minimum DOLA to receive (in wei, scaled by 1e18)
+   * @returns Promise that resolves to the transaction hash
+   */
+  const removeLiquidity = async (
+    bondingTokenAmount: bigint,
+    minInputTokens: bigint
+  ): Promise<Hash> => {
+    if (!bondingCurveAddress) {
+      throw new Error('Bonding curve address not available')
+    }
+
+    const hash = await writeContractAsync({
+      address: bondingCurveAddress,
+      abi: behodler3TokenlaunchAbi,
+      functionName: 'removeLiquidity',
+      args: [bondingTokenAmount, minInputTokens],
+    })
+    return hash
+  }
+
+  return {
+    removeLiquidity,
+    isPending,
+    isConfirming,
+    isSuccess,
+    hash,
+    receipt,
+  }
+}
