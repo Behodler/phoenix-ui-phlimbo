@@ -115,7 +115,6 @@ export interface FAQProps {
 
 export interface FAQWrapperProps {
   componentType: string;
-  icon?: boolean;
   children: React.ReactNode;
   onTriggerFAQ: (componentName: string) => void;
 }

@@ -577,26 +577,24 @@ export default function VaultPage() {
             <div className="phoenix-card p-4">
               <h3 className="text-sm font-semibold text-card-foreground mb-3">FAQWrapper Demo</h3>
 
-              {/* Icon Mode Example */}
+              {/* Example 1: Button */}
               <div className="mb-4">
-                <p className="text-xs text-muted-foreground mb-2">Icon Mode (icon=true):</p>
+                <p className="text-xs text-muted-foreground mb-2">Wrapped Button (help cursor on hover):</p>
                 <FAQWrapper
                   componentType="BondingCurveBox"
-                  icon={true}
                   onTriggerFAQ={setFaqComponent}
                 >
                   <button className="px-4 py-2 bg-accent text-accent-foreground rounded-md text-sm hover:bg-accent/80">
-                    Interactive Button
+                    Click for FAQ
                   </button>
                 </FAQWrapper>
               </div>
 
-              {/* Direct Click Mode Example */}
+              {/* Example 2: Text Box */}
               <div className="mb-4">
-                <p className="text-xs text-muted-foreground mb-2">Direct Click Mode (icon=false):</p>
+                <p className="text-xs text-muted-foreground mb-2">Wrapped Text Box (entire area clickable):</p>
                 <FAQWrapper
                   componentType="DepositForm"
-                  icon={false}
                   onTriggerFAQ={setFaqComponent}
                 >
                   <div className="px-4 py-2 bg-card border border-border rounded-md text-sm">
@@ -605,15 +603,14 @@ export default function VaultPage() {
                 </FAQWrapper>
               </div>
 
-              {/* Another Icon Mode Example */}
+              {/* Example 3: Text Span */}
               <div>
-                <p className="text-xs text-muted-foreground mb-2">Icon Mode with Text:</p>
+                <p className="text-xs text-muted-foreground mb-2">Wrapped Text Span:</p>
                 <FAQWrapper
                   componentType="WithdrawTab"
-                  icon={true}
                   onTriggerFAQ={setFaqComponent}
                 >
-                  <span className="text-sm text-card-foreground">Hover over the icon for FAQ</span>
+                  <span className="text-sm text-card-foreground">Click this text for FAQ (help cursor)</span>
                 </FAQWrapper>
               </div>
             </div>
