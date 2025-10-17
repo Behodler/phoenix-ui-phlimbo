@@ -13,6 +13,7 @@ import DepositForm from '../components/vault/DepositForm';
 import WithdrawTab from '../components/vault/WithdrawTab';
 import BondingCurveBox from '../components/vault/BondingCurveBox';
 import FAQ from '../components/vault/FAQ';
+import FAQWrapper from '../components/vault/FAQWrapper';
 import DOLA from "../assets/sDOLA.png";
 
 export default function VaultPage() {
@@ -553,6 +554,51 @@ export default function VaultPage() {
 
           {/* FAQ Component - with manual testing controls */}
           <div className="space-y-4">
+            {/* FAQWrapper Demo Section */}
+            <div className="phoenix-card p-4">
+              <h3 className="text-sm font-semibold text-card-foreground mb-3">FAQWrapper Demo</h3>
+
+              {/* Icon Mode Example */}
+              <div className="mb-4">
+                <p className="text-xs text-muted-foreground mb-2">Icon Mode (icon=true):</p>
+                <FAQWrapper
+                  componentType="BondingCurveBox"
+                  icon={true}
+                  onTriggerFAQ={setFaqComponent}
+                >
+                  <button className="px-4 py-2 bg-accent text-accent-foreground rounded-md text-sm hover:bg-accent/80">
+                    Interactive Button
+                  </button>
+                </FAQWrapper>
+              </div>
+
+              {/* Direct Click Mode Example */}
+              <div className="mb-4">
+                <p className="text-xs text-muted-foreground mb-2">Direct Click Mode (icon=false):</p>
+                <FAQWrapper
+                  componentType="DepositForm"
+                  icon={false}
+                  onTriggerFAQ={setFaqComponent}
+                >
+                  <div className="px-4 py-2 bg-card border border-border rounded-md text-sm">
+                    Click Anywhere on This Text
+                  </div>
+                </FAQWrapper>
+              </div>
+
+              {/* Another Icon Mode Example */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Icon Mode with Text:</p>
+                <FAQWrapper
+                  componentType="WithdrawTab"
+                  icon={true}
+                  onTriggerFAQ={setFaqComponent}
+                >
+                  <span className="text-sm text-card-foreground">Hover over the icon for FAQ</span>
+                </FAQWrapper>
+              </div>
+            </div>
+
             {/* Manual Testing Controls - temporary for development */}
             <div className="phoenix-card p-4">
               <h3 className="text-sm font-semibold text-card-foreground mb-3">FAQ Testing Controls</h3>
