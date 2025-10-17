@@ -1,14 +1,36 @@
 import type { RateInfoProps } from '../../types/vault';
 
-export default function RateInfo({ constants, slippageBps, onSlippageChange, minReceived }: RateInfoProps) {
+export default function RateInfo({
+  constants,
+  slippageBps,
+  onSlippageChange,
+  minReceived,
+  invertRate = false,
+  outputToken = "phUSD"
+}: RateInfoProps) {
   // Price of 0 indicates loading or error state
   const isLoadingPrice = constants.dolaToPhUSDRate === 0;
-  const displayPrice = isLoadingPrice ? "Loading..." : `≈ ${constants.dolaToPhUSDRate.toFixed(6)} phUSD`;
+
+  // Calculate display based on invertRate flag
+  // For deposit (invertRate=false): "1 DOLA = X phUSD" where X = 1/price
+  // For withdraw (invertRate=true): "1 phUSD = Y DOLA" where Y = price
+  let displayLabel: string;
+  let displayPrice: string;
+
+  if (invertRate) {
+    // Withdraw: Show "1 phUSD = Y DOLA"
+    displayLabel = "1 phUSD";
+    displayPrice = isLoadingPrice ? "Loading..." : `≈ ${constants.dolaToPhUSDRate.toFixed(6)} DOLA`;
+  } else {
+    // Deposit: Show "1 DOLA = X phUSD"
+    displayLabel = "1 DOLA";
+    displayPrice = isLoadingPrice ? "Loading..." : `≈ ${constants.dolaToPhUSDRate.toFixed(6)} phUSD`;
+  }
 
   return (
     <div className="space-y-3 text-sm">
       <div className="flex items-center justify-between">
-        <span className="text-muted-foreground">1 DOLA</span>
+        <span className="text-muted-foreground">{displayLabel}</span>
         <span className="font-medium text-foreground">{displayPrice}</span>
       </div>
       <div className="flex items-center justify-between">
@@ -30,7 +52,7 @@ export default function RateInfo({ constants, slippageBps, onSlippageChange, min
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground">Receive at least</span>
         <span className="font-medium text-foreground">
-          {minReceived > 0 ? minReceived.toFixed(6) : "-"} phUSD
+          {minReceived > 0 ? minReceived.toFixed(6) : "-"} {outputToken}
         </span>
       </div>
     </div>

@@ -15,6 +15,7 @@ export default function WithdrawTab({
   positionInfo,
   onWithdraw,
   isTransacting = false,
+  withdrawalFeeRate = 0.02, // Default to 2% if not provided
 }: WithdrawFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
 
@@ -24,8 +25,7 @@ export default function WithdrawTab({
   // getCurrentMarginalPrice() returns price of 1 phUSD in DOLA
   // If price = 0.81, then 1 phUSD costs 0.81 DOLA
   // To get DOLA from phUSD: DOLA = phUSD * price
-  // Calculate 2% withdrawal fee
-  const withdrawalFeeRate = 0.02;
+  // Calculate withdrawal fee (using dynamic rate from contract)
   const feeAmount = parsedAmount * withdrawalFeeRate;
   const amountAfterFee = parsedAmount - feeAmount;
 
@@ -127,6 +127,8 @@ export default function WithdrawTab({
           slippageBps={formData.slippageBps}
           onSlippageChange={handleSlippageChange}
           minReceived={minReceived}
+          invertRate={true}
+          outputToken="DOLA"
         />
 
         <ActionButton

@@ -46,11 +46,12 @@ export default function VaultPage() {
   // Contract addresses context
   const { addresses, loading: addressesLoading, error: addressesError, networkType } = useContractAddresses();
 
-  // Fetch bonding curve prices
+  // Fetch bonding curve prices and withdraw fee
   const {
     currentPrice: currentPriceRaw,
     initialPrice: initialPriceRaw,
     finalPrice: finalPriceRaw,
+    withdrawalFeeBasisPoints: withdrawalFeeBasisPointsRaw,
     isLoading: bondingCurveLoading,
     isError: bondingCurveError,
     refetch: refetchBondingCurve
@@ -74,6 +75,15 @@ export default function VaultPage() {
     addresses?.dolaToken as `0x${string}` | undefined
   );
 
+  // Fetch phUSD balance from wallet's ERC20 token balance (following pattern from story 018)
+  const {
+    balance: phUSDBalanceRaw,
+    refetch: refetchPhUSDBalance
+  } = useTokenBalance(
+    walletAddress,
+    addresses?.bondingToken as `0x${string}` | undefined
+  );
+
 
   // Fetch DOLA allowance for bonding curve contract
   const {
@@ -92,10 +102,21 @@ export default function VaultPage() {
     ? parseFloat(formatUnits(dolaBalanceRaw, 18))
     : 0;
 
+  // Convert bigint balance to decimal number (phUSD uses 18 decimals)
+  const phUSDBalanceDecimal = phUSDBalanceRaw
+    ? parseFloat(formatUnits(phUSDBalanceRaw, 18))
+    : 0;
+
   // Convert bigint allowance to decimal number (DOLA uses 18 decimals)
   const dolaAllowanceDecimal = dolaAllowanceRaw
     ? parseFloat(formatUnits(dolaAllowanceRaw, 18))
     : 0;
+
+  // Convert withdraw fee from basis points to decimal rate
+  // Basis points: 200 = 2%, 100 = 1%, etc.
+  const withdrawalFeeRate = withdrawalFeeBasisPointsRaw
+    ? Number(withdrawalFeeBasisPointsRaw) / 10000
+    : 0.02; // Fallback to 2% if not loaded
 
   // Format balance data for components (assuming 1:1 USD ratio for DOLA)
   const dolaBalance = {
@@ -105,8 +126,13 @@ export default function VaultPage() {
     }
   };
 
-  // Mock phUSD balance - will be implemented in future story
-  const phUSDBalance = { balance: { balance: 0.0, balanceUsd: 0.0 } };
+  // Format phUSD balance data for components (using current bonding curve price for USD value)
+  const phUSDBalance = {
+    balance: {
+      balance: phUSDBalanceDecimal,
+      balanceUsd: phUSDBalanceDecimal * (currentPriceRaw ? parseFloat(formatUnits(currentPriceRaw, 18)) : 0)
+    }
+  };
   const isTransacting = false;
   const transactionError: string | undefined = undefined;
 
@@ -207,7 +233,8 @@ export default function VaultPage() {
       const refetchData = async () => {
         await Promise.all([
           refetchDolaBalance(), // User's DOLA balance decreased
-          refetchBondingCurve(), // Bonding curve state changed (price, total raised)
+          refetchPhUSDBalance(), // User's phUSD balance increased
+          refetchBondingCurve(), // Bonding curve state changed (price, total raised, fee)
           refetchAllowance(), // Allowance may have been consumed during transaction
         ]);
       };
@@ -219,7 +246,7 @@ export default function VaultPage() {
       // Clear the ref after successful toast display
       lastDepositAmountRef.current = "";
     }
-  }, [isDepositSuccess, depositReceipt, depositHash, dolaToPhUSDRate, networkType, addToast, refetchDolaBalance, refetchBondingCurve, refetchAllowance]);
+  }, [isDepositSuccess, depositReceipt, depositHash, dolaToPhUSDRate, networkType, addToast, refetchDolaBalance, refetchPhUSDBalance, refetchBondingCurve, refetchAllowance]);
 
   // Approval transaction state management
   const approvalTransaction = useApprovalTransaction(
@@ -407,7 +434,7 @@ export default function VaultPage() {
       removeToast(pendingToastId);
 
       // Show confirming toast
-      const confirmingToastId = addToast({
+      addToast({
         type: 'info',
         title: 'Transaction Submitted',
         description: 'Waiting for blockchain confirmation...',
@@ -578,6 +605,7 @@ export default function VaultPage() {
                 positionInfo={positionInfo}
                 onWithdraw={handleWithdraw}
                 isTransacting={isTransacting}
+                withdrawalFeeRate={withdrawalFeeRate}
               />
             ) : (
               <TestnetFaucet />
@@ -709,6 +737,7 @@ export default function VaultPage() {
       <footer className="mx-auto max-w-5xl px-4 pb-10 text-xs text-muted-foreground">
         <div className="border-t border-border pt-6 space-y-3">
           <p>RainbowKit wallet integration enabled. Connect your wallet to interact with Phoenix contracts.</p>
+          <p>Withdraw at any time • 0% Deposit Fee • {(withdrawalFeeRate * 100).toFixed(1)}% Withdraw Fee</p>
 
           {/* Balance and Allowance Loading/Error Status */}
           <div className="border-t border-border pt-3">

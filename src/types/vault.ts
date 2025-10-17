@@ -72,6 +72,8 @@ export interface RateInfoProps {
   slippageBps: number;
   onSlippageChange: (bps: number) => void;
   minReceived: number;
+  invertRate?: boolean; // If true, show "1 phUSD = X DOLA" instead of "1 DOLA = X phUSD"
+  outputToken?: string; // Token symbol for "Receive at least" display (defaults to phUSD)
 }
 
 export interface ActionButtonProps {
@@ -89,6 +91,7 @@ export interface WithdrawFormProps {
   positionInfo: PositionInfo;
   onWithdraw: () => void;
   isTransacting?: boolean;
+  withdrawalFeeRate?: number; // Decimal rate (e.g., 0.02 = 2%)
 }
 
 export interface BondingCurveBoxProps {

@@ -138,6 +138,16 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
     },
   })
 
+  // Fetch withdrawal fee in basis points (e.g., 200 = 2%)
+  const { data: withdrawalFeeBasisPoints, refetch: refetchFee } = useReadContract({
+    address: bondingCurveAddress,
+    abi: behodler3TokenlaunchAbi,
+    functionName: 'withdrawalFeeBasisPoints',
+    query: {
+      enabled: !!bondingCurveAddress,
+    },
+  })
+
   // Aggregate loading and error states
   const isLoading = isLoadingCurrent || isLoadingInitial || isLoadingFinal
   const isError = isErrorCurrent || isErrorInitial || isErrorFinal
@@ -150,6 +160,7 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
       refetchInitial(),
       refetchFinal(),
       refetchTotalRaised(),
+      refetchFee(),
     ])
   }
 
@@ -158,6 +169,7 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
     initialPrice: initialPrice as bigint | undefined,
     finalPrice: finalPrice as bigint | undefined,
     totalRaised: totalRaised as bigint | undefined,
+    withdrawalFeeBasisPoints: withdrawalFeeBasisPoints as bigint | undefined,
     isLoading,
     isError,
     refetch, // Expose aggregate refetch to update all bonding curve data after transactions
