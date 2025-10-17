@@ -114,7 +114,7 @@ export default function VaultPage() {
 
   // Convert withdraw fee from basis points to decimal rate
   // Basis points: 200 = 2%, 100 = 1%, etc.
-  const withdrawalFeeRate = withdrawalFeeBasisPointsRaw
+  const withdrawalFeeRate = withdrawalFeeBasisPointsRaw !== undefined
     ? Number(withdrawalFeeBasisPointsRaw) / 10000
     : 0.02; // Fallback to 2% if not loaded
 
