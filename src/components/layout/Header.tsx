@@ -1,5 +1,6 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import phoenixLogo from '../../assets/phUSD-nobackground.png';
+import WalletBalances from './WalletBalances';
 
 export default function Header() {
   return (
@@ -19,6 +20,7 @@ export default function Header() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <WalletBalances />
           <ConnectButton />
         </div>
       </div>
