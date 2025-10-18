@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAccount, useChainId } from 'wagmi';
+import { useAccount, useChainId, useReadContract } from 'wagmi';
 import type { Tab, VaultFormData, VaultConstants, TokenInfo, PositionInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
@@ -7,11 +7,13 @@ import { useTokenBalance, useTokenAllowance, useTokenApproval, useBondingCurve, 
 import { useApprovalTransaction } from '../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
 import { formatUnits, parseUnits } from 'viem';
+import { behodler3TokenlaunchAbi } from '../generated/wagmi';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
 import WithdrawTab from '../components/vault/WithdrawTab';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
+import Admin from '../components/vault/Admin';
 import BondingCurveBox from '../components/vault/BondingCurveBox';
 import FAQ from '../components/vault/FAQ';
 import FAQWrapper from '../components/vault/FAQWrapper';
@@ -25,18 +27,52 @@ export default function VaultPage() {
   // State to track if component has mounted (prevents flickering)
   const [isMounted, setIsMounted] = useState(false);
 
-  // Determine tabs based on network - hide faucet on mainnet
-  const tabs = isMounted && !isMainnet
-    ? (["Deposit to Mint", "Burn to Withdraw", "Testnet Faucet"] as const)
-    : (["Deposit to Mint", "Burn to Withdraw"] as const);
+  // Wagmi hooks for wallet connection
+  const { isConnected, address: walletAddress } = useAccount();
+
+  // Contract addresses context
+  const { addresses, loading: addressesLoading, error: addressesError, networkType } = useContractAddresses();
+
+  // Fetch the owner address from the bonding curve contract
+  const { data: ownerAddress } = useReadContract({
+    address: addresses?.bondingCurve as `0x${string}` | undefined,
+    abi: behodler3TokenlaunchAbi,
+    functionName: 'owner',
+    query: {
+      enabled: !!addresses?.bondingCurve,
+    },
+  });
+
+  // Check if the connected wallet is the owner (case-insensitive comparison)
+  const isOwner = isMounted && walletAddress && ownerAddress
+    ? walletAddress.toLowerCase() === ownerAddress.toLowerCase()
+    : false;
+
+  // Determine tabs based on network and owner status
+  // - Show Admin tab if user is the owner
+  // - Show Testnet Faucet if not on mainnet
+  const tabs: readonly Tab[] = (() => {
+    if (!isMounted) {
+      return ["Deposit to Mint", "Burn to Withdraw"];
+    }
+
+    const tabList: Tab[] = ["Deposit to Mint", "Burn to Withdraw"];
+
+    if (!isMainnet) {
+      tabList.push("Testnet Faucet");
+    }
+
+    if (isOwner) {
+      tabList.push("Admin");
+    }
+
+    return tabList;
+  })();
 
   const [activeTab, setActiveTab] = useState<Tab>("Deposit to Mint");
 
   // FAQ testing state - for manual testing during development
   const [faqComponent, setFaqComponent] = useState<string | undefined>("BondingCurveBox");
-
-  // Wagmi hooks for wallet connection
-  const { isConnected, address: walletAddress } = useAccount();
 
   // Set mounted state after initial render to prevent flickering
   useEffect(() => {
@@ -61,9 +97,6 @@ export default function VaultPage() {
       setFormData(prev => ({ ...prev, amount: withdrawAmount }));
     }
   }, [activeTab, depositAmount, withdrawAmount]);
-
-  // Contract addresses context
-  const { addresses, loading: addressesLoading, error: addressesError, networkType } = useContractAddresses();
 
   // Fetch bonding curve prices and withdraw fee
   const {
@@ -719,9 +752,11 @@ export default function VaultPage() {
                 isTransacting={isTransacting || isWithdrawPending || isWithdrawConfirming}
                 withdrawalFeeRate={withdrawalFeeRate}
               />
-            ) : (
+            ) : activeTab === "Testnet Faucet" ? (
               <TestnetFaucet />
-            )}
+            ) : activeTab === "Admin" ? (
+              <Admin />
+            ) : null}
           </div>
         </section>
 
