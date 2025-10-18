@@ -849,7 +849,7 @@ export default function VaultPage() {
       <footer className="mx-auto max-w-5xl px-4 pb-10 text-xs text-muted-foreground">
         <div className="border-t border-border pt-6 space-y-3">
           <p>RainbowKit wallet integration enabled. Connect your wallet to interact with Phoenix contracts.</p>
-          <p>Withdraw at any time • 0% Deposit Fee • {(withdrawalFeeRate * 100).toFixed(1)}% Withdraw Fee</p>
+          <p>Withdraw at any time • 0% Deposit Fee{withdrawalFeeRate !== 0 ? ` • ${(withdrawalFeeRate * 100).toFixed(1)}% Withdraw Fee` : ''}</p>
 
           {/* Balance and Allowance Loading/Error Status */}
           <div className="border-t border-border pt-3">

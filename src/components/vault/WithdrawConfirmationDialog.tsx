@@ -82,26 +82,28 @@ export default function WithdrawConfirmationDialog({
           </div>
         </div>
 
-        {/* Fee Breakdown */}
-        <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4">
-          <div className="text-sm font-medium text-pxusd-orange-300 mb-2">Fee Breakdown</div>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-foreground">Withdraw Amount</span>
-              <span className="font-medium">{formatNumber(data.inputAmount)} {data.inputToken}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-foreground">Withdrawal Fee ({formatPercent(data.feeRate)})</span>
-              <span className="font-medium text-pxusd-pink-400">-{formatNumber(data.feeAmount)} {data.inputToken}</span>
-            </div>
-            <div className="border-t border-pxusd-teal-600 pt-2">
-              <div className="flex justify-between font-medium">
-                <span className="text-pxusd-orange-300">Amount After Fee</span>
-                <span className="text-pxusd-orange-300">{formatNumber(data.amountAfterFee)} {data.inputToken}</span>
+        {/* Fee Breakdown - Only show when fee is non-zero */}
+        {data.feeRate !== 0 && (
+          <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4">
+            <div className="text-sm font-medium text-pxusd-orange-300 mb-2">Fee Breakdown</div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-foreground">Withdraw Amount</span>
+                <span className="font-medium">{formatNumber(data.inputAmount)} {data.inputToken}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-foreground">Withdrawal Fee ({formatPercent(data.feeRate)})</span>
+                <span className="font-medium text-pxusd-pink-400">-{formatNumber(data.feeAmount)} {data.inputToken}</span>
+              </div>
+              <div className="border-t border-pxusd-teal-600 pt-2">
+                <div className="flex justify-between font-medium">
+                  <span className="text-pxusd-orange-300">Amount After Fee</span>
+                  <span className="text-pxusd-orange-300">{formatNumber(data.amountAfterFee)} {data.inputToken}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Transaction Details */}
         <div className="space-y-2 text-sm">

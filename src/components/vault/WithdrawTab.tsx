@@ -145,8 +145,8 @@ export default function WithdrawTab({
           onMaxClick={handleMaxClick}
         />
 
-        {/* Fee Information Display */}
-        {parsedAmount > 0 && (
+        {/* Fee Information Display - Only show when fee is non-zero */}
+        {parsedAmount > 0 && withdrawalFeeRate !== 0 && (
           <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-3 sm:p-4 mb-4">
             <div className="text-sm font-medium text-pxusd-orange-300 mb-2">Withdrawal Fee</div>
             <div className="space-y-2 text-xs sm:text-sm">
