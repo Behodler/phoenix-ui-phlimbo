@@ -1,8 +1,30 @@
-import { useAccount } from 'wagmi';
-import { useReadContract } from 'wagmi';
+import { useState } from 'react';
+import { useAccount, useChainId, useReadContract, useWriteContract } from 'wagmi';
 import { behodler3TokenlaunchAbi } from '../../generated/wagmi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
+import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
+
+// ABI for ERC20 tokens with mint function (used on testnets)
+const mintableErc20Abi = [
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'amount', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'mint',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+] as const;
 
 /**
  * Admin Component
@@ -13,7 +35,10 @@ import ActionButton from '../ui/ActionButton';
  */
 export default function Admin() {
   const { isConnected, address: walletAddress } = useAccount();
-  const { addresses } = useContractAddresses();
+  const { addresses, networkType } = useContractAddresses();
+  const chainId = useChainId();
+  const { addToast, removeToast } = useToast();
+  const [isMinting, setIsMinting] = useState(false);
 
   // Fetch the owner address from the bonding curve contract
   const { data: ownerAddress } = useReadContract({
@@ -25,10 +50,139 @@ export default function Admin() {
     },
   });
 
-  // Placeholder handler for mint yield button (no functionality yet)
-  const handleMintYield = () => {
-    // Placeholder - functionality to be added in future story
-    console.log('Mint yield button clicked');
+  // Fetch DOLA balance from AutoDolaVault
+  const { data: vaultDolaBalance, refetch: refetchVaultBalance } = useReadContract({
+    address: addresses?.dolaToken as `0x${string}` | undefined,
+    abi: mintableErc20Abi,
+    functionName: 'balanceOf',
+    args: addresses?.autoDolaVault ? [addresses.autoDolaVault as `0x${string}`] : undefined,
+    query: {
+      enabled: !!addresses?.dolaToken && !!addresses?.autoDolaVault,
+    },
+  });
+
+  // Wagmi hook for contract write
+  const { writeContractAsync } = useWriteContract();
+
+  // Check if we should show mint yield button (hide on mainnet, chainID 1)
+  const isMainnet = chainId === 1;
+  const showMintYieldButton = !isMainnet;
+
+  /**
+   * Handle mint yield button click
+   * Mints 1% of current AutoDolaVault DOLA balance to the vault
+   */
+  const handleMintYield = async () => {
+    if (!isConnected || !walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet to mint yield.',
+      });
+      return;
+    }
+
+    if (!addresses?.dolaToken || !addresses?.autoDolaVault) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Available',
+        description: 'Contract addresses not loaded. Please try again.',
+      });
+      return;
+    }
+
+    if (!vaultDolaBalance || vaultDolaBalance === 0n) {
+      addToast({
+        type: 'error',
+        title: 'No Balance to Mint',
+        description: 'AutoDolaVault has no DOLA balance. Cannot mint yield.',
+      });
+      return;
+    }
+
+    setIsMinting(true);
+
+    try {
+      // Calculate 1% of current vault DOLA balance
+      const mintAmount = vaultDolaBalance / 100n;
+
+      // Show pending toast
+      const pendingToastId = addToast({
+        type: 'info',
+        title: 'Confirm Transaction',
+        description: 'Please confirm the mint yield transaction in your wallet.',
+        duration: 0,
+      });
+
+      // Call the mint function on the DOLA token contract, minting to AutoDolaVault
+      const hash = await writeContractAsync({
+        address: addresses.dolaToken as `0x${string}`,
+        abi: mintableErc20Abi,
+        functionName: 'mint',
+        args: [addresses.autoDolaVault as `0x${string}`, mintAmount],
+      });
+
+      // Remove pending toast
+      removeToast(pendingToastId);
+
+      // Show confirming toast
+      const confirmingToastId = addToast({
+        type: 'info',
+        title: 'Transaction Submitted',
+        description: 'Waiting for blockchain confirmation...',
+        duration: 0,
+        action: {
+          label: 'View on Explorer',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${hash}`
+              : networkType === 'local'
+              ? `http://localhost:8545` // Anvil doesn't have a block explorer
+              : `https://sepolia.etherscan.io/tx/${hash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
+      });
+
+      // Wait for confirmation (simplified - just using setTimeout)
+      setTimeout(async () => {
+        removeToast(confirmingToastId);
+
+        // Refetch vault balance to show updated amount
+        await refetchVaultBalance();
+
+        addToast({
+          type: 'success',
+          title: 'Yield Minted Successfully',
+          description: `Successfully minted 1% of vault balance (${(Number(mintAmount) / 1e18).toFixed(2)} DOLA) to AutoDolaVault!`,
+          duration: 8000,
+          action: {
+            label: 'View Transaction',
+            onClick: () => {
+              const explorerUrl = networkType === 'mainnet'
+                ? `https://etherscan.io/tx/${hash}`
+                : networkType === 'local'
+                ? `http://localhost:8545`
+                : `https://sepolia.etherscan.io/tx/${hash}`;
+              window.open(explorerUrl, '_blank');
+            }
+          }
+        });
+        setIsMinting(false);
+      }, 2000);
+
+    } catch (error) {
+      console.error('Mint yield failed:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      addToast({
+        type: 'error',
+        title: 'Mint Yield Failed',
+        description: errorMessage,
+        duration: 8000,
+      });
+      setIsMinting(false);
+    }
   };
 
   return (
@@ -59,16 +213,24 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* Mint Yield Button */}
-      <div className="mb-6">
-        <ActionButton
-          disabled={!isConnected}
-          onAction={handleMintYield}
-          label="Mint Yield"
-          variant="primary"
-          isLoading={false}
-        />
-      </div>
+      {/* Mint Yield Button - Hidden on mainnet (chainID 1) */}
+      {showMintYieldButton && (
+        <div className="mb-6">
+          <ActionButton
+            disabled={!isConnected || isMinting}
+            onAction={handleMintYield}
+            label={!isConnected ? "Connect Wallet" : "Mint Yield (1% of Vault Balance)"}
+            variant="primary"
+            isLoading={isMinting}
+          />
+          {vaultDolaBalance !== undefined && (
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              Current vault DOLA balance: {(Number(vaultDolaBalance) / 1e18).toFixed(2)} DOLA
+              {vaultDolaBalance > 0n && ` → Will mint ${(Number(vaultDolaBalance / 100n) / 1e18).toFixed(2)} DOLA`}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Contract and Function Dropdowns */}
       <div className="flex gap-4 mb-6">
@@ -103,7 +265,11 @@ export default function Admin() {
       <div className="mt-6 p-4 bg-card border border-border rounded-lg">
         <p className="text-xs text-muted-foreground">
           <strong>Note:</strong> This tab is only visible to the bonding curve contract owner.
-          Administrative functions will be added in future updates.
+          {showMintYieldButton && (
+            <span className="block mt-2">
+              <strong>Mint Yield:</strong> This testnet-only feature simulates yield generation by minting DOLA tokens directly into the AutoDolaVault. This button is hidden on mainnet.
+            </span>
+          )}
         </p>
       </div>
     </div>
