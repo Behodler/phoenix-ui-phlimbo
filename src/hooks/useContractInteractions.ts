@@ -1,55 +1,16 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
-import { autoDolaVaultAbi, behodler3TokenlaunchAbi } from '../generated/wagmi'
+import { behodler3TokenlaunchAbi } from '@behodler/wagmi-hooks'
 import { erc20Abi, maxUint256 } from 'viem'
 import type { Address, Hash } from 'viem'
 
-// For now, using placeholder addresses - these should be loaded from deployment server
-// or configured via environment variables
-const CONTRACTS = {
-  autoDolaVault: '0x0000000000000000000000000000000000000000' as Address,
-  behodler3Tokenlaunch: '0x0000000000000000000000000000000000000000' as Address,
-  vault: '0x0000000000000000000000000000000000000000' as Address,
-}
-
 /**
- * Hook for interacting with AutoDolaVault contract
+ * NOTE: useAutoDolaVault hook has been removed as it was unused.
+ * The hook had outdated function signatures that didn't match the ERC4626 standard
+ * in the @behodler/wagmi-hooks package. If direct AutoDolaVault interactions are needed
+ * in the future, use mockAutoDolaAbi from '@behodler/wagmi-hooks' with ERC4626 standard functions:
+ * - deposit(assets: bigint, receiver: Address) → shares
+ * - withdraw(assets: bigint, receiver: Address, owner: Address) → shares
  */
-export function useAutoDolaVault() {
-  const { data: hash, writeContract, isPending } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-    query: {
-      enabled: !!hash,
-    },
-  })
-
-  const deposit = async (amount: bigint, recipient: Address) => {
-    return writeContract({
-      address: CONTRACTS.autoDolaVault,
-      abi: autoDolaVaultAbi,
-      functionName: 'deposit',
-      args: [CONTRACTS.vault, amount, recipient],
-    })
-  }
-
-  const withdraw = async (token: Address, client: Address, amount: bigint, recipient: Address) => {
-    return writeContract({
-      address: CONTRACTS.autoDolaVault,
-      abi: autoDolaVaultAbi,
-      functionName: 'withdrawFrom',
-      args: [token, client, amount, recipient],
-    })
-  }
-
-  return {
-    deposit,
-    withdraw,
-    isPending,
-    isConfirming,
-    isSuccess,
-    hash,
-  }
-}
 
 /**
  * Hook for reading wallet's ERC20 token balance
