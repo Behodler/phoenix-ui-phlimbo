@@ -108,7 +108,6 @@ export default function VaultPage() {
     isError: bondingCurveError,
     refetch: refetchBondingCurve
   } = useBondingCurve(addresses?.bondingCurve as `0x${string}` | undefined);
-
   // Convert prices from wei (18 decimals) to decimal format
   const bondingCurveData = {
     startPrice: initialPriceRaw ? parseFloat(formatUnits(initialPriceRaw, 18)) : 0.74, // Fallback to mock
@@ -820,51 +819,46 @@ export default function VaultPage() {
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setFaqComponent("BondingCurveBox")}
-                  className={`px-3 py-1 text-xs rounded border ${
-                    faqComponent === "BondingCurveBox"
+                  className={`px-3 py-1 text-xs rounded border ${faqComponent === "BondingCurveBox"
                       ? "bg-accent text-accent-foreground border-accent"
                       : "bg-card border-border text-muted-foreground hover:bg-accent/5"
-                  }`}
+                    }`}
                 >
                   BondingCurveBox
                 </button>
                 <button
                   onClick={() => setFaqComponent("DepositForm")}
-                  className={`px-3 py-1 text-xs rounded border ${
-                    faqComponent === "DepositForm"
+                  className={`px-3 py-1 text-xs rounded border ${faqComponent === "DepositForm"
                       ? "bg-accent text-accent-foreground border-accent"
                       : "bg-card border-border text-muted-foreground hover:bg-accent/5"
-                  }`}
+                    }`}
                 >
                   DepositForm
                 </button>
                 <button
                   onClick={() => setFaqComponent("WithdrawTab")}
-                  className={`px-3 py-1 text-xs rounded border ${
-                    faqComponent === "WithdrawTab"
+                  className={`px-3 py-1 text-xs rounded border ${faqComponent === "WithdrawTab"
                       ? "bg-accent text-accent-foreground border-accent"
                       : "bg-card border-border text-muted-foreground hover:bg-accent/5"
-                  }`}
+                    }`}
                 >
                   WithdrawTab
                 </button>
                 <button
                   onClick={() => setFaqComponent("InvalidComponent")}
-                  className={`px-3 py-1 text-xs rounded border ${
-                    faqComponent === "InvalidComponent"
+                  className={`px-3 py-1 text-xs rounded border ${faqComponent === "InvalidComponent"
                       ? "bg-accent text-accent-foreground border-accent"
                       : "bg-card border-border text-muted-foreground hover:bg-accent/5"
-                  }`}
+                    }`}
                 >
                   Invalid
                 </button>
                 <button
                   onClick={() => setFaqComponent(undefined)}
-                  className={`px-3 py-1 text-xs rounded border ${
-                    faqComponent === undefined
+                  className={`px-3 py-1 text-xs rounded border ${faqComponent === undefined
                       ? "bg-accent text-accent-foreground border-accent"
                       : "bg-card border-border text-muted-foreground hover:bg-accent/5"
-                  }`}
+                    }`}
                 >
                   None
                 </button>
