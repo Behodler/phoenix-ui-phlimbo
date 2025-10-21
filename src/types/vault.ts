@@ -39,7 +39,7 @@ export interface DepositFormProps {
   onFormChange: (data: Partial<VaultFormData>) => void;
   constants: VaultConstants;
   tokenInfo: TokenInfo;
-  onDeposit: () => void;
+  onDeposit: (bondingCurveOutput?: number) => void;
   isTransacting?: boolean;
   needsApproval?: boolean;
   onApprove?: () => void;

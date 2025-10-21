@@ -453,7 +453,7 @@ export default function VaultPage() {
     }
   };
 
-  const handleDeposit = async () => {
+  const handleDeposit = async (bondingCurveOutput?: number) => {
     if (!isConnected) {
       addToast({
         type: 'error',
@@ -513,11 +513,14 @@ export default function VaultPage() {
       });
 
       // Calculate expected output and minimum received
-      // For deposit: DOLA → phUSD conversion
-      // If price = 0.81, then 1 phUSD costs 0.81 DOLA
-      // To get phUSD from DOLA: phUSD = DOLA / price
-      const estPhUSD = dolaToPhUSDRate > 0 ? amount / dolaToPhUSDRate : 0;
-      const minReceived = estPhUSD * (1 - formData.slippageBps / 10000);
+      // Use bonding curve output if available (from DepositForm's quoteAddLiquidity call)
+      // This ensures minReceived matches actual bonding curve output, not marginal price
+      // bondingCurveOutput comes from the actual bonding curve contract quote
+      const estPhUSD = bondingCurveOutput ?? (dolaToPhUSDRate > 0 ? amount / dolaToPhUSDRate : 0);
+
+      // Apply slippage tolerance and add 0.1% safety buffer for blockchain state changes
+      // Safety buffer accounts for other transactions executing between quote and our transaction
+      const minReceived = estPhUSD * (1 - formData.slippageBps / 10000) * 0.999;
 
       // Scale parameters by 1e18 for contract call
       const inputAmount = parseUnits(amount.toString(), 18);
