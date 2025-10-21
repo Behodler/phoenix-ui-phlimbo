@@ -7,7 +7,7 @@ import { useTokenBalance, useTokenAllowance, useTokenApproval, useBondingCurve, 
 import { useApprovalTransaction } from '../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
 import { formatUnits, parseUnits } from 'viem';
-import { behodler3TokenlaunchAbi } from '../generated/wagmi';
+import { behodler3TokenlaunchAbi } from '@behodler/wagmi-hooks';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
