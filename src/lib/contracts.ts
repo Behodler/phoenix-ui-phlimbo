@@ -13,5 +13,6 @@ export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
   autoDolaVault: '0x0000000000000000000000000000000000000000', // TODO: Add actual AutoDola vault address
   tokemakMainRewarder: '0x0000000000000000000000000000000000000000', // TODO: Add actual Tokemak main rewarder address
   bondingToken: '0x0000000000000000000000000000000000000000', // TODO: Add actual bonding token address
+  autoDolaYieldStrategy: '0x0000000000000000000000000000000000000000', // TODO: Add actual AutoDolaYieldStrategy address
   bondingCurve: '0x0000000000000000000000000000000000000000', // TODO: Add actual Behodler3Tokenlaunch address
 }
