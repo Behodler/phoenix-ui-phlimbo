@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
 import { useToast } from '../ui/ToastProvider';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
+import { useTokenBalance } from '../../hooks/useContractInteractions';
 import ActionButton from '../ui/ActionButton';
 
 // ABI for ERC20 tokens with mint function (used on testnets)
@@ -33,7 +34,19 @@ export default function TestnetFaucet() {
   const { addresses, networkType } = useContractAddresses();
 
   // Wagmi hooks for contract interaction
-  const { writeContractAsync } = useWriteContract();
+  const { data: hash, writeContractAsync } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    query: {
+      enabled: !!hash,
+    },
+  });
+
+  // Fetch DOLA balance to enable refetch after mint
+  const { refetch: refetchDolaBalance } = useTokenBalance(
+    walletAddress,
+    addresses?.dolaToken as `0x${string}` | undefined
+  );
 
   /**
    * Handle mint button click
@@ -73,7 +86,7 @@ export default function TestnetFaucet() {
       const mintAmount = parseUnits('10000', 18);
 
       // Call the mint function on the DOLA token contract
-      const hash = await writeContractAsync({
+      await writeContractAsync({
         address: addresses.dolaToken as `0x${string}`,
         abi: mintableErc20Abi,
         functionName: 'mint',
@@ -83,46 +96,13 @@ export default function TestnetFaucet() {
       // Remove pending toast
       removeToast(pendingToastId);
 
-      // Show confirming toast
-      const confirmingToastId = addToast({
+      // Show confirming toast - success will be handled by useEffect when transaction confirms
+      addToast({
         type: 'info',
         title: 'Transaction Submitted',
         description: 'Waiting for blockchain confirmation...',
         duration: 0,
-        action: {
-          label: 'View on Explorer',
-          onClick: () => {
-            const explorerUrl = networkType === 'mainnet'
-              ? `https://etherscan.io/tx/${hash}`
-              : `https://sepolia.etherscan.io/tx/${hash}`;
-            window.open(explorerUrl, '_blank');
-          }
-        }
       });
-
-      // Wait for transaction confirmation (we don't use the hook here for simplicity)
-      // The transaction will be confirmed in the background
-
-      // Show success toast after a short delay (simulating confirmation)
-      setTimeout(() => {
-        removeToast(confirmingToastId);
-        addToast({
-          type: 'success',
-          title: 'Faucet Successful',
-          description: 'Successfully minted 10,000 DOLA to your wallet!',
-          duration: 8000,
-          action: {
-            label: 'View Transaction',
-            onClick: () => {
-              const explorerUrl = networkType === 'mainnet'
-                ? `https://etherscan.io/tx/${hash}`
-                : `https://sepolia.etherscan.io/tx/${hash}`;
-              window.open(explorerUrl, '_blank');
-            }
-          }
-        });
-        setIsMinting(false);
-      }, 2000);
 
     } catch (error) {
       console.error('Mint failed:', error);
@@ -137,6 +117,39 @@ export default function TestnetFaucet() {
       setIsMinting(false);
     }
   };
+
+  // Handle mint transaction success
+  // Following the pattern from phoenix:031 for automatic balance refresh
+  useEffect(() => {
+    if (isSuccess && hash) {
+      // Show success toast
+      addToast({
+        type: 'success',
+        title: 'Faucet Successful',
+        description: 'Successfully minted 10,000 DOLA to your wallet!',
+        duration: 8000,
+        action: {
+          label: 'View Transaction',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${hash}`
+              : `https://sepolia.etherscan.io/tx/${hash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
+      });
+
+      // Refetch DOLA balance to update UI immediately after mint
+      // This ensures the balance reflects the newly minted tokens without manual refresh
+      const refetchData = async () => {
+        await refetchDolaBalance();
+      };
+      refetchData();
+
+      // Reset minting state
+      setIsMinting(false);
+    }
+  }, [isSuccess, hash, networkType, addToast, refetchDolaBalance]);
 
   return (
     <div className="p-6">
@@ -172,11 +185,11 @@ export default function TestnetFaucet() {
 
       {/* Mint Button */}
       <ActionButton
-        disabled={!isConnected || isMinting}
+        disabled={!isConnected || isMinting || isConfirming}
         onAction={handleMint}
         label={!isConnected ? "Connect Wallet" : "Mint 10 000 Dola"}
         variant="primary"
-        isLoading={isMinting}
+        isLoading={isMinting || isConfirming}
       />
 
       {/* Faucet Notice */}
