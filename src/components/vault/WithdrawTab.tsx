@@ -93,7 +93,11 @@ export default function WithdrawTab({
     setShowConfirmation(true);
   };
 
-  const handleConfirmWithdraw = async () => {
+  const handleConfirmWithdraw = async (slippageBps: number) => {
+    // Update the slippage in form data if it changed
+    if (slippageBps !== formData.slippageBps) {
+      onFormChange({ slippageBps });
+    }
     setShowConfirmation(false);
     // Pass bonding curve output to parent for accurate minReceived calculation
     onWithdraw(estDOLA);
