@@ -41,6 +41,12 @@ export default function DepositConfirmationDialog({
   const userSlippagePercent = slippageBps / 10000; // Convert bps to decimal (50 bps = 0.005 = 0.5%)
   const isSlippageInsufficient = userSlippagePercent < actualSlippageRequired;
 
+  // Calculate minimum slippage display value, rounded UP to avoid UX confusion
+  // Example: If actual requirement is 0.124%, we must display 0.13% (not 0.12%)
+  // because users expect the displayed "minimum" to actually work when they use it
+  // Formula: Math.ceil(value * 100 * 100) / 100 rounds UP to 2 decimal places
+  const minSlippageDisplay = (Math.ceil(actualSlippageRequired * 100 * 100) / 100).toFixed(2);
+
   // Sync with parent data when dialog opens
   useEffect(() => {
     if (isOpen) {
@@ -174,7 +180,7 @@ export default function DepositConfirmationDialog({
         {isSlippageInsufficient && (
           <div className="bg-pxusd-teal-700 border border-pxusd-pink-400 rounded-lg p-3">
             <div className="text-pxusd-pink-400 text-sm">
-              ⚠️ Slippage tolerance too low. The current price impact of {(actualSlippageRequired * 100).toFixed(2)}% requires at least {(actualSlippageRequired * 100).toFixed(2)}% slippage tolerance. Please increase your slippage tolerance to continue.
+              ⚠️ Slippage tolerance too low. The current price impact of {(actualSlippageRequired * 100).toFixed(2)}% requires at least {minSlippageDisplay}% slippage tolerance. Please increase your slippage tolerance to continue.
             </div>
           </div>
         )}
