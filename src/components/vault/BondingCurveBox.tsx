@@ -58,123 +58,123 @@ export default function BondingCurveBox({
         {!isLoading && !isError && (
           <>
 
-        {/* Bonding Curve Visualization */}
-        <div className="relative overflow-hidden">
-          <svg
-            width={svgWidth}
-            height={svgHeight}
-            className="w-full h-auto min-h-[120px]"
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            preserveAspectRatio="xMidYMid meet"
-          >
-            {/* Background grid lines */}
-            <defs>
-              <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                <path
-                  d="M 20 0 L 0 0 0 20"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.1)"
-                  strokeWidth="0.5"
+            {/* Bonding Curve Visualization */}
+            <div className="relative overflow-hidden">
+              <svg
+                width={svgWidth}
+                height={svgHeight}
+                className="w-full h-auto min-h-[120px]"
+                viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+                preserveAspectRatio="xMidYMid meet"
+              >
+                {/* Background grid lines */}
+                <defs>
+                  <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path
+                      d="M 20 0 L 0 0 0 20"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.1)"
+                      strokeWidth="0.5"
+                    />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" opacity="0.3" />
+
+                {/* Bonding curve line */}
+                <line
+                  x1={startX}
+                  y1={startY}
+                  x2={endX}
+                  y2={endY}
+                  stroke="var(--pxusd-orange-500)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
                 />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" opacity="0.3" />
 
-            {/* Bonding curve line */}
-            <line
-              x1={startX}
-              y1={startY}
-              x2={endX}
-              y2={endY}
-              stroke="var(--pxusd-orange-500)"
-              strokeWidth="3"
-              strokeLinecap="round"
-            />
+                {/* Progress line (completed portion) */}
+                <line
+                  x1={startX}
+                  y1={startY}
+                  x2={currentX}
+                  y2={currentY}
+                  stroke="var(--pxusd-pink-400)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
 
-            {/* Progress line (completed portion) */}
-            <line
-              x1={startX}
-              y1={startY}
-              x2={currentX}
-              y2={currentY}
-              stroke="var(--pxusd-pink-400)"
-              strokeWidth="3"
-              strokeLinecap="round"
-            />
+                {/* Current price marker with pulsing animation */}
+                <g>
+                  <circle
+                    cx={currentX}
+                    cy={currentY}
+                    r="6"
+                    fill="var(--pxusd-pink-400)"
+                    className="animate-pulse"
+                  />
+                  <circle
+                    cx={currentX}
+                    cy={currentY}
+                    r="3"
+                    fill="var(--pxusd-white)"
+                  />
+                </g>
 
-            {/* Current price marker with pulsing animation */}
-            <g>
-              <circle
-                cx={currentX}
-                cy={currentY}
-                r="6"
-                fill="var(--pxusd-pink-400)"
-                className="animate-pulse"
-              />
-              <circle
-                cx={currentX}
-                cy={currentY}
-                r="3"
-                fill="var(--pxusd-white)"
-              />
-            </g>
+                {/* Price labels */}
+                <text
+                  x={startX}
+                  y={startY + 20}
+                  textAnchor="start"
+                  className="text-xs fill-muted-foreground"
+                >
+                  ${startPrice.toFixed(2)}
+                </text>
+                <text
+                  x={endX}
+                  y={endY - 10}
+                  textAnchor="end"
+                  className="text-xs fill-muted-foreground"
+                >
+                  ${endPrice.toFixed(2)}
+                </text>
 
-            {/* Price labels */}
-            <text
-              x={startX}
-              y={startY + 20}
-              textAnchor="start"
-              className="text-xs fill-muted-foreground"
-            >
-              ${startPrice.toFixed(2)}
-            </text>
-            <text
-              x={endX}
-              y={endY - 10}
-              textAnchor="end"
-              className="text-xs fill-muted-foreground"
-            >
-              ${endPrice.toFixed(2)}
-            </text>
-
-            {/* Current price label */}
-            <text
-              x={currentX}
-              y={currentY - 15}
-              textAnchor="middle"
-              className="text-xs font-semibold fill-card-foreground"
-            >
-              ${currentPrice.toFixed(2)}
-            </text>
-          </svg>
-        </div>
-
-        {/* Progress indicator */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-xs sm:text-sm text-muted-foreground">
-            <span>Progress</span>
-            <span>{progress.toFixed(1)}%</span>
-          </div>
-          <div className="w-full bg-border rounded-full h-2">
-            <div
-              className="h-2 rounded-full transition-all duration-500 ease-out"
-              style={{
-                width: `${progress}%`,
-                background: 'var(--grad-accent)'
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Additional info */}
-        <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm pt-4 border-t border-border">
-          <div className="text-muted-foreground">Current Phase</div>
-          <div className="text-right">
-            <div className="font-semibold text-card-foreground">
-              {progress < 25 ? 'Early' : progress < 75 ? 'Active' : 'Late'} Ignition
+                {/* Current price label */}
+                <text
+                  x={currentX}
+                  y={currentY - 15}
+                  textAnchor="middle"
+                  className="text-xs font-semibold fill-card-foreground"
+                >
+                  ${currentPrice.toFixed(2)}
+                </text>
+              </svg>
             </div>
-          </div>
-        </div>
+
+            {/* Progress indicator */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs sm:text-sm text-muted-foreground">
+                <span>Progress</span>
+                <span>{progress.toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-border rounded-full h-2">
+                <div
+                  className="h-2 rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width: `${progress}%`,
+                    background: 'var(--grad-accent)'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Additional info */}
+            <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm pt-4 border-t border-border">
+              <div className="text-muted-foreground">Current Phase</div>
+              <div className="text-right">
+                <div className="font-semibold text-card-foreground">
+                  {progress < 25 ? 'Early' : progress < 75 ? 'Active' : 'Late'} Ignition
+                </div>
+              </div>
+            </div>
           </>
         )}
       </div>

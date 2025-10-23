@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useReadContract } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
 import type { DepositFormProps } from '../../types/vault';
-import { behodler3TokenlaunchAbi } from '../../generated/wagmi';
+import { behodler3TokenlaunchAbi } from '@behodler/wagmi-hooks';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import AmountDisplay from '../ui/AmountDisplay';
 import TokenRow from '../ui/TokenRow';

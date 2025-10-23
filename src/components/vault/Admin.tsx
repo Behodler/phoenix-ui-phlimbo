@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAccount, useChainId, useReadContract, useWriteContract } from 'wagmi';
-import { behodler3TokenlaunchAbi } from '../../generated/wagmi';
+import { behodler3TokenlaunchAbi } from '@behodler/wagmi-hooks';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';

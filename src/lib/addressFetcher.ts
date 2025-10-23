@@ -36,6 +36,7 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       autoDolaVault: data.contracts.mockAutoDolaVault,
       tokemakMainRewarder: data.contracts.mockMainRewarder,
       bondingToken: data.contracts.bondingToken,
+      autoDolaYieldStrategy: data.contracts.autoDolaYieldStrategy,
       bondingCurve: data.contracts.behodler3Tokenlaunch,
     }
 

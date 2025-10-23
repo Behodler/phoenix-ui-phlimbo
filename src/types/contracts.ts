@@ -11,6 +11,7 @@ export interface ContractAddresses {
   autoDolaVault: string
   tokemakMainRewarder: string
   bondingToken: string
+  autoDolaYieldStrategy: string
   bondingCurve: string
 }
 
@@ -34,6 +35,7 @@ export interface LocalAddressServerResponse {
     mockAutoDolaVault: string
     mockMainRewarder: string
     bondingToken: string
+    autoDolaYieldStrategy: string
     behodler3Tokenlaunch: string
   }
 }

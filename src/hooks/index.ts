@@ -1,6 +1,5 @@
 // Contract interaction hooks
 export {
-  useAutoDolaVault,
   useTokenBalance,
   useTokenAllowance,
   useBondingCurve,
