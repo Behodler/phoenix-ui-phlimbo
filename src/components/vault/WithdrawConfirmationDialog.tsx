@@ -36,7 +36,11 @@ export default function WithdrawConfirmationDialog({
   };
 
   const formatPercent = (num: number) => {
-    return `${(num * 100).toFixed(2)}%`;
+    // Round UP to 2 decimal places to avoid UX confusion
+    // Users need to see the actual minimum slippage value they should use
+    // Example: 0.124% should display as 0.13% (not 0.12%)
+    // Formula: Math.ceil(value * 100 * 100) / 100 rounds UP to 2 decimal places
+    return `${(Math.ceil(num * 100 * 100) / 100).toFixed(2)}%`;
   };
 
   return (
