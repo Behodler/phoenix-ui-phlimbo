@@ -220,8 +220,8 @@ export function useTokenApproval() {
  * @returns Object containing addLiquidity function and transaction state
  */
 export function useAddLiquidity(bondingCurveAddress: Address | undefined) {
-  const { data: hash, writeContractAsync, isPending } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
+  const { data: hash, writeContractAsync, isPending, error: writeError, isError: isWriteError } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess, data: receipt, error: receiptError, isError: isReceiptError } = useWaitForTransactionReceipt({
     hash,
     query: {
       enabled: !!hash,
@@ -259,6 +259,8 @@ export function useAddLiquidity(bondingCurveAddress: Address | undefined) {
     isSuccess,
     hash,
     receipt,
+    error: writeError || receiptError,
+    isError: isWriteError || isReceiptError,
   }
 }
 
@@ -270,8 +272,8 @@ export function useAddLiquidity(bondingCurveAddress: Address | undefined) {
  * @returns Object containing removeLiquidity function and transaction state
  */
 export function useRemoveLiquidity(bondingCurveAddress: Address | undefined) {
-  const { data: hash, writeContractAsync, isPending } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
+  const { data: hash, writeContractAsync, isPending, error: writeError, isError: isWriteError } = useWriteContract()
+  const { isLoading: isConfirming, isSuccess, data: receipt, error: receiptError, isError: isReceiptError } = useWaitForTransactionReceipt({
     hash,
     query: {
       enabled: !!hash,
@@ -309,5 +311,7 @@ export function useRemoveLiquidity(bondingCurveAddress: Address | undefined) {
     isSuccess,
     hash,
     receipt,
+    error: writeError || receiptError,
+    isError: isWriteError || isReceiptError,
   }
 }

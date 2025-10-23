@@ -169,6 +169,8 @@ export default function VaultPage() {
     isSuccess: isDepositSuccess,
     hash: depositHash,
     receipt: depositReceipt,
+    error: depositError,
+    isError: isDepositError,
   } = useAddLiquidity(addresses?.bondingCurve as `0x${string}` | undefined);
 
   // Remove liquidity hook
@@ -179,6 +181,8 @@ export default function VaultPage() {
     isSuccess: isWithdrawSuccess,
     hash: withdrawHash,
     receipt: withdrawReceipt,
+    error: withdrawError,
+    isError: isWithdrawError,
   } = useRemoveLiquidity(addresses?.bondingCurve as `0x${string}` | undefined);
 
   // Store the deposit amount when transaction is initiated to prevent duplicate toasts
@@ -334,6 +338,70 @@ export default function VaultPage() {
       lastWithdrawAmountRef.current = "";
     }
   }, [isWithdrawSuccess, withdrawReceipt, withdrawHash, dolaToPhUSDRate, withdrawalFeeRate, networkType, addToast, refetchDolaBalance, refetchPhUSDBalance, refetchBondingCurve]);
+
+  // Handle deposit errors
+  useEffect(() => {
+    if (isDepositError && depositError) {
+      console.error('Deposit transaction error:', depositError);
+
+      // Extract error message
+      let errorMessage = 'An error occurred during the deposit transaction.';
+
+      // Check for common error patterns
+      if (depositError.message.includes('User rejected') || depositError.message.includes('user rejected')) {
+        errorMessage = 'Transaction was rejected in your wallet.';
+      } else if (depositError.message.includes('insufficient')) {
+        errorMessage = 'Insufficient amount or slippage tolerance too low. Try increasing slippage.';
+      } else if (depositError.message.includes('gas')) {
+        errorMessage = 'Gas estimation failed. The transaction may fail or require more gas.';
+      } else if (depositError.message) {
+        // Use the actual error message if available
+        errorMessage = depositError.message;
+      }
+
+      addToast({
+        type: 'error',
+        title: 'Deposit Failed',
+        description: errorMessage,
+        duration: 8000,
+      });
+
+      // Clear the deposit amount ref to prevent stale state
+      lastDepositAmountRef.current = "";
+    }
+  }, [isDepositError, depositError, addToast]);
+
+  // Handle withdraw errors
+  useEffect(() => {
+    if (isWithdrawError && withdrawError) {
+      console.error('Withdraw transaction error:', withdrawError);
+
+      // Extract error message
+      let errorMessage = 'An error occurred during the withdrawal transaction.';
+
+      // Check for common error patterns
+      if (withdrawError.message.includes('User rejected') || withdrawError.message.includes('user rejected')) {
+        errorMessage = 'Transaction was rejected in your wallet.';
+      } else if (withdrawError.message.includes('insufficient')) {
+        errorMessage = 'Insufficient amount or slippage tolerance too low. Try increasing slippage.';
+      } else if (withdrawError.message.includes('gas')) {
+        errorMessage = 'Gas estimation failed. The transaction may fail or require more gas.';
+      } else if (withdrawError.message) {
+        // Use the actual error message if available
+        errorMessage = withdrawError.message;
+      }
+
+      addToast({
+        type: 'error',
+        title: 'Withdrawal Failed',
+        description: errorMessage,
+        duration: 8000,
+      });
+
+      // Clear the withdraw amount ref to prevent stale state
+      lastWithdrawAmountRef.current = "";
+    }
+  }, [isWithdrawError, withdrawError, addToast]);
 
   // Approval transaction state management
   const approvalTransaction = useApprovalTransaction(
