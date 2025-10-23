@@ -95,7 +95,8 @@ export default function WithdrawTab({
 
   const handleConfirmWithdraw = async () => {
     setShowConfirmation(false);
-    onWithdraw();
+    // Pass bonding curve output to parent for accurate minReceived calculation
+    onWithdraw(estDOLA);
   };
 
   const handleCancelWithdraw = () => {
@@ -105,7 +106,7 @@ export default function WithdrawTab({
   // Determine button state and properties
   // Validate that user has sufficient balance for the withdrawal amount (fee is deducted from output)
   const isAmountValid = parsedAmount > 0 && parsedAmount <= positionInfo.value;
-  const buttonDisabled = !isAmountValid || isTransacting;
+  const buttonDisabled = !isAmountValid || isTransacting || isQuoteLoading;
 
   let buttonLabel = "Enter Amount";
   let buttonVariant: 'primary' | 'approve' = 'primary';

@@ -111,7 +111,7 @@ vi.mock('./DepositConfirmationDialog', () => ({
       <div data-testid="confirmation-dialog">
         <div data-testid="dialog-input-amount">Input: {data.inputAmount} {data.inputToken}</div>
         <div data-testid="dialog-output-amount">Output: {data.outputAmount.toFixed(4)} {data.outputToken}</div>
-        <div data-testid="dialog-price-impact">Price Impact: {(data.priceImpact * 100).toFixed(2)}%</div>
+        <div data-testid="dialog-price-impact">Price Impact: {(Math.ceil(data.priceImpact * 100 * 100) / 100).toFixed(2)}%</div>
         <div data-testid="dialog-slippage">Slippage: {data.slippage} bps</div>
         <button onClick={onClose} data-testid="dialog-cancel">Cancel</button>
         <button onClick={() => onConfirm(data.slippage)} data-testid="dialog-confirm" disabled={isLoading}>

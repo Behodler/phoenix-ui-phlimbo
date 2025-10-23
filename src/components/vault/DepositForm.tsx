@@ -105,7 +105,8 @@ export default function DepositForm({
       onFormChange({ slippageBps });
     }
     setShowConfirmation(false);
-    onDeposit();
+    // Pass bonding curve output to parent for accurate minReceived calculation
+    onDeposit(estPhUSD);
   };
 
   const handleCancelDeposit = () => {

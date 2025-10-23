@@ -201,6 +201,8 @@ export default function VaultPage() {
     isSuccess: isDepositSuccess,
     hash: depositHash,
     receipt: depositReceipt,
+    error: depositError,
+    isError: isDepositError,
   } = useAddLiquidity(addresses?.bondingCurve as `0x${string}` | undefined);
 
   // Remove liquidity hook
@@ -211,6 +213,8 @@ export default function VaultPage() {
     isSuccess: isWithdrawSuccess,
     hash: withdrawHash,
     receipt: withdrawReceipt,
+    error: withdrawError,
+    isError: isWithdrawError,
   } = useRemoveLiquidity(addresses?.bondingCurve as `0x${string}` | undefined);
 
   // Store the deposit amount when transaction is initiated to prevent duplicate toasts
@@ -367,6 +371,70 @@ export default function VaultPage() {
     }
   }, [isWithdrawSuccess, withdrawReceipt, withdrawHash, dolaToPhUSDRate, withdrawalFeeRate, networkType, addToast, refetchDolaBalance, refetchPhUSDBalance, refetchBondingCurve]);
 
+  // Handle deposit errors
+  useEffect(() => {
+    if (isDepositError && depositError) {
+      console.error('Deposit transaction error:', depositError);
+
+      // Extract error message
+      let errorMessage = 'An error occurred during the deposit transaction.';
+
+      // Check for common error patterns
+      if (depositError.message.includes('User rejected') || depositError.message.includes('user rejected')) {
+        errorMessage = 'Transaction was rejected in your wallet.';
+      } else if (depositError.message.includes('insufficient')) {
+        errorMessage = 'Insufficient amount or slippage tolerance too low. Try increasing slippage.';
+      } else if (depositError.message.includes('gas')) {
+        errorMessage = 'Gas estimation failed. The transaction may fail or require more gas.';
+      } else if (depositError.message) {
+        // Use the actual error message if available
+        errorMessage = depositError.message;
+      }
+
+      addToast({
+        type: 'error',
+        title: 'Deposit Failed',
+        description: errorMessage,
+        duration: 8000,
+      });
+
+      // Clear the deposit amount ref to prevent stale state
+      lastDepositAmountRef.current = "";
+    }
+  }, [isDepositError, depositError, addToast]);
+
+  // Handle withdraw errors
+  useEffect(() => {
+    if (isWithdrawError && withdrawError) {
+      console.error('Withdraw transaction error:', withdrawError);
+
+      // Extract error message
+      let errorMessage = 'An error occurred during the withdrawal transaction.';
+
+      // Check for common error patterns
+      if (withdrawError.message.includes('User rejected') || withdrawError.message.includes('user rejected')) {
+        errorMessage = 'Transaction was rejected in your wallet.';
+      } else if (withdrawError.message.includes('insufficient')) {
+        errorMessage = 'Insufficient amount or slippage tolerance too low. Try increasing slippage.';
+      } else if (withdrawError.message.includes('gas')) {
+        errorMessage = 'Gas estimation failed. The transaction may fail or require more gas.';
+      } else if (withdrawError.message) {
+        // Use the actual error message if available
+        errorMessage = withdrawError.message;
+      }
+
+      addToast({
+        type: 'error',
+        title: 'Withdrawal Failed',
+        description: errorMessage,
+        duration: 8000,
+      });
+
+      // Clear the withdraw amount ref to prevent stale state
+      lastWithdrawAmountRef.current = "";
+    }
+  }, [isWithdrawError, withdrawError, addToast]);
+
   // Approval transaction state management
   const approvalTransaction = useApprovalTransaction(
     async () => {
@@ -485,7 +553,7 @@ export default function VaultPage() {
     }
   };
 
-  const handleDeposit = async () => {
+  const handleDeposit = async (bondingCurveOutput?: number) => {
     if (!isConnected) {
       addToast({
         type: 'error',
@@ -545,11 +613,14 @@ export default function VaultPage() {
       });
 
       // Calculate expected output and minimum received
-      // For deposit: DOLA → phUSD conversion
-      // If price = 0.81, then 1 phUSD costs 0.81 DOLA
-      // To get phUSD from DOLA: phUSD = DOLA / price
-      const estPhUSD = dolaToPhUSDRate > 0 ? amount / dolaToPhUSDRate : 0;
-      const minReceived = estPhUSD * (1 - formData.slippageBps / 10000);
+      // Use bonding curve output if available (from DepositForm's quoteAddLiquidity call)
+      // This ensures minReceived matches actual bonding curve output, not marginal price
+      // bondingCurveOutput comes from the actual bonding curve contract quote
+      const estPhUSD = bondingCurveOutput ?? (dolaToPhUSDRate > 0 ? amount / dolaToPhUSDRate : 0);
+
+      // Apply slippage tolerance and add 0.1% safety buffer for blockchain state changes
+      // Safety buffer accounts for other transactions executing between quote and our transaction
+      const minReceived = estPhUSD * (1 - formData.slippageBps / 10000) * 0.999;
 
       // Scale parameters by 1e18 for contract call
       const inputAmount = parseUnits(amount.toString(), 18);
@@ -596,7 +667,7 @@ export default function VaultPage() {
   };
 
 
-  const handleWithdraw = async () => {
+  const handleWithdraw = async (bondingCurveOutput?: number) => {
     if (!isConnected) {
       addToast({
         type: 'error',
@@ -663,12 +734,14 @@ export default function VaultPage() {
       const feeAmount = amount * withdrawalFeeRate;
       const amountAfterFee = amount - feeAmount;
 
-      // Calculate expected output and minimum received
-      // For withdraw: phUSD → DOLA conversion
-      // If price = 0.81, then 1 phUSD = 0.81 DOLA
-      // To get DOLA from phUSD: DOLA = phUSD × price
-      const estDOLA = dolaToPhUSDRate > 0 ? amountAfterFee * dolaToPhUSDRate : 0;
-      const minReceived = estDOLA * (1 - formData.slippageBps / 10000);
+      // Use bonding curve output if available (from WithdrawTab's quoteRemoveLiquidity call)
+      // This ensures minReceived matches actual bonding curve output, not marginal price
+      // bondingCurveOutput comes from the actual bonding curve contract quote
+      const estDOLA = bondingCurveOutput ?? (dolaToPhUSDRate > 0 ? amountAfterFee * dolaToPhUSDRate : 0);
+
+      // Apply slippage tolerance and add 0.1% safety buffer for blockchain state changes
+      // Safety buffer accounts for other transactions executing between quote and our transaction
+      const minReceived = estDOLA * (1 - formData.slippageBps / 10000) * 0.999;
 
       // Scale parameters by 1e18 for contract call
       const bondingTokenAmount = parseUnits(amount.toString(), 18);
