@@ -89,7 +89,7 @@ export interface WithdrawFormProps {
   onFormChange: (data: Partial<VaultFormData>) => void;
   constants: VaultConstants;
   positionInfo: PositionInfo;
-  onWithdraw: () => void;
+  onWithdraw: (bondingCurveOutput?: number) => void;
   isTransacting?: boolean;
   withdrawalFeeRate?: number; // Decimal rate (e.g., 0.02 = 2%)
 }

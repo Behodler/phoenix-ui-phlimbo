@@ -635,7 +635,7 @@ export default function VaultPage() {
   };
 
 
-  const handleWithdraw = async () => {
+  const handleWithdraw = async (bondingCurveOutput?: number) => {
     if (!isConnected) {
       addToast({
         type: 'error',
@@ -702,12 +702,14 @@ export default function VaultPage() {
       const feeAmount = amount * withdrawalFeeRate;
       const amountAfterFee = amount - feeAmount;
 
-      // Calculate expected output and minimum received
-      // For withdraw: phUSD → DOLA conversion
-      // If price = 0.81, then 1 phUSD = 0.81 DOLA
-      // To get DOLA from phUSD: DOLA = phUSD × price
-      const estDOLA = dolaToPhUSDRate > 0 ? amountAfterFee * dolaToPhUSDRate : 0;
-      const minReceived = estDOLA * (1 - formData.slippageBps / 10000);
+      // Use bonding curve output if available (from WithdrawTab's quoteRemoveLiquidity call)
+      // This ensures minReceived matches actual bonding curve output, not marginal price
+      // bondingCurveOutput comes from the actual bonding curve contract quote
+      const estDOLA = bondingCurveOutput ?? (dolaToPhUSDRate > 0 ? amountAfterFee * dolaToPhUSDRate : 0);
+
+      // Apply slippage tolerance and add 0.1% safety buffer for blockchain state changes
+      // Safety buffer accounts for other transactions executing between quote and our transaction
+      const minReceived = estDOLA * (1 - formData.slippageBps / 10000) * 0.999;
 
       // Scale parameters by 1e18 for contract call
       const bondingTokenAmount = parseUnits(amount.toString(), 18);

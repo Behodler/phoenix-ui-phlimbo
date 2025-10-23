@@ -95,7 +95,8 @@ export default function WithdrawTab({
 
   const handleConfirmWithdraw = async () => {
     setShowConfirmation(false);
-    onWithdraw();
+    // Pass bonding curve output to parent for accurate minReceived calculation
+    onWithdraw(estDOLA);
   };
 
   const handleCancelWithdraw = () => {
