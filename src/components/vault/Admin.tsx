@@ -1,9 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccount, useChainId, useReadContract, useWriteContract } from 'wagmi';
-import { behodler3TokenlaunchAbi } from '@behodler/wagmi-hooks';
+import {
+  behodler3TokenlaunchAbi,
+  mockAutoDolaAbi,
+  mockMainRewarderAbi,
+  mockBondingTokenAbi,
+} from '@behodler/wagmi-hooks';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
+import type { Abi, AbiFunction } from 'viem';
 
 // ABI for ERC20 tokens with mint function (used on testnets)
 const mintableErc20Abi = [
@@ -26,6 +32,82 @@ const mintableErc20Abi = [
   },
 ] as const;
 
+// Common owner ABI fragment for checking contract ownership
+const ownerAbi = [
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+/**
+ * Contract configuration type
+ */
+interface ContractConfig {
+  name: string;
+  addressKey: keyof typeof import('../../types/contracts').ContractAddresses;
+  abi: Abi;
+}
+
+/**
+ * Extracted function information
+ */
+interface ExtractedFunction {
+  name: string;
+  signature: string;
+}
+
+/**
+ * Contract configurations for admin panel
+ * Only includes contracts that might be ownable
+ */
+const getContractConfigs = (): ContractConfig[] => [
+  {
+    name: 'Bonding Curve',
+    addressKey: 'bondingCurve',
+    abi: behodler3TokenlaunchAbi as Abi,
+  },
+  {
+    name: 'AutoDola Vault',
+    addressKey: 'autoDolaVault',
+    abi: mockAutoDolaAbi as Abi,
+  },
+  {
+    name: 'Main Rewarder',
+    addressKey: 'tokemakMainRewarder',
+    abi: mockMainRewarderAbi as Abi,
+  },
+  {
+    name: 'Bonding Token',
+    addressKey: 'bondingToken',
+    abi: mockBondingTokenAbi as Abi,
+  },
+];
+
+/**
+ * Extract public/external functions from ABI
+ */
+const extractFunctionsFromAbi = (abi: Abi): ExtractedFunction[] => {
+  const functions = abi.filter(
+    (item): item is AbiFunction =>
+      item.type === 'function' &&
+      (item.stateMutability === 'nonpayable' || item.stateMutability === 'payable')
+  );
+
+  return functions.map((func) => {
+    const params = func.inputs
+      .map((input) => `${input.type} ${input.name}`)
+      .join(', ');
+    return {
+      name: func.name,
+      signature: `${func.name}(${params})`,
+    };
+  });
+};
+
 /**
  * Admin Component
  *
@@ -39,6 +121,12 @@ export default function Admin() {
   const chainId = useChainId();
   const { addToast, removeToast } = useToast();
   const [isMinting, setIsMinting] = useState(false);
+
+  // State for contract and function selection
+  const [selectedContractKey, setSelectedContractKey] = useState<string>('');
+  const [ownedContracts, setOwnedContracts] = useState<ContractConfig[]>([]);
+  const [isLoadingOwnership, setIsLoadingOwnership] = useState(false);
+  const [availableFunctions, setAvailableFunctions] = useState<ExtractedFunction[]>([]);
 
   // Fetch the owner address from the bonding curve contract
   const { data: ownerAddress } = useReadContract({
@@ -67,6 +155,116 @@ export default function Admin() {
   // Check if we should show mint yield button (hide on mainnet, chainID 1)
   const isMainnet = chainId === 1;
   const showMintYieldButton = !isMainnet;
+
+  /**
+   * Discover owned contracts by checking ownership of each contract
+   */
+  useEffect(() => {
+    const discoverOwnedContracts = async () => {
+      if (!isConnected || !walletAddress || !addresses) {
+        setOwnedContracts([]);
+        return;
+      }
+
+      setIsLoadingOwnership(true);
+
+      try {
+        const contractConfigs = getContractConfigs();
+        const ownedConfigsPromises = contractConfigs.map(async (config) => {
+          try {
+            const contractAddress = addresses[config.addressKey];
+            if (!contractAddress) return null;
+
+            // Try to read the owner() function
+            const response = await fetch(
+              `http://localhost:8545`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  method: 'eth_call',
+                  params: [
+                    {
+                      to: contractAddress,
+                      data: '0x8da5cb5b', // keccak256("owner()") selector
+                    },
+                    'latest',
+                  ],
+                  id: 1,
+                }),
+              }
+            );
+
+            const data = await response.json();
+            if (data.result && data.result !== '0x') {
+              // Parse the owner address from the result
+              const ownerAddress = '0x' + data.result.slice(-40);
+
+              // Compare addresses (case-insensitive)
+              if (ownerAddress.toLowerCase() === walletAddress.toLowerCase()) {
+                return config;
+              }
+            }
+
+            return null;
+          } catch (error) {
+            console.error(`Error checking ownership for ${config.name}:`, error);
+            return null;
+          }
+        });
+
+        const ownedConfigs = (await Promise.all(ownedConfigsPromises)).filter(
+          (config): config is ContractConfig => config !== null
+        );
+
+        setOwnedContracts(ownedConfigs);
+      } catch (error) {
+        console.error('Error discovering owned contracts:', error);
+        addToast({
+          type: 'error',
+          title: 'Contract Discovery Failed',
+          description: 'Unable to check contract ownership. Please try again.',
+        });
+      } finally {
+        setIsLoadingOwnership(false);
+      }
+    };
+
+    discoverOwnedContracts();
+  }, [isConnected, walletAddress, addresses, addToast]);
+
+  /**
+   * Extract functions when a contract is selected
+   */
+  useEffect(() => {
+    if (!selectedContractKey) {
+      setAvailableFunctions([]);
+      return;
+    }
+
+    const selectedContract = ownedContracts.find(
+      (contract) => contract.addressKey === selectedContractKey
+    );
+
+    if (selectedContract) {
+      const functions = extractFunctionsFromAbi(selectedContract.abi);
+      setAvailableFunctions(functions);
+    } else {
+      setAvailableFunctions([]);
+    }
+  }, [selectedContractKey, ownedContracts]);
+
+  /**
+   * Reset selections when wallet changes or disconnects
+   */
+  useEffect(() => {
+    if (!isConnected) {
+      setSelectedContractKey('');
+      setOwnedContracts([]);
+      setAvailableFunctions([]);
+    }
+  }, [isConnected]);
 
   /**
    * Handle mint yield button click
@@ -237,14 +435,34 @@ export default function Admin() {
         {/* Contracts Dropdown */}
         <div className="flex-1">
           <label className="block text-sm font-medium text-foreground mb-2">
-            Contracts
+            Contracts {isLoadingOwnership && <span className="text-xs text-muted-foreground">(Loading...)</span>}
           </label>
           <select
-            className="w-full px-4 py-2 bg-card border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-            disabled
+            className="w-full px-4 py-2 bg-card border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!isConnected || isLoadingOwnership || ownedContracts.length === 0}
+            value={selectedContractKey}
+            onChange={(e) => setSelectedContractKey(e.target.value)}
           >
-            <option>Select Contract...</option>
+            <option value="">
+              {!isConnected
+                ? 'Connect wallet to view contracts'
+                : isLoadingOwnership
+                ? 'Checking ownership...'
+                : ownedContracts.length === 0
+                ? 'No owned contracts found'
+                : 'Select Contract...'}
+            </option>
+            {ownedContracts.map((contract) => (
+              <option key={contract.addressKey} value={contract.addressKey}>
+                {contract.name}
+              </option>
+            ))}
           </select>
+          {ownedContracts.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {ownedContracts.length} owned contract{ownedContracts.length > 1 ? 's' : ''} found
+            </p>
+          )}
         </div>
 
         {/* Functions Dropdown */}
@@ -253,11 +471,27 @@ export default function Admin() {
             Functions
           </label>
           <select
-            className="w-full px-4 py-2 bg-card border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-            disabled
+            className="w-full px-4 py-2 bg-card border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!selectedContractKey || availableFunctions.length === 0}
           >
-            <option>Select Function...</option>
+            <option value="">
+              {!selectedContractKey
+                ? 'Select a contract first'
+                : availableFunctions.length === 0
+                ? 'No functions available'
+                : 'Select Function...'}
+            </option>
+            {availableFunctions.map((func, index) => (
+              <option key={`${func.name}-${index}`} value={func.name}>
+                {func.signature}
+              </option>
+            ))}
           </select>
+          {availableFunctions.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {availableFunctions.length} function{availableFunctions.length > 1 ? 's' : ''} available
+            </p>
+          )}
         </div>
       </div>
 
