@@ -128,18 +128,41 @@ export default function Admin() {
   useEffect(() => {
     const discoverOwnedContracts = async () => {
       if (!isConnected || !walletAddress || !addresses) {
+        console.log('🔍 Contract discovery skipped:', {
+          isConnected,
+          hasWallet: !!walletAddress,
+          hasAddresses: !!addresses,
+        });
         setOwnedContracts([]);
         return;
       }
+
+      console.log('🔍 Starting contract ownership discovery...');
+      console.log('📋 Available addresses:', addresses);
+      console.log('👛 Connected wallet:', walletAddress);
 
       setIsLoadingOwnership(true);
 
       try {
         const contractConfigs = getContractConfigs();
+        console.log('📝 Contract configs to check:', contractConfigs.map(c => ({ name: c.name, key: c.addressKey })));
+
         const ownedConfigsPromises = contractConfigs.map(async (config) => {
           try {
             const contractAddress = addresses[config.addressKey];
-            if (!contractAddress) return null;
+
+            console.log(`🔎 Checking ${config.name}:`, {
+              addressKey: config.addressKey,
+              contractAddress,
+              hasAddress: !!contractAddress,
+            });
+
+            if (!contractAddress) {
+              console.warn(`⚠️ ${config.name}: No address found for key "${config.addressKey}"`);
+              return null;
+            }
+
+            console.log(`🌐 ${config.name}: Calling owner() at ${contractAddress}...`);
 
             // Try to read the owner() function
             const response = await fetch(
@@ -163,19 +186,36 @@ export default function Admin() {
             );
 
             const data = await response.json();
+
+            console.log(`📡 ${config.name}: RPC response:`, {
+              result: data.result,
+              error: data.error,
+            });
+
             if (data.result && data.result !== '0x') {
               // Parse the owner address from the result
               const ownerAddress = '0x' + data.result.slice(-40);
 
+              console.log(`👤 ${config.name}: Owner check:`, {
+                contractOwner: ownerAddress,
+                walletAddress,
+                matches: ownerAddress.toLowerCase() === walletAddress.toLowerCase(),
+              });
+
               // Compare addresses (case-insensitive)
               if (ownerAddress.toLowerCase() === walletAddress.toLowerCase()) {
+                console.log(`✅ ${config.name}: Owned by connected wallet!`);
                 return config;
+              } else {
+                console.log(`❌ ${config.name}: Not owned by connected wallet`);
               }
+            } else {
+              console.warn(`⚠️ ${config.name}: No owner() result or empty response`);
             }
 
             return null;
           } catch (error) {
-            console.error(`Error checking ownership for ${config.name}:`, error);
+            console.error(`❌ Error checking ownership for ${config.name}:`, error);
             return null;
           }
         });
@@ -184,9 +224,15 @@ export default function Admin() {
           (config): config is ContractConfig => config !== null
         );
 
+        console.log('✨ Ownership discovery complete:', {
+          totalChecked: contractConfigs.length,
+          ownedCount: ownedConfigs.length,
+          ownedContracts: ownedConfigs.map(c => c.name),
+        });
+
         setOwnedContracts(ownedConfigs);
       } catch (error) {
-        console.error('Error discovering owned contracts:', error);
+        console.error('💥 Error discovering owned contracts:', error);
         addToast({
           type: 'error',
           title: 'Contract Discovery Failed',
@@ -470,6 +516,12 @@ export default function Admin() {
               <strong>Mint Yield:</strong> This testnet-only feature simulates yield generation by minting DOLA tokens directly into the AutoDolaVault. This button is hidden on mainnet.
             </span>
           )}
+        </p>
+        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+          <strong>Dynamic ABI Loading:</strong> ABIs are statically imported from <code className="px-1 py-0.5 bg-background rounded">@behodler/wagmi-hooks</code>.
+          To update contract ABIs, reinstall the wagmi-hooks package or rebuild it from source.
+          Changes to ABIs in the deployment contracts will NOT be reflected automatically - the package must be updated first.
+          Check browser console (F12) for detailed contract discovery logs.
         </p>
       </div>
     </div>
