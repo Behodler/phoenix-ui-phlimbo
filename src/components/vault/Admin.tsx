@@ -32,17 +32,6 @@ const mintableErc20Abi = [
   },
 ] as const;
 
-// Common owner ABI fragment for checking contract ownership
-const ownerAbi = [
-  {
-    type: 'function',
-    inputs: [],
-    name: 'owner',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-] as const;
-
 /**
  * Contract configuration type
  */
