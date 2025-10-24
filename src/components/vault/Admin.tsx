@@ -4,6 +4,7 @@ import {
   behodler3TokenlaunchAbi,
   mockAutoDolaAbi,
   mockBondingTokenAbi,
+  iBondingTokenAbi,
 } from '@behodler/wagmi-hooks';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
@@ -44,7 +45,7 @@ interface ContractConfig {
  * Contract configurations for admin panel
  * Only includes contracts that might be ownable
  */
-const getContractConfigs = (): ContractConfig[] => [
+const getContractConfigs = (networkType: string): ContractConfig[] => [
   {
     name: 'Bonding Curve',
     addressKey: 'bondingCurve',
@@ -53,7 +54,7 @@ const getContractConfigs = (): ContractConfig[] => [
   {
     name: 'Bonding Token',
     addressKey: 'bondingToken',
-    abi: mockBondingTokenAbi as Abi,
+    abi: (networkType === 'mainnet' ? iBondingTokenAbi : mockBondingTokenAbi) as Abi,
   },
   {
     name: 'AutoDolaYieldStrategy',
@@ -144,7 +145,7 @@ export default function Admin() {
       setIsLoadingOwnership(true);
 
       try {
-        const contractConfigs = getContractConfigs();
+        const contractConfigs = getContractConfigs(networkType);
         console.log('📝 Contract configs to check:', contractConfigs.map(c => ({ name: c.name, key: c.addressKey })));
 
         const ownedConfigsPromises = contractConfigs.map(async (config) => {
