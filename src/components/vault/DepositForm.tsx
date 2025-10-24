@@ -83,10 +83,10 @@ export default function DepositForm({
   const handleMaxClick = () => {
     // Use raw BigInt balance if available to maintain precision
     if (tokenInfo.balanceRaw !== undefined) {
-      // Floor at BigInt level: remove any fractional wei (shouldn't exist, but be safe)
-      const flooredBalanceWei = tokenInfo.balanceRaw;
+      // Simple truncation: subtract 1 wei to ensure we never round up
+      const truncatedBalanceWei = tokenInfo.balanceRaw - BigInt(1);
       // Convert to decimal string with full precision
-      const balanceStr = flooredBalanceWei.toString();
+      const balanceStr = truncatedBalanceWei.toString();
       // Format as decimal (18 decimal places)
       const wholePart = balanceStr.length > 18 ? balanceStr.slice(0, -18) : '0';
       const fractionalPart = balanceStr.length > 18

@@ -86,10 +86,10 @@ export default function WithdrawTab({
   const handleMaxClick = () => {
     // Use raw BigInt value if available to maintain precision
     if (positionInfo.valueRaw !== undefined) {
-      // Floor at BigInt level: remove any fractional wei (shouldn't exist, but be safe)
-      const flooredValueWei = positionInfo.valueRaw;
+      // Simple truncation: subtract 1 wei to ensure we never round up
+      const truncatedValueWei = positionInfo.valueRaw - BigInt(1);
       // Convert to decimal string with full precision
-      const valueStr = flooredValueWei.toString();
+      const valueStr = truncatedValueWei.toString();
       // Format as decimal (18 decimal places)
       const wholePart = valueStr.length > 18 ? valueStr.slice(0, -18) : '0';
       const fractionalPart = valueStr.length > 18
