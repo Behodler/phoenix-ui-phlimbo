@@ -86,7 +86,8 @@ export default function WithdrawTab({
   const handleMaxClick = () => {
     // Set max amount to the full available balance
     // User will see the fee deduction in the confirmation
-    onFormChange({ amount: positionInfo.value.toString() });
+    const flooredValue = Math.floor(positionInfo.value * 1e18) / 1e18;
+    onFormChange({ amount: flooredValue.toString() });
   };
 
   const handleInitiateWithdraw = () => {

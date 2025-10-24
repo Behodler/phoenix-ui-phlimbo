@@ -81,7 +81,8 @@ export default function DepositForm({
   };
 
   const handleMaxClick = () => {
-    onFormChange({ amount: tokenInfo.balance.toString() });
+    const flooredBalance = Math.floor(tokenInfo.balance * 1e18) / 1e18;
+    onFormChange({ amount: flooredBalance.toString() });
   };
 
   const handleApprove = async () => {
