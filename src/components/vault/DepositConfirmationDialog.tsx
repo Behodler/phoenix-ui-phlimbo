@@ -82,7 +82,7 @@ export default function DepositConfirmationDialog({
     onConfirm(slippageBps);
   }, [onConfirm, slippageBps]);
 
-  const formatNumber = (num: number, decimals = 4) => {
+  const formatNumber = (num: number, decimals = 18) => {
     return num.toLocaleString('en-US', {
       minimumFractionDigits: 0,
       maximumFractionDigits: decimals,
