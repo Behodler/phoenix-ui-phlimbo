@@ -173,7 +173,8 @@ export default function VaultPage() {
   const dolaBalance = {
     balance: {
       balance: dolaBalanceDecimal,
-      balanceUsd: dolaBalanceDecimal
+      balanceUsd: dolaBalanceDecimal,
+      balanceRaw: dolaBalanceRaw // Pass raw BigInt for precision-sensitive operations
     }
   };
 
@@ -181,7 +182,8 @@ export default function VaultPage() {
   const phUSDBalance = {
     balance: {
       balance: phUSDBalanceDecimal,
-      balanceUsd: phUSDBalanceDecimal * (currentPriceRaw ? parseFloat(formatUnits(currentPriceRaw, 18)) : 0)
+      balanceUsd: phUSDBalanceDecimal * (currentPriceRaw ? parseFloat(formatUnits(currentPriceRaw, 18)) : 0),
+      valueRaw: phUSDBalanceRaw // Pass raw BigInt for precision-sensitive operations
     }
   };
   const isTransacting = false;

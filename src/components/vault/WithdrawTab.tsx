@@ -84,10 +84,25 @@ export default function WithdrawTab({
   };
 
   const handleMaxClick = () => {
-    // Set max amount to the full available balance
-    // User will see the fee deduction in the confirmation
-    const flooredValue = Math.floor(positionInfo.value * 1e18) / 1e18;
-    onFormChange({ amount: flooredValue.toString() });
+    // Use raw BigInt value if available to maintain precision
+    if (positionInfo.valueRaw !== undefined) {
+      // Floor at BigInt level: remove any fractional wei (shouldn't exist, but be safe)
+      const flooredValueWei = positionInfo.valueRaw;
+      // Convert to decimal string with full precision
+      const valueStr = flooredValueWei.toString();
+      // Format as decimal (18 decimal places)
+      const wholePart = valueStr.length > 18 ? valueStr.slice(0, -18) : '0';
+      const fractionalPart = valueStr.length > 18
+        ? valueStr.slice(-18).padStart(18, '0')
+        : valueStr.padStart(18, '0');
+      // Combine and remove trailing zeros
+      const fullDecimal = `${wholePart}.${fractionalPart}`.replace(/\.?0+$/, '');
+      onFormChange({ amount: fullDecimal || '0' });
+    } else {
+      // Fallback to previous flooring logic if raw value not available
+      const flooredValue = Math.floor(positionInfo.value * 1e18) / 1e18;
+      onFormChange({ amount: flooredValue.toString() });
+    }
   };
 
   const handleInitiateWithdraw = () => {

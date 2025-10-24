@@ -81,8 +81,25 @@ export default function DepositForm({
   };
 
   const handleMaxClick = () => {
-    const flooredBalance = Math.floor(tokenInfo.balance * 1e18) / 1e18;
-    onFormChange({ amount: flooredBalance.toString() });
+    // Use raw BigInt balance if available to maintain precision
+    if (tokenInfo.balanceRaw !== undefined) {
+      // Floor at BigInt level: remove any fractional wei (shouldn't exist, but be safe)
+      const flooredBalanceWei = tokenInfo.balanceRaw;
+      // Convert to decimal string with full precision
+      const balanceStr = flooredBalanceWei.toString();
+      // Format as decimal (18 decimal places)
+      const wholePart = balanceStr.length > 18 ? balanceStr.slice(0, -18) : '0';
+      const fractionalPart = balanceStr.length > 18
+        ? balanceStr.slice(-18).padStart(18, '0')
+        : balanceStr.padStart(18, '0');
+      // Combine and remove trailing zeros
+      const fullDecimal = `${wholePart}.${fractionalPart}`.replace(/\.?0+$/, '');
+      onFormChange({ amount: fullDecimal || '0' });
+    } else {
+      // Fallback to previous flooring logic if raw balance not available
+      const flooredBalance = Math.floor(tokenInfo.balance * 1e18) / 1e18;
+      onFormChange({ amount: flooredBalance.toString() });
+    }
   };
 
   const handleApprove = async () => {

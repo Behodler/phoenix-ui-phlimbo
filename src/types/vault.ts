@@ -15,12 +15,14 @@ export interface TokenInfo {
   balance: number;
   balanceUsd: number;
   icon: string;
+  balanceRaw?: bigint; // Raw BigInt balance for precision-sensitive operations
 }
 
 export interface PositionInfo {
   value: number;
   valueUsd: number;
   isStaked: boolean;
+  valueRaw?: bigint; // Raw BigInt value for precision-sensitive operations
 }
 
 export interface HeaderProps {
