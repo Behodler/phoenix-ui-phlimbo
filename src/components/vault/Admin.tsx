@@ -3,7 +3,6 @@ import { useAccount, useChainId, useReadContract, useWriteContract } from 'wagmi
 import {
   behodler3TokenlaunchAbi,
   mockAutoDolaAbi,
-  mockMainRewarderAbi,
   mockBondingTokenAbi,
 } from '@behodler/wagmi-hooks';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
@@ -42,14 +41,6 @@ interface ContractConfig {
 }
 
 /**
- * Extracted function information
- */
-interface ExtractedFunction {
-  name: string;
-  signature: string;
-}
-
-/**
  * Contract configurations for admin panel
  * Only includes contracts that might be ownable
  */
@@ -60,41 +51,27 @@ const getContractConfigs = (): ContractConfig[] => [
     abi: behodler3TokenlaunchAbi as Abi,
   },
   {
-    name: 'AutoDola Vault',
-    addressKey: 'autoDolaVault',
-    abi: mockAutoDolaAbi as Abi,
-  },
-  {
-    name: 'Main Rewarder',
-    addressKey: 'tokemakMainRewarder',
-    abi: mockMainRewarderAbi as Abi,
-  },
-  {
     name: 'Bonding Token',
     addressKey: 'bondingToken',
     abi: mockBondingTokenAbi as Abi,
   },
+  {
+    name: 'AutoDolaYieldStrategy',
+    addressKey: 'autoDolaYieldStrategy',
+    abi: mockAutoDolaAbi as Abi,
+  },
 ];
 
 /**
- * Extract public/external functions from ABI
+ * Extract all functions from ABI
+ * Note: ABIs only contain external/public functions by definition
  */
-const extractFunctionsFromAbi = (abi: Abi): ExtractedFunction[] => {
+const extractFunctionsFromAbi = (abi: Abi): string[] => {
   const functions = abi.filter(
-    (item): item is AbiFunction =>
-      item.type === 'function' &&
-      (item.stateMutability === 'nonpayable' || item.stateMutability === 'payable')
+    (item): item is AbiFunction => item.type === 'function'
   );
 
-  return functions.map((func) => {
-    const params = func.inputs
-      .map((input) => `${input.type} ${input.name}`)
-      .join(', ');
-    return {
-      name: func.name,
-      signature: `${func.name}(${params})`,
-    };
-  });
+  return functions.map((func) => func.name);
 };
 
 /**
@@ -115,7 +92,7 @@ export default function Admin() {
   const [selectedContractKey, setSelectedContractKey] = useState<string>('');
   const [ownedContracts, setOwnedContracts] = useState<ContractConfig[]>([]);
   const [isLoadingOwnership, setIsLoadingOwnership] = useState(false);
-  const [availableFunctions, setAvailableFunctions] = useState<ExtractedFunction[]>([]);
+  const [availableFunctions, setAvailableFunctions] = useState<string[]>([]);
 
   // Fetch the owner address from the bonding curve contract
   const { data: ownerAddress } = useReadContract({
@@ -470,9 +447,9 @@ export default function Admin() {
                 ? 'No functions available'
                 : 'Select Function...'}
             </option>
-            {availableFunctions.map((func, index) => (
-              <option key={`${func.name}-${index}`} value={func.name}>
-                {func.signature}
+            {availableFunctions.map((funcName, index) => (
+              <option key={`${funcName}-${index}`} value={funcName}>
+                {funcName}
               </option>
             ))}
           </select>
