@@ -588,7 +588,7 @@ export default function VaultPage() {
       addToast({
         type: 'error',
         title: 'Insufficient Balance',
-        description: `You only have ${dolaBalance.balance.balance} DOLA available.`,
+        description: `You only have ${dolaBalance.balance.balance.toFixed(4)} DOLA available.`,
       });
       return;
     }

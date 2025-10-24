@@ -1,5 +1,16 @@
 import type { TokenRowProps } from '../../types/vault';
 
+// Format balance with appropriate decimals to avoid truncation
+// This ensures balances like 9999.5 display as "9,999.50" not "10000"
+const formatBalance = (balance: number): string => {
+  if (balance === 0) return '0.00';
+  if (balance < 0.01) return balance.toFixed(4);
+  if (balance < 1) return balance.toFixed(3);
+  if (balance < 1000) return balance.toFixed(2);
+  // Add comma separators for large numbers
+  return balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 export default function TokenRow({ token, onMaxClick }: TokenRowProps) {
   return (
     <div className="flex items-center justify-between gap-4 mb-4">
@@ -12,7 +23,7 @@ export default function TokenRow({ token, onMaxClick }: TokenRowProps) {
         <div className="min-w-0 flex-1">
           <div className="text-base font-semibold text-foreground">{token.name}</div>
           <div className="text-xs sm:text-sm text-muted-foreground break-words">
-            Balance {token.balance.toFixed(2)} (${token.balanceUsd.toFixed(2)})
+            Balance {formatBalance(token.balance)} (${formatBalance(token.balanceUsd)})
           </div>
         </div>
       </div>
