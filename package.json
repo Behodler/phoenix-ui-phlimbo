@@ -15,7 +15,7 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@behodler/wagmi-hooks": "^0.2.0",
+    "@behodler/wagmi-hooks": "^0.3.0",
     "@rainbow-me/rainbowkit": "^2.2.8",
     "@tanstack/react-query": "^5.89.0",
     "@testing-library/dom": "^10.4.1",
