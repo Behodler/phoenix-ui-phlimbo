@@ -148,6 +148,18 @@ export default function VaultPage() {
     addresses?.dolaToken as `0x${string}` | undefined
   );
 
+  // Fetch bonding token (phUSD) allowance for bonding curve contract
+  // This is needed for withdrawals - bonding curve needs approval to burn user's phUSD
+  const {
+    allowance: bondingTokenAllowanceRaw,
+    isLoading: bondingTokenAllowanceLoading,
+    refetch: refetchBondingTokenAllowance
+  } = useTokenAllowance(
+    walletAddress,
+    addresses?.bondingCurve as `0x${string}` | undefined,
+    addresses?.bondingToken as `0x${string}` | undefined
+  );
+
   // Convert bigint balance to decimal number (DOLA uses 18 decimals)
   const dolaBalanceDecimal = dolaBalanceRaw
     ? parseFloat(formatUnits(dolaBalanceRaw, 18))
@@ -161,6 +173,11 @@ export default function VaultPage() {
   // Convert bigint allowance to decimal number (DOLA uses 18 decimals)
   const dolaAllowanceDecimal = dolaAllowanceRaw
     ? parseFloat(formatUnits(dolaAllowanceRaw, 18))
+    : 0;
+
+  // Convert bigint allowance to decimal number (bonding token uses 18 decimals)
+  const bondingTokenAllowanceDecimal = bondingTokenAllowanceRaw
+    ? parseFloat(formatUnits(bondingTokenAllowanceRaw, 18))
     : 0;
 
   // Convert withdraw fee from basis points to decimal rate
@@ -360,6 +377,7 @@ export default function VaultPage() {
           refetchDolaBalance(), // User's DOLA balance increased
           refetchPhUSDBalance(), // User's phUSD balance decreased
           refetchBondingCurve(), // Bonding curve state changed (price, total raised, fee)
+          refetchBondingTokenAllowance(), // Bonding token allowance may have been consumed during withdrawal
         ]);
       };
       refetchData();
@@ -437,7 +455,7 @@ export default function VaultPage() {
     }
   }, [isWithdrawError, withdrawError, addToast]);
 
-  // Approval transaction state management
+  // DOLA approval transaction state management (for deposits)
   const approvalTransaction = useApprovalTransaction(
     async () => {
       // Execute the approval with addresses from context
@@ -495,6 +513,63 @@ export default function VaultPage() {
     }
   );
 
+  // Bonding token (phUSD) approval transaction state management (for withdrawals)
+  const bondingTokenApprovalTransaction = useApprovalTransaction(
+    async () => {
+      // Execute the approval with addresses from context
+      if (!addresses?.bondingToken || !addresses?.bondingCurve) {
+        throw new Error('Contract addresses not loaded');
+      }
+      return approve(
+        addresses.bondingToken as `0x${string}`,
+        addresses.bondingCurve as `0x${string}`
+        // Using default maxUint256 for unlimited approval
+      );
+    },
+    {
+      onSuccess: async (hash) => {
+        // Refetch the bonding token allowance to update the UI immediately after approval transaction
+        await refetchBondingTokenAllowance();
+
+        addToast({
+          type: 'success',
+          title: 'Approval Successful',
+          description: 'phUSD spending has been approved. You can now withdraw.',
+          action: {
+            label: 'View Transaction',
+            onClick: () => {
+              const explorerUrl = networkType === 'mainnet'
+                ? `https://etherscan.io/tx/${hash}`
+                : `https://sepolia.etherscan.io/tx/${hash}`;
+              window.open(explorerUrl, '_blank');
+            }
+          }
+        });
+      },
+      onError: (error) => {
+        console.error('Bonding token approval failed:', error);
+      },
+      onStatusChange: (status) => {
+        // Handle status changes with appropriate toast notifications
+        if (status === 'PENDING_SIGNATURE') {
+          addToast({
+            type: 'info',
+            title: 'Confirm in Wallet',
+            description: 'Please confirm the approval transaction in your wallet.',
+            duration: 0, // Don't auto-dismiss
+          });
+        } else if (status === 'PENDING_CONFIRMATION') {
+          addToast({
+            type: 'info',
+            title: 'Transaction Submitted',
+            description: 'Waiting for blockchain confirmation...',
+            duration: 0, // Don't auto-dismiss
+          });
+        }
+      }
+    }
+  );
+
   // Event handlers
   const handleFormChange = (data: Partial<VaultFormData>) => {
     setFormData(prev => ({ ...prev, ...data }));
@@ -511,7 +586,7 @@ export default function VaultPage() {
     // (dolaAllowanceDecimal) is the source of truth and updates automatically
   };
 
-  // Handle approval button click
+  // Handle DOLA approval button click (for deposits)
   const handleApprove = async (): Promise<void> => {
 
 
@@ -549,6 +624,47 @@ export default function VaultPage() {
           action: shouldOfferRetry(txError.type) ? {
             label: 'Retry',
             onClick: () => approvalTransaction.retry()
+          } : undefined
+        });
+      }
+    }
+  };
+
+  // Handle bonding token (phUSD) approval button click (for withdrawals)
+  const handleBondingTokenApprove = async (): Promise<void> => {
+    if (!isConnected) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet using the button in the header.',
+      });
+      return;
+    }
+
+    if (!addresses?.bondingToken || !addresses?.bondingCurve) {
+      addToast({
+        type: 'error',
+        title: 'Contract Addresses Not Loaded',
+        description: 'Please wait for contract addresses to load and try again.',
+      });
+      return;
+    }
+
+    try {
+      await bondingTokenApprovalTransaction.execute();
+    } catch (error) {
+      // Error handling is done in the transaction hook's onError callback
+      // But we can add an additional toast here if needed
+      if (bondingTokenApprovalTransaction.state.error) {
+        const { error: txError } = bondingTokenApprovalTransaction.state;
+        addToast({
+          type: 'error',
+          title: getErrorTitle(txError.type),
+          description: txError.message,
+          duration: 8000,
+          action: shouldOfferRetry(txError.type) ? {
+            label: 'Retry',
+            onClick: () => bondingTokenApprovalTransaction.retry()
           } : undefined
         });
       }
@@ -823,8 +939,11 @@ export default function VaultPage() {
                 constants={constants}
                 positionInfo={positionInfo}
                 onWithdraw={handleWithdraw}
-                isTransacting={isTransacting || isWithdrawPending || isWithdrawConfirming}
+                isTransacting={isTransacting || bondingTokenApprovalTransaction.state.isPending || bondingTokenApprovalTransaction.state.isConfirming || isWithdrawPending || isWithdrawConfirming}
                 withdrawalFeeRate={withdrawalFeeRate}
+                needsApproval={parseFloat(formData.amount || '0') > bondingTokenAllowanceDecimal}
+                onApprove={handleBondingTokenApprove}
+                isAllowanceLoading={bondingTokenAllowanceLoading}
               />
             ) : activeTab === "Testnet Faucet" ? (
               <TestnetFaucet />

@@ -20,6 +20,9 @@ export default function WithdrawTab({
   onWithdraw,
   isTransacting = false,
   withdrawalFeeRate = 0.02, // Default to 2% if not provided
+  needsApproval = false, // Whether bonding token approval is needed
+  onApprove, // Callback for bonding token approval
+  isAllowanceLoading = false, // Whether allowance is still loading
 }: WithdrawFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
 
@@ -126,7 +129,7 @@ export default function WithdrawTab({
   // Determine button state and properties
   // Validate that user has sufficient balance for the withdrawal amount (fee is deducted from output)
   const isAmountValid = parsedAmount > 0 && parsedAmount <= positionInfo.value;
-  const buttonDisabled = !isAmountValid || isTransacting || isQuoteLoading;
+  const buttonDisabled = !isAmountValid || isTransacting || isQuoteLoading || isAllowanceLoading;
 
   let buttonLabel = "Enter Amount";
   let buttonVariant: 'primary' | 'approve' = 'primary';
@@ -136,6 +139,15 @@ export default function WithdrawTab({
   if (parsedAmount > 0) {
     if (parsedAmount > positionInfo.value) {
       buttonLabel = "Insufficient phUSD Balance";
+    } else if (isAllowanceLoading) {
+      buttonLabel = "Loading...";
+      buttonLoading = true;
+    } else if (needsApproval && onApprove) {
+      // Show approve button when bonding token allowance is insufficient
+      buttonLabel = "Approve phUSD";
+      buttonVariant = 'approve';
+      buttonAction = onApprove;
+      buttonLoading = isTransacting;
     } else if (isAmountValid) {
       buttonLabel = "Withdraw";
       buttonAction = handleInitiateWithdraw;

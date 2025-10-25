@@ -94,6 +94,9 @@ export interface WithdrawFormProps {
   onWithdraw: (bondingCurveOutput?: number) => void;
   isTransacting?: boolean;
   withdrawalFeeRate?: number; // Decimal rate (e.g., 0.02 = 2%)
+  needsApproval?: boolean; // Whether bonding token approval is needed
+  onApprove?: () => Promise<void>; // Callback for bonding token approval
+  isAllowanceLoading?: boolean; // Whether allowance is still loading
 }
 
 export interface BondingCurveBoxProps {
