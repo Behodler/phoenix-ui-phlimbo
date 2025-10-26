@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useChainId, useReadContract, useWriteContract } from 'wagmi';
+import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { readContract } from '@wagmi/core';
+import { wagmiConfig } from '../../wagmiConfig';
 import {
   behodler3TokenlaunchAbi,
   mockAutoDolaAbi,
@@ -10,6 +12,7 @@ import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
 import type { Abi, AbiFunction } from 'viem';
+import type { ContractAddresses } from '../../types/contracts';
 
 // ABI for ERC20 tokens with mint function (used on testnets)
 const mintableErc20Abi = [
@@ -37,7 +40,7 @@ const mintableErc20Abi = [
  */
 interface ContractConfig {
   name: string;
-  addressKey: keyof typeof import('../../types/contracts').ContractAddresses;
+  addressKey: keyof ContractAddresses;
   abi: Abi;
 }
 
@@ -133,6 +136,10 @@ export default function Admin() {
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
   const [conversionErrors, setConversionErrors] = useState<Record<string, string>>({});
 
+  // State for transaction management
+  const [isCalling, setIsCalling] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+
   // Fetch the owner address from the bonding curve contract
   const { data: ownerAddress } = useReadContract({
     address: addresses?.bondingCurve as `0x${string}` | undefined,
@@ -154,8 +161,14 @@ export default function Admin() {
     },
   });
 
-  // Wagmi hook for contract write
-  const { writeContractAsync } = useWriteContract();
+  // Wagmi hooks for contract write and transaction tracking
+  const { data: txHash, writeContractAsync } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({
+    hash: txHash,
+    query: {
+      enabled: !!txHash,
+    },
+  });
 
   // Check if we should show mint yield button (hide on mainnet, chainID 1)
   const isMainnet = chainId === 1;
@@ -368,6 +381,35 @@ export default function Admin() {
   }, [isConnected]);
 
   /**
+   * Handle transaction success for Execute button
+   */
+  useEffect(() => {
+    if (isTxSuccess && txHash && isExecuting) {
+      // Show success toast with transaction hash
+      addToast({
+        type: 'success',
+        title: 'Transaction Confirmed',
+        description: `Function executed successfully!`,
+        duration: 8000,
+        action: {
+          label: 'View Transaction',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${txHash}`
+              : networkType === 'local'
+              ? `http://localhost:8545` // Anvil doesn't have a block explorer
+              : `https://sepolia.etherscan.io/tx/${txHash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
+      });
+
+      // Reset executing state
+      setIsExecuting(false);
+    }
+  }, [isTxSuccess, txHash, isExecuting, networkType, addToast]);
+
+  /**
    * Handle parameter input changes
    */
   const handleParameterChange = (paramKey: string, value: string) => {
@@ -420,16 +462,15 @@ export default function Admin() {
   };
 
   /**
-   * Handle form submission
+   * Convert and validate parameters for contract calls
+   * Returns converted parameters array or null if there are errors
    */
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const convertAndValidateParameters = (): any[] | null => {
+    if (!selectedFunction) return null;
 
-    if (!selectedFunction) return;
-
-    // Validate form
+    // Validate form first
     if (!validateForm()) {
-      return;
+      return null;
     }
 
     // Convert e-notation values for numeric parameters
@@ -442,7 +483,7 @@ export default function Admin() {
       const value = parameterValues[key] || '';
       const paramType = input.type;
 
-      console.log(`[E-notation Debug] Parameter "${key}":`, {
+      console.log(`[Admin Panel] Parameter "${key}":`, {
         type: paramType,
         originalValue: value,
         isNumeric: isNumericType(paramType),
@@ -455,44 +496,176 @@ export default function Admin() {
           // Convert e-notation to full integer string
           const expandedValue = expandExpInt(value);
           convertedValues[key] = expandedValue;
-          console.log(`[E-notation Debug] ✅ Converted "${value}" → "${expandedValue}"`);
+          console.log(`[Admin Panel] ✅ Converted "${value}" → "${expandedValue}"`);
         } catch (error) {
           // Store conversion error
           const errorMessage = error instanceof Error ? error.message : 'Conversion failed';
           newConversionErrors[key] = errorMessage;
           hasConversionErrors = true;
-          console.log(`[E-notation Debug] ❌ Conversion failed for "${value}":`, errorMessage);
+          console.log(`[Admin Panel] ❌ Conversion failed for "${value}":`, errorMessage);
         }
       } else {
         // Pass through non-numeric or non-e-notation values unchanged
         convertedValues[key] = value;
-        console.log(`[E-notation Debug] ⏭️ Passed through unchanged: "${value}"`);
+        console.log(`[Admin Panel] ⏭️ Passed through unchanged: "${value}"`);
       }
     });
 
-    // If there are conversion errors, update state and prevent submission
+    // If there are conversion errors, update state and return null
     if (hasConversionErrors) {
       setConversionErrors(newConversionErrors);
+      return null;
+    }
+
+    // Build args array in the correct order for the contract function
+    const args = selectedFunction.inputs.map((input, index) => {
+      const key = input.name || `param${index}`;
+      return convertedValues[key];
+    });
+
+    return args;
+  };
+
+  /**
+   * Handle Call button - for read-only functions (view/pure)
+   */
+  const handleCall = async () => {
+    if (!selectedFunction || !selectedContractKey) return;
+
+    const args = convertAndValidateParameters();
+    if (!args) return;
+
+    setIsCalling(true);
+
+    try {
+      const selectedContract = ownedContracts.find(
+        (contract) => contract.addressKey === selectedContractKey
+      );
+
+      if (!selectedContract || !addresses) {
+        throw new Error('Contract not found');
+      }
+
+      const contractAddress = addresses[selectedContract.addressKey];
+      if (!contractAddress) {
+        throw new Error('Contract address not available');
+      }
+
+      console.log(`[Admin Panel] Calling ${selectedFunction.name} with args:`, args);
+
+      // Call the contract function using readContract
+      const result = await readContract(wagmiConfig, {
+        address: contractAddress as `0x${string}`,
+        abi: selectedContract.abi,
+        functionName: selectedFunction.name,
+        args: args as any,
+      });
+
+      console.log(`[Admin Panel] ✅ Call result for ${selectedFunction.name}:`, result);
+
+      // Show success toast
+      addToast({
+        type: 'success',
+        title: 'Call Successful',
+        description: 'Function called successfully. Check console for results.',
+        duration: 6000,
+      });
+
+    } catch (error) {
+      console.error('[Admin Panel] ❌ Call error:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      addToast({
+        type: 'error',
+        title: 'Call Failed',
+        description: errorMessage,
+        duration: 8000,
+      });
+    } finally {
+      setIsCalling(false);
+    }
+  };
+
+  /**
+   * Handle Execute button - for state-changing functions
+   */
+  const handleExecute = async () => {
+    if (!selectedFunction || !selectedContractKey) return;
+
+    const args = convertAndValidateParameters();
+    if (!args) return;
+
+    if (!isConnected || !walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet to execute transactions.',
+        duration: 6000,
+      });
       return;
     }
 
-    // Build alert message showing function name and all parameters with converted values
-    let alertMessage = `Function: ${selectedFunction.name}\n\n`;
+    setIsExecuting(true);
 
-    console.log('[E-notation Debug] Building alert message with convertedValues:', convertedValues);
+    try {
+      const selectedContract = ownedContracts.find(
+        (contract) => contract.addressKey === selectedContractKey
+      );
 
-    selectedFunction.inputs.forEach((input, index) => {
-      const key = input.name || `param${index}`;
-      const value = convertedValues[key] || '';
-      const paramName = input.name || `parameter${index}`;
-      const paramType = input.type;
+      if (!selectedContract || !addresses) {
+        throw new Error('Contract not found');
+      }
 
-      console.log(`[E-notation Debug] Alert - Adding parameter "${key}": "${value}"`);
-      alertMessage += `${paramName} (${paramType}): ${value}\n`;
-    });
+      const contractAddress = addresses[selectedContract.addressKey];
+      if (!contractAddress) {
+        throw new Error('Contract address not available');
+      }
 
-    console.log('[E-notation Debug] Final alert message:', alertMessage);
-    alert(alertMessage);
+      console.log(`[Admin Panel] Executing ${selectedFunction.name} with args:`, args);
+
+      // Show pending toast
+      const pendingToastId = addToast({
+        type: 'info',
+        title: 'Confirm Transaction',
+        description: `Please confirm the transaction in your wallet.`,
+        duration: 0,
+      });
+
+      // Execute the transaction
+      const hash = await writeContractAsync({
+        address: contractAddress as `0x${string}`,
+        abi: selectedContract.abi,
+        functionName: selectedFunction.name,
+        args: args as any,
+      });
+
+      // Remove pending toast
+      removeToast(pendingToastId);
+
+      // Show confirming toast
+      addToast({
+        type: 'info',
+        title: 'Transaction Submitted',
+        description: 'Waiting for blockchain confirmation...',
+        duration: 0,
+      });
+
+      console.log(`[Admin Panel] ✅ Transaction submitted:`, hash);
+
+      // Success will be handled by useEffect when transaction confirms
+
+    } catch (error) {
+      console.error('[Admin Panel] ❌ Execute error:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      addToast({
+        type: 'error',
+        title: 'Transaction Failed',
+        description: errorMessage,
+        duration: 8000,
+      });
+      setIsExecuting(false);
+    }
   };
 
   /**
@@ -728,7 +901,7 @@ export default function Admin() {
 
       {/* Parameter Input Form */}
       {selectedFunction && (
-        <form onSubmit={handleFormSubmit} className="mb-6 p-4 bg-card border border-border rounded-lg">
+        <div className="mb-6 p-4 bg-card border border-border rounded-lg">
           <h3 className="text-sm font-semibold text-foreground mb-4">
             Function Parameters
           </h3>
@@ -779,17 +952,26 @@ export default function Admin() {
           )}
 
           <div className="mt-4">
-            <button
-              type="submit"
-              className="w-full px-4 py-2 bg-accent text-accent-foreground rounded-md text-sm font-medium hover:bg-accent/90 transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
-            >
-              {selectedFunction.stateMutability === 'view' ||
-              selectedFunction.stateMutability === 'pure'
-                ? 'Call'
-                : 'Execute'}
-            </button>
+            {selectedFunction.stateMutability === 'view' ||
+            selectedFunction.stateMutability === 'pure' ? (
+              <ActionButton
+                disabled={!isConnected || isCalling}
+                onAction={handleCall}
+                label="Call"
+                variant="primary"
+                isLoading={isCalling}
+              />
+            ) : (
+              <ActionButton
+                disabled={!isConnected || isExecuting || isConfirming}
+                onAction={handleExecute}
+                label="Execute"
+                variant="primary"
+                isLoading={isExecuting || isConfirming}
+              />
+            )}
           </div>
-        </form>
+        </div>
       )}
 
       {/* Admin Notice */}
