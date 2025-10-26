@@ -71,7 +71,7 @@ export default function VaultPage() {
   const [activeTab, setActiveTab] = useState<Tab>("Deposit to Mint");
 
   // FAQ state - tracks which FAQ context to display
-  const [faqComponent, setFaqComponent] = useState<string | undefined>(undefined);
+  const [faqComponent, setFaqComponent] = useState<string | undefined>("DepositTab");
 
   // Set mounted state after initial render to prevent flickering
   useEffect(() => {
