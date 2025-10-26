@@ -64,6 +64,37 @@ const getContractConfigs = (networkType: string): ContractConfig[] => [
 ];
 
 /**
+ * Expands exponential notation into a plain integer string
+ * e.g. "1e20" -> "100000000000000000000"
+ * Rejects any negative exponents or decimals
+ */
+function expandExpInt(input: string): string {
+  const s = String(input).trim();
+  const m = /^([+-]?)(\d+)(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error("Invalid integer format");
+
+  const sign = m[1] === "-" ? "-" : "";
+  const base = m[2];
+  const exp = m[3] !== undefined ? parseInt(m[3], 10) : 0;
+
+  if (exp < 0) throw new Error("Negative exponents not allowed (Ethereum uses integers only)");
+
+  // Append exp number of zeros
+  const result = base + "0".repeat(exp);
+
+  // Strip leading zeros except one
+  return sign + result.replace(/^(-?)0+(?=\d)/, "$1");
+}
+
+/**
+ * Check if a Solidity type is numeric (uint/int variants)
+ */
+function isNumericType(solidityType: string): boolean {
+  // Match uint/int with any bit size or no bit size specified
+  return /^(u?int\d*)$/.test(solidityType);
+}
+
+/**
  * Extract all functions from ABI
  * Note: ABIs only contain external/public functions by definition
  */
@@ -100,6 +131,7 @@ export default function Admin() {
   // State for parameter inputs and validation
   const [parameterValues, setParameterValues] = useState<Record<string, string>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+  const [conversionErrors, setConversionErrors] = useState<Record<string, string>>({});
 
   // Fetch the owner address from the bonding curve contract
   const { data: ownerAddress } = useReadContract({
@@ -309,10 +341,12 @@ export default function Admin() {
 
         setParameterValues(initialValues);
         setValidationErrors(initialErrors);
+        setConversionErrors({});
       } else {
         setSelectedFunction(null);
         setParameterValues({});
         setValidationErrors({});
+        setConversionErrors({});
       }
     }
   }, [selectedFunctionName, selectedContractKey, ownedContracts]);
@@ -329,6 +363,7 @@ export default function Admin() {
       setSelectedFunction(null);
       setParameterValues({});
       setValidationErrors({});
+      setConversionErrors({});
     }
   }, [isConnected]);
 
@@ -347,6 +382,15 @@ export default function Admin() {
         ...prev,
         [paramKey]: false,
       }));
+    }
+
+    // Clear conversion error when user types
+    if (conversionErrors[paramKey]) {
+      setConversionErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[paramKey];
+        return newErrors;
+      });
     }
   };
 
@@ -388,12 +432,45 @@ export default function Admin() {
       return;
     }
 
-    // Build alert message showing function name and all parameters
-    let alertMessage = `Function: ${selectedFunction.name}\n\n`;
+    // Convert e-notation values for numeric parameters
+    const convertedValues: Record<string, string> = {};
+    const newConversionErrors: Record<string, string> = {};
+    let hasConversionErrors = false;
 
     selectedFunction.inputs.forEach((input, index) => {
       const key = input.name || `param${index}`;
       const value = parameterValues[key] || '';
+      const paramType = input.type;
+
+      // Check if parameter is numeric type and contains e-notation
+      if (isNumericType(paramType) && /[eE]/.test(value)) {
+        try {
+          // Convert e-notation to full integer string
+          convertedValues[key] = expandExpInt(value);
+        } catch (error) {
+          // Store conversion error
+          const errorMessage = error instanceof Error ? error.message : 'Conversion failed';
+          newConversionErrors[key] = errorMessage;
+          hasConversionErrors = true;
+        }
+      } else {
+        // Pass through non-numeric or non-e-notation values unchanged
+        convertedValues[key] = value;
+      }
+    });
+
+    // If there are conversion errors, update state and prevent submission
+    if (hasConversionErrors) {
+      setConversionErrors(newConversionErrors);
+      return;
+    }
+
+    // Build alert message showing function name and all parameters with converted values
+    let alertMessage = `Function: ${selectedFunction.name}\n\n`;
+
+    selectedFunction.inputs.forEach((input, index) => {
+      const key = input.name || `param${index}`;
+      const value = convertedValues[key] || '';
       const paramName = input.name || `parameter${index}`;
       const paramType = input.type;
 
@@ -648,6 +725,7 @@ export default function Admin() {
                 const paramName = input.name || `parameter${index}`;
                 const paramType = input.type;
                 const hasError = validationErrors[key];
+                const conversionError = conversionErrors[key];
 
                 return (
                   <div key={key}>
@@ -657,7 +735,7 @@ export default function Admin() {
                     <input
                       type="text"
                       className={`w-full px-3 py-2 bg-background border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent ${
-                        hasError
+                        hasError || conversionError
                           ? 'border-red-500 focus:ring-red-500'
                           : 'border-border'
                       }`}
@@ -668,6 +746,11 @@ export default function Admin() {
                     {hasError && (
                       <p className="text-xs text-red-500 mt-1">
                         This field is required
+                      </p>
+                    )}
+                    {conversionError && (
+                      <p className="text-xs text-red-500 mt-1">
+                        {conversionError}
                       </p>
                     )}
                   </div>
