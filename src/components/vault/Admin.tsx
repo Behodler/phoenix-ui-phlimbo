@@ -442,20 +442,31 @@ export default function Admin() {
       const value = parameterValues[key] || '';
       const paramType = input.type;
 
+      console.log(`[E-notation Debug] Parameter "${key}":`, {
+        type: paramType,
+        originalValue: value,
+        isNumeric: isNumericType(paramType),
+        hasENotation: /[eE]/.test(value),
+      });
+
       // Check if parameter is numeric type and contains e-notation
       if (isNumericType(paramType) && /[eE]/.test(value)) {
         try {
           // Convert e-notation to full integer string
-          convertedValues[key] = expandExpInt(value);
+          const expandedValue = expandExpInt(value);
+          convertedValues[key] = expandedValue;
+          console.log(`[E-notation Debug] ✅ Converted "${value}" → "${expandedValue}"`);
         } catch (error) {
           // Store conversion error
           const errorMessage = error instanceof Error ? error.message : 'Conversion failed';
           newConversionErrors[key] = errorMessage;
           hasConversionErrors = true;
+          console.log(`[E-notation Debug] ❌ Conversion failed for "${value}":`, errorMessage);
         }
       } else {
         // Pass through non-numeric or non-e-notation values unchanged
         convertedValues[key] = value;
+        console.log(`[E-notation Debug] ⏭️ Passed through unchanged: "${value}"`);
       }
     });
 
@@ -468,15 +479,19 @@ export default function Admin() {
     // Build alert message showing function name and all parameters with converted values
     let alertMessage = `Function: ${selectedFunction.name}\n\n`;
 
+    console.log('[E-notation Debug] Building alert message with convertedValues:', convertedValues);
+
     selectedFunction.inputs.forEach((input, index) => {
       const key = input.name || `param${index}`;
       const value = convertedValues[key] || '';
       const paramName = input.name || `parameter${index}`;
       const paramType = input.type;
 
+      console.log(`[E-notation Debug] Alert - Adding parameter "${key}": "${value}"`);
       alertMessage += `${paramName} (${paramType}): ${value}\n`;
     });
 
+    console.log('[E-notation Debug] Final alert message:', alertMessage);
     alert(alertMessage);
   };
 
