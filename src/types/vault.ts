@@ -34,6 +34,7 @@ export interface TabNavigationProps {
   tabs: readonly Tab[];
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
+  onTriggerFAQ?: (componentName: string) => void;
 }
 
 export interface DepositFormProps {
@@ -105,6 +106,7 @@ export interface BondingCurveBoxProps {
   currentPrice: number;
   isLoading?: boolean;
   isError?: boolean;
+  onTriggerFAQ?: (componentName: string) => void;
 }
 
 export interface FAQItem {

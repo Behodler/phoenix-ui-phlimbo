@@ -1,11 +1,13 @@
 import type { BondingCurveBoxProps } from '../../types/vault';
+import FAQWrapper from './FAQWrapper';
 
 export default function BondingCurveBox({
   startPrice,
   endPrice,
   currentPrice,
   isLoading = false,
-  isError = false
+  isError = false,
+  onTriggerFAQ
 }: BondingCurveBoxProps) {
   // Calculate the progress percentage (0-100) based on current price position
   const progress = Math.max(0, Math.min(100, ((currentPrice - startPrice) / (endPrice - startPrice)) * 100));
@@ -32,9 +34,17 @@ export default function BondingCurveBox({
       <div className="space-y-6">
         {/* Title and Subtitle */}
         <div className="space-y-2">
-          <h2 className="text-lg sm:text-xl font-bold text-card-foreground">
-            Ignition Phase
-          </h2>
+          {onTriggerFAQ ? (
+            <FAQWrapper componentType="IgnitionPhase" onTriggerFAQ={onTriggerFAQ}>
+              <h2 className="text-lg sm:text-xl font-bold text-card-foreground">
+                Ignition Phase
+              </h2>
+            </FAQWrapper>
+          ) : (
+            <h2 className="text-lg sm:text-xl font-bold text-card-foreground">
+              Ignition Phase
+            </h2>
+          )}
           <p className="text-xs sm:text-sm text-muted-foreground">
             Bonding Curve state
           </p>

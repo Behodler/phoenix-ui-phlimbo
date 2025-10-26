@@ -16,11 +16,11 @@ export default function FAQWrapper({
     onTriggerFAQ(componentType);
   };
 
-  // Make entire wrapped component clickable with help cursor
+  // Make entire wrapped component clickable with pointer cursor
   return (
     <div
       onClick={handleClick}
-      className="inline-block cursor-help transition-opacity duration-200 hover:opacity-90"
+      className="inline-block cursor-pointer transition-opacity duration-200 hover:opacity-90"
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {

@@ -16,7 +16,6 @@ import TestnetFaucet from '../components/vault/TestnetFaucet';
 import Admin from '../components/vault/Admin';
 import BondingCurveBox from '../components/vault/BondingCurveBox';
 import FAQ from '../components/vault/FAQ';
-import FAQWrapper from '../components/vault/FAQWrapper';
 import DOLA from "../assets/sDOLA.png";
 
 export default function VaultPage() {
@@ -71,8 +70,8 @@ export default function VaultPage() {
 
   const [activeTab, setActiveTab] = useState<Tab>("Deposit to Mint");
 
-  // FAQ testing state - for manual testing during development
-  const [faqComponent, setFaqComponent] = useState<string | undefined>("BondingCurveBox");
+  // FAQ state - tracks which FAQ context to display
+  const [faqComponent, setFaqComponent] = useState<string | undefined>(undefined);
 
   // Set mounted state after initial render to prevent flickering
   useEffect(() => {
@@ -917,6 +916,7 @@ export default function VaultPage() {
               tabs={tabs}
               activeTab={activeTab}
               onTabChange={setActiveTab}
+              onTriggerFAQ={setFaqComponent}
             />
 
             {/* Tab content */}
@@ -961,58 +961,11 @@ export default function VaultPage() {
             currentPrice={bondingCurveData.currentPrice}
             isLoading={bondingCurveLoading}
             isError={bondingCurveError}
+            onTriggerFAQ={setFaqComponent}
           />
 
-          {/* FAQ Component - with manual testing controls */}
-          <div className="space-y-4">
-            {/* FAQWrapper Demo Section */}
-            <div className="phoenix-card p-4">
-              <h3 className="text-sm font-semibold text-card-foreground mb-3">FAQWrapper Demo</h3>
-
-              {/* Example 1: Button */}
-              <div className="mb-4">
-                <p className="text-xs text-muted-foreground mb-2">Wrapped Button (help cursor on hover):</p>
-                <FAQWrapper
-                  componentType="BondingCurveBox"
-                  onTriggerFAQ={setFaqComponent}
-                >
-                  <button className="px-4 py-2 bg-accent text-accent-foreground rounded-md text-sm hover:bg-accent/80">
-                    Click for FAQ
-                  </button>
-                </FAQWrapper>
-              </div>
-
-              {/* Example 2: Text Box */}
-              <div className="mb-4">
-                <p className="text-xs text-muted-foreground mb-2">Wrapped Text Box (entire area clickable):</p>
-                <FAQWrapper
-                  componentType="DepositForm"
-                  onTriggerFAQ={setFaqComponent}
-                >
-                  <div className="px-4 py-2 bg-card border border-border rounded-md text-sm">
-                    Click Anywhere on This Text
-                  </div>
-                </FAQWrapper>
-              </div>
-
-              {/* Example 3: Text Span */}
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Wrapped Text Span:</p>
-                <FAQWrapper
-                  componentType="WithdrawTab"
-                  onTriggerFAQ={setFaqComponent}
-                >
-                  <span className="text-sm text-card-foreground">Click this text for FAQ (help cursor)</span>
-                </FAQWrapper>
-              </div>
-            </div>
-
-            {/* Manual Testing Controls - temporary for development */}
-
-
-
-            <FAQ componentName={faqComponent} />
-          </div>
+          {/* FAQ Component */}
+          <FAQ componentName={faqComponent} />
         </aside>
       </main>
 
