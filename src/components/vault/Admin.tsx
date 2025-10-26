@@ -94,6 +94,12 @@ export default function Admin() {
   const [ownedContracts, setOwnedContracts] = useState<ContractConfig[]>([]);
   const [isLoadingOwnership, setIsLoadingOwnership] = useState(false);
   const [availableFunctions, setAvailableFunctions] = useState<string[]>([]);
+  const [selectedFunctionName, setSelectedFunctionName] = useState<string>('');
+  const [selectedFunction, setSelectedFunction] = useState<AbiFunction | null>(null);
+
+  // State for parameter inputs and validation
+  const [parameterValues, setParameterValues] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
   // Fetch the owner address from the bonding curve contract
   const { data: ownerAddress } = useReadContract({
@@ -269,6 +275,49 @@ export default function Admin() {
   }, [selectedContractKey, ownedContracts]);
 
   /**
+   * Extract function details when a function is selected
+   */
+  useEffect(() => {
+    if (!selectedFunctionName || !selectedContractKey) {
+      setSelectedFunction(null);
+      setParameterValues({});
+      setValidationErrors({});
+      return;
+    }
+
+    const selectedContract = ownedContracts.find(
+      (contract) => contract.addressKey === selectedContractKey
+    );
+
+    if (selectedContract) {
+      const functionAbi = selectedContract.abi.find(
+        (item): item is AbiFunction =>
+          item.type === 'function' && item.name === selectedFunctionName
+      );
+
+      if (functionAbi) {
+        setSelectedFunction(functionAbi);
+        // Initialize parameter values and validation state
+        const initialValues: Record<string, string> = {};
+        const initialErrors: Record<string, boolean> = {};
+
+        functionAbi.inputs.forEach((input, index) => {
+          const key = input.name || `param${index}`;
+          initialValues[key] = '';
+          initialErrors[key] = false;
+        });
+
+        setParameterValues(initialValues);
+        setValidationErrors(initialErrors);
+      } else {
+        setSelectedFunction(null);
+        setParameterValues({});
+        setValidationErrors({});
+      }
+    }
+  }, [selectedFunctionName, selectedContractKey, ownedContracts]);
+
+  /**
    * Reset selections when wallet changes or disconnects
    */
   useEffect(() => {
@@ -276,8 +325,83 @@ export default function Admin() {
       setSelectedContractKey('');
       setOwnedContracts([]);
       setAvailableFunctions([]);
+      setSelectedFunctionName('');
+      setSelectedFunction(null);
+      setParameterValues({});
+      setValidationErrors({});
     }
   }, [isConnected]);
+
+  /**
+   * Handle parameter input changes
+   */
+  const handleParameterChange = (paramKey: string, value: string) => {
+    setParameterValues((prev) => ({
+      ...prev,
+      [paramKey]: value,
+    }));
+
+    // Clear validation error when user types
+    if (validationErrors[paramKey]) {
+      setValidationErrors((prev) => ({
+        ...prev,
+        [paramKey]: false,
+      }));
+    }
+  };
+
+  /**
+   * Validate form - check that all parameters have values
+   */
+  const validateForm = (): boolean => {
+    if (!selectedFunction) return false;
+
+    const errors: Record<string, boolean> = {};
+    let hasErrors = false;
+
+    selectedFunction.inputs.forEach((input, index) => {
+      const key = input.name || `param${index}`;
+      const value = parameterValues[key] || '';
+
+      if (value.trim() === '') {
+        errors[key] = true;
+        hasErrors = true;
+      } else {
+        errors[key] = false;
+      }
+    });
+
+    setValidationErrors(errors);
+    return !hasErrors;
+  };
+
+  /**
+   * Handle form submission
+   */
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedFunction) return;
+
+    // Validate form
+    if (!validateForm()) {
+      return;
+    }
+
+    // Build alert message showing function name and all parameters
+    let alertMessage = `Function: ${selectedFunction.name}\n\n`;
+
+    selectedFunction.inputs.forEach((input, index) => {
+      const key = input.name || `param${index}`;
+      const value = parameterValues[key] || '';
+      const paramName = input.name || `parameter${index}`;
+      const paramType = input.type;
+
+      alertMessage += `${paramName} (${paramType}): ${value}\n`;
+    });
+
+    alert(alertMessage);
+  };
 
   /**
    * Handle mint yield button click
@@ -486,6 +610,8 @@ export default function Admin() {
           <select
             className="w-full px-4 py-2 bg-card border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!selectedContractKey || availableFunctions.length === 0}
+            value={selectedFunctionName}
+            onChange={(e) => setSelectedFunctionName(e.target.value)}
           >
             <option value="">
               {!selectedContractKey
@@ -507,6 +633,66 @@ export default function Admin() {
           )}
         </div>
       </div>
+
+      {/* Parameter Input Form */}
+      {selectedFunction && (
+        <form onSubmit={handleFormSubmit} className="mb-6 p-4 bg-card border border-border rounded-lg">
+          <h3 className="text-sm font-semibold text-foreground mb-4">
+            Function Parameters
+          </h3>
+
+          {selectedFunction.inputs.length > 0 ? (
+            <div className="space-y-3">
+              {selectedFunction.inputs.map((input, index) => {
+                const key = input.name || `param${index}`;
+                const paramName = input.name || `parameter${index}`;
+                const paramType = input.type;
+                const hasError = validationErrors[key];
+
+                return (
+                  <div key={key}>
+                    <label className="block text-xs font-medium text-foreground mb-1">
+                      {paramName}({paramType})
+                    </label>
+                    <input
+                      type="text"
+                      className={`w-full px-3 py-2 bg-background border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent ${
+                        hasError
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-border'
+                      }`}
+                      value={parameterValues[key] || ''}
+                      onChange={(e) => handleParameterChange(key, e.target.value)}
+                      placeholder={`Enter ${paramName}`}
+                    />
+                    {hasError && (
+                      <p className="text-xs text-red-500 mt-1">
+                        This field is required
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground mb-3">
+              This function has no parameters
+            </p>
+          )}
+
+          <div className="mt-4">
+            <button
+              type="submit"
+              className="w-full px-4 py-2 bg-accent text-accent-foreground rounded-md text-sm font-medium hover:bg-accent/90 transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+            >
+              {selectedFunction.stateMutability === 'view' ||
+              selectedFunction.stateMutability === 'pure'
+                ? 'Call'
+                : 'Execute'}
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Admin Notice */}
       <div className="mt-6 p-4 bg-card border border-border rounded-lg">
