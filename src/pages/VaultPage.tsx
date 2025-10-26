@@ -1008,60 +1008,8 @@ export default function VaultPage() {
             </div>
 
             {/* Manual Testing Controls - temporary for development */}
-            <div className="phoenix-card p-4">
-              <h3 className="text-sm font-semibold text-card-foreground mb-3">FAQ Testing Controls</h3>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setFaqComponent("BondingCurveBox")}
-                  className={`px-3 py-1 text-xs rounded border ${faqComponent === "BondingCurveBox"
-                      ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-card border-border text-muted-foreground hover:bg-accent/5"
-                    }`}
-                >
-                  BondingCurveBox
-                </button>
-                <button
-                  onClick={() => setFaqComponent("DepositForm")}
-                  className={`px-3 py-1 text-xs rounded border ${faqComponent === "DepositForm"
-                      ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-card border-border text-muted-foreground hover:bg-accent/5"
-                    }`}
-                >
-                  DepositForm
-                </button>
-                <button
-                  onClick={() => setFaqComponent("WithdrawTab")}
-                  className={`px-3 py-1 text-xs rounded border ${faqComponent === "WithdrawTab"
-                      ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-card border-border text-muted-foreground hover:bg-accent/5"
-                    }`}
-                >
-                  WithdrawTab
-                </button>
-                <button
-                  onClick={() => setFaqComponent("InvalidComponent")}
-                  className={`px-3 py-1 text-xs rounded border ${faqComponent === "InvalidComponent"
-                      ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-card border-border text-muted-foreground hover:bg-accent/5"
-                    }`}
-                >
-                  Invalid
-                </button>
-                <button
-                  onClick={() => setFaqComponent(undefined)}
-                  className={`px-3 py-1 text-xs rounded border ${faqComponent === undefined
-                      ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-card border-border text-muted-foreground hover:bg-accent/5"
-                    }`}
-                >
-                  None
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Current: {faqComponent || "None"}
-                {faqComponent && !["BondingCurveBox", "DepositForm", "WithdrawTab"].includes(faqComponent) && " (should not render)"}
-              </p>
-            </div>
+
+
 
             <FAQ componentName={faqComponent} />
           </div>
