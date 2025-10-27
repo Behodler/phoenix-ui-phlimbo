@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 import { useChainId } from 'wagmi'
 import type { ContractAddresses } from '../types/contracts'
 import { NetworkType } from '../types/contracts'
-import { getNetworkType, isMainnet, isLocalAnvil } from '../lib/networkDetection'
-import { MAINNET_CONTRACT_ADDRESSES } from '../lib/contracts'
+import { getNetworkType, isMainnet, isSepolia, isLocalAnvil } from '../lib/networkDetection'
+import { MAINNET_CONTRACT_ADDRESSES, SEPOLIA_CONTRACT_ADDRESSES } from '../lib/contracts'
 import { fetchLocalAddresses } from '../lib/addressFetcher'
 
 /**
@@ -34,6 +34,7 @@ interface ContractAddressProviderProps {
  *
  * Detects the current network and loads appropriate contract addresses:
  * - Mainnet (chain ID 1): Uses hardcoded addresses from constants
+ * - Sepolia (chain ID 11155111): Uses hardcoded testnet addresses from constants
  * - Local Anvil (chain ID 31337): Fetches addresses from http://localhost:3001/contracts
  * - Other networks: Returns unsupported error
  *
@@ -69,6 +70,10 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
           // Use hardcoded mainnet addresses
           console.log('🏦 Loading mainnet contract addresses')
           setAddresses(MAINNET_CONTRACT_ADDRESSES)
+        } else if (isSepolia(chainId)) {
+          // Use hardcoded Sepolia testnet addresses
+          console.log('🧪 Loading Sepolia testnet contract addresses')
+          setAddresses(SEPOLIA_CONTRACT_ADDRESSES)
         } else if (isLocalAnvil(chainId)) {
           // Fetch addresses from local development server
           console.log('🔧 Fetching contract addresses from local server...')
@@ -76,7 +81,7 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
           setAddresses(localAddresses)
         } else {
           // Unsupported network
-          const errorMsg = `Unsupported network (Chain ID: ${chainId}). Please connect to Mainnet or Local Anvil.`
+          const errorMsg = `Unsupported network (Chain ID: ${chainId}). Please connect to Mainnet, Sepolia, or Local Anvil.`
           console.error('❌', errorMsg)
           setError(errorMsg)
           setAddresses(null)

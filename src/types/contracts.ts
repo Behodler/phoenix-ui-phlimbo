@@ -45,6 +45,7 @@ export interface LocalAddressServerResponse {
  */
 export const NetworkType = {
   MAINNET: 'mainnet',
+  SEPOLIA: 'sepolia',
   LOCAL: 'local',
   UNSUPPORTED: 'unsupported',
 } as const
