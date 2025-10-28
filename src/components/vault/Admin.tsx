@@ -4,9 +4,8 @@ import { readContract } from '@wagmi/core';
 import { wagmiConfig } from '../../wagmiConfig';
 import {
   behodler3TokenlaunchAbi,
-  mockAutoDolaAbi,
-  mockBondingTokenAbi,
-  iBondingTokenAbi,
+  flaxTokenAbi,
+  autoDolaYieldStrategyAbi,
 } from '@behodler/wagmi-hooks';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
@@ -57,12 +56,12 @@ const getContractConfigs = (networkType: string): ContractConfig[] => [
   {
     name: 'Bonding Token',
     addressKey: 'bondingToken',
-    abi: (networkType === 'mainnet' ? iBondingTokenAbi : mockBondingTokenAbi) as Abi,
+    abi:   flaxTokenAbi as Abi,
   },
   {
     name: 'AutoDolaYieldStrategy',
     addressKey: 'autoDolaYieldStrategy',
-    abi: mockAutoDolaAbi as Abi,
+    abi: autoDolaYieldStrategyAbi as Abi,
   },
 ];
 
