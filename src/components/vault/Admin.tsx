@@ -216,53 +216,32 @@ export default function Admin() {
 
             console.log(`🌐 ${config.name}: Calling owner() at ${contractAddress}...`);
 
-            // Try to read the owner() function
-            const response = await fetch(
-              `http://localhost:8545`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  jsonrpc: '2.0',
-                  method: 'eth_call',
-                  params: [
-                    {
-                      to: contractAddress,
-                      data: '0x8da5cb5b', // keccak256("owner()") selector
-                    },
-                    'latest',
-                  ],
-                  id: 1,
-                }),
-              }
-            );
+            // Try to read the owner() function using wagmi's readContract
+            try {
+              const ownerAddress = await readContract(wagmiConfig, {
+                address: contractAddress as `0x${string}`,
+                abi: config.abi,
+                functionName: 'owner',
+              });
 
-            const data = await response.json();
-
-            console.log(`📡 ${config.name}: RPC response:`, {
-              result: data.result,
-              error: data.error,
-            });
-
-            if (data.result && data.result !== '0x') {
-              // Parse the owner address from the result
-              const ownerAddress = '0x' + data.result.slice(-40);
+              console.log(`📡 ${config.name}: Successfully read owner address:`, ownerAddress);
 
               console.log(`👤 ${config.name}: Owner check:`, {
                 contractOwner: ownerAddress,
                 walletAddress,
-                matches: ownerAddress.toLowerCase() === walletAddress.toLowerCase(),
+                matches: (ownerAddress as string).toLowerCase() === walletAddress.toLowerCase(),
               });
 
               // Compare addresses (case-insensitive)
-              if (ownerAddress.toLowerCase() === walletAddress.toLowerCase()) {
+              if ((ownerAddress as string).toLowerCase() === walletAddress.toLowerCase()) {
                 console.log(`✅ ${config.name}: Owned by connected wallet!`);
                 return config;
               } else {
                 console.log(`❌ ${config.name}: Not owned by connected wallet`);
               }
-            } else {
-              console.warn(`⚠️ ${config.name}: No owner() result or empty response`);
+            } catch (ownerError) {
+              console.warn(`⚠️ ${config.name}: Failed to read owner() function:`, ownerError);
+              // Contract might not have an owner() function, skip it
             }
 
             return null;
