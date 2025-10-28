@@ -13,7 +13,7 @@ export const wagmiConfig = createConfig({
   chains: [anvil, sepolia, arbitrum, mainnet],
   transports: {
     [anvil.id]: http('http://127.0.0.1:8545'),
-    [sepolia.id]: http(),
+    [sepolia.id]: http('https://eth-sepolia.g.alchemy.com/v2/CH_ODalQJ5HhLA1WOu1iA'),
     [arbitrum.id]: http(),
     [mainnet.id]: http(),
   },
