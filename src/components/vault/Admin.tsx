@@ -47,7 +47,7 @@ interface ContractConfig {
  * Contract configurations for admin panel
  * Only includes contracts that might be ownable
  */
-const getContractConfigs = (networkType: string): ContractConfig[] => [
+const getContractConfigs = (_networkType: string): ContractConfig[] => [
   {
     name: 'Bonding Curve',
     addressKey: 'bondingCurve',

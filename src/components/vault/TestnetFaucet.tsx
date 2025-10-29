@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useChainId, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
 import { useToast } from '../ui/ToastProvider';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
@@ -30,7 +30,6 @@ export default function TestnetFaucet() {
   const [isMinting, setIsMinting] = useState(false);
   const { addToast, removeToast } = useToast();
   const { isConnected, address: walletAddress } = useAccount();
-  const chainId = useChainId();
   const { addresses, networkType } = useContractAddresses();
 
   // Wagmi hooks for contract interaction

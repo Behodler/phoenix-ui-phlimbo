@@ -49,13 +49,6 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       throw new Error(`Missing contract addresses: ${missingAddresses.join(', ')}`)
     }
 
-    console.log('📍 Loaded contract addresses from local server:', {
-      networkId: data.networkId,
-      networkName: data.networkName,
-      deployedAt: data.deployedAt,
-      addresses,
-    })
-
     return addresses
   } catch (error) {
     if (error instanceof TypeError && error.message.includes('fetch')) {

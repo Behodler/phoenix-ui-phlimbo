@@ -30,7 +30,7 @@ export default function VaultPage() {
   const { isConnected, address: walletAddress } = useAccount();
 
   // Contract addresses context
-  const { addresses, loading: addressesLoading, error: addressesError, networkType } = useContractAddresses();
+  const { addresses, networkType } = useContractAddresses();
 
   // Fetch the owner address from the bonding curve contract
   const { data: ownerAddress } = useReadContract({
@@ -117,8 +117,6 @@ export default function VaultPage() {
   // Fetch DOLA balance from wallet's ERC20 token balance
   const {
     balance: dolaBalanceRaw,
-    isLoading: dolaBalanceLoading,
-    isError: dolaBalanceError,
     refetch: refetchDolaBalance
   } = useTokenBalance(
     walletAddress,
@@ -139,7 +137,6 @@ export default function VaultPage() {
   const {
     allowance: dolaAllowanceRaw,
     isLoading: dolaAllowanceLoading,
-    isError: dolaAllowanceError,
     refetch: refetchAllowance
   } = useTokenAllowance(
     walletAddress,
@@ -202,8 +199,8 @@ export default function VaultPage() {
       valueRaw: phUSDBalanceRaw // Pass raw BigInt for precision-sensitive operations
     }
   };
+
   const isTransacting = false;
-  const transactionError: string | undefined = undefined;
 
   // Toast notifications
   const { addToast, removeToast } = useToast();
@@ -892,8 +889,6 @@ export default function VaultPage() {
       // We'll handle success in the useEffect above
 
     } catch (error) {
-      console.error('Withdraw failed:', error);
-
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
         type: 'error',
@@ -968,63 +963,6 @@ export default function VaultPage() {
           <FAQ componentName={faqComponent} />
         </aside>
       </main>
-
-      {/* Footer */}
-      <footer className="mx-auto max-w-5xl px-4 pb-10 text-xs text-muted-foreground">
-        <div className="border-t border-border pt-6 space-y-3">
-          <p>RainbowKit wallet integration enabled. Connect your wallet to interact with Phoenix contracts.</p>
-          <p>Withdraw at any time • 0% Deposit Fee{withdrawalFeeRate !== 0 ? ` • ${(withdrawalFeeRate * 100).toFixed(1)}% Withdraw Fee` : ''}</p>
-
-          {/* Balance and Allowance Loading/Error Status */}
-          <div className="border-t border-border pt-3">
-            <p className="font-semibold mb-1">Balance & Allowance Status:</p>
-            <div className="space-y-1">
-              {dolaBalanceLoading && <p className="text-blue-400">Loading DOLA balance...</p>}
-              {dolaBalanceError && <p className="text-red-400">Error loading DOLA balance. Please check your connection.</p>}
-              {dolaAllowanceLoading && <p className="text-blue-400">Loading DOLA allowance...</p>}
-              {dolaAllowanceError && <p className="text-red-400">Error loading DOLA allowance. Please check your connection.</p>}
-              {!walletAddress && <p className="text-yellow-400">Connect wallet to view balance and allowance</p>}
-              {walletAddress && !dolaBalanceLoading && !dolaBalanceError && (
-                <p className="text-green-400">DOLA Balance: {dolaBalanceDecimal.toFixed(4)} DOLA (${dolaBalanceDecimal.toFixed(2)} USD)</p>
-              )}
-              {walletAddress && !dolaAllowanceLoading && !dolaAllowanceError && (
-                <p className="text-green-400">DOLA Allowance: {dolaAllowanceDecimal.toFixed(4)} DOLA (approved for bonding curve)</p>
-              )}
-            </div>
-          </div>
-
-          {/* Contract Addresses Debug Info */}
-          <div className="border-t border-border pt-3">
-            <p className="font-semibold mb-1">Network & Contract Addresses:</p>
-            <div className="space-y-1">
-              <p>Network Type: <span className="text-accent">{networkType}</span></p>
-              {addressesLoading && <p className="text-blue-400">Loading contract addresses...</p>}
-              {addressesError && <p className="text-red-400">Error: {addressesError}</p>}
-              {addresses && (
-                <div className="space-y-1 mt-2">
-                  <p>DOLA Token: <code className="text-accent">{addresses.dolaToken}</code></p>
-                  <p>TOKE Token: <code className="text-accent">{addresses.tokeToken}</code></p>
-                  <p>AutoDola Vault: <code className="text-accent">{addresses.autoDolaVault}</code></p>
-                  <p>Tokemak Main Rewarder: <code className="text-accent">{addresses.tokemakMainRewarder}</code></p>
-                  <p>Bonding Token (ERC20): <code className="text-accent">{addresses.bondingToken}</code></p>
-                  <p>Bonding Curve (Minter): <code className="text-accent">{addresses.bondingCurve}</code></p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {transactionError && (
-            <div className="mt-2 text-red-500">
-              Transaction Error: {transactionError}
-            </div>
-          )}
-          {isTransacting && (
-            <div className="mt-2 text-blue-500">
-              Transaction processing...
-            </div>
-          )}
-        </div>
-      </footer>
     </div>
   );
 }

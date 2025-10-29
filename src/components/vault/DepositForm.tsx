@@ -34,7 +34,7 @@ export default function DepositForm({
   const inputAmountWei = parsedAmount > 0 ? parseUnits(parsedAmount.toString(), 18) : 0n;
 
   // Fetch expected bonding tokens output from bonding curve contract
-  const { data: expectedOutputWei, isLoading: isQuoteLoading } = useReadContract({
+  const { data: expectedOutputWei } = useReadContract({
     address: addresses?.bondingCurve as `0x${string}` | undefined,
     abi: behodler3TokenlaunchAbi,
     functionName: 'quoteAddLiquidity',

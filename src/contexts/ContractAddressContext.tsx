@@ -60,23 +60,15 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
       const detectedNetworkType = getNetworkType(chainId)
       setNetworkType(detectedNetworkType)
 
-      console.log('🌐 Network detected:', {
-        chainId,
-        networkType: detectedNetworkType,
-      })
-
       try {
         if (isMainnet(chainId)) {
           // Use hardcoded mainnet addresses
-          console.log('🏦 Loading mainnet contract addresses')
           setAddresses(MAINNET_CONTRACT_ADDRESSES)
         } else if (isSepolia(chainId)) {
           // Use hardcoded Sepolia testnet addresses
-          console.log('🧪 Loading Sepolia testnet contract addresses')
           setAddresses(SEPOLIA_CONTRACT_ADDRESSES)
         } else if (isLocalAnvil(chainId)) {
           // Fetch addresses from local development server
-          console.log('🔧 Fetching contract addresses from local server...')
           const localAddresses = await fetchLocalAddresses()
           setAddresses(localAddresses)
         } else {
