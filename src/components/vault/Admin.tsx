@@ -97,6 +97,23 @@ function isNumericType(solidityType: string): boolean {
 }
 
 /**
+ * Check if a Solidity type is boolean
+ */
+function isBooleanType(solidityType: string): boolean {
+  return solidityType === 'bool';
+}
+
+/**
+ * Convert string value to boolean
+ * Only "true" (case-insensitive) returns true, everything else returns false
+ */
+function convertBooleanParameter(value: string): boolean {
+  const result = !!value && `${value}`.toLowerCase() === 'true';
+  console.log('[Boolean Debug] Converting:', { input: value, output: result });
+  return result;
+}
+
+/**
  * Extract all functions from ABI
  * Note: ABIs only contain external/public functions by definition
  */
@@ -451,8 +468,8 @@ export default function Admin() {
       return null;
     }
 
-    // Convert e-notation values for numeric parameters
-    const convertedValues: Record<string, string> = {};
+    // Convert e-notation values for numeric parameters and boolean values
+    const convertedValues: Record<string, string | boolean> = {};
     const newConversionErrors: Record<string, string> = {};
     let hasConversionErrors = false;
 
@@ -465,11 +482,19 @@ export default function Admin() {
         type: paramType,
         originalValue: value,
         isNumeric: isNumericType(paramType),
+        isBoolean: isBooleanType(paramType),
         hasENotation: /[eE]/.test(value),
       });
 
+      // Check if parameter is boolean type
+      if (isBooleanType(paramType)) {
+        // Convert string to boolean
+        const boolValue = convertBooleanParameter(value);
+        convertedValues[key] = boolValue;
+        console.log(`[Admin Panel] ✅ Boolean converted "${value}" → ${boolValue}`);
+      }
       // Check if parameter is numeric type and contains e-notation
-      if (isNumericType(paramType) && /[eE]/.test(value)) {
+      else if (isNumericType(paramType) && /[eE]/.test(value)) {
         try {
           // Convert e-notation to full integer string
           const expandedValue = expandExpInt(value);
