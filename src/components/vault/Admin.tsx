@@ -166,7 +166,7 @@ export default function Admin() {
     },
   });
 
-  // Fetch DOLA balance from AutoDolaVault
+  // Fetch DOLA balance from AutoDolaVault (total balance including yield)
   const { data: vaultDolaBalance, refetch: refetchVaultBalance } = useReadContract({
     address: addresses?.dolaToken as `0x${string}` | undefined,
     abi: mintableErc20Abi,
@@ -174,6 +174,16 @@ export default function Admin() {
     args: addresses?.autoDolaVault ? [addresses.autoDolaVault as `0x${string}`] : undefined,
     query: {
       enabled: !!addresses?.dolaToken && !!addresses?.autoDolaVault,
+    },
+  });
+
+  // Fetch virtualInputTokens from bonding curve (represents principal amount)
+  const { data: bondingCurvePrincipal, refetch: refetchPrincipal } = useReadContract({
+    address: addresses?.bondingCurve as `0x${string}` | undefined,
+    abi: behodler3TokenlaunchAbi,
+    functionName: 'virtualInputTokens',
+    query: {
+      enabled: !!addresses?.bondingCurve,
     },
   });
 
@@ -189,6 +199,16 @@ export default function Admin() {
   // Check if we should show mint yield button (hide on mainnet, chainID 1)
   const isMainnet = chainId === 1;
   const showMintYieldButton = !isMainnet;
+
+  // Calculate yield vs principal breakdown
+  const principal = bondingCurvePrincipal !== undefined ? bondingCurvePrincipal : 0n;
+  const totalVaultBalance = vaultDolaBalance !== undefined ? vaultDolaBalance : 0n;
+  const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
+
+  // Format for display (convert from wei to DOLA)
+  const principalDisplay = (Number(principal) / 1e18).toFixed(2);
+  const yieldDisplay = (Number(yield_) / 1e18).toFixed(2);
+  const totalDisplay = (Number(totalVaultBalance) / 1e18).toFixed(2);
 
   /**
    * Discover owned contracts by checking ownership of each contract
@@ -751,8 +771,9 @@ export default function Admin() {
       setTimeout(async () => {
         removeToast(confirmingToastId);
 
-        // Refetch vault balance to show updated amount
+        // Refetch vault balance and principal to show updated amounts
         await refetchVaultBalance();
+        await refetchPrincipal();
 
         addToast({
           type: 'success',
@@ -832,6 +853,55 @@ export default function Admin() {
               {vaultDolaBalance > 0n && ` → Will mint ${(Number(vaultDolaBalance / 100n) / 1e18).toFixed(2)} DOLA`}
             </p>
           )}
+        </div>
+      )}
+
+      {/* AutoDola Vault Yield vs Principal Breakdown */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-semibold text-foreground mb-3">
+          AutoDola Vault Balance Breakdown
+        </h3>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Principal (Bonding Curve):</span>
+            <span className="text-sm font-mono text-foreground">
+              {principalDisplay} DOLA
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Yield Generated:</span>
+            <span className="text-sm font-mono text-accent">
+              {yieldDisplay} DOLA
+            </span>
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-foreground">Total Vault Balance:</span>
+            <span className="text-sm font-mono font-semibold text-foreground">
+              {totalDisplay} DOLA
+            </span>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+          <strong>Note:</strong> Principal represents DOLA deposited through the bonding curve.
+          Yield is vault balance growth beyond principal. The bonding curve values phUSD as though yield is 0%,
+          while the protocol utilizes yield separately.
+        </p>
+      </div>
+
+      {/* Selected Contract Address Display */}
+      {selectedContractKey && addresses && (
+        <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-3 mb-4">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-foreground">Selected Contract Address:</span>
+            <span className="text-xs font-mono text-accent">
+              {(() => {
+                const selectedContract = ownedContracts.find(c => c.addressKey === selectedContractKey);
+                if (!selectedContract) return 'N/A';
+                const address = addresses[selectedContract.addressKey];
+                return address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'N/A';
+              })()}
+            </span>
+          </div>
         </div>
       )}
 
