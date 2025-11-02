@@ -25,11 +25,11 @@ export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
  *            bondingToken is the ERC20 token produced by the bonding curve
  */
 export const SEPOLIA_CONTRACT_ADDRESSES: ContractAddresses = {
-  autoDolaVault: '0xbB5f6b7d9d64B9b6e2eE720284926a8d54FaA0cF',
-  autoDolaYieldStrategy: '0x23BFFd51967342e926e6d2E0550Cd2E45c9f68a6',
-  bondingCurve: '0x72F8003f2968DaF8D72926D79B2527Cc8a9b083d',
-  bondingToken: '0x5A8581ba8F3872f261542F4aFDD7c8C1B40C1f81',
-  dolaToken: '0x7cBB0D58734165A95C259c3B5ef3E1f6AAc10e7D',
-  tokeToken: '0x2a6DF6574392Da39cEB97e035F4800E764D210Af',
-  tokemakMainRewarder: '0x82b6DC26A72772620f06552ba91B1bD1Fd3753c8',
+  autoDolaVault: '0x2215c4D493D46aF04550a75197F70363e2178E1b',
+  autoDolaYieldStrategy: '0xdbd3383fAe2D72FCaa5aF7Ccd74B3290D140Badd',
+  bondingCurve: '0xA95A4670fbd0b6b9130f840A3423Ff7CA82E53cf',
+  bondingToken: '0xED33913430cdF11387FE2376b6ce79d20d8e2Ee7',
+  dolaToken: '0x1E391B5A519543482D44e2724B7A8EB42AE469c9',
+  tokeToken: '0x141F829D99e96db28411CFDe4286b070fCe24A54',
+  tokemakMainRewarder: '0xA108d897C51ceD3Ae208c952FdE15D2B384e09aD',
 };

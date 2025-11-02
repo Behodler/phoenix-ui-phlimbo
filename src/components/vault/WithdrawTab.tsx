@@ -19,7 +19,7 @@ export default function WithdrawTab({
   positionInfo,
   onWithdraw,
   isTransacting = false,
-  withdrawalFeeRate = 0.02, // Default to 2% if not provided
+  withdrawalFeeRate = 0, // Default to 2% if not provided
   needsApproval = false, // Whether bonding token approval is needed
   onApprove, // Callback for bonding token approval
   isAllowanceLoading = false, // Whether allowance is still loading
