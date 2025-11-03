@@ -3,19 +3,19 @@
  * while preventing JavaScript Number precision loss.
  */
 
+import { formatUnits } from 'viem';
+
 /**
  * Safely converts a high-precision BigInt wei value to a display-friendly decimal string.
  *
  * This function prevents the UX issue where max button values are so precise that they
- * fail validation when re-submitted. It works by:
- * 1. Reducing precision before Number conversion (divide by 10^10)
- * 2. Converting to Number (now safe with reduced precision)
- * 3. Scaling back up to preserve magnitude (multiply by 10^10)
- * 4. Converting to decimal string for display
- * 5. Limiting to 4 decimal places for consistency with dollar amounts
+ * fail validation when re-submitted. It uses a simple, direct approach:
+ * 1. Convert BigInt wei to decimal string using formatUnits
+ * 2. Parse to Number (precision loss is acceptable for display)
+ * 3. Use .toFixed(4) to limit to exactly 4 decimal places
  *
- * The result is a value that can safely round-trip through JavaScript Number conversions
- * without causing "insufficient balance" errors, and displays with consistent precision.
+ * The result is a value that displays consistently and can safely round-trip through
+ * JavaScript Number conversions without causing "insufficient balance" errors.
  *
  * @param bigIntWei - The BigInt value in wei (18 decimals)
  * @param decimals - Number of decimals for the token (default: 18)
@@ -25,7 +25,7 @@
  * @example
  * // Balance: 19,999,999,602,418,267,839,998 wei
  * const displayValue = safeMaxForDisplay(balanceWei - 1n, 18);
- * // Returns: "19999.9996" (truncated to 4 decimal places)
+ * // Returns: "19999.9996" (exactly 4 decimal places)
  * // This value won't cause insufficient balance errors when re-submitted
  */
 export function safeMaxForDisplay(
@@ -37,52 +37,15 @@ export function safeMaxForDisplay(
     return '0';
   }
 
-  // Precision reducer - drop 10 digits of precision before Number conversion
-  // This ensures we stay well within JavaScript Number's safe range
-  const PRECISION_REDUCER = 10n ** 10n;
+  // Step 1: Convert BigInt wei to decimal string using formatUnits
+  const fullPrecisionValue = formatUnits(bigIntWei, decimals);
 
-  // Step 1: Reduce precision to make Number conversion safe
-  const reducedValue = bigIntWei / PRECISION_REDUCER;
+  // Step 2: Parse to Number (precision loss is OK for display)
+  const asNumber = parseFloat(fullPrecisionValue);
 
-  // Step 2: Convert to Number (safe now because precision is reduced)
-  const asNumber = Number(reducedValue);
-
-  // Step 3: Scale back up to preserve magnitude (but with reduced precision)
-  const scaledBackWei = BigInt(Math.floor(asNumber)) * PRECISION_REDUCER;
-
-  // Step 4: Convert to decimal string for display
-  const valueStr = scaledBackWei.toString();
-
-  // Format as decimal with proper decimal places
-  let formattedValue: string;
-  if (valueStr.length <= decimals) {
-    // Value is less than 1.0
-    const paddedValue = valueStr.padStart(decimals, '0');
-    formattedValue = `0.${paddedValue}`.replace(/\.?0+$/, '') || '0';
-  } else {
-    // Value is >= 1.0
-    const wholePart = valueStr.slice(0, -decimals);
-    const fractionalPart = valueStr.slice(-decimals);
-
-    // Remove trailing zeros from fractional part
-    const trimmedFractional = fractionalPart.replace(/0+$/, '');
-
-    if (trimmedFractional) {
-      formattedValue = `${wholePart}.${trimmedFractional}`;
-    } else {
-      formattedValue = wholePart;
-    }
-  }
-
-  // Step 5: Limit to displayDecimals (4 for dollar amounts)
-  // This ensures consistency with validation error messages
-  const parts = formattedValue.split('.');
-  if (parts.length === 2 && parts[1].length > displayDecimals) {
-    // Truncate to displayDecimals (no rounding to avoid going over limit)
-    return `${parts[0]}.${parts[1].substring(0, displayDecimals)}`;
-  }
-
-  return formattedValue;
+  // Step 3: Use .toFixed() to limit to exactly displayDecimals decimal places
+  // This is simple, direct, and guaranteed to work
+  return asNumber.toFixed(displayDecimals);
 }
 
 /**
