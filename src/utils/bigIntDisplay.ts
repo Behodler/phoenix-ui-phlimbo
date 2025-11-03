@@ -12,21 +12,27 @@
  * 2. Converting to Number (now safe with reduced precision)
  * 3. Scaling back up to preserve magnitude (multiply by 10^10)
  * 4. Converting to decimal string for display
+ * 5. Limiting to 4 decimal places for consistency with dollar amounts
  *
  * The result is a value that can safely round-trip through JavaScript Number conversions
- * without causing "insufficient balance" errors.
+ * without causing "insufficient balance" errors, and displays with consistent precision.
  *
  * @param bigIntWei - The BigInt value in wei (18 decimals)
  * @param decimals - Number of decimals for the token (default: 18)
- * @returns Display-safe decimal string
+ * @param displayDecimals - Maximum decimal places to show (default: 4 for dollar amounts)
+ * @returns Display-safe decimal string limited to displayDecimals precision
  *
  * @example
  * // Balance: 19,999,999,602,418,267,839,998 wei
  * const displayValue = safeMaxForDisplay(balanceWei - 1n, 18);
- * // Returns: "19.9999996024" (truncated to safe precision)
+ * // Returns: "19999.9996" (truncated to 4 decimal places)
  * // This value won't cause insufficient balance errors when re-submitted
  */
-export function safeMaxForDisplay(bigIntWei: bigint, decimals: number = 18): string {
+export function safeMaxForDisplay(
+  bigIntWei: bigint,
+  decimals: number = 18,
+  displayDecimals: number = 4
+): string {
   if (bigIntWei <= 0n) {
     return '0';
   }
@@ -48,10 +54,11 @@ export function safeMaxForDisplay(bigIntWei: bigint, decimals: number = 18): str
   const valueStr = scaledBackWei.toString();
 
   // Format as decimal with proper decimal places
+  let formattedValue: string;
   if (valueStr.length <= decimals) {
     // Value is less than 1.0
     const paddedValue = valueStr.padStart(decimals, '0');
-    return `0.${paddedValue}`.replace(/\.?0+$/, '') || '0';
+    formattedValue = `0.${paddedValue}`.replace(/\.?0+$/, '') || '0';
   } else {
     // Value is >= 1.0
     const wholePart = valueStr.slice(0, -decimals);
@@ -61,11 +68,21 @@ export function safeMaxForDisplay(bigIntWei: bigint, decimals: number = 18): str
     const trimmedFractional = fractionalPart.replace(/0+$/, '');
 
     if (trimmedFractional) {
-      return `${wholePart}.${trimmedFractional}`;
+      formattedValue = `${wholePart}.${trimmedFractional}`;
     } else {
-      return wholePart;
+      formattedValue = wholePart;
     }
   }
+
+  // Step 5: Limit to displayDecimals (4 for dollar amounts)
+  // This ensures consistency with validation error messages
+  const parts = formattedValue.split('.');
+  if (parts.length === 2 && parts[1].length > displayDecimals) {
+    // Truncate to displayDecimals (no rounding to avoid going over limit)
+    return `${parts[0]}.${parts[1].substring(0, displayDecimals)}`;
+  }
+
+  return formattedValue;
 }
 
 /**
