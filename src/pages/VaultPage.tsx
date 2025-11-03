@@ -258,12 +258,14 @@ export default function VaultPage() {
     name: "DOLA",
     balance: dolaBalance.balance?.balance ?? 0,
     balanceUsd: dolaBalance.balance?.balanceUsd ?? 0,
+    balanceRaw: dolaBalance.balance?.balanceRaw, // Add raw BigInt for precision-sensitive operations
     icon: DOLA
   };
 
   const positionInfo: PositionInfo = {
     value: phUSDBalance.balance?.balance ?? 0,
     valueUsd: phUSDBalance.balance?.balanceUsd ?? 0,
+    valueRaw: phUSDBalance.balance?.valueRaw, // Add raw BigInt for precision-sensitive operations
     isStaked: true,
   };
 
