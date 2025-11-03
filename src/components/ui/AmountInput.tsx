@@ -4,7 +4,7 @@ export default function AmountInput({ amount, onAmountChange, onMaxClick }: Amou
   return (
     <div className="flex gap-3 mb-5">
       <input
-        type="number"
+        type="text"
         inputMode="decimal"
         value={amount}
         onChange={(e) => onAmountChange(e.target.value)}
