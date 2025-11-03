@@ -39,13 +39,17 @@ export function safeMaxForDisplay(
 
   // Step 1: Convert BigInt wei to decimal string using formatUnits
   const fullPrecisionValue = formatUnits(bigIntWei, decimals);
+  console.log('safeMaxForDisplay - fullPrecisionValue:', fullPrecisionValue);
 
   // Step 2: Parse to Number (precision loss is OK for display)
   const asNumber = parseFloat(fullPrecisionValue);
+  console.log('safeMaxForDisplay - asNumber:', asNumber);
 
   // Step 3: Use .toFixed() to limit to exactly displayDecimals decimal places
   // This is simple, direct, and guaranteed to work
-  return asNumber.toFixed(displayDecimals);
+  const result = asNumber.toFixed(displayDecimals);
+  console.log('safeMaxForDisplay - result with toFixed(' + displayDecimals + '):', result);
+  return result;
 }
 
 /**

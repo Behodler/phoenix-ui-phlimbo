@@ -93,10 +93,13 @@ export default function DepositForm({
       // This reduces precision just enough to ensure the displayed value
       // can safely round-trip through JavaScript Number conversions
       const displayValue = safeMaxForDisplay(truncatedBalanceWei, 18);
+      console.log('MAX CLICKED - safeMaxForDisplay returned:', displayValue);
+      console.log('MAX CLICKED - truncatedBalanceWei:', truncatedBalanceWei.toString());
       onFormChange({ amount: displayValue });
     } else {
       // Fallback to previous flooring logic if raw balance not available
       const flooredBalance = Math.floor(tokenInfo.balance * 1e18) / 1e18;
+      console.log('MAX CLICKED - fallback value:', flooredBalance.toString());
       onFormChange({ amount: flooredBalance.toString() });
     }
   };
