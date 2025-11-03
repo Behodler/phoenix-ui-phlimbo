@@ -4,6 +4,7 @@ import { parseUnits, formatUnits } from 'viem';
 import type { WithdrawFormProps } from '../../types/vault';
 import { behodler3TokenlaunchAbi } from '@behodler/wagmi-hooks';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
+import { safeMaxForDisplay } from '../../utils/bigIntDisplay';
 import AmountDisplay from '../ui/AmountDisplay';
 import TokenRow from '../ui/TokenRow';
 import AmountInput from '../ui/AmountInput';
@@ -96,18 +97,13 @@ export default function WithdrawTab({
   const handleMaxClick = () => {
     // Use raw BigInt value if available to maintain precision
     if (positionInfo.valueRaw !== undefined) {
-      // Simple truncation: subtract 1 wei to ensure we never round up
+      // Subtract 1 wei to ensure we never round up
       const truncatedValueWei = positionInfo.valueRaw - BigInt(1);
-      // Convert to decimal string with full precision
-      const valueStr = truncatedValueWei.toString();
-      // Format as decimal (18 decimal places)
-      const wholePart = valueStr.length > 18 ? valueStr.slice(0, -18) : '0';
-      const fractionalPart = valueStr.length > 18
-        ? valueStr.slice(-18).padStart(18, '0')
-        : valueStr.padStart(18, '0');
-      // Combine and remove trailing zeros
-      const fullDecimal = `${wholePart}.${fractionalPart}`.replace(/\.?0+$/, '');
-      onFormChange({ amount: fullDecimal || '0' });
+      // Use safe display truncation to prevent validation errors
+      // This reduces precision just enough to ensure the displayed value
+      // can safely round-trip through JavaScript Number conversions
+      const displayValue = safeMaxForDisplay(truncatedValueWei, 18);
+      onFormChange({ amount: displayValue });
     } else {
       // Fallback to previous flooring logic if raw value not available
       const flooredValue = Math.floor(positionInfo.value * 1e18) / 1e18;
