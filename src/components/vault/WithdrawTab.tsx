@@ -130,11 +130,14 @@ export default function WithdrawTab({
   };
 
   // Determine button state and properties
-  // Validate that user has sufficient balance for the withdrawal amount (fee is deducted from output)
-  // Use BigInt comparison for precision-sensitive validation
-  const isAmountValid = inputAmountWei > 0n && (positionInfo.valueRaw !== undefined
-    ? inputAmountWei <= positionInfo.valueRaw
-    : parsedAmountForDisplay <= positionInfo.value);
+  // Validate that user has sufficient balance for the withdrawal amount
+  // Validate against the maximum value that the max button would produce
+  // This ensures max button values always pass validation
+  const maxAllowedWei = positionInfo.valueRaw !== undefined
+    ? parseUnits(safeMaxForDisplay(positionInfo.valueRaw - 1n, 18), 18)
+    : parseUnits(String(positionInfo.value), 18);
+
+  const isAmountValid = inputAmountWei > 0n && inputAmountWei <= maxAllowedWei;
   const buttonDisabled = !isAmountValid || isTransacting || isQuoteLoading || isAllowanceLoading;
 
   let buttonLabel = "Enter Amount";

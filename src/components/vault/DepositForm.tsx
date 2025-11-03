@@ -131,10 +131,13 @@ export default function DepositForm({
   };
 
   // Determine button state and properties
-  // Use BigInt comparison for precision-sensitive validation
-  const isAmountValid = inputAmountWei > 0n && (tokenInfo.balanceRaw !== undefined
-    ? inputAmountWei <= tokenInfo.balanceRaw
-    : parsedAmountForDisplay <= tokenInfo.balance);
+  // Validate against the maximum value that the max button would produce
+  // This ensures max button values always pass validation
+  const maxAllowedWei = tokenInfo.balanceRaw !== undefined
+    ? parseUnits(safeMaxForDisplay(tokenInfo.balanceRaw - 1n, 18), 18)
+    : parseUnits(String(tokenInfo.balance), 18);
+
+  const isAmountValid = inputAmountWei > 0n && inputAmountWei <= maxAllowedWei;
   const buttonDisabled = !isAmountValid || isTransacting || isApproving || isAllowanceLoading;
 
   let buttonLabel = "Enter Amount";
