@@ -16,6 +16,7 @@ import TestnetFaucet from '../components/vault/TestnetFaucet';
 import Admin from '../components/vault/Admin';
 import BondingCurveBox from '../components/vault/BondingCurveBox';
 import FAQ from '../components/vault/FAQ';
+import ErrorBoundary from '../components/ui/ErrorBoundary';
 import DOLA from "../assets/sDOLA.png";
 
 export default function VaultPage() {
@@ -958,30 +959,34 @@ export default function VaultPage() {
 
             {/* Tab content */}
             {activeTab === "Deposit to Mint" ? (
-              <DepositForm
-                formData={formData}
-                onFormChange={handleFormChange}
-                constants={constants}
-                tokenInfo={tokenInfo}
-                onDeposit={handleDeposit}
-                isTransacting={isTransacting || approvalTransaction.state.isPending || approvalTransaction.state.isConfirming || isDepositPending || isDepositConfirming}
-                needsApproval={parseFloat(formData.amount || '0') > dolaAllowanceDecimal}
-                onApprove={handleApprove}
-                isAllowanceLoading={dolaAllowanceLoading}
-              />
+              <ErrorBoundary>
+                <DepositForm
+                  formData={formData}
+                  onFormChange={handleFormChange}
+                  constants={constants}
+                  tokenInfo={tokenInfo}
+                  onDeposit={handleDeposit}
+                  isTransacting={isTransacting || approvalTransaction.state.isPending || approvalTransaction.state.isConfirming || isDepositPending || isDepositConfirming}
+                  needsApproval={parseFloat(formData.amount || '0') > dolaAllowanceDecimal}
+                  onApprove={handleApprove}
+                  isAllowanceLoading={dolaAllowanceLoading}
+                />
+              </ErrorBoundary>
             ) : activeTab === "Burn to Withdraw" ? (
-              <WithdrawTab
-                formData={formData}
-                onFormChange={handleFormChange}
-                constants={constants}
-                positionInfo={positionInfo}
-                onWithdraw={handleWithdraw}
-                isTransacting={isTransacting || bondingTokenApprovalTransaction.state.isPending || bondingTokenApprovalTransaction.state.isConfirming || isWithdrawPending || isWithdrawConfirming}
-                withdrawalFeeRate={withdrawalFeeRate}
-                needsApproval={parseFloat(formData.amount || '0') > bondingTokenAllowanceDecimal}
-                onApprove={handleBondingTokenApprove}
-                isAllowanceLoading={bondingTokenAllowanceLoading}
-              />
+              <ErrorBoundary>
+                <WithdrawTab
+                  formData={formData}
+                  onFormChange={handleFormChange}
+                  constants={constants}
+                  positionInfo={positionInfo}
+                  onWithdraw={handleWithdraw}
+                  isTransacting={isTransacting || bondingTokenApprovalTransaction.state.isPending || bondingTokenApprovalTransaction.state.isConfirming || isWithdrawPending || isWithdrawConfirming}
+                  withdrawalFeeRate={withdrawalFeeRate}
+                  needsApproval={parseFloat(formData.amount || '0') > bondingTokenAllowanceDecimal}
+                  onApprove={handleBondingTokenApprove}
+                  isAllowanceLoading={bondingTokenAllowanceLoading}
+                />
+              </ErrorBoundary>
             ) : activeTab === "Testnet Faucet" ? (
               <TestnetFaucet />
             ) : activeTab === "Admin" ? (

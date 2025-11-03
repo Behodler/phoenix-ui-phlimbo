@@ -26,14 +26,24 @@ export default function WithdrawTab({
   isAllowanceLoading = false, // Whether allowance is still loading
 }: WithdrawFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [validationError, setValidationError] = useState<string>('');
 
   // Get contract addresses for bonding curve
   const { addresses } = useContractAddresses();
 
-  // Parse amount directly from string to BigInt, avoiding Number precision loss
-  const inputAmountWei = formData.amount && formData.amount !== '0' && formData.amount !== ''
-    ? parseUnits(formData.amount, 18)
-    : 0n;
+  // Validate input and parse to BigInt with error handling
+  let inputAmountWei = 0n;
+  let parseError = false;
+
+  if (formData.amount && formData.amount !== '0' && formData.amount !== '') {
+    try {
+      inputAmountWei = parseUnits(formData.amount, 18);
+    } catch (error) {
+      // Handle parsing errors gracefully without crashing
+      parseError = true;
+      console.warn('Failed to parse amount:', formData.amount, error);
+    }
+  }
 
   // For display purposes only - use parseFloat sparingly
   const parsedAmountForDisplay = parseFloat(formData.amount) || 0;
@@ -86,8 +96,56 @@ export default function WithdrawTab({
 
   const minReceived = estDOLA * (1 - formData.slippageBps / 10000);
 
+  // Validate input format and decimal places
+  const validateInput = (value: string): string => {
+    // Allow empty string
+    if (value === '') {
+      return '';
+    }
+
+    // Check for invalid characters (allow only digits, one decimal point, and leading minus)
+    if (!/^-?\d*\.?\d*$/.test(value)) {
+      return 'Please enter a valid number';
+    }
+
+    // Check for negative numbers
+    if (value.startsWith('-')) {
+      return 'Please enter a positive number';
+    }
+
+    // Check for multiple decimal points
+    if ((value.match(/\./g) || []).length > 1) {
+      return 'Please enter a valid number';
+    }
+
+    // Check decimal places (maximum 4)
+    const decimalIndex = value.indexOf('.');
+    if (decimalIndex !== -1) {
+      const decimalPlaces = value.length - decimalIndex - 1;
+      if (decimalPlaces > 4) {
+        return 'Maximum 4 decimal places allowed';
+      }
+    }
+
+    // Check for exponential notation
+    if (/[eE]/.test(value)) {
+      return 'Please enter a valid number';
+    }
+
+    return '';
+  };
+
   const handleAmountChange = (amount: string) => {
-    onFormChange({ amount });
+    // Trim whitespace
+    const trimmedAmount = amount.trim();
+
+    // Validate input
+    const error = validateInput(trimmedAmount);
+    setValidationError(error);
+
+    // Always update the form to allow user to see what they're typing
+    // But validation error will prevent submission
+    onFormChange({ amount: trimmedAmount });
   };
 
   const handleSlippageChange = (slippageBps: number) => {
@@ -138,7 +196,8 @@ export default function WithdrawTab({
     : parseUnits(String(positionInfo.value), 18);
 
   const isAmountValid = inputAmountWei > 0n && inputAmountWei <= maxAllowedWei;
-  const buttonDisabled = !isAmountValid || isTransacting || isQuoteLoading || isAllowanceLoading;
+  const hasValidationError = validationError !== '' || parseError;
+  const buttonDisabled = !isAmountValid || hasValidationError || isTransacting || isQuoteLoading || isAllowanceLoading;
 
   let buttonLabel = "Enter Amount";
   let buttonVariant: 'primary' | 'approve' = 'primary';
@@ -186,6 +245,20 @@ export default function WithdrawTab({
           onAmountChange={handleAmountChange}
           onMaxClick={handleMaxClick}
         />
+
+        {/* Validation Error Display */}
+        {validationError && (
+          <div className="text-sm text-red-500 mb-4 -mt-3">
+            {validationError}
+          </div>
+        )}
+
+        {/* Parse Error Display */}
+        {parseError && !validationError && (
+          <div className="text-sm text-red-500 mb-4 -mt-3">
+            Please enter a valid number
+          </div>
+        )}
 
         {/* Fee Information Display - Only show when fee is non-zero */}
         {inputAmountWei > 0n && withdrawalFeeRate !== 0 && (
