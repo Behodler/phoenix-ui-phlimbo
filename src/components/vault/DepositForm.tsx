@@ -28,10 +28,13 @@ export default function DepositForm({
   // Get contract addresses for bonding curve
   const { addresses } = useContractAddresses();
 
-  const parsedAmount = Number(formData.amount) || 0;
+  // Parse amount directly from string to BigInt, avoiding Number precision loss
+  const inputAmountWei = formData.amount && formData.amount !== '0' && formData.amount !== ''
+    ? parseUnits(formData.amount, 18)
+    : 0n;
 
-  // Convert input amount to wei for contract call
-  const inputAmountWei = parsedAmount > 0 ? parseUnits(parsedAmount.toString(), 18) : 0n;
+  // For display purposes only - use parseFloat sparingly
+  const parsedAmountForDisplay = parseFloat(formData.amount) || 0;
 
   // Fetch expected bonding tokens output from bonding curve contract
   const { data: expectedOutputWei } = useReadContract({
@@ -40,7 +43,7 @@ export default function DepositForm({
     functionName: 'quoteAddLiquidity',
     args: [inputAmountWei],
     query: {
-      enabled: !!addresses?.bondingCurve && parsedAmount > 0,
+      enabled: !!addresses?.bondingCurve && inputAmountWei > 0n,
     },
   });
 
@@ -48,13 +51,13 @@ export default function DepositForm({
   let estPhUSD: number;
   let priceImpact: number;
 
-  if (expectedOutputWei && parsedAmount > 0 && constants.dolaToPhUSDRate > 0) {
+  if (expectedOutputWei && inputAmountWei > 0n && constants.dolaToPhUSDRate > 0) {
     // Convert contract output from wei to decimal
     estPhUSD = parseFloat(formatUnits(expectedOutputWei, 18));
 
     // Calculate price impact:
     // 1. Calculate what we WOULD get at current marginal price (no slippage)
-    const theoreticalOutput = parsedAmount / constants.dolaToPhUSDRate;
+    const theoreticalOutput = parsedAmountForDisplay / constants.dolaToPhUSDRate;
 
     // 2. Compare actual output from bonding curve to theoretical output
     // Price impact = (theoretical - actual) / theoretical
@@ -65,7 +68,7 @@ export default function DepositForm({
   } else {
     // Fallback calculation when contract data not available
     estPhUSD = constants.dolaToPhUSDRate > 0
-      ? parsedAmount / constants.dolaToPhUSDRate
+      ? parsedAmountForDisplay / constants.dolaToPhUSDRate
       : 0;
     priceImpact = 0; // No price impact data available
   }
@@ -132,7 +135,10 @@ export default function DepositForm({
   };
 
   // Determine button state and properties
-  const isAmountValid = parsedAmount > 0 && parsedAmount <= tokenInfo.balance;
+  // Use BigInt comparison for precision-sensitive validation
+  const isAmountValid = inputAmountWei > 0n && (tokenInfo.balanceRaw !== undefined
+    ? inputAmountWei <= tokenInfo.balanceRaw
+    : parsedAmountForDisplay <= tokenInfo.balance);
   const buttonDisabled = !isAmountValid || isTransacting || isApproving || isAllowanceLoading;
 
   let buttonLabel = "Enter Amount";
@@ -140,7 +146,7 @@ export default function DepositForm({
   let buttonAction = handleInitiateDeposit;
   let buttonLoading = false;
 
-  if (!isAmountValid && parsedAmount > 0) {
+  if (!isAmountValid && inputAmountWei > 0n) {
     buttonLabel = "Insufficient Balance";
   } else if (isAmountValid) {
     if (needsApproval) {
@@ -158,7 +164,7 @@ export default function DepositForm({
   return (
     <>
       <div className="p-6">
-        <AmountDisplay amount={parsedAmount} />
+        <AmountDisplay amount={parsedAmountForDisplay} />
 
         <div className="h-px w-full bg-border mb-6" />
 
@@ -192,7 +198,7 @@ export default function DepositForm({
         onConfirm={handleConfirmDeposit}
         isLoading={isTransacting}
         data={{
-          inputAmount: parsedAmount,
+          inputAmount: parsedAmountForDisplay,
           inputToken: 'DOLA',
           outputAmount: estPhUSD,
           outputToken: 'phUSD',

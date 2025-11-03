@@ -29,23 +29,30 @@ export default function WithdrawTab({
   // Get contract addresses for bonding curve
   const { addresses } = useContractAddresses();
 
-  const parsedAmount = Number(formData.amount) || 0;
+  // Parse amount directly from string to BigInt, avoiding Number precision loss
+  const inputAmountWei = formData.amount && formData.amount !== '0' && formData.amount !== ''
+    ? parseUnits(formData.amount, 18)
+    : 0n;
 
-  // Calculate withdrawal fee (using dynamic rate from contract)
-  const feeAmount = parsedAmount * withdrawalFeeRate;
-  const amountAfterFee = parsedAmount - feeAmount;
+  // For display purposes only - use parseFloat sparingly
+  const parsedAmountForDisplay = parseFloat(formData.amount) || 0;
 
-  // Convert phUSD amount after fee to wei for contract call
-  const inputAmountWei = amountAfterFee > 0 ? parseUnits(amountAfterFee.toString(), 18) : 0n;
+  // Calculate withdrawal fee using BigInt arithmetic to maintain precision
+  const feeAmountWei = (inputAmountWei * BigInt(Math.floor(withdrawalFeeRate * 1e18))) / BigInt(1e18);
+  const amountAfterFeeWei = inputAmountWei - feeAmountWei;
+
+  // Convert to decimal for display (fee amount and amount after fee)
+  const feeAmount = parseFloat(formatUnits(feeAmountWei, 18));
+  const amountAfterFee = parseFloat(formatUnits(amountAfterFeeWei, 18));
 
   // Fetch expected DOLA output from bonding curve contract
   const { data: expectedOutputWei, isLoading: isQuoteLoading } = useReadContract({
     address: addresses?.bondingCurve as `0x${string}` | undefined,
     abi: behodler3TokenlaunchAbi,
     functionName: 'quoteRemoveLiquidity',
-    args: [inputAmountWei],
+    args: [amountAfterFeeWei],
     query: {
-      enabled: !!addresses?.bondingCurve && amountAfterFee > 0,
+      enabled: !!addresses?.bondingCurve && amountAfterFeeWei > 0n,
     },
   });
 
@@ -128,7 +135,10 @@ export default function WithdrawTab({
 
   // Determine button state and properties
   // Validate that user has sufficient balance for the withdrawal amount (fee is deducted from output)
-  const isAmountValid = parsedAmount > 0 && parsedAmount <= positionInfo.value;
+  // Use BigInt comparison for precision-sensitive validation
+  const isAmountValid = inputAmountWei > 0n && (positionInfo.valueRaw !== undefined
+    ? inputAmountWei <= positionInfo.valueRaw
+    : parsedAmountForDisplay <= positionInfo.value);
   const buttonDisabled = !isAmountValid || isTransacting || isQuoteLoading || isAllowanceLoading;
 
   let buttonLabel = "Enter Amount";
@@ -136,8 +146,8 @@ export default function WithdrawTab({
   let buttonAction = handleInitiateWithdraw;
   let buttonLoading = false;
 
-  if (parsedAmount > 0) {
-    if (parsedAmount > positionInfo.value) {
+  if (inputAmountWei > 0n) {
+    if (!isAmountValid) {
       buttonLabel = "Insufficient phUSD Balance";
     } else if (isAllowanceLoading) {
       buttonLabel = "Loading...";
@@ -166,7 +176,7 @@ export default function WithdrawTab({
   return (
     <>
       <div className="p-6">
-        <AmountDisplay amount={parsedAmount} />
+        <AmountDisplay amount={parsedAmountForDisplay} />
 
         <div className="h-px w-full bg-border mb-6" />
 
@@ -179,7 +189,7 @@ export default function WithdrawTab({
         />
 
         {/* Fee Information Display - Only show when fee is non-zero */}
-        {parsedAmount > 0 && withdrawalFeeRate !== 0 && (
+        {inputAmountWei > 0n && withdrawalFeeRate !== 0 && (
           <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-3 sm:p-4 mb-4">
             <div className="text-sm font-medium text-pxusd-orange-300 mb-2">Withdrawal Fee</div>
             <div className="space-y-2 text-xs sm:text-sm">
@@ -219,7 +229,7 @@ export default function WithdrawTab({
         onConfirm={handleConfirmWithdraw}
         isLoading={isTransacting}
         data={{
-          inputAmount: parsedAmount,
+          inputAmount: parsedAmountForDisplay,
           inputToken: 'phUSD',
           outputAmount: estDOLA,
           outputToken: 'DOLA',

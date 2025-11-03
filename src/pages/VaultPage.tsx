@@ -677,8 +677,8 @@ export default function VaultPage() {
       return;
     }
 
-    const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
+    // Validate amount string without converting through Number (preserves precision)
+    if (!formData.amount || formData.amount === '0' || formData.amount === '') {
       addToast({
         type: 'error',
         title: 'Invalid Amount',
@@ -696,7 +696,26 @@ export default function VaultPage() {
       return;
     }
 
-    if (amount > dolaBalance.balance.balance) {
+    // Convert to BigInt for comparison (maintains full precision)
+    let inputAmountWei: bigint;
+    try {
+      inputAmountWei = parseUnits(formData.amount, 18);
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Invalid Amount',
+        description: 'Please enter a valid numeric amount.',
+      });
+      return;
+    }
+
+    // Use BigInt comparison if balanceRaw is available, otherwise fall back to number comparison
+    const balanceRaw = dolaBalance.balance.balanceRaw;
+    const isInsufficient = balanceRaw !== undefined
+      ? inputAmountWei > balanceRaw
+      : parseFloat(formData.amount) > dolaBalance.balance.balance;
+
+    if (isInsufficient) {
       addToast({
         type: 'error',
         title: 'Insufficient Balance',
@@ -730,14 +749,14 @@ export default function VaultPage() {
       // Use bonding curve output if available (from DepositForm's quoteAddLiquidity call)
       // This ensures minReceived matches actual bonding curve output, not marginal price
       // bondingCurveOutput comes from the actual bonding curve contract quote
-      const estPhUSD = bondingCurveOutput ?? (dolaToPhUSDRate > 0 ? amount / dolaToPhUSDRate : 0);
+      const estPhUSD = bondingCurveOutput ?? (dolaToPhUSDRate > 0 ? parseFloat(formData.amount) / dolaToPhUSDRate : 0);
 
       // Apply slippage tolerance and add 0.1% safety buffer for blockchain state changes
       // Safety buffer accounts for other transactions executing between quote and our transaction
       const minReceived = estPhUSD * (1 - formData.slippageBps / 10000) * 0.999;
 
-      // Scale parameters by 1e18 for contract call
-      const inputAmount = parseUnits(amount.toString(), 18);
+      // Use the already-parsed BigInt amount (maintains full precision)
+      const inputAmount = inputAmountWei;
       const minBondingTokens = parseUnits(minReceived.toString(), 18);
 
       // Call addLiquidity
@@ -791,8 +810,8 @@ export default function VaultPage() {
       return;
     }
 
-    const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
+    // Validate amount string without converting through Number (preserves precision)
+    if (!formData.amount || formData.amount === '0' || formData.amount === '') {
       addToast({
         type: 'error',
         title: 'Invalid Amount',
@@ -810,7 +829,27 @@ export default function VaultPage() {
       return;
     }
 
-    if (amount > phUSDBalance.balance.balance) {
+    // Convert to BigInt for comparison (maintains full precision)
+    let inputAmountWei: bigint;
+    try {
+      inputAmountWei = parseUnits(formData.amount, 18);
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Invalid Amount',
+        description: 'Please enter a valid numeric amount.',
+      });
+      return;
+    }
+
+    // Use BigInt comparison if valueRaw is available, otherwise fall back to number comparison
+    const valueRaw = phUSDBalance.balance.valueRaw;
+    const isInsufficient = valueRaw !== undefined
+      ? inputAmountWei > valueRaw
+      : parseFloat(formData.amount) > phUSDBalance.balance.balance;
+
+    if (isInsufficient) {
+      const amount = parseFloat(formData.amount);
       const feeAmount = (amount * withdrawalFeeRate).toFixed(4);
       const amountAfterFee = amount - (amount * withdrawalFeeRate);
       const dolaReceived = (amountAfterFee * dolaToPhUSDRate).toFixed(4);
@@ -844,9 +883,10 @@ export default function VaultPage() {
         duration: 0,
       });
 
-      // Calculate fee and amount after fee
-      const feeAmount = amount * withdrawalFeeRate;
-      const amountAfterFee = amount - feeAmount;
+      // Calculate fee and amount after fee using BigInt arithmetic
+      const feeAmountWei = (inputAmountWei * BigInt(Math.floor(withdrawalFeeRate * 1e18))) / BigInt(1e18);
+      const amountAfterFeeWei = inputAmountWei - feeAmountWei;
+      const amountAfterFee = parseFloat(formatUnits(amountAfterFeeWei, 18));
 
       // Use bonding curve output if available (from WithdrawTab's quoteRemoveLiquidity call)
       // This ensures minReceived matches actual bonding curve output, not marginal price
@@ -857,8 +897,8 @@ export default function VaultPage() {
       // Safety buffer accounts for other transactions executing between quote and our transaction
       const minReceived = estDOLA * (1 - formData.slippageBps / 10000) * 0.999;
 
-      // Scale parameters by 1e18 for contract call
-      const bondingTokenAmount = parseUnits(amount.toString(), 18);
+      // Use the already-parsed BigInt amount (maintains full precision)
+      const bondingTokenAmount = inputAmountWei;
       const minInputTokens = parseUnits(minReceived.toString(), 18);
 
       // Call removeLiquidity
