@@ -47,9 +47,15 @@ export function safeMaxForDisplay(
 
   // Step 3: Use .toFixed() to limit to exactly displayDecimals decimal places
   // This is simple, direct, and guaranteed to work
-  const result = asNumber.toFixed(displayDecimals);
+  //  asNumber.toFixed(displayDecimals);
+  const result = toFixedFloorString(asNumber, displayDecimals);
   console.log('safeMaxForDisplay - result with toFixed(' + displayDecimals + '):', result);
   return result;
+}
+
+function toFixedFloorString(num: number, decimals: number) {
+  const truncated = Math.floor(num * 10 ** decimals) / 10 ** decimals;
+  return truncated.toFixed(decimals);
 }
 
 /**
