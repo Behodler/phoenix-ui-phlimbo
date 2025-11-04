@@ -166,24 +166,29 @@ export default function Admin() {
     },
   });
 
-  // Fetch DOLA balance from AutoDolaVault (total balance including yield)
-  const { data: vaultDolaBalance, refetch: refetchVaultBalance } = useReadContract({
-    address: addresses?.dolaToken as `0x${string}` | undefined,
-    abi: mintableErc20Abi,
-    functionName: 'balanceOf',
-    args: addresses?.autoDolaVault ? [addresses.autoDolaVault as `0x${string}`] : undefined,
+  // Fetch principal from AutoDolaYieldStrategy (principal deposited via bonding curve)
+  const { data: bondingCurvePrincipal, refetch: refetchPrincipal } = useReadContract({
+    address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
+    abi: autoDolaYieldStrategyAbi,
+    functionName: 'principalOf',
+    args: addresses?.dolaToken && addresses?.bondingCurve
+      ? [addresses.dolaToken as `0x${string}`, addresses.bondingCurve as `0x${string}`]
+      : undefined,
     query: {
-      enabled: !!addresses?.dolaToken && !!addresses?.autoDolaVault,
+      enabled: !!addresses?.autoDolaYieldStrategy && !!addresses?.dolaToken && !!addresses?.bondingCurve,
     },
   });
 
-  // Fetch virtualInputTokens from bonding curve (represents principal amount)
-  const { data: bondingCurvePrincipal, refetch: refetchPrincipal } = useReadContract({
-    address: addresses?.bondingCurve as `0x${string}` | undefined,
-    abi: behodler3TokenlaunchAbi,
-    functionName: 'virtualInputTokens',
+  // Fetch total balance from AutoDolaYieldStrategy (principal + yield)
+  const { data: vaultDolaBalance, refetch: refetchVaultBalance } = useReadContract({
+    address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
+    abi: autoDolaYieldStrategyAbi,
+    functionName: 'totalBalanceOf',
+    args: addresses?.dolaToken && addresses?.bondingCurve
+      ? [addresses.dolaToken as `0x${string}`, addresses.bondingCurve as `0x${string}`]
+      : undefined,
     query: {
-      enabled: !!addresses?.bondingCurve,
+      enabled: !!addresses?.autoDolaYieldStrategy && !!addresses?.dolaToken && !!addresses?.bondingCurve,
     },
   });
 
@@ -885,6 +890,9 @@ export default function Admin() {
           <strong>Note:</strong> Principal represents DOLA deposited through the bonding curve.
           Yield is vault balance growth beyond principal. The bonding curve values phUSD as though yield is 0%,
           while the protocol utilizes yield separately.
+          <span className="block mt-2">
+            Values are fetched directly from AutoDolaYieldStrategy using the IYieldStrategy interface (principalOf and totalBalanceOf methods).
+          </span>
         </p>
       </div>
 
