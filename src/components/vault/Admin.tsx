@@ -183,7 +183,7 @@ export default function Admin() {
   const { data: vaultDolaBalance, refetch: refetchVaultBalance } = useReadContract({
     address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
     abi: autoDolaYieldStrategyAbi,
-    functionName: 'totalBalanceOf',
+    functionName: 'balanceOf',
     args: addresses?.dolaToken && addresses?.bondingCurve
       ? [addresses.dolaToken as `0x${string}`, addresses.bondingCurve as `0x${string}`]
       : undefined,
@@ -720,6 +720,7 @@ export default function Admin() {
     }
 
     if (!vaultDolaBalance || vaultDolaBalance === 0n) {
+
       addToast({
         type: 'error',
         title: 'No Balance to Mint',
