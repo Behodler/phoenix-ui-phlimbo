@@ -180,10 +180,11 @@ export default function Admin() {
   });
 
   // Fetch total balance from AutoDolaYieldStrategy (principal + yield)
+  // Uses totalBalanceOf per IYieldStrategy interface specification
   const { data: vaultDolaBalance, refetch: refetchVaultBalance } = useReadContract({
     address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
     abi: autoDolaYieldStrategyAbi,
-    functionName: 'balanceOf',
+    functionName: 'totalBalanceOf',
     args: addresses?.dolaToken && addresses?.bondingCurve
       ? [addresses.dolaToken as `0x${string}`, addresses.bondingCurve as `0x${string}`]
       : undefined,
@@ -206,6 +207,7 @@ export default function Admin() {
   const showMintYieldButton = !isMainnet;
 
   // Calculate yield vs principal breakdown
+  // Per IYieldStrategy interface: yield = totalBalanceOf - principalOf
   const principal = bondingCurvePrincipal !== undefined ? bondingCurvePrincipal : 0n;
   const totalVaultBalance = vaultDolaBalance !== undefined ? vaultDolaBalance : 0n;
   const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
@@ -892,7 +894,9 @@ export default function Admin() {
           Yield is vault balance growth beyond principal. The bonding curve values phUSD as though yield is 0%,
           while the protocol utilizes yield separately.
           <span className="block mt-2">
-            Values are fetched directly from AutoDolaYieldStrategy using the IYieldStrategy interface (principalOf and totalBalanceOf methods).
+            Values are fetched directly from AutoDolaYieldStrategy using the IYieldStrategy interface:
+            principalOf() returns principal only, totalBalanceOf() returns principal + yield.
+            Yield is calculated as: totalBalanceOf - principalOf.
           </span>
         </p>
       </div>
