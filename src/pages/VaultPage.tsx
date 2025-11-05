@@ -31,7 +31,18 @@ export default function VaultPage() {
   const { isConnected, address: walletAddress } = useAccount();
 
   // Contract addresses context
-  const { addresses, networkType } = useContractAddresses();
+  const { addresses, networkType, loading: addressesLoading, error: addressesError } = useContractAddresses();
+
+  // Debug logging for contract addresses
+  useEffect(() => {
+    console.log('🎯 VaultPage: Contract addresses updated:', {
+      addresses,
+      networkType,
+      loading: addressesLoading,
+      error: addressesError,
+      chainId
+    });
+  }, [addresses, networkType, addressesLoading, addressesError, chainId]);
 
   // Fetch the owner address from the bonding curve contract
   const { data: ownerAddress } = useReadContract({

@@ -11,14 +11,17 @@ const LOCAL_ADDRESS_SERVER = 'http://localhost:3001/contracts'
  * @throws Error if server is not running or response is invalid
  */
 export async function fetchLocalAddresses(): Promise<ContractAddresses> {
+  console.log('📡 fetchLocalAddresses: Attempting to fetch from', LOCAL_ADDRESS_SERVER)
   try {
     const response = await fetch(LOCAL_ADDRESS_SERVER)
+    console.log('📡 fetchLocalAddresses: Response status:', response.status, response.statusText)
 
     if (!response.ok) {
       throw new Error(`Address server returned ${response.status}: ${response.statusText}`)
     }
 
     const data: LocalAddressServerResponse = await response.json()
+    console.log('📡 fetchLocalAddresses: Raw response data:', data)
 
     // Validate response structure
     if (!data.contracts) {
@@ -39,6 +42,7 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       autoDolaYieldStrategy: data.contracts.autoDolaYieldStrategy,
       bondingCurve: data.contracts.behodler3Tokenlaunch,
     }
+    console.log('📡 fetchLocalAddresses: Mapped addresses:', addresses)
 
     // Validate all addresses are present
     const missingAddresses = Object.entries(addresses)
@@ -46,11 +50,14 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       .map(([key]) => key)
 
     if (missingAddresses.length > 0) {
+      console.error('❌ fetchLocalAddresses: Missing addresses:', missingAddresses)
       throw new Error(`Missing contract addresses: ${missingAddresses.join(', ')}`)
     }
 
+    console.log('✅ fetchLocalAddresses: Successfully validated all addresses')
     return addresses
   } catch (error) {
+    console.error('❌ fetchLocalAddresses: Error occurred:', error)
     if (error instanceof TypeError && error.message.includes('fetch')) {
       throw new Error(
         `Local address server is not running at ${LOCAL_ADDRESS_SERVER}. ` +

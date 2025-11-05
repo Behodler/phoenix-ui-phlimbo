@@ -60,6 +60,8 @@ export function useTokenAllowance(
  * Hook for interacting with Behodler3Tokenlaunch (bonding curve)
  */
 export function useBondingCurve(bondingCurveAddress: Address | undefined) {
+  console.log('🎲 useBondingCurve: Called with address:', bondingCurveAddress)
+
   // Fetch current marginal price
   const { data: currentPrice, isLoading: isLoadingCurrent, isError: isErrorCurrent, refetch: refetchCurrent } = useReadContract({
     address: bondingCurveAddress,
@@ -68,6 +70,14 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
     query: {
       enabled: !!bondingCurveAddress,
     },
+  })
+
+  console.log('🎲 useBondingCurve: Query state -', {
+    address: bondingCurveAddress,
+    enabled: !!bondingCurveAddress,
+    currentPrice,
+    isLoading: isLoadingCurrent,
+    isError: isErrorCurrent
   })
 
   // Fetch initial marginal price (start price)

@@ -54,22 +54,28 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
 
   useEffect(() => {
     const loadAddresses = async () => {
+      console.log('🔍 ContractAddressContext: Loading addresses for chainId:', chainId)
       setLoading(true)
       setError(null)
 
       const detectedNetworkType = getNetworkType(chainId)
+      console.log('🌐 Detected network type:', detectedNetworkType)
       setNetworkType(detectedNetworkType)
 
       try {
         if (isMainnet(chainId)) {
           // Use hardcoded mainnet addresses
+          console.log('📍 Using mainnet addresses')
           setAddresses(MAINNET_CONTRACT_ADDRESSES)
         } else if (isSepolia(chainId)) {
           // Use hardcoded Sepolia testnet addresses
+          console.log('📍 Using Sepolia testnet addresses')
           setAddresses(SEPOLIA_CONTRACT_ADDRESSES)
         } else if (isLocalAnvil(chainId)) {
           // Fetch addresses from local development server
+          console.log('🔧 Detected Anvil (chainId 31337) - fetching addresses from http://localhost:3001/contracts')
           const localAddresses = await fetchLocalAddresses()
+          console.log('✅ Successfully fetched local addresses:', localAddresses)
           setAddresses(localAddresses)
         } else {
           // Unsupported network
