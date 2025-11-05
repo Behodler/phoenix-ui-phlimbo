@@ -222,16 +222,17 @@ export default function Admin() {
   const showMintYieldButton = !isMainnet;
 
   // Calculate yield vs principal breakdown
-  // Per IYieldStrategy interface: yield = totalBalanceOf - principalOf
-  // Uses bondingCurveTotalBalance (from AutoDolaYieldStrategy) for accurate yield calculation
+  // Total = vault's actual DOLA balance (same as used by mint button)
+  // Principal = principal tracked for bonding curve deposits
+  // Yield = Total - Principal (any DOLA in vault beyond principal is yield)
   const principal = bondingCurvePrincipal !== undefined ? bondingCurvePrincipal : 0n;
-  const totalBondingCurveBalance = bondingCurveTotalBalance !== undefined ? bondingCurveTotalBalance : 0n;
-  const yield_ = totalBondingCurveBalance > principal ? totalBondingCurveBalance - principal : 0n;
+  const totalVaultBalance = vaultDolaBalance !== undefined ? vaultDolaBalance : 0n;
+  const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
 
   // Format for display (convert from wei to DOLA)
   const principalDisplay = (Number(principal) / 1e18).toFixed(2);
   const yieldDisplay = (Number(yield_) / 1e18).toFixed(2);
-  const totalDisplay = (Number(totalBondingCurveBalance) / 1e18).toFixed(2);
+  const totalDisplay = (Number(totalVaultBalance) / 1e18).toFixed(2);
 
   /**
    * Discover owned contracts by checking ownership of each contract
