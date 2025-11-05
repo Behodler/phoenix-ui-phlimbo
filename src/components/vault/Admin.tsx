@@ -179,9 +179,10 @@ export default function Admin() {
     },
   });
 
-  // Fetch total balance from AutoDolaYieldStrategy (principal + yield)
+  // Fetch total balance from AutoDolaYieldStrategy (principal + yield in bonding curve)
   // Uses totalBalanceOf per IYieldStrategy interface specification
-  const { data: vaultDolaBalance, refetch: refetchVaultBalance } = useReadContract({
+  // This is used for calculating yield display: yield = totalBalanceOf - principalOf
+  const { data: bondingCurveTotalBalance, refetch: refetchBondingCurveBalance } = useReadContract({
     address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
     abi: autoDolaYieldStrategyAbi,
     functionName: 'totalBalanceOf',
@@ -190,6 +191,20 @@ export default function Admin() {
       : undefined,
     query: {
       enabled: !!addresses?.autoDolaYieldStrategy && !!addresses?.dolaToken && !!addresses?.bondingCurve,
+    },
+  });
+
+  // Fetch DOLA balance IN the AutoDolaVault contract itself
+  // This is used by the mint yield button to check if there's DOLA available to mint as yield
+  const { data: vaultDolaBalance, refetch: refetchVaultDolaBalance } = useReadContract({
+    address: addresses?.dolaToken as `0x${string}` | undefined,
+    abi: mintableErc20Abi,
+    functionName: 'balanceOf',
+    args: addresses?.autoDolaVault
+      ? [addresses.autoDolaVault as `0x${string}`]
+      : undefined,
+    query: {
+      enabled: !!addresses?.dolaToken && !!addresses?.autoDolaVault,
     },
   });
 
@@ -208,14 +223,15 @@ export default function Admin() {
 
   // Calculate yield vs principal breakdown
   // Per IYieldStrategy interface: yield = totalBalanceOf - principalOf
+  // Uses bondingCurveTotalBalance (from AutoDolaYieldStrategy) for accurate yield calculation
   const principal = bondingCurvePrincipal !== undefined ? bondingCurvePrincipal : 0n;
-  const totalVaultBalance = vaultDolaBalance !== undefined ? vaultDolaBalance : 0n;
-  const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
+  const totalBondingCurveBalance = bondingCurveTotalBalance !== undefined ? bondingCurveTotalBalance : 0n;
+  const yield_ = totalBondingCurveBalance > principal ? totalBondingCurveBalance - principal : 0n;
 
   // Format for display (convert from wei to DOLA)
   const principalDisplay = (Number(principal) / 1e18).toFixed(2);
   const yieldDisplay = (Number(yield_) / 1e18).toFixed(2);
-  const totalDisplay = (Number(totalVaultBalance) / 1e18).toFixed(2);
+  const totalDisplay = (Number(totalBondingCurveBalance) / 1e18).toFixed(2);
 
   /**
    * Discover owned contracts by checking ownership of each contract
@@ -779,9 +795,10 @@ export default function Admin() {
       setTimeout(async () => {
         removeToast(confirmingToastId);
 
-        // Refetch vault balance and principal to show updated amounts
-        await refetchVaultBalance();
-        await refetchPrincipal();
+        // Refetch all balances to show updated amounts
+        await refetchVaultDolaBalance(); // DOLA balance in vault (for mint button)
+        await refetchBondingCurveBalance(); // Total balance in bonding curve (for yield display)
+        await refetchPrincipal(); // Principal in bonding curve
 
         addToast({
           type: 'success',
