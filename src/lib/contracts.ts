@@ -15,6 +15,8 @@ export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
   bondingToken: '0x0000000000000000000000000000000000000000', // TODO: Add actual bonding token address
   autoDolaYieldStrategy: '0x0000000000000000000000000000000000000000', // TODO: Add actual AutoDolaYieldStrategy address
   bondingCurve: '0x0000000000000000000000000000000000000000', // TODO: Add actual Behodler3Tokenlaunch address
+  surplusTracker: '0x0000000000000000000000000000000000000000', // TODO: Add actual SurplusTracker address after mainnet deployment
+  surplusWithdrawer: '0x0000000000000000000000000000000000000000', // TODO: Add actual SurplusWithdrawer address after mainnet deployment
 }
 
 /**
@@ -32,4 +34,6 @@ export const SEPOLIA_CONTRACT_ADDRESSES: ContractAddresses = {
   dolaToken: '0x1E391B5A519543482D44e2724B7A8EB42AE469c9',
   tokeToken: '0x141F829D99e96db28411CFDe4286b070fCe24A54',
   tokemakMainRewarder: '0xA108d897C51ceD3Ae208c952FdE15D2B384e09aD',
+  surplusTracker: '0x0000000000000000000000000000000000000000', // TODO: Add actual SurplusTracker address after Sepolia deployment
+  surplusWithdrawer: '0x0000000000000000000000000000000000000000', // TODO: Add actual SurplusWithdrawer address after Sepolia deployment
 };

@@ -182,7 +182,7 @@ export default function Admin() {
   // Fetch total balance from AutoDolaYieldStrategy (principal + yield in bonding curve)
   // Uses totalBalanceOf per IYieldStrategy interface specification
   // This is used for calculating yield display: yield = totalBalanceOf - principalOf
-  const { data: bondingCurveTotalBalance, refetch: refetchBondingCurveBalance } = useReadContract({
+  const { refetch: refetchBondingCurveBalance } = useReadContract({
     address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
     abi: autoDolaYieldStrategyAbi,
     functionName: 'totalBalanceOf',

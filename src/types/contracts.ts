@@ -4,6 +4,8 @@
  * IMPORTANT DISTINCTION:
  * - bondingCurve: The Behodler3Tokenlaunch contract that MINTS bonding tokens (the factory/minter)
  * - bondingToken: The ERC20 token PRODUCED by the bonding curve (the product)
+ * - surplusTracker: Tracks surplus yield accumulation from the yield strategy
+ * - surplusWithdrawer: Handles withdrawal of accumulated surplus yield
  */
 export interface ContractAddresses {
   dolaToken: string
@@ -13,6 +15,8 @@ export interface ContractAddresses {
   bondingToken: string
   autoDolaYieldStrategy: string
   bondingCurve: string
+  surplusTracker: string
+  surplusWithdrawer: string
 }
 
 /**
@@ -37,6 +41,8 @@ export interface LocalAddressServerResponse {
     bondingToken: string
     autoDolaYieldStrategy: string
     behodler3Tokenlaunch: string
+    surplusTracker: string
+    surplusWithdrawer: string
   }
 }
 

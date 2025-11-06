@@ -41,6 +41,8 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       bondingToken: data.contracts.bondingToken,
       autoDolaYieldStrategy: data.contracts.autoDolaYieldStrategy,
       bondingCurve: data.contracts.behodler3Tokenlaunch,
+      surplusTracker: data.contracts.surplusTracker,
+      surplusWithdrawer: data.contracts.surplusWithdrawer,
     }
     console.log('📡 fetchLocalAddresses: Mapped addresses:', addresses)
 
