@@ -546,13 +546,13 @@ export default function Admin() {
       // This fixes the bug where balances didn't update after admin function execution
       // Following the same pattern as the mint yield button (Admin.tsx lines 909-915)
       // which uses a small delay to allow blockchain state to settle before refetch
-      setTimeout(async () => {
+      setTimeout(async () => 
         await Promise.all([
           refetchVaultDolaBalance(), // DOLA balance in vault (for mint button)
           refetchBondingCurveBalance(), // Total balance in bonding curve (for yield display)
           refetchPrincipal(), // Principal in bonding curve (for principal display)
-        ]);
-      }, 1000); // Wait 1 second for blockchain state to settle
+        ])
+      , 1000); // Wait 1 second for blockchain state to settle
 
       // Reset executing state
       setIsExecuting(false);
