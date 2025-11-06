@@ -235,7 +235,7 @@ export default function Admin() {
   });
 
   // Fetch principal from AutoDolaYieldStrategy (principal deposited via bonding curve)
-  const { data: bondingCurvePrincipal, refetch: refetchPrincipal } = useReadContract({
+  const { data: bondingCurvePrincipal, refetch: refetchPrincipal, error: principalError } = useReadContract({
     address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
     abi: autoDolaYieldStrategyAbi,
     functionName: 'principalOf',
@@ -250,7 +250,7 @@ export default function Admin() {
   // Fetch total balance from AutoDolaYieldStrategy (principal + yield in bonding curve)
   // Uses totalBalanceOf per IYieldStrategy interface specification
   // This is used for calculating yield display: yield = totalBalanceOf - principalOf
-  const { data: bondingCurveTotalBalance, refetch: refetchBondingCurveBalance } = useReadContract({
+  const { data: bondingCurveTotalBalance, refetch: refetchBondingCurveBalance, error: totalBalanceError } = useReadContract({
     address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
     abi: autoDolaYieldStrategyAbi,
     functionName: 'totalBalanceOf',
@@ -301,6 +301,35 @@ export default function Admin() {
   const principalDisplay = (Number(principal) / 1e18).toFixed(2);
   const yieldDisplay = (Number(yield_) / 1e18).toFixed(2);
   const totalDisplay = (Number(totalVaultBalance) / 1e18).toFixed(2);
+
+  // Debug logging for balance queries
+  useEffect(() => {
+    console.log('🔍 Balance Query Debug:', {
+      bondingCurvePrincipal: bondingCurvePrincipal?.toString(),
+      bondingCurveTotalBalance: bondingCurveTotalBalance?.toString(),
+      vaultDolaBalance: vaultDolaBalance?.toString(),
+      principal: principal.toString(),
+      totalVaultBalance: totalVaultBalance.toString(),
+      yield_: yield_.toString(),
+      addresses: {
+        autoDolaYieldStrategy: addresses?.autoDolaYieldStrategy,
+        dolaToken: addresses?.dolaToken,
+        bondingCurve: addresses?.bondingCurve,
+        autoDolaVault: addresses?.autoDolaVault,
+      },
+      errors: {
+        principalError: principalError?.message,
+        totalBalanceError: totalBalanceError?.message,
+      }
+    });
+
+    if (principalError) {
+      console.error('❌ Principal Query Error:', principalError);
+    }
+    if (totalBalanceError) {
+      console.error('❌ Total Balance Query Error:', totalBalanceError);
+    }
+  }, [bondingCurvePrincipal, bondingCurveTotalBalance, vaultDolaBalance, principal, totalVaultBalance, yield_, addresses, principalError, totalBalanceError]);
 
   /**
    * Discover owned contracts by checking ownership of each contract
