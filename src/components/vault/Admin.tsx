@@ -293,10 +293,10 @@ export default function Admin() {
   // Total = bondingCurveTotalBalance (queries AutoDolaYieldStrategy.totalBalanceOf)
   // Principal = principal tracked for bonding curve deposits (queries AutoDolaYieldStrategy.principalOf)
   // Yield = Total - Principal (any DOLA in vault beyond principal is yield)
-  // NOTE: We use bondingCurveTotalBalance for display because it tracks the actual balance
-  //       associated with the bonding curve client. vaultDolaBalance is only used for the mint button.
+  // NOTE: We use vaultDolaBalance for display because it shows actual DOLA in the vault.
+  //       bondingCurveTotalBalance returns 0 when strategy has no tracked deposits.
   const principal = bondingCurvePrincipal !== undefined ? bondingCurvePrincipal : 0n;
-  const totalVaultBalance = bondingCurveTotalBalance !== undefined ? bondingCurveTotalBalance : 0n;
+  const totalVaultBalance = vaultDolaBalance !== undefined ? vaultDolaBalance : 0n;
   const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
 
   // Format for display (convert from wei to DOLA)
