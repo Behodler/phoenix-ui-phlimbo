@@ -7,6 +7,32 @@ import {
   flaxTokenAbi,
   autoDolaYieldStrategyAbi,
 } from '@behodler/wagmi-hooks';
+
+// Minimal Ownable ABI for contracts that implement OpenZeppelin's Ownable
+// Used for SurplusWithdrawer until full ABI is available in wagmi-hooks
+const ownableAbi = [
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+] as const;
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
@@ -62,6 +88,11 @@ const getContractConfigs = (_networkType: string): ContractConfig[] => [
     name: 'AutoDolaYieldStrategy',
     addressKey: 'autoDolaYieldStrategy',
     abi: autoDolaYieldStrategyAbi as Abi,
+  },
+  {
+    name: 'SurplusWithdrawer',
+    addressKey: 'surplusWithdrawer',
+    abi: ownableAbi as Abi,
   },
 ];
 
