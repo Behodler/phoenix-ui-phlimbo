@@ -290,11 +290,14 @@ export default function Admin() {
   const showMintYieldButton = !isMainnet;
 
   // Calculate yield vs principal breakdown
-  // Total = bonding curve total balance (principal + yield from AutoDolaYieldStrategy.totalBalanceOf)
+  // Total = vault DOLA balance (actual DOLA in the vault contract)
   // Principal = principal tracked for bonding curve deposits
-  // Yield = Total - Principal (any DOLA in bonding curve beyond principal is yield)
+  // Yield = Total - Principal (any DOLA in vault beyond principal is yield)
+  // NOTE: Using vaultDolaBalance instead of bondingCurveTotalBalance because totalBalanceOf
+  //       returns 0 when there are no deposits tracked in the yield strategy's clientBalances.
+  //       The vault DOLA balance represents actual available funds regardless of deposit state.
   const principal = bondingCurvePrincipal !== undefined ? bondingCurvePrincipal : 0n;
-  const totalVaultBalance = bondingCurveTotalBalance !== undefined ? bondingCurveTotalBalance : 0n;
+  const totalVaultBalance = vaultDolaBalance !== undefined ? vaultDolaBalance : 0n;
   const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
 
   // Format for display (convert from wei to DOLA)
