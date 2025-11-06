@@ -492,6 +492,19 @@ export default function Admin() {
    */
   useEffect(() => {
     if (isTxSuccess && txHash && isExecuting) {
+      // Refetch all affected blockchain data to update UI immediately
+      // This fixes the bug where balances didn't update after admin function execution
+      // Following the same pattern as deposit/withdraw tabs (VaultPage.tsx lines 321-331, 384-393)
+      // and the mint yield button (Admin.tsx lines 868-870)
+      const refetchData = async () => {
+        await Promise.all([
+          refetchVaultDolaBalance(), // DOLA balance in vault (for mint button and total)
+          refetchBondingCurveBalance(), // Total balance in bonding curve (for yield display)
+          refetchPrincipal(), // Principal in bonding curve (for principal display)
+        ]);
+      };
+      refetchData();
+
       // Show success toast with transaction hash
       addToast({
         type: 'success',
@@ -514,7 +527,7 @@ export default function Admin() {
       // Reset executing state
       setIsExecuting(false);
     }
-  }, [isTxSuccess, txHash, isExecuting, networkType, addToast]);
+  }, [isTxSuccess, txHash, isExecuting, networkType, addToast, refetchVaultDolaBalance, refetchBondingCurveBalance, refetchPrincipal]);
 
   /**
    * Handle parameter input changes
