@@ -250,7 +250,7 @@ export default function Admin() {
   // Fetch total balance from AutoDolaYieldStrategy (principal + yield in bonding curve)
   // Uses totalBalanceOf per IYieldStrategy interface specification
   // This is used for calculating yield display: yield = totalBalanceOf - principalOf
-  const { refetch: refetchBondingCurveBalance } = useReadContract({
+  const { data: bondingCurveTotalBalance, refetch: refetchBondingCurveBalance } = useReadContract({
     address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
     abi: autoDolaYieldStrategyAbi,
     functionName: 'totalBalanceOf',
@@ -290,11 +290,11 @@ export default function Admin() {
   const showMintYieldButton = !isMainnet;
 
   // Calculate yield vs principal breakdown
-  // Total = vault's actual DOLA balance (same as used by mint button)
+  // Total = bonding curve total balance (principal + yield from AutoDolaYieldStrategy.totalBalanceOf)
   // Principal = principal tracked for bonding curve deposits
-  // Yield = Total - Principal (any DOLA in vault beyond principal is yield)
+  // Yield = Total - Principal (any DOLA in bonding curve beyond principal is yield)
   const principal = bondingCurvePrincipal !== undefined ? bondingCurvePrincipal : 0n;
-  const totalVaultBalance = vaultDolaBalance !== undefined ? vaultDolaBalance : 0n;
+  const totalVaultBalance = bondingCurveTotalBalance !== undefined ? bondingCurveTotalBalance : 0n;
   const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
 
   // Format for display (convert from wei to DOLA)
