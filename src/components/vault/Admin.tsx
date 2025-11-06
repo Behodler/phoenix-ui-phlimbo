@@ -290,14 +290,13 @@ export default function Admin() {
   const showMintYieldButton = !isMainnet;
 
   // Calculate yield vs principal breakdown
-  // Total = vault DOLA balance (actual DOLA in the vault contract)
-  // Principal = principal tracked for bonding curve deposits
+  // Total = bondingCurveTotalBalance (queries AutoDolaYieldStrategy.totalBalanceOf)
+  // Principal = principal tracked for bonding curve deposits (queries AutoDolaYieldStrategy.principalOf)
   // Yield = Total - Principal (any DOLA in vault beyond principal is yield)
-  // NOTE: Using vaultDolaBalance instead of bondingCurveTotalBalance because totalBalanceOf
-  //       returns 0 when there are no deposits tracked in the yield strategy's clientBalances.
-  //       The vault DOLA balance represents actual available funds regardless of deposit state.
+  // NOTE: We use bondingCurveTotalBalance for display because it tracks the actual balance
+  //       associated with the bonding curve client. vaultDolaBalance is only used for the mint button.
   const principal = bondingCurvePrincipal !== undefined ? bondingCurvePrincipal : 0n;
-  const totalVaultBalance = vaultDolaBalance !== undefined ? vaultDolaBalance : 0n;
+  const totalVaultBalance = bondingCurveTotalBalance !== undefined ? bondingCurveTotalBalance : 0n;
   const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
 
   // Format for display (convert from wei to DOLA)
@@ -524,19 +523,6 @@ export default function Admin() {
    */
   useEffect(() => {
     if (isTxSuccess && txHash && isExecuting) {
-      // Refetch all affected blockchain data to update UI immediately
-      // This fixes the bug where balances didn't update after admin function execution
-      // Following the same pattern as deposit/withdraw tabs (VaultPage.tsx lines 321-331, 384-393)
-      // and the mint yield button (Admin.tsx lines 868-870)
-      const refetchData = async () => {
-        await Promise.all([
-          refetchVaultDolaBalance(), // DOLA balance in vault (for mint button and total)
-          refetchBondingCurveBalance(), // Total balance in bonding curve (for yield display)
-          refetchPrincipal(), // Principal in bonding curve (for principal display)
-        ]);
-      };
-      refetchData();
-
       // Show success toast with transaction hash
       addToast({
         type: 'success',
@@ -555,6 +541,18 @@ export default function Admin() {
           }
         }
       });
+
+      // Refetch all affected blockchain data to update UI immediately
+      // This fixes the bug where balances didn't update after admin function execution
+      // Following the same pattern as the mint yield button (Admin.tsx lines 909-915)
+      // which uses a small delay to allow blockchain state to settle before refetch
+      setTimeout(async () => {
+        await Promise.all([
+          refetchVaultDolaBalance(), // DOLA balance in vault (for mint button)
+          refetchBondingCurveBalance(), // Total balance in bonding curve (for yield display)
+          refetchPrincipal(), // Principal in bonding curve (for principal display)
+        ]);
+      }, 1000); // Wait 1 second for blockchain state to settle
 
       // Reset executing state
       setIsExecuting(false);
