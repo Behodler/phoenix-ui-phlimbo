@@ -6,70 +6,8 @@ import {
   behodler3TokenlaunchAbi,
   flaxTokenAbi,
   autoDolaYieldStrategyAbi,
+  surplusWithdrawerAbi,
 } from '@behodler/wagmi-hooks';
-
-// Complete SurplusWithdrawer ABI
-// Full contract interface including operational functions, view functions, ownership, and events
-// Based on /home/justin/code/reflax-mint/vault/src/SurplusWithdrawer.sol
-const surplusWithdrawerAbi = [
-  // View functions
-  {
-    type: 'function',
-    name: 'surplusTracker',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-  },
-  {
-    type: 'function',
-    name: 'owner',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-  },
-  // State-changing functions
-  {
-    type: 'function',
-    name: 'withdrawSurplusPercent',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'vault', internalType: 'address', type: 'address' },
-      { name: 'token', internalType: 'address', type: 'address' },
-      { name: 'client', internalType: 'address', type: 'address' },
-      { name: 'clientInternalBalance', internalType: 'uint256', type: 'uint256' },
-      { name: 'percentage', internalType: 'uint256', type: 'uint256' },
-      { name: 'recipient', internalType: 'address', type: 'address' },
-    ],
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'transferOwnership',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
-    outputs: [],
-  },
-  {
-    type: 'function',
-    name: 'renounceOwnership',
-    stateMutability: 'nonpayable',
-    inputs: [],
-    outputs: [],
-  },
-  // Events
-  {
-    type: 'event',
-    name: 'SurplusWithdrawn',
-    inputs: [
-      { name: 'vault', type: 'address', indexed: true },
-      { name: 'token', type: 'address', indexed: true },
-      { name: 'client', type: 'address', indexed: true },
-      { name: 'percentage', type: 'uint256', indexed: false },
-      { name: 'amount', type: 'uint256', indexed: false },
-      { name: 'recipient', type: 'address', indexed: false },
-    ],
-  },
-] as const;
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
