@@ -10,6 +10,7 @@ import type { ContractAddresses } from '../types/contracts'
 export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
   dolaToken: '0x0000000000000000000000000000000000000000', // TODO: Add actual DOLA token address
   tokeToken: '0x0000000000000000000000000000000000000000', // TODO: Add actual TOKE token address
+  eyeToken: '0x0000000000000000000000000000000000000000', // TODO: Add actual EYE token address
   autoDolaVault: '0x0000000000000000000000000000000000000000', // TODO: Add actual AutoDola vault address
   tokemakMainRewarder: '0x0000000000000000000000000000000000000000', // TODO: Add actual Tokemak main rewarder address
   bondingToken: '0x0000000000000000000000000000000000000000', // TODO: Add actual bonding token address
@@ -17,6 +18,7 @@ export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
   bondingCurve: '0x0000000000000000000000000000000000000000', // TODO: Add actual Behodler3Tokenlaunch address
   surplusTracker: '0x0000000000000000000000000000000000000000', // TODO: Add actual SurplusTracker address after mainnet deployment
   surplusWithdrawer: '0x0000000000000000000000000000000000000000', // TODO: Add actual SurplusWithdrawer address after mainnet deployment
+  pauser: '0x0000000000000000000000000000000000000000', // TODO: Add actual Pauser address after mainnet deployment
 }
 
 /**

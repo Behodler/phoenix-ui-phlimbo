@@ -39,6 +39,7 @@ export interface LocalAddressServerResponse {
   contracts: {
     dolaToken: string
     tokeToken: string
+    eyeToken?: string
     mockAutoDolaVault: string
     mockMainRewarder: string
     bondingToken: string
@@ -46,6 +47,7 @@ export interface LocalAddressServerResponse {
     behodler3Tokenlaunch: string
     surplusTracker: string
     surplusWithdrawer: string
+    pauser?: string
   }
 }
 

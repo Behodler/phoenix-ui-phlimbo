@@ -36,6 +36,7 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
     const addresses: ContractAddresses = {
       dolaToken: data.contracts.dolaToken,
       tokeToken: data.contracts.tokeToken,
+      eyeToken: data.contracts.eyeToken || '0x0000000000000000000000000000000000000000',
       autoDolaVault: data.contracts.mockAutoDolaVault,
       tokemakMainRewarder: data.contracts.mockMainRewarder,
       bondingToken: data.contracts.bondingToken,
@@ -43,12 +44,15 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       bondingCurve: data.contracts.behodler3Tokenlaunch,
       surplusTracker: data.contracts.surplusTracker,
       surplusWithdrawer: data.contracts.surplusWithdrawer,
+      pauser: data.contracts.pauser || '0x0000000000000000000000000000000000000000',
     }
     console.log('📡 fetchLocalAddresses: Mapped addresses:', addresses)
 
     // Validate all addresses are present
+    // Allow zero addresses for optional contracts (pauser, eyeToken)
+    const optionalContracts = ['pauser', 'eyeToken']
     const missingAddresses = Object.entries(addresses)
-      .filter(([_, value]) => !value)
+      .filter(([key, value]) => !value && !optionalContracts.includes(key))
       .map(([key]) => key)
 
     if (missingAddresses.length > 0) {

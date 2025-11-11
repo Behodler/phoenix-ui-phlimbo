@@ -8,6 +8,7 @@ import {
   autoDolaYieldStrategyAbi,
   surplusWithdrawerAbi,
 } from '@behodler/wagmi-hooks';
+import { pauserAbi } from '../../lib/pauserAbi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
@@ -68,6 +69,11 @@ const getContractConfigs = (_networkType: string): ContractConfig[] => [
     name: 'SurplusWithdrawer',
     addressKey: 'surplusWithdrawer',
     abi: surplusWithdrawerAbi as Abi,
+  },
+  {
+    name: 'Pauser',
+    addressKey: 'pauser',
+    abi: pauserAbi as Abi,
   },
 ];
 
