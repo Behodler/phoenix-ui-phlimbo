@@ -312,7 +312,7 @@ export default function VaultPage() {
         type: 'success',
         title: 'Deposit Successful',
         description: `Successfully deposited ${lastDepositAmountRef.current} DOLA and minted ${bondingTokensMinted} phUSD`,
-        duration: 8000,
+        duration: 30000,
         action: {
           label: 'View Transaction',
           onClick: () => {
@@ -375,7 +375,7 @@ export default function VaultPage() {
         type: 'success',
         title: 'Withdrawal Successful',
         description: `Burned ${phUSDBurnt} phUSD • Fee: ${feeAmount} phUSD (${(withdrawalFeeRate * 100).toFixed(1)}%) • Received: ${dolaReceived} DOLA`,
-        duration: 8000,
+        duration: 30000,
         action: {
           label: 'View Transaction',
           onClick: () => {
@@ -431,7 +431,7 @@ export default function VaultPage() {
         type: 'error',
         title: 'Deposit Failed',
         description: errorMessage,
-        duration: 8000,
+        duration: 16000,
       });
 
       // Clear the deposit amount ref to prevent stale state
@@ -463,7 +463,7 @@ export default function VaultPage() {
         type: 'error',
         title: 'Withdrawal Failed',
         description: errorMessage,
-        duration: 8000,
+        duration: 16000,
       });
 
       // Clear the withdraw amount ref to prevent stale state

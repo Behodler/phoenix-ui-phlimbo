@@ -472,7 +472,7 @@ export default function Admin() {
         type: 'success',
         title: 'Transaction Confirmed',
         description: `Function executed successfully!`,
-        duration: 8000,
+        duration: 30000,
         action: {
           label: 'View Transaction',
           onClick: () => {
@@ -681,7 +681,7 @@ export default function Admin() {
         type: 'error',
         title: 'Call Failed',
         description: errorMessage,
-        duration: 8000,
+        duration: 16000,
       });
     } finally {
       setIsCalling(false);
@@ -702,7 +702,7 @@ export default function Admin() {
         type: 'error',
         title: 'Wallet Not Connected',
         description: 'Please connect your wallet to execute transactions.',
-        duration: 6000,
+        duration: 12000,
       });
       return;
     }
@@ -764,7 +764,7 @@ export default function Admin() {
         type: 'error',
         title: 'Transaction Failed',
         description: errorMessage,
-        duration: 8000,
+        duration: 16000,
       });
       setIsExecuting(false);
     }
@@ -860,7 +860,7 @@ export default function Admin() {
           type: 'success',
           title: 'Yield Minted Successfully',
           description: `Successfully minted 1% of vault balance (${(Number(mintAmount) / 1e18).toFixed(2)} DOLA) to AutoDolaVault!`,
-          duration: 8000,
+          duration: 30000,
           action: {
             label: 'View Transaction',
             onClick: () => {
@@ -884,7 +884,7 @@ export default function Admin() {
         type: 'error',
         title: 'Mint Yield Failed',
         description: errorMessage,
-        duration: 8000,
+        duration: 16000,
       });
       setIsMinting(false);
     }

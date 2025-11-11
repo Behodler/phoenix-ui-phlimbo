@@ -127,7 +127,7 @@ export default function TestnetFaucet() {
         type: 'error',
         title: 'Faucet Failed',
         description: errorMessage,
-        duration: 8000,
+        duration: 16000,
       });
       setIsMinting(false);
     }
@@ -197,7 +197,7 @@ export default function TestnetFaucet() {
         type: 'error',
         title: 'Faucet Failed',
         description: errorMessage,
-        duration: 8000,
+        duration: 16000,
       });
       setIsMintingEye(false);
     }
@@ -212,7 +212,7 @@ export default function TestnetFaucet() {
         type: 'success',
         title: 'Faucet Successful',
         description: 'Successfully minted 10,000 DOLA to your wallet!',
-        duration: 8000,
+        duration: 30000,
         action: {
           label: 'View Transaction',
           onClick: () => {
@@ -245,7 +245,7 @@ export default function TestnetFaucet() {
         type: 'success',
         title: 'Faucet Successful',
         description: 'Successfully minted 1,000 EYE to your wallet!',
-        duration: 8000,
+        duration: 30000,
         action: {
           label: 'View Transaction',
           onClick: () => {

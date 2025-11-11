@@ -100,6 +100,7 @@ export default function SafetyTab() {
           type: 'success',
           title: 'Approval Successful',
           description: `${requiredEyeAmount} EYE spending has been approved for the Pauser contract.`,
+          duration: 30000,
           action: {
             label: 'View Transaction',
             onClick: () => {
@@ -163,7 +164,7 @@ export default function SafetyTab() {
           type: 'error',
           title: getErrorTitle(txError.type),
           description: txError.message,
-          duration: 8000,
+          duration: 16000,
           action: shouldOfferRetry(txError.type) ? {
             label: 'Retry',
             onClick: () => approvalTransaction.retry()
@@ -181,7 +182,7 @@ export default function SafetyTab() {
         type: 'error',
         title: 'Insufficient EYE Balance',
         description: `You need ${requiredEyeAmount} EYE to pause the application. Current balance: ${eyeBalance.toFixed(4)} EYE`,
-        duration: 8000,
+        duration: 16000,
       });
       return;
     }
@@ -251,7 +252,7 @@ export default function SafetyTab() {
         type: 'error',
         title: 'Pause Failed',
         description: errorMessage,
-        duration: 8000,
+        duration: 16000,
       });
     }
   };
@@ -263,7 +264,7 @@ export default function SafetyTab() {
         type: 'success',
         title: 'Application Paused',
         description: `Successfully paused the application. ${requiredEyeAmount} EYE has been burnt from your wallet.`,
-        duration: 10000,
+        duration: 30000,
         action: {
           label: 'View Transaction',
           onClick: () => {
