@@ -13,6 +13,7 @@ import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
 import WithdrawTab from '../components/vault/WithdrawTab';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
+import SafetyTab from '../components/vault/SafetyTab';
 import Admin from '../components/vault/Admin';
 import BondingCurveBox from '../components/vault/BondingCurveBox';
 import FAQ from '../components/vault/FAQ';
@@ -62,6 +63,7 @@ export default function VaultPage() {
   // Determine tabs based on network and owner status
   // - Show Admin tab if user is the owner
   // - Show Testnet Faucet if not on mainnet
+  // - Show Safety tab on all networks
   const tabs: readonly Tab[] = (() => {
     if (!isMounted) {
       return ["Deposit to Mint", "Burn to Withdraw"];
@@ -72,6 +74,9 @@ export default function VaultPage() {
     if (!isMainnet) {
       tabList.push("Testnet Faucet");
     }
+
+    // Safety tab is available on all networks
+    tabList.push("Safety");
 
     if (isOwner) {
       tabList.push("Admin");
@@ -1000,6 +1005,10 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "Testnet Faucet" ? (
               <TestnetFaucet />
+            ) : activeTab === "Safety" ? (
+              <ErrorBoundary>
+                <SafetyTab />
+              </ErrorBoundary>
             ) : activeTab === "Admin" ? (
               <Admin />
             ) : null}

@@ -7,6 +7,7 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
     if (activeTab === "Deposit to Mint") return "You're depositing";
     if (activeTab === "Burn to Withdraw") return "You're withdrawing";
     if (activeTab === "Testnet Faucet") return "You're minting test tokens";
+    if (activeTab === "Safety") return "Emergency pause controls";
     return "";
   };
 
