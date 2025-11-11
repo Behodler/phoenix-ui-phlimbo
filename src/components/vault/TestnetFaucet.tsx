@@ -94,7 +94,7 @@ export default function TestnetFaucet() {
         type: 'info',
         title: 'Confirm Transaction',
         description: 'Please confirm the faucet transaction in your wallet.',
-        duration: 0,
+        duration: 30000,
       });
 
       // Mint 10,000 DOLA tokens (with 18 decimals)
@@ -116,7 +116,7 @@ export default function TestnetFaucet() {
         type: 'info',
         title: 'Transaction Submitted',
         description: 'Waiting for blockchain confirmation...',
-        duration: 0,
+        duration: 30000,
       });
 
     } catch (error) {
@@ -164,7 +164,7 @@ export default function TestnetFaucet() {
         type: 'info',
         title: 'Confirm Transaction',
         description: 'Please confirm the faucet transaction in your wallet.',
-        duration: 0,
+        duration: 30000,
       });
 
       // Mint 1,000 EYE tokens (with 18 decimals)
@@ -186,7 +186,7 @@ export default function TestnetFaucet() {
         type: 'info',
         title: 'Transaction Submitted',
         description: 'Waiting for blockchain confirmation...',
-        duration: 0,
+        duration: 30000,
       });
 
     } catch (error) {

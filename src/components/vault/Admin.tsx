@@ -730,7 +730,7 @@ export default function Admin() {
         type: 'info',
         title: 'Confirm Transaction',
         description: `Please confirm the transaction in your wallet.`,
-        duration: 0,
+        duration: 30000,
       });
 
       // Execute the transaction
@@ -749,7 +749,7 @@ export default function Admin() {
         type: 'info',
         title: 'Transaction Submitted',
         description: 'Waiting for blockchain confirmation...',
-        duration: 0,
+        duration: 30000,
       });
 
       console.log(`[Admin Panel] ✅ Transaction submitted:`, hash);
@@ -814,7 +814,7 @@ export default function Admin() {
         type: 'info',
         title: 'Confirm Transaction',
         description: 'Please confirm the mint yield transaction in your wallet.',
-        duration: 0,
+        duration: 30000,
       });
 
       // Call the mint function on the DOLA token contract, minting to AutoDolaVault
@@ -833,7 +833,7 @@ export default function Admin() {
         type: 'info',
         title: 'Transaction Submitted',
         description: 'Waiting for blockchain confirmation...',
-        duration: 0,
+        duration: 30000,
         action: {
           label: 'View on Explorer',
           onClick: () => {

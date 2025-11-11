@@ -121,14 +121,14 @@ export default function SafetyTab() {
             type: 'info',
             title: 'Confirm in Wallet',
             description: 'Please confirm the approval transaction in your wallet.',
-            duration: 0,
+            duration: 30000,
           });
         } else if (status === 'PENDING_CONFIRMATION') {
           addToast({
             type: 'info',
             title: 'Transaction Submitted',
             description: 'Waiting for blockchain confirmation...',
-            duration: 0,
+            duration: 30000,
           });
         }
       }
@@ -218,7 +218,7 @@ export default function SafetyTab() {
         type: 'info',
         title: 'Confirm Transaction',
         description: 'Please confirm the pause transaction in your wallet.',
-        duration: 0,
+        duration: 30000,
       });
 
       // Call pause function
@@ -233,7 +233,7 @@ export default function SafetyTab() {
         type: 'info',
         title: 'Transaction Submitted',
         description: 'Waiting for blockchain confirmation...',
-        duration: 0,
+        duration: 30000,
         action: {
           label: 'View on Etherscan',
           onClick: () => {

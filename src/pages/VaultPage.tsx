@@ -515,14 +515,14 @@ export default function VaultPage() {
             type: 'info',
             title: 'Confirm in Wallet',
             description: 'Please confirm the approval transaction in your wallet.',
-            duration: 0, // Don't auto-dismiss
+            duration: 30000,
           });
         } else if (status === 'PENDING_CONFIRMATION') {
           addToast({
             type: 'info',
             title: 'Transaction Submitted',
             description: 'Waiting for blockchain confirmation...',
-            duration: 0, // Don't auto-dismiss
+            duration: 30000,
           });
         }
       }
@@ -572,14 +572,14 @@ export default function VaultPage() {
             type: 'info',
             title: 'Confirm in Wallet',
             description: 'Please confirm the approval transaction in your wallet.',
-            duration: 0, // Don't auto-dismiss
+            duration: 30000,
           });
         } else if (status === 'PENDING_CONFIRMATION') {
           addToast({
             type: 'info',
             title: 'Transaction Submitted',
             description: 'Waiting for blockchain confirmation...',
-            duration: 0, // Don't auto-dismiss
+            duration: 30000,
           });
         }
       }
@@ -762,7 +762,7 @@ export default function VaultPage() {
         type: 'info',
         title: 'Confirm Transaction',
         description: 'Please confirm the transaction in your wallet.',
-        duration: 0,
+        duration: 30000,
       });
 
       // Calculate expected output and minimum received
@@ -790,7 +790,7 @@ export default function VaultPage() {
         type: 'info',
         title: 'Transaction Submitted',
         description: 'Waiting for blockchain confirmation...',
-        duration: 0,
+        duration: 30000,
         action: {
           label: 'View on Etherscan',
           onClick: () => {
@@ -900,7 +900,7 @@ export default function VaultPage() {
         type: 'info',
         title: 'Confirm Transaction',
         description: 'Please confirm the transaction in your wallet.',
-        duration: 0,
+        duration: 30000,
       });
 
       // Calculate fee and amount after fee using BigInt arithmetic
@@ -932,7 +932,7 @@ export default function VaultPage() {
         type: 'info',
         title: 'Transaction Submitted',
         description: 'Waiting for blockchain confirmation...',
-        duration: 0,
+        duration: 30000,
         action: {
           label: 'View on Etherscan',
           onClick: () => {
