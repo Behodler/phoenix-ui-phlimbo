@@ -22,7 +22,6 @@ export default function PauseConfirmationDialog({
       cancelLabel="Cancel"
       onConfirm={onConfirm}
       isLoading={isLoading}
-      variant="danger"
     >
       <div className="space-y-4">
         <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">

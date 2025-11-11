@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
-import { erc20Abi } from 'viem';
 import { pauserAbi } from '../../lib/pauserAbi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useTokenBalance, useTokenAllowance, useTokenApproval } from '../../hooks/useContractInteractions';
