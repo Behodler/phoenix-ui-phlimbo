@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
 import { erc20Abi } from 'viem';
@@ -256,28 +256,30 @@ export default function SafetyTab() {
     }
   };
 
-  // Handle pause success
-  if (isPauseSuccess) {
-    addToast({
-      type: 'success',
-      title: 'Application Paused',
-      description: `Successfully paused the application. ${requiredEyeAmount} EYE has been burnt from your wallet.`,
-      duration: 10000,
-      action: {
-        label: 'View Transaction',
-        onClick: () => {
-          const explorerUrl = networkType === 'mainnet'
-            ? `https://etherscan.io/tx/${pauseHash}`
-            : `https://sepolia.etherscan.io/tx/${pauseHash}`;
-          window.open(explorerUrl, '_blank');
+  // Handle pause success in useEffect to prevent infinite loop
+  useEffect(() => {
+    if (isPauseSuccess && pauseHash) {
+      addToast({
+        type: 'success',
+        title: 'Application Paused',
+        description: `Successfully paused the application. ${requiredEyeAmount} EYE has been burnt from your wallet.`,
+        duration: 10000,
+        action: {
+          label: 'View Transaction',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${pauseHash}`
+              : `https://sepolia.etherscan.io/tx/${pauseHash}`;
+            window.open(explorerUrl, '_blank');
+          }
         }
-      }
-    });
+      });
 
-    // Refetch balances
-    refetchEyeBalance();
-    refetchAllowance();
-  }
+      // Refetch balances
+      refetchEyeBalance();
+      refetchAllowance();
+    }
+  }, [isPauseSuccess, pauseHash, addToast, requiredEyeAmount, networkType, refetchEyeBalance, refetchAllowance]); // Only run when dependencies change
 
   const handleCancelPause = () => {
     setShowConfirmation(false);
