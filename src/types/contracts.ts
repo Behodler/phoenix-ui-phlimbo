@@ -10,6 +10,7 @@
 export interface ContractAddresses {
   dolaToken: string
   tokeToken: string
+  eyeToken: string
   autoDolaVault: string
   tokemakMainRewarder: string
   bondingToken: string
@@ -17,7 +18,9 @@ export interface ContractAddresses {
   bondingCurve: string
   surplusTracker: string
   surplusWithdrawer: string
+  pauser: string
 }
+
 
 /**
  * Response structure from local development address server

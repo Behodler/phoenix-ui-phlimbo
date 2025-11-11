@@ -26,14 +26,17 @@ export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
  * IMPORTANT: bondingCurve is the Behodler3Tokenlaunch contract (mints bonding tokens)
  *            bondingToken is the ERC20 token produced by the bonding curve
  */
+
 export const SEPOLIA_CONTRACT_ADDRESSES: ContractAddresses = {
-  autoDolaVault: '0x52D5A1cd81b4cc08aFa69132944686Bc0dCE6683',
-  autoDolaYieldStrategy: '0x0f8500e47A7C3070611220De48b81eeDfD83bfb3',
-  bondingCurve: '0xf49bdBa3194Fa044b9D6143f70197445b04aEDa7',
-  bondingToken: '0xD15FD844227e3a474808e3F18561B4D230980716',
-  dolaToken: '0xd4B6E817687005B30bFbf104Ef4F787347348AF8',
-  surplusTracker: '0x9d72F8eF966c4772eb62425DD01952429587Da36',
-  surplusWithdrawer: '0x5BAA4fd203Fc95a82aD19AC1b1c7f8bBB5226Bc3',
-  tokeToken: '0x85bb8e662a3877A6bB074728c8DDa837E6505AeD',
-  tokemakMainRewarder: '0x80B2407d16145761D368f51f231F91Cd41E49330',
+  autoDolaVault: '0xB1Bd6dFa01bDF73CC874766e527ec48dC7E219Ab',
+  autoDolaYieldStrategy: '0x387f6C1Bd54ff45Ba5bD5cDb1e73191F9da41549',
+  bondingCurve: '0x035cc3dA9EEf5b95F92ad8953D76f0EE9cC8de12',
+  bondingToken: '0xe11e8237bb44FA621D3Bd2d4832Bc1Cf78CA7a64',
+  dolaToken: '0x689ce47B630F676Cfc5C5B0Cd7Dabfcd999d105D',
+  eyeToken: '0xb10E00DE1e7C9947D9eEF3E46e94ff56eB94d460',
+  pauser: '0x7eb3B25D52eaE6AED07b148e3d75B6224F9481D9',
+  surplusTracker: '0x6C5ABf4336591051A0288e8Ad1B0d833219D0b23',
+  surplusWithdrawer: '0x58810b71885049b2043BED515724129A5269A68E',
+  tokeToken: '0x771C4E7C3f5Ab191b796d66c66d471078bC46c34',
+  tokemakMainRewarder: '0x589482473377217e38569a9eFb4b836F6be92564',
 };
