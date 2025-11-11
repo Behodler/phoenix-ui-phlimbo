@@ -24,6 +24,7 @@ export default function WithdrawTab({
   needsApproval = false, // Whether bonding token approval is needed
   onApprove, // Callback for bonding token approval
   isAllowanceLoading = false, // Whether allowance is still loading
+  isPaused = false
 }: WithdrawFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
@@ -286,13 +287,20 @@ export default function WithdrawTab({
           outputToken="DOLA"
         />
 
-        <ActionButton
-          disabled={buttonDisabled}
-          onAction={buttonAction}
-          label={buttonLabel}
-          variant={buttonVariant}
-          isLoading={buttonLoading}
-        />
+        {/* Conditionally render button or pause message based on pause state */}
+        {isPaused === true ? (
+          <div className="bg-pxusd-orange-900/20 border border-pxusd-orange-500 rounded-lg p-4 text-center">
+            <p className="text-pxusd-orange-300 font-semibold">Phoenix is currently paused</p>
+          </div>
+        ) : (
+          <ActionButton
+            disabled={buttonDisabled}
+            onAction={buttonAction}
+            label={buttonLabel}
+            variant={buttonVariant}
+            isLoading={buttonLoading}
+          />
+        )}
       </div>
 
       <WithdrawConfirmationDialog

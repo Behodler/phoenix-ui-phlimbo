@@ -47,6 +47,7 @@ export interface DepositFormProps {
   needsApproval?: boolean;
   onApprove?: () => void;
   isAllowanceLoading?: boolean;
+  isPaused?: boolean;
 }
 
 
@@ -98,6 +99,7 @@ export interface WithdrawFormProps {
   needsApproval?: boolean; // Whether bonding token approval is needed
   onApprove?: () => Promise<void>; // Callback for bonding token approval
   isAllowanceLoading?: boolean; // Whether allowance is still loading
+  isPaused?: boolean;
 }
 
 export interface BondingCurveBoxProps {

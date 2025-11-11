@@ -21,7 +21,8 @@ export default function DepositForm({
   isTransacting = false,
   needsApproval = false,
   onApprove,
-  isAllowanceLoading = false
+  isAllowanceLoading = false,
+  isPaused = false
 }: DepositFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
@@ -258,13 +259,20 @@ export default function DepositForm({
           minReceived={minReceived}
         />
 
-        <ActionButton
-          disabled={buttonDisabled}
-          onAction={buttonAction}
-          label={buttonLabel}
-          variant={buttonVariant}
-          isLoading={buttonLoading}
-        />
+        {/* Conditionally render button or pause message based on pause state */}
+        {isPaused === true ? (
+          <div className="bg-pxusd-orange-900/20 border border-pxusd-orange-500 rounded-lg p-4 text-center">
+            <p className="text-pxusd-orange-300 font-semibold">Phoenix is currently paused</p>
+          </div>
+        ) : (
+          <ActionButton
+            disabled={buttonDisabled}
+            onAction={buttonAction}
+            label={buttonLabel}
+            variant={buttonVariant}
+            isLoading={buttonLoading}
+          />
+        )}
       </div>
 
       <DepositConfirmationDialog

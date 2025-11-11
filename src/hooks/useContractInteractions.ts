@@ -119,6 +119,18 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
     },
   })
 
+  // Fetch pause state from Behodler contract
+  // The Behodler3Tokenlaunch contract inherits from OpenZeppelin's Pausable
+  // When paused, addLiquidity and removeLiquidity operations are blocked
+  const { data: isPaused, refetch: refetchPaused } = useReadContract({
+    address: bondingCurveAddress,
+    abi: behodler3TokenlaunchAbi,
+    functionName: 'paused',
+    query: {
+      enabled: !!bondingCurveAddress,
+    },
+  })
+
   // Aggregate loading and error states
   const isLoading = isLoadingCurrent || isLoadingInitial || isLoadingFinal
   const isError = isErrorCurrent || isErrorInitial || isErrorFinal
@@ -132,6 +144,7 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
       refetchFinal(),
       refetchTotalRaised(),
       refetchFee(),
+      refetchPaused(),
     ])
   }
 
@@ -141,6 +154,7 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
     finalPrice: finalPrice as bigint | undefined,
     totalRaised: totalRaised as bigint | undefined,
     withdrawalFeeBasisPoints: withdrawalFeeBasisPoints as bigint | undefined,
+    isPaused: isPaused as boolean | undefined,
     isLoading,
     isError,
     refetch, // Expose aggregate refetch to update all bonding curve data after transactions

@@ -114,12 +114,13 @@ export default function VaultPage() {
     }
   }, [activeTab, depositAmount, withdrawAmount]);
 
-  // Fetch bonding curve prices and withdraw fee
+  // Fetch bonding curve prices, withdraw fee, and pause state
   const {
     currentPrice: currentPriceRaw,
     initialPrice: initialPriceRaw,
     finalPrice: finalPriceRaw,
     withdrawalFeeBasisPoints: withdrawalFeeBasisPointsRaw,
+    isPaused,
     isLoading: bondingCurveLoading,
     isError: bondingCurveError,
     refetch: refetchBondingCurve
@@ -986,6 +987,7 @@ export default function VaultPage() {
                   needsApproval={parseFloat(formData.amount || '0') > dolaAllowanceDecimal}
                   onApprove={handleApprove}
                   isAllowanceLoading={dolaAllowanceLoading}
+                  isPaused={isPaused === true}
                 />
               </ErrorBoundary>
             ) : activeTab === "Burn to Withdraw" ? (
@@ -1001,6 +1003,7 @@ export default function VaultPage() {
                   needsApproval={parseFloat(formData.amount || '0') > bondingTokenAllowanceDecimal}
                   onApprove={handleBondingTokenApprove}
                   isAllowanceLoading={bondingTokenAllowanceLoading}
+                  isPaused={isPaused === true}
                 />
               </ErrorBoundary>
             ) : activeTab === "Testnet Faucet" ? (
