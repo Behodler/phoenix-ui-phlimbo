@@ -236,11 +236,12 @@ export default function Admin() {
   // Calculate yield vs principal breakdown
   // Total = bondingCurveTotalBalance (queries AutoDolaYieldStrategy.totalBalanceOf)
   // Principal = principal tracked for bonding curve deposits (queries AutoDolaYieldStrategy.principalOf)
-  // Yield = Total - Principal (any DOLA in vault beyond principal is yield)
-  // NOTE: We use vaultDolaBalance for display because it shows actual DOLA in the vault.
-  //       bondingCurveTotalBalance returns 0 when strategy has no tracked deposits.
+  // Yield = Total - Principal (calculated from AutoDolaYieldStrategy's tracked principal + yield)
+  // CRITICAL: Use bondingCurveTotalBalance (from AutoDolaYieldStrategy.totalBalanceOf) NOT vaultDolaBalance
+  //           vaultDolaBalance includes ALL DOLA in vault (including non-Phoenix deposits)
+  //           bondingCurveTotalBalance returns ONLY Phoenix protocol's principal + yield
   const principal = bondingCurvePrincipal !== undefined ? bondingCurvePrincipal : 0n;
-  const totalVaultBalance = vaultDolaBalance !== undefined ? vaultDolaBalance : 0n;
+  const totalVaultBalance = bondingCurveTotalBalance !== undefined ? bondingCurveTotalBalance : 0n;
   const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
 
   // Format for display (convert from wei to DOLA)
