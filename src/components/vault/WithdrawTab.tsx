@@ -313,7 +313,7 @@ export default function WithdrawTab({
           inputToken: 'phUSD',
           outputAmount: estDOLA,
           outputToken: 'DOLA',
-          priceImpact: priceImpact,
+          priceImpact: priceImpact*1.001,//autodola vault has a tad bit of unadvertised slippage
           slippage: formData.slippageBps,
           feeAmount: feeAmount,
           feeRate: withdrawalFeeRate,
