@@ -40,8 +40,8 @@ export interface LocalAddressServerResponse {
     dolaToken: string
     tokeToken: string
     eyeToken?: string
-    mockAutoDolaVault: string
-    mockMainRewarder: string
+    autoDolaVault: string
+    tokemakMainRewarder: string
     bondingToken: string
     autoDolaYieldStrategy: string
     behodler3Tokenlaunch: string
