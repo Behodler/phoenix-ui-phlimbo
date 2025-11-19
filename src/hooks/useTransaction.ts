@@ -3,6 +3,7 @@ import { useWaitForTransactionReceipt } from 'wagmi'
 import type { Hash } from 'viem'
 import { TransactionStatus, type TransactionState } from '../types/transaction'
 import { parseTransactionError } from '../utils/transactionErrors'
+import { log } from '../utils/logger'
 
 /**
  * Configuration options for the transaction hook
@@ -39,7 +40,7 @@ export interface UseTransactionConfig {
  *   },
  *   {
  *     onSuccess: (hash) => ,
- *     onError: (error) => console.error('Failed', error)
+ *     onError: (error) => log.error('Failed', error)
  *   }
  * )
  * ```
@@ -72,7 +73,7 @@ export function useTransaction(
   // Log receipt errors
   useEffect(() => {
     if (isReceiptError && receiptError) {
-      console.error('[useTransaction] Receipt watching error:', receiptError)
+      log.error('[useTransaction] Receipt watching error:', receiptError)
     }
   }, [isReceiptError, receiptError])
 

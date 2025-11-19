@@ -2,6 +2,7 @@ import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 
 import { behodler3TokenlaunchAbi } from '@behodler/wagmi-hooks'
 import { erc20Abi, maxUint256 } from 'viem'
 import type { Address, Hash } from 'viem'
+import { log } from '../utils/logger'
 
 /**
  * NOTE: useAutoDolaVault hook has been removed as it was unused.
@@ -60,7 +61,7 @@ export function useTokenAllowance(
  * Hook for interacting with Behodler3Tokenlaunch (bonding curve)
  */
 export function useBondingCurve(bondingCurveAddress: Address | undefined) {
-  console.log('🎲 useBondingCurve: Called with address:', bondingCurveAddress)
+  log.debug('🎲 useBondingCurve: Called with address:', bondingCurveAddress)
 
   // Fetch current marginal price
   const { data: currentPrice, isLoading: isLoadingCurrent, isError: isErrorCurrent, refetch: refetchCurrent } = useReadContract({
@@ -72,7 +73,7 @@ export function useBondingCurve(bondingCurveAddress: Address | undefined) {
     },
   })
 
-  console.log('🎲 useBondingCurve: Query state -', {
+  log.debug('🎲 useBondingCurve: Query state -', {
     address: bondingCurveAddress,
     enabled: !!bondingCurveAddress,
     currentPrice,
