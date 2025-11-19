@@ -19,6 +19,7 @@ import BondingCurveBox from '../components/vault/BondingCurveBox';
 import FAQ from '../components/vault/FAQ';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
 import DOLA from "../assets/sDOLA.png";
+import { log } from '../utils/logger';
 
 export default function VaultPage() {
   // Detect chain ID to determine if Testnet Faucet should be shown
@@ -36,7 +37,7 @@ export default function VaultPage() {
 
   // Debug logging for contract addresses
   useEffect(() => {
-    console.log('🎯 VaultPage: Contract addresses updated:', {
+    log.debug('🎯 VaultPage: Contract addresses updated:', {
       addresses,
       networkType,
       loading: addressesLoading,

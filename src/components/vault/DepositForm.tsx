@@ -11,6 +11,7 @@ import AmountInput from '../ui/AmountInput';
 import RateInfo from '../ui/RateInfo';
 import ActionButton from '../ui/ActionButton';
 import DepositConfirmationDialog from './DepositConfirmationDialog';
+import { log } from '../../utils/logger';
 
 export default function DepositForm({
   formData,
@@ -41,7 +42,7 @@ export default function DepositForm({
     } catch (error) {
       // Handle parsing errors gracefully without crashing
       parseError = true;
-      console.warn('Failed to parse amount:', formData.amount, error);
+      log.warn('Failed to parse amount:', formData.amount, error);
     }
   }
 
@@ -152,13 +153,13 @@ export default function DepositForm({
       // This reduces precision just enough to ensure the displayed value
       // can safely round-trip through JavaScript Number conversions
       const displayValue = safeMaxForDisplay(truncatedBalanceWei, 18);
-      console.log('MAX CLICKED - safeMaxForDisplay returned:', displayValue);
-      console.log('MAX CLICKED - truncatedBalanceWei:', truncatedBalanceWei.toString());
+      log.debug('MAX CLICKED - safeMaxForDisplay returned:', displayValue);
+      log.debug('MAX CLICKED - truncatedBalanceWei:', truncatedBalanceWei.toString());
       onFormChange({ amount: displayValue });
     } else {
       // Fallback to previous flooring logic if raw balance not available
       const flooredBalance = Math.floor(tokenInfo.balance * 1e18) / 1e18;
-      console.log('MAX CLICKED - fallback value:', flooredBalance.toString());
+      log.debug('MAX CLICKED - fallback value:', flooredBalance.toString());
       onFormChange({ amount: flooredBalance.toString() });
     }
   };

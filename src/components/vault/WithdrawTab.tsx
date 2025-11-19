@@ -12,6 +12,7 @@ import RateInfo from '../ui/RateInfo';
 import ActionButton from '../ui/ActionButton';
 import WithdrawConfirmationDialog from './WithdrawConfirmationDialog';
 import phUSD from "../../assets/phUSD.png"
+import { log } from '../../utils/logger';
 
 export default function WithdrawTab({
   formData,
@@ -42,7 +43,7 @@ export default function WithdrawTab({
     } catch (error) {
       // Handle parsing errors gracefully without crashing
       parseError = true;
-      console.warn('Failed to parse amount:', formData.amount, error);
+      log.warn('Failed to parse amount:', formData.amount, error);
     }
   }
 
