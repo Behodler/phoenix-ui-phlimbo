@@ -81,13 +81,13 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
         } else {
           // Unsupported network
           const errorMsg = `Unsupported network (Chain ID: ${chainId}). Please connect to Mainnet, Sepolia, or Local Anvil.`
-          console.error('❌', errorMsg)
+          log.error('❌', errorMsg)
           setError(errorMsg)
           setAddresses(null)
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Failed to load contract addresses'
-        console.error('❌ Error loading contract addresses:', errorMsg)
+        log.error('❌ Error loading contract addresses:', errorMsg)
         setError(errorMsg)
         setAddresses(null)
       } finally {

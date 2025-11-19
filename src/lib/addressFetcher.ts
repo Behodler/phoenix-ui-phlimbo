@@ -57,14 +57,14 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       .map(([key]) => key)
 
     if (missingAddresses.length > 0) {
-      console.error('❌ fetchLocalAddresses: Missing addresses:', missingAddresses)
+      log.error('❌ fetchLocalAddresses: Missing addresses:', missingAddresses)
       throw new Error(`Missing contract addresses: ${missingAddresses.join(', ')}`)
     }
 
     log.debug('✅ fetchLocalAddresses: Successfully validated all addresses')
     return addresses
   } catch (error) {
-    console.error('❌ fetchLocalAddresses: Error occurred:', error)
+    log.error('❌ fetchLocalAddresses: Error occurred:', error)
     if (error instanceof TypeError && error.message.includes('fetch')) {
       throw new Error(
         `Local address server is not running at ${LOCAL_ADDRESS_SERVER}. ` +

@@ -305,7 +305,7 @@ export default function VaultPage() {
         const estPhUSD = dolaToPhUSDRate > 0 ? amount / dolaToPhUSDRate : 0;
         bondingTokensMinted = estPhUSD.toFixed(4);
       } catch (error) {
-        console.error('Error parsing receipt:', error);
+        log.error('Error parsing receipt:', error);
       }
 
       // Show success toast with amount minted
@@ -368,7 +368,7 @@ export default function VaultPage() {
         const estDOLA = dolaToPhUSDRate > 0 ? amountAfterFee * dolaToPhUSDRate : 0;
         dolaReceived = estDOLA.toFixed(4);
       } catch (error) {
-        console.error('Error parsing receipt:', error);
+        log.error('Error parsing receipt:', error);
       }
 
       // Show success toast with actual amounts burnt and redeemed
@@ -411,7 +411,7 @@ export default function VaultPage() {
   // Handle deposit errors
   useEffect(() => {
     if (isDepositError && depositError) {
-      console.error('Deposit transaction error:', depositError);
+      log.error('Deposit transaction error:', depositError);
 
       // Extract error message
       let errorMessage = 'An error occurred during the deposit transaction.';
@@ -443,7 +443,7 @@ export default function VaultPage() {
   // Handle withdraw errors
   useEffect(() => {
     if (isWithdrawError && withdrawError) {
-      console.error('Withdraw transaction error:', withdrawError);
+      log.error('Withdraw transaction error:', withdrawError);
 
       // Extract error message
       let errorMessage = 'An error occurred during the withdrawal transaction.';
@@ -506,7 +506,7 @@ export default function VaultPage() {
         });
       },
       onError: (error) => {
-        console.error('Approval failed:', error);
+        log.error('Approval failed:', error);
       },
       onStatusChange: (status) => {
 
@@ -564,7 +564,7 @@ export default function VaultPage() {
         });
       },
       onError: (error) => {
-        console.error('Bonding token approval failed:', error);
+        log.error('Bonding token approval failed:', error);
       },
       onStatusChange: (status) => {
         // Handle status changes with appropriate toast notifications
@@ -808,7 +808,7 @@ export default function VaultPage() {
       // We'll handle success in a useEffect below
 
     } catch (error) {
-      console.error('Deposit failed:', error);
+      log.error('Deposit failed:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({

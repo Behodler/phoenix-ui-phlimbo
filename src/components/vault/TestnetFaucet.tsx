@@ -5,6 +5,7 @@ import { useToast } from '../ui/ToastProvider';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useTokenBalance } from '../../hooks/useContractInteractions';
 import ActionButton from '../ui/ActionButton';
+import { log } from '../../utils/logger';
 
 // ABI for ERC20 tokens with mint function (used on testnets)
 const mintableErc20Abi = [
@@ -120,7 +121,7 @@ export default function TestnetFaucet() {
       });
 
     } catch (error) {
-      console.error('Mint failed:', error);
+      log.error('Mint failed:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
@@ -190,7 +191,7 @@ export default function TestnetFaucet() {
       });
 
     } catch (error) {
-      console.error('Mint EYE failed:', error);
+      log.error('Mint EYE failed:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({

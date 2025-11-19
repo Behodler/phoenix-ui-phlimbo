@@ -272,10 +272,10 @@ export default function Admin() {
     });
 
     if (principalError) {
-      console.error('❌ Principal Query Error:', principalError);
+      log.error('❌ Principal Query Error:', principalError);
     }
     if (totalBalanceError) {
-      console.error('❌ Total Balance Query Error:', totalBalanceError);
+      log.error('❌ Total Balance Query Error:', totalBalanceError);
     }
   }, [bondingCurvePrincipal, bondingCurveTotalBalance, vaultDolaBalance, principal, totalVaultBalance, yield_, addresses, principalError, totalBalanceError]);
 
@@ -351,7 +351,7 @@ export default function Admin() {
 
             return null;
           } catch (error) {
-            console.error(`❌ Error checking ownership for ${config.name}:`, error);
+            log.error(`❌ Error checking ownership for ${config.name}:`, error);
             return null;
           }
         });
@@ -368,7 +368,7 @@ export default function Admin() {
 
         setOwnedContracts(ownedConfigs);
       } catch (error) {
-        console.error('💥 Error discovering owned contracts:', error);
+        log.error('💥 Error discovering owned contracts:', error);
         addToast({
           type: 'error',
           title: 'Contract Discovery Failed',
@@ -676,7 +676,7 @@ export default function Admin() {
       });
 
     } catch (error) {
-      console.error('[Admin Panel] ❌ Call error:', error);
+      log.error('[Admin Panel] ❌ Call error:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
@@ -759,7 +759,7 @@ export default function Admin() {
       // Success will be handled by useEffect when transaction confirms
 
     } catch (error) {
-      console.error('[Admin Panel] ❌ Execute error:', error);
+      log.error('[Admin Panel] ❌ Execute error:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
@@ -879,7 +879,7 @@ export default function Admin() {
       }, 2000);
 
     } catch (error) {
-      console.error('Mint yield failed:', error);
+      log.error('Mint yield failed:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({

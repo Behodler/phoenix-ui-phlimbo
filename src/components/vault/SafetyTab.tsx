@@ -9,6 +9,7 @@ import { useApprovalTransaction } from '../../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../../utils/transactionErrors';
 import ActionButton from '../ui/ActionButton';
 import PauseConfirmationDialog from './PauseConfirmationDialog';
+import { log } from '../../utils/logger';
 
 export default function SafetyTab() {
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -112,7 +113,7 @@ export default function SafetyTab() {
         });
       },
       onError: (error) => {
-        console.error('EYE approval failed:', error);
+        log.error('EYE approval failed:', error);
       },
       onStatusChange: (status) => {
         if (status === 'PENDING_SIGNATURE') {
@@ -244,7 +245,7 @@ export default function SafetyTab() {
         }
       });
     } catch (error) {
-      console.error('Pause failed:', error);
+      log.error('Pause failed:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
