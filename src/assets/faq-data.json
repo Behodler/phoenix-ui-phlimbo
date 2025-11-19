@@ -28,16 +28,16 @@
         "body": "Enter the amount of phUSD you want to burn to withdraw DOLA. The system calculates how much DOLA you'll receive based on the current bonding curve price, minus the withdrawal fee. Click Withdraw to complete the transaction."
       },
       {
-        "title": "What is the withdrawal fee?",
-        "body": "A small percentage fee is charged on withdrawals to maintain protocol stability and provide value to remaining token holders. The exact fee rate and the amount deducted will be clearly displayed before you confirm your withdrawal."
-      },
-      {
         "title": "How long does a withdrawal take?",
         "body": "Withdrawals are processed immediately on the blockchain. Once your transaction is confirmed (typically 12-15 seconds), you'll receive your DOLA tokens. The actual time may vary based on network congestion."
       },
       {
         "title": "Can I withdraw any amount?",
         "body": "Yes, you can withdraw any amount up to your total phUSD balance. Use the Max button to automatically select your entire balance for withdrawal if you want to exit your position completely."
+      },
+      {
+        "title": "Is the slippage on Withdraw worse than on deposit",
+        "body":"The deposits are stored in vaults owned and controlled by external protocols. Depending on the vault, there may be additional slippage but this is usually less than 0.1%."
       }
     ]
   },
@@ -54,12 +54,20 @@
       },
       {
         "title": "What does the progress percentage mean?",
-        "body": "The progress percentage shows how far along the bonding curve we've traveled from the start price to the end price. Higher progress means a higher current price and less remaining opportunity for early-bird pricing benefits."
+        "body": "The progress percentage shows how far along the bonding curve we've traveled from the start price to the end price. Higher progress means a higher current price and less remaining opportuni0y for early-adopter pricing benefits."
       },
       {
         "title": "Why does the current price keep changing?",
         "body": "The current price changes with each deposit as more phUSD tokens are minted. The bonding curve algorithm automatically adjusts the price upward, creating a fair price discovery mechanism that rewards early participation."
-      }
+      },
+      {
+        "title": "Does the dapp lock when the price reaches $1",
+        "body": "Not automatically. The protocol has to be manually locked."
+      },
+      {
+        "title": "What if the price never reaches $1",
+        "body": "The $1 price is a limit, not a goal. Ending the ignition phase on a lower final price simply confers more early adopter benefit to those who bought."
+      }      
     ]
   }
 }
