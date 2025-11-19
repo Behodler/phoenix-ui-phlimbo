@@ -4,6 +4,7 @@
  */
 
 import { formatUnits } from 'viem';
+import { log } from './logger';
 
 /**
  * Safely converts a high-precision BigInt wei value to a display-friendly decimal string.
@@ -39,17 +40,17 @@ export function safeMaxForDisplay(
 
   // Step 1: Convert BigInt wei to decimal string using formatUnits
   const fullPrecisionValue = formatUnits(bigIntWei, decimals);
-  console.log('safeMaxForDisplay - fullPrecisionValue:', fullPrecisionValue);
+  log.debug('safeMaxForDisplay - fullPrecisionValue:', fullPrecisionValue);
 
   // Step 2: Parse to Number (precision loss is OK for display)
   const asNumber = parseFloat(fullPrecisionValue);
-  console.log('safeMaxForDisplay - asNumber:', asNumber);
+  log.debug('safeMaxForDisplay - asNumber:', asNumber);
 
   // Step 3: Use .toFixed() to limit to exactly displayDecimals decimal places
   // This is simple, direct, and guaranteed to work
   //  asNumber.toFixed(displayDecimals);
   const result = toFixedFloorString(asNumber, displayDecimals);
-  console.log('safeMaxForDisplay - result with toFixed(' + displayDecimals + '):', result);
+  log.debug('safeMaxForDisplay - result with toFixed(' + displayDecimals + '):', result);
   return result;
 }
 
