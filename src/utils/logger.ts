@@ -180,7 +180,7 @@ export function createLogger(options?: boolean | LoggerOptions): Logger {
  * log.warn('Warning!');
  * log.error('Error occurred', errorObject);
  */
-export const log = createLogger();
+export const log = createLogger({enabled:false});
 
 /**
  * Usage Guidelines
