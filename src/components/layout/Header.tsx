@@ -16,7 +16,7 @@ export default function Header() {
           <div>
             <div className="text-xl leading-tight text-pxusd-white">Phoenix</div>
             <div className="text-sm font-semibold text-pxusd-white">phUSD minter</div>
-            <div className="text-sm text-muted-foreground italic hidden sm:block">Behodler 3 technology</div>
+            <div className="text-sm text-muted-foreground font-semibold italic hidden sm:block">B3 Tech</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
