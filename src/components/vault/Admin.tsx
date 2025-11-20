@@ -14,7 +14,7 @@ import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
 import type { Abi, AbiFunction } from 'viem';
 import type { ContractAddresses } from '../../types/contracts';
-import { log } from '../../utils/logger';
+// import { log } from '../../utils/logger';
 
 // ABI for ERC20 tokens with mint function (used on testnets)
 const mintableErc20Abi = [
@@ -122,7 +122,7 @@ function isBooleanType(solidityType: string): boolean {
  */
 function convertBooleanParameter(value: string): boolean {
   const result = !!value && `${value}`.toLowerCase() === 'true';
-  log.debug('[Boolean Debug] Converting:', { input: value, output: result });
+  console.log('[Boolean Debug] Converting:', { input: value, output: result });
   return result;
 }
 
@@ -252,7 +252,7 @@ export default function Admin() {
 
   // Debug logging for balance queries
   useEffect(() => {
-    log.debug('🔍 Balance Query Debug:', {
+    console.log('🔍 Balance Query Debug:', {
       bondingCurvePrincipal: bondingCurvePrincipal?.toString(),
       bondingCurveTotalBalance: bondingCurveTotalBalance?.toString(),
       vaultDolaBalance: vaultDolaBalance?.toString(),
@@ -272,10 +272,10 @@ export default function Admin() {
     });
 
     if (principalError) {
-      log.error('❌ Principal Query Error:', principalError);
+      console.error('❌ Principal Query Error:', principalError);
     }
     if (totalBalanceError) {
-      log.error('❌ Total Balance Query Error:', totalBalanceError);
+      console.error('❌ Total Balance Query Error:', totalBalanceError);
     }
   }, [bondingCurvePrincipal, bondingCurveTotalBalance, vaultDolaBalance, principal, totalVaultBalance, yield_, addresses, principalError, totalBalanceError]);
 
@@ -285,7 +285,7 @@ export default function Admin() {
   useEffect(() => {
     const discoverOwnedContracts = async () => {
       if (!isConnected || !walletAddress || !addresses) {
-        log.debug('🔍 Contract discovery skipped:', {
+        console.log('🔍 Contract discovery skipped:', {
           isConnected,
           hasWallet: !!walletAddress,
           hasAddresses: !!addresses,
@@ -294,32 +294,32 @@ export default function Admin() {
         return;
       }
 
-      log.debug('🔍 Starting contract ownership discovery...');
-      log.debug('📋 Available addresses:', addresses);
-      log.debug('👛 Connected wallet:', walletAddress);
+      console.log('🔍 Starting contract ownership discovery...');
+      console.log('📋 Available addresses:', addresses);
+      console.log('👛 Connected wallet:', walletAddress);
 
       setIsLoadingOwnership(true);
 
       try {
         const contractConfigs = getContractConfigs(networkType);
-        log.debug('📝 Contract configs to check:', contractConfigs.map(c => ({ name: c.name, key: c.addressKey })));
+        console.log('📝 Contract configs to check:', contractConfigs.map(c => ({ name: c.name, key: c.addressKey })));
 
         const ownedConfigsPromises = contractConfigs.map(async (config) => {
           try {
             const contractAddress = addresses[config.addressKey];
 
-            log.debug(`🔎 Checking ${config.name}:`, {
+            console.log(`🔎 Checking ${config.name}:`, {
               addressKey: config.addressKey,
               contractAddress,
               hasAddress: !!contractAddress,
             });
 
             if (!contractAddress) {
-              log.warn(`⚠️ ${config.name}: No address found for key "${config.addressKey}"`);
+              console.warn(`⚠️ ${config.name}: No address found for key "${config.addressKey}"`);
               return null;
             }
 
-            log.debug(`🌐 ${config.name}: Calling owner() at ${contractAddress}...`);
+            console.log(`🌐 ${config.name}: Calling owner() at ${contractAddress}...`);
 
             // Try to read the owner() function using wagmi's readContract
             try {
@@ -329,9 +329,9 @@ export default function Admin() {
                 functionName: 'owner',
               });
 
-              log.debug(`📡 ${config.name}: Successfully read owner address:`, ownerAddress);
+              console.log(`📡 ${config.name}: Successfully read owner address:`, ownerAddress);
 
-              log.debug(`👤 ${config.name}: Owner check:`, {
+              console.log(`👤 ${config.name}: Owner check:`, {
                 contractOwner: ownerAddress,
                 walletAddress,
                 matches: (ownerAddress as string).toLowerCase() === walletAddress.toLowerCase(),
@@ -339,19 +339,19 @@ export default function Admin() {
 
               // Compare addresses (case-insensitive)
               if ((ownerAddress as string).toLowerCase() === walletAddress.toLowerCase()) {
-                log.debug(`✅ ${config.name}: Owned by connected wallet!`);
+                console.log(`✅ ${config.name}: Owned by connected wallet!`);
                 return config;
               } else {
-                log.debug(`❌ ${config.name}: Not owned by connected wallet`);
+                console.log(`❌ ${config.name}: Not owned by connected wallet`);
               }
             } catch (ownerError) {
-              log.warn(`⚠️ ${config.name}: Failed to read owner() function:`, ownerError);
+              console.warn(`⚠️ ${config.name}: Failed to read owner() function:`, ownerError);
               // Contract might not have an owner() function, skip it
             }
 
             return null;
           } catch (error) {
-            log.error(`❌ Error checking ownership for ${config.name}:`, error);
+            console.error(`❌ Error checking ownership for ${config.name}:`, error);
             return null;
           }
         });
@@ -360,7 +360,7 @@ export default function Admin() {
           (config): config is ContractConfig => config !== null
         );
 
-        log.debug('✨ Ownership discovery complete:', {
+        console.log('✨ Ownership discovery complete:', {
           totalChecked: contractConfigs.length,
           ownedCount: ownedConfigs.length,
           ownedContracts: ownedConfigs.map(c => c.name),
@@ -368,7 +368,7 @@ export default function Admin() {
 
         setOwnedContracts(ownedConfigs);
       } catch (error) {
-        log.error('💥 Error discovering owned contracts:', error);
+        console.error('💥 Error discovering owned contracts:', error);
         addToast({
           type: 'error',
           title: 'Contract Discovery Failed',
@@ -579,7 +579,7 @@ export default function Admin() {
       const value = parameterValues[key] || '';
       const paramType = input.type;
 
-      log.debug(`[Admin Panel] Parameter "${key}":`, {
+      console.log(`[Admin Panel] Parameter "${key}":`, {
         type: paramType,
         originalValue: value,
         isNumeric: isNumericType(paramType),
@@ -592,7 +592,7 @@ export default function Admin() {
         // Convert string to boolean
         const boolValue = convertBooleanParameter(value);
         convertedValues[key] = boolValue;
-        log.debug(`[Admin Panel] ✅ Boolean converted "${value}" → ${boolValue}`);
+        console.log(`[Admin Panel] ✅ Boolean converted "${value}" → ${boolValue}`);
       }
       // Check if parameter is numeric type and contains e-notation
       else if (isNumericType(paramType) && /[eE]/.test(value)) {
@@ -600,18 +600,18 @@ export default function Admin() {
           // Convert e-notation to full integer string
           const expandedValue = expandExpInt(value);
           convertedValues[key] = expandedValue;
-          log.debug(`[Admin Panel] ✅ Converted "${value}" → "${expandedValue}"`);
+          console.log(`[Admin Panel] ✅ Converted "${value}" → "${expandedValue}"`);
         } catch (error) {
           // Store conversion error
           const errorMessage = error instanceof Error ? error.message : 'Conversion failed';
           newConversionErrors[key] = errorMessage;
           hasConversionErrors = true;
-          log.debug(`[Admin Panel] ❌ Conversion failed for "${value}":`, errorMessage);
+          console.log(`[Admin Panel] ❌ Conversion failed for "${value}":`, errorMessage);
         }
       } else {
         // Pass through non-numeric or non-e-notation values unchanged
         convertedValues[key] = value;
-        log.debug(`[Admin Panel] ⏭️ Passed through unchanged: "${value}"`);
+        console.log(`[Admin Panel] ⏭️ Passed through unchanged: "${value}"`);
       }
     });
 
@@ -655,7 +655,7 @@ export default function Admin() {
         throw new Error('Contract address not available');
       }
 
-      log.debug(`[Admin Panel] Calling ${selectedFunction.name} with args:`, args);
+      console.log(`[Admin Panel] Calling ${selectedFunction.name} with args:`, args);
 
       // Call the contract function using readContract
       const result = await readContract(wagmiConfig, {
@@ -665,7 +665,7 @@ export default function Admin() {
         args: args as any,
       });
 
-      log.debug(`[Admin Panel] ✅ Call result for ${selectedFunction.name}:`, result);
+      console.log(`[Admin Panel] ✅ Call result for ${selectedFunction.name}:`, result);
 
       // Show success toast
       addToast({
@@ -676,7 +676,7 @@ export default function Admin() {
       });
 
     } catch (error) {
-      log.error('[Admin Panel] ❌ Call error:', error);
+      console.error('[Admin Panel] ❌ Call error:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
@@ -725,7 +725,7 @@ export default function Admin() {
         throw new Error('Contract address not available');
       }
 
-      log.debug(`[Admin Panel] Executing ${selectedFunction.name} with args:`, args);
+      console.log(`[Admin Panel] Executing ${selectedFunction.name} with args:`, args);
 
       // Show pending toast
       const pendingToastId = addToast({
@@ -754,12 +754,12 @@ export default function Admin() {
         duration: 30000,
       });
 
-      log.debug(`[Admin Panel] ✅ Transaction submitted:`, hash);
+      console.log(`[Admin Panel] ✅ Transaction submitted:`, hash);
 
       // Success will be handled by useEffect when transaction confirms
 
     } catch (error) {
-      log.error('[Admin Panel] ❌ Execute error:', error);
+      console.error('[Admin Panel] ❌ Execute error:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
@@ -879,7 +879,7 @@ export default function Admin() {
       }, 2000);
 
     } catch (error) {
-      log.error('Mint yield failed:', error);
+      console.error('Mint yield failed:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
