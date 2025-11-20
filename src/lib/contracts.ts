@@ -8,18 +8,18 @@ import type { ContractAddresses } from '../types/contracts'
  *            bondingToken is the ERC20 token produced by the bonding curve
  */
 export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
-  dolaToken: '0x0000000000000000000000000000000000000000', // TODO: Add actual DOLA token address
-  tokeToken: '0x0000000000000000000000000000000000000000', // TODO: Add actual TOKE token address
-  eyeToken: '0x0000000000000000000000000000000000000000', // TODO: Add actual EYE token address
-  autoDolaVault: '0x0000000000000000000000000000000000000000', // TODO: Add actual AutoDola vault address
-  tokemakMainRewarder: '0x0000000000000000000000000000000000000000', // TODO: Add actual Tokemak main rewarder address
-  bondingToken: '0x0000000000000000000000000000000000000000', // TODO: Add actual bonding token address
-  autoDolaYieldStrategy: '0x0000000000000000000000000000000000000000', // TODO: Add actual AutoDolaYieldStrategy address
-  bondingCurve: '0x0000000000000000000000000000000000000000', // TODO: Add actual Behodler3Tokenlaunch address
-  surplusTracker: '0x0000000000000000000000000000000000000000', // TODO: Add actual SurplusTracker address after mainnet deployment
-  surplusWithdrawer: '0x0000000000000000000000000000000000000000', // TODO: Add actual SurplusWithdrawer address after mainnet deployment
-  pauser: '0x0000000000000000000000000000000000000000', // TODO: Add actual Pauser address after mainnet deployment
-}
+  dolaToken: '0x865377367054516e17014CcdED1e7d814EDC9ce4',
+  tokeToken: '0x2e9d63788249371f1DFC918a52f8d799F4a38C94',
+  eyeToken: '0x155ff1A85F440EE0A382eA949f24CE4E0b751c65',
+  autoDolaVault: '0x79eB84B5E30Ef2481c8f00fD0Aa7aAd6Ac0AA54d',
+  tokemakMainRewarder: '0xDC39C67b38ecdA8a1974336c89B00F68667c91B7',
+  bondingToken: '0xf3B5B661b92B75C71fA5Aba8Fd95D7514A9CD605',
+  autoDolaYieldStrategy: '0x6601b9A7678A00407090BD7dC0fe554bCbB7EF25',
+  bondingCurve: '0xA06ae98c150f3ab5c109Df05Fc51be1dC25E2573',
+  surplusTracker: '0x3d07755C02c69c07BfDc5cBe556d316D08D01447',
+  surplusWithdrawer: '0xa525d92aDaF89C173245B39B74c643E63cA2341d',
+  pauser: '0x912Ce60b408CFCF735ED5c2A5AE4E9F274670d9a',
+};
 
 /**
  * Sepolia testnet contract addresses
