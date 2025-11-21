@@ -24,7 +24,6 @@ export const wagmiConfig = createConfig({
         url: 'https://phoenix.behodler.io',
         icons: ['https://phoenix.behodler.io/icon.png']
       },
-      showQrModal: true,
     }),
   ],
   transports: {
