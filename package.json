@@ -7,6 +7,7 @@
     "dev": "concurrently --kill-others --names \"SERVER,UI\" -c \"blue,green\" \"bash scripts/dev-wrapper.sh\" \"wait-on -t 60000 http://localhost:3001/contracts && vite || (echo 'WARNING: Deployment server not ready, starting UI anyway...' && vite)\"",
     "dev:ui": "vite",
     "build": "tsc -b && vite build",
+    "deploy": "yarn build && aws s3 sync dist/build s3://phusd.behodler.io --delete",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
