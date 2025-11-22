@@ -2209,10 +2209,10 @@
     viem "2.x"
     zod "^4.1.11"
 
-"@wagmi/connectors@6.1.4":
-  version "6.1.4"
-  resolved "https://registry.yarnpkg.com/@wagmi/connectors/-/connectors-6.1.4.tgz#ff49c2a07c0dc2977d04ff3e573ebe89c269c26a"
-  integrity sha512-phfBOBBfkH1huSoyyTcHn1Brsm/YN9Vad4Z1ZYJ7iCE05CDUvipXI0TD9Idzgq+CkAJAxdAv3LBTIwTb3tysZw==
+"@wagmi/connectors@6.2.0":
+  version "6.2.0"
+  resolved "https://registry.yarnpkg.com/@wagmi/connectors/-/connectors-6.2.0.tgz#b90bb85c59305d36f4ca3247fe31c148db5d110b"
+  integrity sha512-2NfkbqhNWdjfibb4abRMrn7u6rPjEGolMfApXss6HCDVt9AW2oVC6k8Q5FouzpJezElxLJSagWz9FW1zaRlanA==
   dependencies:
     "@base-org/account" "2.4.0"
     "@coinbase/wallet-sdk" "4.3.6"
@@ -6064,10 +6064,24 @@ viem@2.23.2:
     ox "0.6.7"
     ws "8.18.0"
 
-viem@2.x, viem@>=2.29.0, viem@^2.1.1, viem@^2.21.26, viem@^2.27.2, viem@^2.31.7, viem@^2.37.6:
+viem@2.x, viem@>=2.29.0, viem@^2.1.1, viem@^2.21.26, viem@^2.27.2, viem@^2.31.7:
   version "2.38.6"
   resolved "https://registry.yarnpkg.com/viem/-/viem-2.38.6.tgz#ab315bef8f872bce86f0f145e9b008b5e94f1904"
   integrity sha512-aqO6P52LPXRjdnP6rl5Buab65sYa4cZ6Cpn+k4OLOzVJhGIK8onTVoKMFMT04YjDfyDICa/DZyV9HmvLDgcjkw==
+  dependencies:
+    "@noble/curves" "1.9.1"
+    "@noble/hashes" "1.8.0"
+    "@scure/bip32" "1.7.0"
+    "@scure/bip39" "1.6.0"
+    abitype "1.1.0"
+    isows "1.0.7"
+    ox "0.9.6"
+    ws "8.18.3"
+
+viem@^2.39.3:
+  version "2.39.3"
+  resolved "https://registry.yarnpkg.com/viem/-/viem-2.39.3.tgz#45884cc27d3faced1fc1d293fc2d9018b8b0789f"
+  integrity sha512-s11rPQRvUEdc5qHK3xT4fIk4qvgPAaLwaTFq+EbFlcJJD+Xn3R4mc9H6B6fquEiHl/mdsdbG/uKCnYpoNtHNHw==
   dependencies:
     "@noble/curves" "1.9.1"
     "@noble/hashes" "1.8.0"
@@ -6139,12 +6153,12 @@ w3c-xmlserializer@^5.0.0:
   dependencies:
     xml-name-validator "^5.0.0"
 
-wagmi@^2.16.9:
-  version "2.19.3"
-  resolved "https://registry.yarnpkg.com/wagmi/-/wagmi-2.19.3.tgz#54e433108015ea50b445be06e466036128d70f3f"
-  integrity sha512-KWeXrU+bKhqdNTqN4nGx2PZW0hKBGZN0LOAsfZtuGItdlvRNxk6WQvF1WpQL06oiD8C9hccnwk1whDGgkPvQpA==
+wagmi@^2.19.5:
+  version "2.19.5"
+  resolved "https://registry.yarnpkg.com/wagmi/-/wagmi-2.19.5.tgz#72d1561f95be6cb50e13283397b4768eb6ffb9ac"
+  integrity sha512-RQUfKMv6U+EcSNNGiPbdkDtJwtuFxZWLmvDiQmjjBgkuPulUwDJsKhi7gjynzJdsx2yDqhHCXkKsbbfbIsHfcQ==
   dependencies:
-    "@wagmi/connectors" "6.1.4"
+    "@wagmi/connectors" "6.2.0"
     "@wagmi/core" "2.22.1"
     use-sync-external-store "1.4.0"
 
