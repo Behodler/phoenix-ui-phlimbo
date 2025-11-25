@@ -17,6 +17,30 @@
       {
         "title": "What is slippage tolerance?",
         "body": "Slippage tolerance is the maximum price change you're willing to accept. If the bonding curve price moves beyond this tolerance before your transaction is confirmed, the transaction will revert to protect you from unfavorable rates."
+      },
+      {
+        "title": "What is phUSD?",
+        "body": "phUSD is Phoenix's Evergreen Stablecoin — a new kind of stablecoin whose backing grows stronger over time. Phoenix takes yield from the wider DeFi ecosystem, captures it permanently using protocol-owned liquidity, and uses that yield in the Behodler ecosystem. For more info, see: phUSD Overview (https://github.com/Behodler/docs-public/blob/main/phUSD.md)"
+      },
+      {
+        "title": "How do I mint phUSD?",
+        "body": "Connect your wallet, deposit DOLA, and the bonding curve mints phUSD at the current curve price. During Phase 1 (Ignition), the curve price gradually increases toward $1. When parity is reached, the bonding curve disables and phUSD mints at a fixed $1 price. For more info on Phase 1, see: Phoenix Phase 1 — Ignition (https://github.com/Behodler/docs-public/blob/main/Phoenix%20Phase%201%3A%20Ignition%20%E2%80%94%20Capitalising%20phUSD%20with%20the%20Behodler%203%20Bonding%20Curve.md)"
+      },
+      {
+        "title": "Why can't I use ETH/USDC etc to mint phUSD?",
+        "body": "Phoenix requires DOLA because all minting must flow into the AutoDOLA Vault. While Phoenix could auto-swap other tokens (ETH, USDC, etc.) into DOLA, adding that routing at launch would have required additional development time and delayed release. Future versions may support multi-asset minting, but for now phUSD mints exclusively from DOLA."
+      },
+      {
+        "title": "What backs phUSD?",
+        "body": "All phUSD minted through the bonding curve is backed by DOLA deposited into the AutoDOLA Vault. This vault compounds yield and provides the foundation for phUSD's stability."
+      },
+      {
+        "title": "What is the AutoDOLA Vault?",
+        "body": "The AutoDOLA vault is a yield vault provided by the Autofinance team (formerly Tokemak). It accepts DOLA and automatically stakes it into sDOLA to generate sustainable on-chain yield. Phoenix uses this vault as the destination for all DOLA minted through phUSD, turning that yield into permanent backing and liquidity. For more info on Auto Pools, see: Autofinance Auto Pools TL;DR (https://docs.auto.finance/auto-pools-protocol/autopools-tl-dr)"
+      },
+      {
+        "title": "Where can I use phUSD?",
+        "body": "During Phase 1, phUSD can be traded on the bonding curve. In later stages, phUSD can be staked to earn yield, and as supply grows, additional integrations across DeFi will become available."
       }
     ]
   },
@@ -38,6 +62,14 @@
       {
         "title": "Is the slippage on Withdraw worse than on deposit",
         "body":"The deposits are stored in vaults owned and controlled by external protocols. Depending on the vault, there may be additional slippage but this is usually less than 0.1%."
+      },
+      {
+        "title": "Can I redeem phUSD or exit the system?",
+        "body": "Yes. You can sell your phUSD on the bonding curve to redeem DOLA."
+      },
+      {
+        "title": "Can the system be paused? If so, what happens to my funds?",
+        "body": "Yes. Anyone can burn 1,000 EYE to trigger a temporary pause if they detect a severe issue. During a Pause, minting and redeeming are disabled, but funds inside the vault remain safe. The Pause is removed once the issue is resolved."
       }
     ]
   },
@@ -67,7 +99,7 @@
       {
         "title": "What if the price never reaches $1",
         "body": "The $1 price is a limit, not a goal. Ending the ignition phase on a lower final price simply confers more early adopter benefit to those who bought."
-      }      
+      }
     ]
   }
 }
