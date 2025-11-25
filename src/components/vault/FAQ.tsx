@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FAQProps, FAQData } from '../../types/vault';
 import faqDataJson from '../../assets/faq-data.json';
+import { parseTextWithLinks } from '../../utils/urlParser';
 
 export default function FAQ({ componentName }: FAQProps) {
   // Don't render if no component name is provided
@@ -78,7 +79,7 @@ export default function FAQ({ componentName }: FAQProps) {
               {expandedItems.has(index) && (
                 <div className="px-4 py-3 border-t border-border bg-accent/5">
                   <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                    {item.body}
+                    {parseTextWithLinks(item.body)}
                   </p>
                 </div>
               )}
