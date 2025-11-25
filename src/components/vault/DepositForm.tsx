@@ -227,7 +227,7 @@ export default function DepositForm({
   return (
     <>
       <div className="p-6">
-        <AmountDisplay amount={parsedAmountForDisplay} />
+        <AmountDisplay amount={parsedAmountForDisplay} showDollarEstimate={true} />
 
         <div className="h-px w-full bg-border mb-6" />
 

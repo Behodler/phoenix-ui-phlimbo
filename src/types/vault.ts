@@ -53,6 +53,7 @@ export interface DepositFormProps {
 
 export interface AmountDisplayProps {
   amount: number;
+  showDollarEstimate?: boolean; // If true, shows dollar estimate below amount (defaults to false)
 }
 
 export interface TokenRowProps {

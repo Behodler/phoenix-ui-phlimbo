@@ -1,6 +1,6 @@
 import type { AmountDisplayProps } from '../../types/vault';
 
-export default function AmountDisplay({ amount }: AmountDisplayProps) {
+export default function AmountDisplay({ amount, showDollarEstimate = false }: AmountDisplayProps) {
   // Format number with up to 6 significant decimals, removing trailing zeros
   const formatAmount = (num: number) => {
     if (num === 0) return '0';
@@ -18,6 +18,11 @@ export default function AmountDisplay({ amount }: AmountDisplayProps) {
       <div className="text-4xl sm:text-5xl lg:text-6xl font-light tracking-tight text-foreground">
         {formatAmount(amount)}
       </div>
+      {showDollarEstimate && (
+        <div className="text-sm text-muted-foreground">
+          ${formatAmount(amount)}
+        </div>
+      )}
     </div>
   );
 }
