@@ -18,9 +18,6 @@ export default function AmountDisplay({ amount }: AmountDisplayProps) {
       <div className="text-4xl sm:text-5xl lg:text-6xl font-light tracking-tight text-foreground">
         {formatAmount(amount)}
       </div>
-      <div className="text-muted-foreground">
-        ${formatAmount(amount)}
-      </div>
     </div>
   );
 }
