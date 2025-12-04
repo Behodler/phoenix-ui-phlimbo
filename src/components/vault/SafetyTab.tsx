@@ -47,10 +47,10 @@ export default function SafetyTab() {
   );
 
   // Fetch required EYE amount from Pauser contract
-  const { data: eyeQuantityToPauseRaw } = useReadContract({
+  const { data: eyeBurnAmountRaw, isLoading: isLoadingEyeBurnAmount } = useReadContract({
     address: addresses?.pauser as `0x${string}` | undefined,
     abi: pauserAbi,
-    functionName: 'eyeQuantityToPause',
+    functionName: 'eyeBurnAmount',
     query: {
       enabled: !!addresses?.pauser,
     },
@@ -65,12 +65,12 @@ export default function SafetyTab() {
     },
   });
 
-  // Convert required EYE amount (default to 1000 if not loaded)
-  const requiredEyeAmount = eyeQuantityToPauseRaw
-    ? parseFloat((Number(eyeQuantityToPauseRaw) / 1e18).toFixed(0))
-    : 1000;
+  // Convert required EYE amount (no fallback - wait for contract to load)
+  const requiredEyeAmount = eyeBurnAmountRaw
+    ? parseFloat((Number(eyeBurnAmountRaw) / 1e18).toFixed(0))
+    : null;
 
-  const requiredEyeAmountWei = parseUnits(requiredEyeAmount.toString(), 18);
+  const requiredEyeAmountWei = requiredEyeAmount !== null ? parseUnits(requiredEyeAmount.toString(), 18) : 0n;
 
   // Convert EYE balance and allowance
   const eyeBalance = eyeBalanceRaw ? parseFloat((Number(eyeBalanceRaw) / 1e18).toFixed(4)) : 0;
@@ -146,11 +146,11 @@ export default function SafetyTab() {
       return;
     }
 
-    if (!addresses?.eyeToken || !addresses?.pauser) {
+    if (!addresses?.eyeToken || !addresses?.pauser || requiredEyeAmount === null) {
       addToast({
         type: 'error',
-        title: 'Contract Addresses Not Loaded',
-        description: 'Please wait for contract addresses to load and try again.',
+        title: 'Contract Not Ready',
+        description: 'Please wait for contract addresses and configuration to load.',
       });
       return;
     }
@@ -176,6 +176,15 @@ export default function SafetyTab() {
 
   // Handle pause button click
   const handleInitiatePause = () => {
+    if (requiredEyeAmount === null) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Ready',
+        description: 'Please wait for contract configuration to load.',
+      });
+      return;
+    }
+
     // Check if user has sufficient EYE balance
     if (eyeBalance < requiredEyeAmount) {
       addToast({
@@ -259,7 +268,7 @@ export default function SafetyTab() {
 
   // Handle pause success in useEffect to prevent infinite loop
   useEffect(() => {
-    if (isPauseSuccess && pauseHash) {
+    if (isPauseSuccess && pauseHash && requiredEyeAmount !== null) {
       addToast({
         type: 'success',
         title: 'Application Paused',
@@ -299,8 +308,8 @@ export default function SafetyTab() {
   let buttonLoading = false;
 
   if (isConnected) {
-    if (eyeAllowanceLoading) {
-      buttonLabel = "Loading...";
+    if (isLoadingEyeBurnAmount || eyeAllowanceLoading || requiredEyeAmount === null) {
+      buttonLabel = "Loading contract configuration...";
       buttonLoading = true;
       buttonDisabled = true;
     } else if (eyeBalance < requiredEyeAmount) {
@@ -341,7 +350,9 @@ export default function SafetyTab() {
 
             <div className="flex justify-between items-start">
               <span className="text-foreground">Required to Pause:</span>
-              <span className="font-medium text-pxusd-pink-400">{requiredEyeAmount} EYE</span>
+              <span className="font-medium text-pxusd-pink-400">
+                {requiredEyeAmount !== null ? `${requiredEyeAmount} EYE` : 'Loading...'}
+              </span>
             </div>
 
             <div className="flex justify-between items-start">
@@ -355,7 +366,7 @@ export default function SafetyTab() {
           <p className="text-red-400 font-bold text-sm mb-2">⚠️ WARNING</p>
           <ul className="text-sm text-foreground space-y-1 list-disc list-inside">
             <li>This will pause ALL deposit and withdrawal operations</li>
-            <li>{requiredEyeAmount} EYE will be permanently burnt from your wallet</li>
+            <li>{requiredEyeAmount !== null ? `${requiredEyeAmount} EYE` : 'A configured amount of EYE'} will be permanently burnt from your wallet</li>
             <li>Only use in case of security emergencies</li>
             <li>The owner must unpause the application to restore functionality</li>
           </ul>
@@ -375,6 +386,7 @@ export default function SafetyTab() {
         onClose={handleCancelPause}
         onConfirm={handleConfirmPause}
         isLoading={isTransacting}
+        eyeAmount={requiredEyeAmount}
       />
     </>
   );

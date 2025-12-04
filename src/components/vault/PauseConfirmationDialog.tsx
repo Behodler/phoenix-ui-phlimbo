@@ -5,13 +5,15 @@ interface PauseConfirmationDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   isLoading?: boolean;
+  eyeAmount: number | null;
 }
 
 export default function PauseConfirmationDialog({
   isOpen,
   onClose,
   onConfirm,
-  isLoading = false
+  isLoading = false,
+  eyeAmount
 }: PauseConfirmationDialogProps) {
   return (
     <ConfirmationDialog
@@ -37,7 +39,7 @@ export default function PauseConfirmationDialog({
           </p>
 
           <p className="text-yellow-400 font-medium">
-            1000 EYE will be burnt from your wallet permanently.
+            {eyeAmount !== null ? `${eyeAmount} EYE` : 'A configured amount of EYE'} will be burnt from your wallet permanently.
           </p>
 
           <p className="text-muted-foreground">
