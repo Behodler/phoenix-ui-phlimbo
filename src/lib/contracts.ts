@@ -18,7 +18,7 @@ export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
   bondingCurve: '0xA06ae98c150f3ab5c109Df05Fc51be1dC25E2573',
   surplusTracker: '0x3d07755C02c69c07BfDc5cBe556d316D08D01447',
   surplusWithdrawer: '0xa525d92aDaF89C173245B39B74c643E63cA2341d',
-  pauser: '0x912Ce60b408CFCF735ED5c2A5AE4E9F274670d9a',
+  pauser: '0x365c4C269bde890a092403279c0f0cef95e26017',
 };
 
 /**
