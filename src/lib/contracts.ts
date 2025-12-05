@@ -31,15 +31,15 @@ export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
 
 
 export const SEPOLIA_CONTRACT_ADDRESSES: ContractAddresses = {
-  autoDolaVault: '0x82484932a2B4B94337D56f6A3B8e7583FC1E5D81',
-  autoDolaYieldStrategy: '0x9f500F1B05a52B76eC5873E11D29C1df4981d595',
-  bondingCurve: '0xbb84159DfBc0ee88f51F0a350033B92b80F63e7F',
-  bondingToken: '0x6B7A8A77713885e2e6bB8B4cb48Db9135bF81bC2',
-  dolaToken: '0x57Df00a8aff6537af97DEa2930D37f714A864460',
-  eyeToken: '0xC8ea89199F8bCd48D6FE2AF2870C2eb6CF73b7AD',
-  pauser: '0xCfe7520695aef99C76862A25CD2273C3cDe1896C',
-  surplusTracker: '0x64743FdfaFF5DE1f5bE33Ae85bDFB915C4b2dF41',
-  surplusWithdrawer: '0x9f9d66EC89cAfA3f735Ac485004c8C97E8771E19',
-  tokeToken: '0x36307fD3211b8365De44B83DB59a83F1B9FFc9E8',
-  tokemakMainRewarder: '0xA5c1ABc6Ef84C2EE17C51E68c5Eb8d017A03DA4C',
+  autoDolaVault: '0x6c67eea46843c1862074cc6676ee5d9a8c7d9dde',
+  autoDolaYieldStrategy: '0x06bdb6597b61def3b208d7aa62dff6cd545c6597',
+  bondingCurve: '0xa3d3d44893d1e043a4de85cd04ee18fe2c4eca43',
+  bondingToken: '0x2b816211e1932dbcb0ac0fe10e3eb55d38237f27',
+  dolaToken: '0x96f82e94126d7b377087018b9c86603288b3dc60',
+  eyeToken: '0x65592560d929829aafa24b45a86ba80869381d29',
+  pauser: '0x15e3a4b7a07265db3b24072e731f0994379bc7a9',
+  surplusTracker: '0x0f4f811d0aa5e71f43bfed9519713220e85071e2',
+  surplusWithdrawer: '0x7754d1935207fb8e8f637e3bc3193c23609027f9',
+  tokeToken: '0xf74654cdef22ee236e0af6d0132962081e6c5fdf',
+  tokemakMainRewarder: '0xbe45cecb90c7c66b38b3480db554421b80a055f9',
 };

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseUnits } from 'viem';
+import { parseUnits, maxUint256 } from 'viem';
 import { pauserAbi } from '../../lib/pauserAbi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useTokenBalance, useTokenAllowance, useTokenApproval } from '../../hooks/useContractInteractions';
@@ -85,11 +85,11 @@ export default function SafetyTab() {
       if (!addresses?.eyeToken || !addresses?.pauser) {
         throw new Error('Contract addresses not loaded');
       }
-      // Approve exactly the required amount (not unlimited for security)
+      // Approve unlimited amount
       return approve(
         addresses.eyeToken as `0x${string}`,
         addresses.pauser as `0x${string}`,
-        requiredEyeAmountWei
+        maxUint256
       );
     },
     {
@@ -99,7 +99,7 @@ export default function SafetyTab() {
         addToast({
           type: 'success',
           title: 'Approval Successful',
-          description: `${requiredEyeAmount} EYE spending has been approved for the Pauser contract.`,
+          description: 'EYE spending has been approved for the Pauser contract.',
           duration: 30000,
           action: {
             label: 'View Transaction',
@@ -316,7 +316,7 @@ export default function SafetyTab() {
       buttonLabel = `Insufficient EYE (need ${requiredEyeAmount})`;
       buttonDisabled = true;
     } else if (needsApproval) {
-      buttonLabel = `Approve ${requiredEyeAmount} EYE`;
+      buttonLabel = 'Approve';
       buttonVariant = 'approve';
       buttonAction = handleApprove;
       buttonDisabled = false;
