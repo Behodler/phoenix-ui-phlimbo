@@ -16,7 +16,7 @@ import MintForm from '../components/vault/MintForm';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
 import SafetyTab from '../components/vault/SafetyTab';
 import Admin from '../components/vault/Admin';
-import BondingCurveBox from '../components/vault/BondingCurveBox';
+import ContextBox from '../components/vault/ContextBox';
 import FAQ from '../components/vault/FAQ';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
 import DOLA from "../assets/sDOLA.png";
@@ -67,12 +67,13 @@ export default function VaultPage() {
   // - Show Testnet Faucet if not on mainnet
   // - Show Safety tab on all networks
   // - Show Mint tab for 1:1 DOLA to phUSD minting
+  // - Show Deposit and Withdraw tabs for ContextBox-driven content
   const tabs: readonly Tab[] = (() => {
     if (!isMounted) {
-      return ["Deposit to Mint", "Burn to Withdraw", "Mint"];
+      return ["Deposit to Mint", "Burn to Withdraw", "Mint", "Deposit", "Withdraw"];
     }
 
-    const tabList: Tab[] = ["Deposit to Mint", "Burn to Withdraw", "Mint"];
+    const tabList: Tab[] = ["Deposit to Mint", "Burn to Withdraw", "Mint", "Deposit", "Withdraw"];
 
     if (!isMainnet) {
       tabList.push("Testnet Faucet");
@@ -126,20 +127,10 @@ export default function VaultPage() {
   // Fetch bonding curve prices, withdraw fee, and pause state
   const {
     currentPrice: currentPriceRaw,
-    initialPrice: initialPriceRaw,
-    finalPrice: finalPriceRaw,
     withdrawalFeeBasisPoints: withdrawalFeeBasisPointsRaw,
     isPaused,
-    isLoading: bondingCurveLoading,
-    isError: bondingCurveError,
     refetch: refetchBondingCurve
   } = useBondingCurve(addresses?.bondingCurve as `0x${string}` | undefined);
-  // Convert prices from wei (18 decimals) to decimal format
-  const bondingCurveData = {
-    startPrice: initialPriceRaw ? parseFloat(formatUnits(initialPriceRaw, 18)) : 0.74, // Fallback to mock
-    endPrice: finalPriceRaw ? parseFloat(formatUnits(finalPriceRaw, 18)) : 1.00, // Fallback to mock
-    currentPrice: currentPriceRaw ? parseFloat(formatUnits(currentPriceRaw, 18)) : 0.89, // Fallback to mock
-  };
 
   // Fetch DOLA balance from wallet's ERC20 token balance
   const {
@@ -286,6 +277,17 @@ export default function VaultPage() {
     balance: dolaBalance.balance?.balance ?? 0,
     balanceUsd: dolaBalance.balance?.balanceUsd ?? 0,
     balanceRaw: dolaBalance.balance?.balanceRaw, // Add raw BigInt for precision-sensitive operations
+    icon: DOLA
+  };
+
+  // Mock token info for the Mint tab (fully mocked flow without blockchain)
+  // Provides 10,000 DOLA for testing the mock mint flow
+  const MOCK_DOLA_BALANCE = 10000;
+  const mintTokenInfo: TokenInfo = {
+    name: "DOLA",
+    balance: MOCK_DOLA_BALANCE,
+    balanceUsd: MOCK_DOLA_BALANCE,
+    balanceRaw: parseUnits(MOCK_DOLA_BALANCE.toString(), 18),
     icon: DOLA
   };
 
@@ -619,16 +621,8 @@ export default function VaultPage() {
   };
 
   // Mock mint handler - simulates a successful mint without actual contract interaction
+  // This is a fully mocked flow - no wallet connection required
   const handleMint = async () => {
-    if (!isConnected) {
-      addToast({
-        type: 'error',
-        title: 'Wallet Not Connected',
-        description: 'Please connect your wallet using the button in the header.',
-      });
-      return;
-    }
-
     // Validate amount
     if (!mintAmount || mintAmount === '0' || mintAmount === '') {
       addToast({
@@ -639,13 +633,13 @@ export default function VaultPage() {
       return;
     }
 
-    // Check balance
+    // Check against mock balance (no real blockchain balance needed)
     const parsedAmount = parseFloat(mintAmount);
-    if (parsedAmount > dolaBalanceDecimal) {
+    if (parsedAmount > MOCK_DOLA_BALANCE) {
       addToast({
         type: 'error',
         title: 'Insufficient Balance',
-        description: `You only have ${dolaBalanceDecimal.toFixed(4)} DOLA available.`,
+        description: `You only have ${MOCK_DOLA_BALANCE.toFixed(4)} DOLA available.`,
       });
       return;
     }
@@ -1097,12 +1091,11 @@ export default function VaultPage() {
                 <MintForm
                   amount={mintAmount}
                   onAmountChange={handleMintAmountChange}
-                  tokenInfo={tokenInfo}
+                  tokenInfo={mintTokenInfo}
                   onMint={handleMint}
                   isTransacting={isMinting}
-                  needsApproval={parseFloat(mintAmount || '0') > dolaAllowanceDecimal}
-                  onApprove={handleApprove}
-                  isAllowanceLoading={dolaAllowanceLoading}
+                  needsApproval={false}  // Mock flow - no approval needed
+                  isAllowanceLoading={false}  // Mock flow - no allowance check
                   isPaused={isPaused === true}
                 />
               </ErrorBoundary>
@@ -1114,20 +1107,28 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "Admin" ? (
               <Admin />
+            ) : activeTab === "Deposit" ? (
+              <div className="p-6">
+                <h1 className="text-2xl font-bold text-card-foreground">Deposit</h1>
+              </div>
+            ) : activeTab === "Withdraw" ? (
+              <div className="p-6">
+                <h1 className="text-2xl font-bold text-card-foreground">Withdraw</h1>
+              </div>
             ) : null}
           </div>
         </section>
 
-        {/* Right: Bonding Curve Box and FAQ */}
+        {/* Right: ContextBox (tab-driven) and FAQ */}
         <aside className="lg:col-span-1 space-y-6">
-          <BondingCurveBox
-            startPrice={bondingCurveData.startPrice}
-            endPrice={bondingCurveData.endPrice}
-            currentPrice={bondingCurveData.currentPrice}
-            isLoading={bondingCurveLoading}
-            isError={bondingCurveError}
-            onTriggerFAQ={setFaqComponent}
-          />
+          <ContextBox visible={activeTab === "Deposit" || activeTab === "Withdraw"}>
+            {activeTab === "Deposit" && (
+              <h1 className="text-2xl font-bold text-card-foreground">Deposit</h1>
+            )}
+            {activeTab === "Withdraw" && (
+              <h1 className="text-2xl font-bold text-card-foreground">Withdraw</h1>
+            )}
+          </ContextBox>
 
           {/* FAQ Component */}
           <FAQ componentName={faqComponent} />
