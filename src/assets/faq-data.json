@@ -72,34 +72,5 @@
         "body": "Yes. Anyone can burn 1,000 EYE to trigger a temporary pause if they detect a severe issue. During a Pause, minting and redeeming are disabled, but funds inside the vault remain safe. The Pause is removed once the issue is resolved."
       }
     ]
-  },
-  "IgnitionPhase": {
-    "componentName": "IgnitionPhase",
-    "items": [
-      {
-        "title": "What is the Ignition Phase?",
-        "body": "The Ignition Phase is the initial launch period of the bonding curve where phUSD can be minted at prices below the target $1.00 peg. Early participants benefit from lower prices that gradually increase as more tokens are minted."
-      },
-      {
-        "title": "How does the bonding curve work?",
-        "body": "The bonding curve is a mathematical formula that determines the price of phUSD based on the total supply minted. The price starts at a lower value and increases along the curve until it reaches the final target price of $1.00."
-      },
-      {
-        "title": "What does the progress percentage mean?",
-        "body": "The progress percentage shows how far along the bonding curve we've traveled from the start price to the end price. Higher progress means a higher current price and less remaining opportuni0y for early-adopter pricing benefits."
-      },
-      {
-        "title": "Why does the current price keep changing?",
-        "body": "The current price changes with each deposit as more phUSD tokens are minted. The bonding curve algorithm automatically adjusts the price upward, creating a fair price discovery mechanism that rewards early participation."
-      },
-      {
-        "title": "Does the dapp lock when the price reaches $1",
-        "body": "Not automatically. The protocol has to be manually locked."
-      },
-      {
-        "title": "What if the price never reaches $1",
-        "body": "The $1 price is a limit, not a goal. Ending the ignition phase on a lower final price simply confers more early adopter benefit to those who bought."
-      }
-    ]
   }
 }

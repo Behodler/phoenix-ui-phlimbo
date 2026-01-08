@@ -1,4 +1,4 @@
-export type Tab = "Deposit to Mint" | "Burn to Withdraw" | "Mint" | "Testnet Faucet" | "Safety" | "Admin";
+export type Tab = "Deposit to Mint" | "Burn to Withdraw" | "Mint" | "Deposit" | "Withdraw" | "Testnet Faucet" | "Safety" | "Admin";
 
 export interface VaultFormData {
   amount: string;
@@ -103,13 +103,10 @@ export interface WithdrawFormProps {
   isPaused?: boolean;
 }
 
-export interface BondingCurveBoxProps {
-  startPrice: number;
-  endPrice: number;
-  currentPrice: number;
-  isLoading?: boolean;
-  isError?: boolean;
-  onTriggerFAQ?: (componentName: string) => void;
+export interface ContextBoxProps {
+  children?: React.ReactNode;
+  visible?: boolean;
+  className?: string;
 }
 
 export interface FAQItem {
