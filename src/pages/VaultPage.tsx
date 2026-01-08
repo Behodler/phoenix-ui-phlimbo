@@ -15,6 +15,7 @@ import WithdrawTab from '../components/vault/WithdrawTab';
 import MintForm from '../components/vault/MintForm';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
 import SafetyTab from '../components/vault/SafetyTab';
+import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import Admin from '../components/vault/Admin';
 import ContextBox from '../components/vault/ContextBox';
 import YieldRewardsInfo from '../components/vault/YieldRewardsInfo';
@@ -69,12 +70,13 @@ export default function VaultPage() {
   // - Show Safety tab on all networks
   // - Show Mint tab for 1:1 DOLA to phUSD minting
   // - Show Deposit and Withdraw tabs for ContextBox-driven content
+  // - Show Yield Funnel tab for claiming accumulated yield at a discount
   const tabs: readonly Tab[] = (() => {
     if (!isMounted) {
-      return ["Deposit to Mint", "Burn to Withdraw", "Mint", "Deposit", "Withdraw"];
+      return ["Deposit to Mint", "Burn to Withdraw", "Mint", "Deposit", "Withdraw", "Yield Funnel"];
     }
 
-    const tabList: Tab[] = ["Deposit to Mint", "Burn to Withdraw", "Mint", "Deposit", "Withdraw"];
+    const tabList: Tab[] = ["Deposit to Mint", "Burn to Withdraw", "Mint", "Deposit", "Withdraw", "Yield Funnel"];
 
     if (!isMainnet) {
       tabList.push("Testnet Faucet");
@@ -1172,6 +1174,10 @@ export default function VaultPage() {
               <div className="p-6">
                 <h1 className="text-2xl font-bold text-card-foreground">Withdraw</h1>
               </div>
+            ) : activeTab === "Yield Funnel" ? (
+              <ErrorBoundary>
+                <YieldFunnelTab />
+              </ErrorBoundary>
             ) : null}
           </div>
         </section>
