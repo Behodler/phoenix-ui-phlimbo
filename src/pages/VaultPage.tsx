@@ -299,6 +299,9 @@ export default function VaultPage() {
     isStaked: true,
   };
 
+  // State for mock claiming transaction
+  const [isClaiming, setIsClaiming] = useState(false);
+
   // Mock yield/rewards data for YieldRewardsInfo component
   // These are placeholder values until real contract integration is implemented
   const mockYieldData = {
@@ -307,6 +310,49 @@ export default function VaultPage() {
     usdcApy: 2.5,        // 2.5% variable USDC APY
     pendingPhUsd: "125.50",  // Mock pending PhUSD rewards
     pendingUsdc: "18.75",    // Mock pending USDC rewards
+    stakedBalance: "1250.00", // Mock staked phUSD balance
+  };
+
+  // Mock claim handler - simulates claiming rewards without actual contract interaction
+  const handleClaim = async () => {
+    try {
+      setIsClaiming(true);
+
+      // Show pending toast
+      addToast({
+        type: 'info',
+        title: 'Claiming Rewards',
+        description: 'Processing your claim transaction...',
+        duration: 3000,
+      });
+
+      // Simulate a delay to mimic transaction processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Show success toast
+      addToast({
+        type: 'success',
+        title: 'Claim Successful (Mock)',
+        description: `Successfully claimed ${mockYieldData.pendingPhUsd} phUSD and ${mockYieldData.pendingUsdc} USDC rewards`,
+        duration: 8000,
+      });
+
+      log.debug('Mock claim completed:', {
+        pendingPhUsd: mockYieldData.pendingPhUsd,
+        pendingUsdc: mockYieldData.pendingUsdc,
+      });
+
+    } catch (error) {
+      log.error('Mock claim failed:', error);
+      addToast({
+        type: 'error',
+        title: 'Claim Failed',
+        description: 'An error occurred during the claim transaction.',
+        duration: 8000,
+      });
+    } finally {
+      setIsClaiming(false);
+    }
   };
 
   // Handle deposit success
@@ -1140,8 +1186,11 @@ export default function VaultPage() {
                 usdcApy={mockYieldData.usdcApy}
                 pendingPhUsd={mockYieldData.pendingPhUsd}
                 pendingUsdc={mockYieldData.pendingUsdc}
+                stakedBalance={mockYieldData.stakedBalance}
                 isLoading={false}
                 isConnected={true} // Mock: always show fake rewards data for now
+                onClaim={handleClaim}
+                isClaiming={isClaiming}
               />
             )}
           </ContextBox>

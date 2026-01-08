@@ -135,6 +135,9 @@ export interface YieldRewardsInfoProps {
   usdcApy: number; // USDC yield percentage (variable)
   pendingPhUsd: bigint | string; // Pending PhUSD rewards
   pendingUsdc: bigint | string; // Pending USDC rewards
+  stakedBalance: bigint | string; // User's staked phUSD balance
   isLoading?: boolean; // Loading state
   isConnected?: boolean; // Whether wallet is connected (for rewards display)
+  onClaim?: () => void; // Callback for claim button action
+  isClaiming?: boolean; // Loading state for claim button
 }
