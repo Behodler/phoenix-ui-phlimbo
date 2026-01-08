@@ -1,4 +1,4 @@
-export type Tab = "Deposit to Mint" | "Burn to Withdraw" | "Testnet Faucet" | "Safety" | "Admin";
+export type Tab = "Deposit to Mint" | "Burn to Withdraw" | "Mint" | "Testnet Faucet" | "Safety" | "Admin";
 
 export interface VaultFormData {
   amount: string;
