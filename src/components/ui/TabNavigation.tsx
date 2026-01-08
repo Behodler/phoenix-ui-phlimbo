@@ -23,7 +23,7 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
   };
 
   return (
-    <div className="flex border-b border-border">
+    <div className="flex items-end border-b border-border">
       {tabs.map((tab) => {
         const faqType = getFAQComponentType(tab);
         const button = (

@@ -11,7 +11,7 @@ export default function ContextBox({
   }
 
   return (
-    <div className={`phoenix-card p-6 ${className}`.trim()}>
+    <div className={`phoenix-card p-6 min-h-[280px] ${className}`.trim()}>
       <div className="space-y-6">
         {children}
       </div>
