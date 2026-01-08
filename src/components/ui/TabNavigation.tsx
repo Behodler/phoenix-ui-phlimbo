@@ -6,6 +6,7 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
   const getTabDescription = () => {
     if (activeTab === "Deposit to Mint") return "You're depositing";
     if (activeTab === "Burn to Withdraw") return "You're withdrawing";
+    if (activeTab === "Mint") return "You're minting 1:1";
     if (activeTab === "Testnet Faucet") return "You're minting test tokens";
     if (activeTab === "Safety") return "Emergency pause controls";
     return "";
@@ -15,6 +16,7 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
   const getFAQComponentType = (tab: string): string | null => {
     if (tab === "Deposit to Mint") return "DepositTab";
     if (tab === "Burn to Withdraw") return "WithdrawTab";
+    if (tab === "Mint") return "MintTab";
     return null;
   };
 

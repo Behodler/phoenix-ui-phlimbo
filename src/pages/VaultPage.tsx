@@ -12,6 +12,7 @@ import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
 import WithdrawTab from '../components/vault/WithdrawTab';
+import MintForm from '../components/vault/MintForm';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
 import SafetyTab from '../components/vault/SafetyTab';
 import Admin from '../components/vault/Admin';
@@ -65,12 +66,13 @@ export default function VaultPage() {
   // - Show Admin tab if user is the owner
   // - Show Testnet Faucet if not on mainnet
   // - Show Safety tab on all networks
+  // - Show Mint tab for 1:1 DOLA to phUSD minting
   const tabs: readonly Tab[] = (() => {
     if (!isMounted) {
-      return ["Deposit to Mint", "Burn to Withdraw"];
+      return ["Deposit to Mint", "Burn to Withdraw", "Mint"];
     }
 
-    const tabList: Tab[] = ["Deposit to Mint", "Burn to Withdraw"];
+    const tabList: Tab[] = ["Deposit to Mint", "Burn to Withdraw", "Mint"];
 
     if (!isMainnet) {
       tabList.push("Testnet Faucet");
@@ -96,15 +98,19 @@ export default function VaultPage() {
     setIsMounted(true);
   }, []);
 
-  // Form state - separate amounts for deposit and withdraw to prevent cross-tab persistence
+  // Form state - separate amounts for deposit, withdraw, and mint to prevent cross-tab persistence
   // MUST be declared before useEffect that depends on these values to avoid TDZ errors
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
+  const [mintAmount, setMintAmount] = useState<string>("");
   const [formData, setFormData] = useState<VaultFormData>({
-    amount: "", // This will be overridden by depositAmount or withdrawAmount depending on active tab
+    amount: "", // This will be overridden by depositAmount, withdrawAmount, or mintAmount depending on active tab
     autoStake: false,
     slippageBps: 10, // 0.10%
   });
+
+  // State for mock minting transaction
+  const [isMinting, setIsMinting] = useState(false);
 
   // Sync formData.amount with the appropriate state variable when tab changes
   useEffect(() => {
@@ -112,8 +118,10 @@ export default function VaultPage() {
       setFormData(prev => ({ ...prev, amount: depositAmount }));
     } else if (activeTab === "Burn to Withdraw") {
       setFormData(prev => ({ ...prev, amount: withdrawAmount }));
+    } else if (activeTab === "Mint") {
+      setFormData(prev => ({ ...prev, amount: mintAmount }));
     }
-  }, [activeTab, depositAmount, withdrawAmount]);
+  }, [activeTab, depositAmount, withdrawAmount, mintAmount]);
 
   // Fetch bonding curve prices, withdraw fee, and pause state
   const {
@@ -597,10 +605,87 @@ export default function VaultPage() {
         setDepositAmount(data.amount);
       } else if (activeTab === "Burn to Withdraw") {
         setWithdrawAmount(data.amount);
+      } else if (activeTab === "Mint") {
+        setMintAmount(data.amount);
       }
     }
     // No need to reset approval transaction state - the blockchain allowance
     // (dolaAllowanceDecimal) is the source of truth and updates automatically
+  };
+
+  // Handle mint amount change for the Mint tab (simplified - no slippage)
+  const handleMintAmountChange = (amount: string) => {
+    setMintAmount(amount);
+  };
+
+  // Mock mint handler - simulates a successful mint without actual contract interaction
+  const handleMint = async () => {
+    if (!isConnected) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet using the button in the header.',
+      });
+      return;
+    }
+
+    // Validate amount
+    if (!mintAmount || mintAmount === '0' || mintAmount === '') {
+      addToast({
+        type: 'error',
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount greater than 0.',
+      });
+      return;
+    }
+
+    // Check balance
+    const parsedAmount = parseFloat(mintAmount);
+    if (parsedAmount > dolaBalanceDecimal) {
+      addToast({
+        type: 'error',
+        title: 'Insufficient Balance',
+        description: `You only have ${dolaBalanceDecimal.toFixed(4)} DOLA available.`,
+      });
+      return;
+    }
+
+    try {
+      setIsMinting(true);
+
+      // Show pending toast
+      addToast({
+        type: 'info',
+        title: 'Minting phUSD',
+        description: 'Processing your mint transaction...',
+        duration: 3000,
+      });
+
+      // Simulate a delay to mimic transaction processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Show success toast
+      addToast({
+        type: 'success',
+        title: 'Mint Successful (Mock)',
+        description: `Successfully minted ${parsedAmount.toFixed(4)} phUSD from ${parsedAmount.toFixed(4)} DOLA at 1:1 rate`,
+        duration: 8000,
+      });
+
+      // Clear the mint amount
+      setMintAmount("");
+
+    } catch (error) {
+      log.error('Mock mint failed:', error);
+      addToast({
+        type: 'error',
+        title: 'Mint Failed',
+        description: 'An error occurred during the mint transaction.',
+        duration: 8000,
+      });
+    } finally {
+      setIsMinting(false);
+    }
   };
 
   // Handle DOLA approval button click (for deposits)
@@ -1004,6 +1089,20 @@ export default function VaultPage() {
                   needsApproval={parseFloat(formData.amount || '0') > bondingTokenAllowanceDecimal}
                   onApprove={handleBondingTokenApprove}
                   isAllowanceLoading={bondingTokenAllowanceLoading}
+                  isPaused={isPaused === true}
+                />
+              </ErrorBoundary>
+            ) : activeTab === "Mint" ? (
+              <ErrorBoundary>
+                <MintForm
+                  amount={mintAmount}
+                  onAmountChange={handleMintAmountChange}
+                  tokenInfo={tokenInfo}
+                  onMint={handleMint}
+                  isTransacting={isMinting}
+                  needsApproval={parseFloat(mintAmount || '0') > dolaAllowanceDecimal}
+                  onApprove={handleApprove}
+                  isAllowanceLoading={dolaAllowanceLoading}
                   isPaused={isPaused === true}
                 />
               </ErrorBoundary>
