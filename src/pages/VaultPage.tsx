@@ -1141,7 +1141,7 @@ export default function VaultPage() {
                 pendingPhUsd={mockYieldData.pendingPhUsd}
                 pendingUsdc={mockYieldData.pendingUsdc}
                 isLoading={false}
-                isConnected={isConnected}
+                isConnected={true} // Mock: always show fake rewards data for now
               />
             )}
           </ContextBox>
