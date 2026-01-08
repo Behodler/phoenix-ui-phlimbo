@@ -128,3 +128,13 @@ export interface FAQWrapperProps {
   children: React.ReactNode;
   onTriggerFAQ: (componentName: string) => void;
 }
+
+export interface YieldRewardsInfoProps {
+  totalApy: number; // Combined yield percentage
+  phUsdApy: number; // PhUSD yield percentage (fixed)
+  usdcApy: number; // USDC yield percentage (variable)
+  pendingPhUsd: bigint | string; // Pending PhUSD rewards
+  pendingUsdc: bigint | string; // Pending USDC rewards
+  isLoading?: boolean; // Loading state
+  isConnected?: boolean; // Whether wallet is connected (for rewards display)
+}

@@ -17,6 +17,7 @@ import TestnetFaucet from '../components/vault/TestnetFaucet';
 import SafetyTab from '../components/vault/SafetyTab';
 import Admin from '../components/vault/Admin';
 import ContextBox from '../components/vault/ContextBox';
+import YieldRewardsInfo from '../components/vault/YieldRewardsInfo';
 import FAQ from '../components/vault/FAQ';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
 import DOLA from "../assets/sDOLA.png";
@@ -296,6 +297,16 @@ export default function VaultPage() {
     valueUsd: phUSDBalance.balance?.balanceUsd ?? 0,
     valueRaw: phUSDBalance.balance?.valueRaw, // Add raw BigInt for precision-sensitive operations
     isStaked: true,
+  };
+
+  // Mock yield/rewards data for YieldRewardsInfo component
+  // These are placeholder values until real contract integration is implemented
+  const mockYieldData = {
+    totalApy: 12.5,      // 12.5% total APY
+    phUsdApy: 10.0,      // 10% fixed PhUSD APY
+    usdcApy: 2.5,        // 2.5% variable USDC APY
+    pendingPhUsd: "125.50",  // Mock pending PhUSD rewards
+    pendingUsdc: "18.75",    // Mock pending USDC rewards
   };
 
   // Handle deposit success
@@ -1122,11 +1133,16 @@ export default function VaultPage() {
         {/* Right: ContextBox (tab-driven) and FAQ */}
         <aside className="lg:col-span-1 space-y-6">
           <ContextBox visible={activeTab === "Deposit" || activeTab === "Withdraw"}>
-            {activeTab === "Deposit" && (
-              <h1 className="text-2xl font-bold text-card-foreground">Deposit</h1>
-            )}
-            {activeTab === "Withdraw" && (
-              <h1 className="text-2xl font-bold text-card-foreground">Withdraw</h1>
+            {(activeTab === "Deposit" || activeTab === "Withdraw") && (
+              <YieldRewardsInfo
+                totalApy={mockYieldData.totalApy}
+                phUsdApy={mockYieldData.phUsdApy}
+                usdcApy={mockYieldData.usdcApy}
+                pendingPhUsd={mockYieldData.pendingPhUsd}
+                pendingUsdc={mockYieldData.pendingUsdc}
+                isLoading={false}
+                isConnected={isConnected}
+              />
             )}
           </ContextBox>
 
