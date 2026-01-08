@@ -8,17 +8,19 @@
  * - surplusWithdrawer: Handles withdrawal of accumulated surplus yield
  */
 export interface ContractAddresses {
-  dolaToken: string
-  tokeToken: string
-  eyeToken: string
-  autoDolaVault: string
-  tokemakMainRewarder: string
-  bondingToken: string
-  autoDolaYieldStrategy: string
-  bondingCurve: string
-  surplusTracker: string
-  surplusWithdrawer: string
-  pauser: string
+  PhUSD: string,
+  USDC: string,
+  USDT: string,
+  Dola: string,
+  USDS: string,
+  EYE: string,
+  Pauser: string,
+  YieldStrategyUSDT: string,
+  YieldStrategyDola: string,
+  YieldStrategyUSDS: string,
+  PhusdStableMinter: string,
+  StableYieldAccumulator: string,
+  PhlimboEA: string
 }
 
 
@@ -31,25 +33,6 @@ export interface ContractAddresses {
  *       behodler3Tokenlaunch is the minter contract that accepts DOLA deposits,
  *       bondingToken is the ERC20 token it produces.
  */
-export interface LocalAddressServerResponse {
-  networkId: number
-  networkName: string
-  deployedAt: string
-  rpcUrl: string
-  contracts: {
-    dolaToken: string
-    tokeToken: string
-    eyeToken?: string
-    autoDolaVault: string
-    tokemakMainRewarder: string
-    bondingToken: string
-    autoDolaYieldStrategy: string
-    behodler3Tokenlaunch: string
-    surplusTracker: string
-    surplusWithdrawer: string
-    pauser?: string
-  }
-}
 
 /**
  * Network type constants

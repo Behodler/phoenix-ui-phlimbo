@@ -1,4 +1,4 @@
-import type { ContractAddresses, LocalAddressServerResponse } from '../types/contracts'
+import type { ContractAddresses } from '../types/contracts'
 import { log } from '../utils/logger'
 
 /**
@@ -21,11 +21,11 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       throw new Error(`Address server returned ${response.status}: ${response.statusText}`)
     }
 
-    const data: LocalAddressServerResponse = await response.json()
+    const data: ContractAddresses = await response.json()
     log.debug('📡 fetchLocalAddresses: Raw response data:', data)
 
     // Validate response structure
-    if (!data.contracts) {
+    if (!data) {
       throw new Error('Invalid response structure: missing contracts field')
     }
 
@@ -35,31 +35,25 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
     // "bondingCurve" for cleaner internal naming. This is the minter contract that accepts
     // DOLA deposits. bondingToken is the ERC20 token it produces.
     const addresses: ContractAddresses = {
-      dolaToken: data.contracts.dolaToken,
-      tokeToken: data.contracts.tokeToken,
-      eyeToken: data.contracts.eyeToken || '0x0000000000000000000000000000000000000000',
-      autoDolaVault: data.contracts.autoDolaVault,
-      tokemakMainRewarder: data.contracts.tokemakMainRewarder,
-      bondingToken: data.contracts.bondingToken,
-      autoDolaYieldStrategy: data.contracts.autoDolaYieldStrategy,
-      bondingCurve: data.contracts.behodler3Tokenlaunch,
-      surplusTracker: data.contracts.surplusTracker,
-      surplusWithdrawer: data.contracts.surplusWithdrawer,
-      pauser: data.contracts.pauser || '0x0000000000000000000000000000000000000000',
+
+      Dola: data.Dola || '0x0000000000000000000000000000000000000000',
+      EYE: data.EYE || '0x0000000000000000000000000000000000000000',
+      YieldStrategyDola: data.YieldStrategyDola ||  '0x0000000000000000000000000000000000000000',
+      Pauser: data.Pauser || '0x0000000000000000000000000000000000000000',
+      PhUSD: data.PhUSD || '0x0000000000000000000000000000000000000000',
+      USDC: data.USDC || '0x0000000000000000000000000000000000000000',
+      USDT: data.USDT || '0x0000000000000000000000000000000000000000',
+      USDS: data.USDS || '0x0000000000000000000000000000000000000000',
+      YieldStrategyUSDT: data.YieldStrategyUSDT || '0x0000000000000000000000000000000000000000',
+      YieldStrategyUSDS: data.YieldStrategyUSDS || '0x0000000000000000000000000000000000000000',
+      PhusdStableMinter: data.PhusdStableMinter || '0x0000000000000000000000000000000000000000',
+      StableYieldAccumulator: data.StableYieldAccumulator || '0x0000000000000000000000000000000000000000',
+      PhlimboEA: data.PhlimboEA || '0x0000000000000000000000000000000000000000'
     }
     log.debug('📡 fetchLocalAddresses: Mapped addresses:', addresses)
 
-    // Validate all addresses are present
-    // Allow zero addresses for optional contracts (pauser, eyeToken)
-    const optionalContracts = ['pauser', 'eyeToken']
-    const missingAddresses = Object.entries(addresses)
-      .filter(([key, value]) => !value && !optionalContracts.includes(key))
-      .map(([key]) => key)
 
-    if (missingAddresses.length > 0) {
-      log.error('❌ fetchLocalAddresses: Missing addresses:', missingAddresses)
-      throw new Error(`Missing contract addresses: ${missingAddresses.join(', ')}`)
-    }
+
 
     log.debug('✅ fetchLocalAddresses: Successfully validated all addresses')
     return addresses
@@ -68,7 +62,7 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
     if (error instanceof TypeError && error.message.includes('fetch')) {
       throw new Error(
         `Local address server is not running at ${LOCAL_ADDRESS_SERVER}. ` +
-          'Please start the address server before running the UI in local development mode.'
+        'Please start the address server before running the UI in local development mode.'
       )
     }
     throw error
