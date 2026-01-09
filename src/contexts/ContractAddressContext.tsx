@@ -120,7 +120,7 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
  *   if (error) return <div>Error: {error}</div>
  *   if (!addresses) return <div>No addresses available</div>
  *
- *   return <div>DOLA Token: {addresses.dolaToken}</div>
+ *   return <div>DOLA Token: {addresses.Dola}</div>
  * }
  * ```
  */

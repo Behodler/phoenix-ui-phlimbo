@@ -55,13 +55,13 @@ export default function TestnetFaucet() {
   // Fetch DOLA balance to enable refetch after mint
   const { refetch: refetchDolaBalance } = useTokenBalance(
     walletAddress,
-    addresses?.dolaToken as `0x${string}` | undefined
+    addresses?.Dola as `0x${string}` | undefined
   );
 
   // Fetch EYE balance to enable refetch after mint
   const { refetch: refetchEyeBalance } = useTokenBalance(
     walletAddress,
-    addresses?.eyeToken as `0x${string}` | undefined
+    addresses?.EYE as `0x${string}` | undefined
   );
 
   /**
@@ -78,7 +78,7 @@ export default function TestnetFaucet() {
       return;
     }
 
-    if (!addresses?.dolaToken) {
+    if (!addresses?.Dola) {
       addToast({
         type: 'error',
         title: 'Contract Not Available',
@@ -103,7 +103,7 @@ export default function TestnetFaucet() {
 
       // Call the mint function on the DOLA token contract
       await writeContractAsync({
-        address: addresses.dolaToken as `0x${string}`,
+        address: addresses.Dola as `0x${string}`,
         abi: mintableErc20Abi,
         functionName: 'mint',
         args: [walletAddress, mintAmount],
@@ -148,7 +148,7 @@ export default function TestnetFaucet() {
       return;
     }
 
-    if (!addresses?.eyeToken) {
+    if (!addresses?.EYE) {
       addToast({
         type: 'error',
         title: 'Contract Not Available',
@@ -173,7 +173,7 @@ export default function TestnetFaucet() {
 
       // Call the mint function on the EYE token contract
       await writeContractAsyncEye({
-        address: addresses.eyeToken as `0x${string}`,
+        address: addresses.EYE as `0x${string}`,
         abi: mintableErc20Abi,
         functionName: 'mint',
         args: [walletAddress, mintAmount],

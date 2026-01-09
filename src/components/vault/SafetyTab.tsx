@@ -32,7 +32,7 @@ export default function SafetyTab() {
     refetch: refetchEyeBalance
   } = useTokenBalance(
     walletAddress,
-    addresses?.eyeToken as `0x${string}` | undefined
+    addresses?.EYE as `0x${string}` | undefined
   );
 
   // Fetch EYE allowance for Pauser contract
@@ -43,7 +43,7 @@ export default function SafetyTab() {
   } = useTokenAllowance(
     walletAddress,
     addresses?.pauser as `0x${string}` | undefined,
-    addresses?.eyeToken as `0x${string}` | undefined
+    addresses?.EYE as `0x${string}` | undefined
   );
 
   // Fetch required EYE amount from Pauser contract
@@ -82,12 +82,12 @@ export default function SafetyTab() {
   // EYE approval transaction state management
   const approvalTransaction = useApprovalTransaction(
     async () => {
-      if (!addresses?.eyeToken || !addresses?.pauser) {
+      if (!addresses?.EYE || !addresses?.pauser) {
         throw new Error('Contract addresses not loaded');
       }
       // Approve unlimited amount
       return approve(
-        addresses.eyeToken as `0x${string}`,
+        addresses.EYE as `0x${string}`,
         addresses.pauser as `0x${string}`,
         maxUint256
       );
@@ -146,7 +146,7 @@ export default function SafetyTab() {
       return;
     }
 
-    if (!addresses?.eyeToken || !addresses?.pauser || requiredEyeAmount === null) {
+    if (!addresses?.EYE || !addresses?.pauser || requiredEyeAmount === null) {
       addToast({
         type: 'error',
         title: 'Contract Not Ready',

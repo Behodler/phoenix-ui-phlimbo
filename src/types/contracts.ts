@@ -3,7 +3,7 @@
  *
  * IMPORTANT DISTINCTION:
  * - bondingCurve: The Behodler3Tokenlaunch contract that MINTS bonding tokens (the factory/minter)
- * - bondingToken: The ERC20 token PRODUCED by the bonding curve (the product)
+ * - bond ingToken: The ERC20 token PRODUCED by the bonding curve (the product)
  * - surplusTracker: Tracks surplus yield accumulation from the yield strategy
  * - surplusWithdrawer: Handles withdrawal of accumulated surplus yield
  */
