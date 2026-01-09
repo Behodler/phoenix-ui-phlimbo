@@ -13,6 +13,7 @@ import TabNavigation from '../components/ui/TabNavigation';
 import DepositForm from '../components/vault/DepositForm';
 import WithdrawTab from '../components/vault/WithdrawTab';
 import MintForm from '../components/vault/MintForm';
+import DepositToYieldForm from '../components/vault/DepositToYieldForm';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
 import SafetyTab from '../components/vault/SafetyTab';
 import YieldFunnelTab from '../components/vault/YieldFunnelTab';
@@ -107,6 +108,7 @@ export default function VaultPage() {
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [mintAmount, setMintAmount] = useState<string>("");
+  const [depositToYieldAmount, setDepositToYieldAmount] = useState<string>("");
   const [formData, setFormData] = useState<VaultFormData>({
     amount: "", // This will be overridden by depositAmount, withdrawAmount, or mintAmount depending on active tab
     autoStake: false,
@@ -115,6 +117,9 @@ export default function VaultPage() {
 
   // State for mock minting transaction
   const [isMinting, setIsMinting] = useState(false);
+
+  // State for mock deposit to yield transaction
+  const [isDepositingToYield, setIsDepositingToYield] = useState(false);
 
   // Sync formData.amount with the appropriate state variable when tab changes
   useEffect(() => {
@@ -741,6 +746,73 @@ export default function VaultPage() {
     }
   };
 
+  // Handle deposit to yield amount change
+  const handleDepositToYieldAmountChange = (amount: string) => {
+    setDepositToYieldAmount(amount);
+  };
+
+  // Mock deposit to yield handler - simulates a successful deposit without actual contract interaction
+  // This is a fully mocked flow - no wallet connection required
+  const handleDepositToYield = async () => {
+    // Validate amount
+    if (!depositToYieldAmount || depositToYieldAmount === '0' || depositToYieldAmount === '') {
+      addToast({
+        type: 'error',
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount greater than 0.',
+      });
+      return;
+    }
+
+    // Check against mock balance (no real blockchain balance needed)
+    const parsedAmount = parseFloat(depositToYieldAmount);
+    if (parsedAmount > MOCK_DOLA_BALANCE) {
+      addToast({
+        type: 'error',
+        title: 'Insufficient Balance',
+        description: `You only have ${MOCK_DOLA_BALANCE.toFixed(4)} DOLA available.`,
+      });
+      return;
+    }
+
+    try {
+      setIsDepositingToYield(true);
+
+      // Show pending toast
+      addToast({
+        type: 'info',
+        title: 'Depositing DOLA',
+        description: 'Processing your deposit transaction...',
+        duration: 3000,
+      });
+
+      // Simulate a delay to mimic transaction processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Show success toast
+      addToast({
+        type: 'success',
+        title: 'Deposit Successful (Mock)',
+        description: `Successfully deposited ${parsedAmount.toFixed(4)} DOLA to earn yield in phUSD and USDC`,
+        duration: 8000,
+      });
+
+      // Clear the deposit amount
+      setDepositToYieldAmount("");
+
+    } catch (error) {
+      log.error('Mock deposit to yield failed:', error);
+      addToast({
+        type: 'error',
+        title: 'Deposit Failed',
+        description: 'An error occurred during the deposit transaction.',
+        duration: 8000,
+      });
+    } finally {
+      setIsDepositingToYield(false);
+    }
+  };
+
   // Handle DOLA approval button click (for deposits)
   const handleApprove = async (): Promise<void> => {
 
@@ -1167,9 +1239,18 @@ export default function VaultPage() {
             ) : activeTab === "Admin" ? (
               <Admin />
             ) : activeTab === "Deposit" ? (
-              <div className="p-6">
-                <h1 className="text-2xl font-bold text-card-foreground">Deposit</h1>
-              </div>
+              <ErrorBoundary>
+                <DepositToYieldForm
+                  amount={depositToYieldAmount}
+                  onAmountChange={handleDepositToYieldAmountChange}
+                  tokenInfo={mintTokenInfo}
+                  onDeposit={handleDepositToYield}
+                  isTransacting={isDepositingToYield}
+                  needsApproval={false}  // Mock flow - no approval needed
+                  isAllowanceLoading={false}  // Mock flow - no allowance check
+                  isPaused={isPaused === true}
+                />
+              </ErrorBoundary>
             ) : activeTab === "Withdraw" ? (
               <div className="p-6">
                 <h1 className="text-2xl font-bold text-card-foreground">Withdraw</h1>
