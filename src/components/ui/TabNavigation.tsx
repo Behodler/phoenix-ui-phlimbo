@@ -4,8 +4,6 @@ import FAQWrapper from '../vault/FAQWrapper';
 export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerFAQ }: TabNavigationProps) {
   // Get description text based on active tab
   const getTabDescription = () => {
-    if (activeTab === "Deposit to Mint") return "You're depositing";
-    if (activeTab === "Burn to Withdraw") return "You're withdrawing";
     if (activeTab === "Mint") return "You're minting 1:1";
     if (activeTab === "Deposit") return "You're depositing";
     if (activeTab === "Withdraw") return "You're withdrawing";
@@ -16,8 +14,6 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
 
   // Map tab names to FAQ component types
   const getFAQComponentType = (tab: string): string | null => {
-    if (tab === "Deposit to Mint") return "DepositTab";
-    if (tab === "Burn to Withdraw") return "WithdrawTab";
     if (tab === "Mint") return "MintTab";
     return null;
   };

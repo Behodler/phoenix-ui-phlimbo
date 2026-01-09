@@ -30,7 +30,7 @@ export default function WalletBalances() {
     isError: phUSDError
   } = useTokenBalance(
     walletAddress,
-    addresses?.bondingToken as `0x${string}` | undefined
+    addresses?.PhUSD as `0x${string}` | undefined
   );
 
   // Don't render if wallet not connected

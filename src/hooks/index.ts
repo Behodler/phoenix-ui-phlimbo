@@ -2,7 +2,6 @@
 export {
   useTokenBalance,
   useTokenAllowance,
-  useBondingCurve,
   useTokenApproval
 } from './useContractInteractions';
 
