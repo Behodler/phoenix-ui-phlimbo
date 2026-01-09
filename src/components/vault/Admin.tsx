@@ -3,18 +3,16 @@ import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTr
 import { readContract } from '@wagmi/core';
 import { wagmiConfig } from '../../wagmiConfig';
 import {
-  behodler3TokenlaunchAbi,
-  flaxTokenAbi,
-  autoDolaYieldStrategyAbi,
-  surplusWithdrawerAbi,
-} from '@behodler/wagmi-hooks';
+  phlimboEaAbi,
+  phusdStableMinterAbi,
+  iYieldStrategyAbi,
+} from '@behodler/phase2-wagmi-hooks';
 import { pauserAbi } from '../../lib/pauserAbi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
 import type { Abi, AbiFunction } from 'viem';
 import type { ContractAddresses } from '../../types/contracts';
-// import { log } from '../../utils/logger';
 
 // ABI for ERC20 tokens with mint function (used on testnets)
 const mintableErc20Abi = [
@@ -47,34 +45,43 @@ interface ContractConfig {
 }
 
 /**
- * Contract configurations for admin panel
- * Only includes contracts that might be ownable
+ * Contract configurations for admin panel - Phase 2 contracts
  */
-const getContractConfigs = (_networkType: string): ContractConfig[] => [
+const getContractConfigs = (): ContractConfig[] => [
   {
-    name: 'Bonding Curve',
-    addressKey: 'bondingCurve',
-    abi: behodler3TokenlaunchAbi as Abi,
-  },
-  {
-    name: 'Bonding Token',
-    addressKey: 'bondingToken',
-    abi:   flaxTokenAbi as Abi,
-  },
-  {
-    name: 'AutoDolaYieldStrategy',
-    addressKey: 'autoDolaYieldStrategy',
-    abi: autoDolaYieldStrategyAbi as Abi,
-  },
-  {
-    name: 'SurplusWithdrawer',
-    addressKey: 'surplusWithdrawer',
-    abi: surplusWithdrawerAbi as Abi,
+    name: 'PhUSD',
+    addressKey: 'PhUSD',
+    abi: mintableErc20Abi as Abi,
   },
   {
     name: 'Pauser',
-    addressKey: 'pauser',
+    addressKey: 'Pauser',
     abi: pauserAbi as Abi,
+  },
+  {
+    name: 'YieldStrategyDola',
+    addressKey: 'YieldStrategyDola',
+    abi: iYieldStrategyAbi as Abi,
+  },
+  {
+    name: 'YieldStrategyUSDT',
+    addressKey: 'YieldStrategyUSDT',
+    abi: iYieldStrategyAbi as Abi,
+  },
+  {
+    name: 'YieldStrategyUSDS',
+    addressKey: 'YieldStrategyUSDS',
+    abi: iYieldStrategyAbi as Abi,
+  },
+  {
+    name: 'PhusdStableMinter',
+    addressKey: 'PhusdStableMinter',
+    abi: phusdStableMinterAbi as Abi,
+  },
+  {
+    name: 'PhlimboEA',
+    addressKey: 'PhlimboEA',
+    abi: phlimboEaAbi as Abi,
   },
 ];
 
@@ -141,9 +148,9 @@ const extractFunctionsFromAbi = (abi: Abi): string[] => {
 /**
  * Admin Component
  *
- * Provides administrative controls for the bonding curve contract owner.
+ * Provides administrative controls for the Phoenix protocol contract owners.
  * This component is only rendered when the connected wallet address matches
- * the owner address of the bonding curve contract.
+ * the owner address of any Phase 2 protocol contract.
  */
 export default function Admin() {
   const { isConnected, address: walletAddress } = useAccount();
@@ -169,55 +176,13 @@ export default function Admin() {
   const [isCalling, setIsCalling] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
 
-  // Fetch the owner address from the bonding curve contract
+  // Fetch the owner address from the PhlimboEA contract (new Phase 2 architecture)
   const { data: ownerAddress } = useReadContract({
-    address: addresses?.bondingCurve as `0x${string}` | undefined,
-    abi: behodler3TokenlaunchAbi,
+    address: addresses?.PhlimboEA as `0x${string}` | undefined,
+    abi: phlimboEaAbi,
     functionName: 'owner',
     query: {
-      enabled: !!addresses?.bondingCurve,
-    },
-  });
-
-  // Fetch principal from AutoDolaYieldStrategy (principal deposited via bonding curve)
-  const { data: bondingCurvePrincipal, refetch: refetchPrincipal, error: principalError } = useReadContract({
-    address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
-    abi: autoDolaYieldStrategyAbi,
-    functionName: 'principalOf',
-    args: addresses?.Dola && addresses?.bondingCurve
-      ? [addresses.Dola as `0x${string}`, addresses.bondingCurve as `0x${string}`]
-      : undefined,
-    query: {
-      enabled: !!addresses?.autoDolaYieldStrategy && !!addresses?.Dola && !!addresses?.bondingCurve,
-    },
-  });
-
-  // Fetch total balance from AutoDolaYieldStrategy (principal + yield in bonding curve)
-  // Uses totalBalanceOf per IYieldStrategy interface specification
-  // This is used for calculating yield display: yield = totalBalanceOf - principalOf
-  const { data: bondingCurveTotalBalance, refetch: refetchBondingCurveBalance, error: totalBalanceError } = useReadContract({
-    address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
-    abi: autoDolaYieldStrategyAbi,
-    functionName: 'totalBalanceOf',
-    args: addresses?.Dola && addresses?.bondingCurve
-      ? [addresses.Dola as `0x${string}`, addresses.bondingCurve as `0x${string}`]
-      : undefined,
-    query: {
-      enabled: !!addresses?.autoDolaYieldStrategy && !!addresses?.Dola && !!addresses?.bondingCurve,
-    },
-  });
-
-  // Fetch DOLA balance IN the AutoDolaVault contract itself
-  // This is used by the mint yield button to check if there's DOLA available to mint as yield
-  const { data: vaultDolaBalance, refetch: refetchVaultDolaBalance } = useReadContract({
-    address: addresses?.Dola as `0x${string}` | undefined,
-    abi: mintableErc20Abi,
-    functionName: 'balanceOf',
-    args: addresses?.autoDolaVault
-      ? [addresses.autoDolaVault as `0x${string}`]
-      : undefined,
-    query: {
-      enabled: !!addresses?.Dola && !!addresses?.autoDolaVault,
+      enabled: !!addresses?.PhlimboEA,
     },
   });
 
@@ -234,58 +199,13 @@ export default function Admin() {
   const isMainnet = chainId === 1;
   const showMintYieldButton = !isMainnet;
 
-  // Calculate yield vs principal breakdown
-  // Total = bondingCurveTotalBalance (queries AutoDolaYieldStrategy.totalBalanceOf)
-  // Principal = principal tracked for bonding curve deposits (queries AutoDolaYieldStrategy.principalOf)
-  // Yield = Total - Principal (calculated from AutoDolaYieldStrategy's tracked principal + yield)
-  // CRITICAL: Use bondingCurveTotalBalance (from AutoDolaYieldStrategy.totalBalanceOf) NOT vaultDolaBalance
-  //           vaultDolaBalance includes ALL DOLA in vault (including non-Phoenix deposits)
-  //           bondingCurveTotalBalance returns ONLY Phoenix protocol's principal + yield
-  const principal = bondingCurvePrincipal !== undefined ? bondingCurvePrincipal : 0n;
-  const totalVaultBalance = bondingCurveTotalBalance !== undefined ? bondingCurveTotalBalance : 0n;
-  const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
-
-  // Format for display (convert from wei to DOLA)
-  const principalDisplay = (Number(principal) / 1e18).toFixed(2);
-  const yieldDisplay = (Number(yield_) / 1e18).toFixed(2);
-  const totalDisplay = (Number(totalVaultBalance) / 1e18).toFixed(2);
-
-  // Debug logging for balance queries
-  useEffect(() => {
-    console.log('🔍 Balance Query Debug:', {
-      bondingCurvePrincipal: bondingCurvePrincipal?.toString(),
-      bondingCurveTotalBalance: bondingCurveTotalBalance?.toString(),
-      vaultDolaBalance: vaultDolaBalance?.toString(),
-      principal: principal.toString(),
-      totalVaultBalance: totalVaultBalance.toString(),
-      yield_: yield_.toString(),
-      addresses: {
-        autoDolaYieldStrategy: addresses?.autoDolaYieldStrategy,
-        dolaToken: addresses?.Dola,
-        bondingCurve: addresses?.bondingCurve,
-        autoDolaVault: addresses?.autoDolaVault,
-      },
-      errors: {
-        principalError: principalError?.message,
-        totalBalanceError: totalBalanceError?.message,
-      }
-    });
-
-    if (principalError) {
-      console.error('❌ Principal Query Error:', principalError);
-    }
-    if (totalBalanceError) {
-      console.error('❌ Total Balance Query Error:', totalBalanceError);
-    }
-  }, [bondingCurvePrincipal, bondingCurveTotalBalance, vaultDolaBalance, principal, totalVaultBalance, yield_, addresses, principalError, totalBalanceError]);
-
   /**
    * Discover owned contracts by checking ownership of each contract
    */
   useEffect(() => {
     const discoverOwnedContracts = async () => {
       if (!isConnected || !walletAddress || !addresses) {
-        console.log('🔍 Contract discovery skipped:', {
+        console.log('Contract discovery skipped:', {
           isConnected,
           hasWallet: !!walletAddress,
           hasAddresses: !!addresses,
@@ -294,64 +214,64 @@ export default function Admin() {
         return;
       }
 
-      console.log('🔍 Starting contract ownership discovery...');
-      console.log('📋 Available addresses:', addresses);
-      console.log('👛 Connected wallet:', walletAddress);
+      console.log('Starting contract ownership discovery...');
+      console.log('Available addresses:', addresses);
+      console.log('Connected wallet:', walletAddress);
 
       setIsLoadingOwnership(true);
 
       try {
-        const contractConfigs = getContractConfigs(networkType);
-        console.log('📝 Contract configs to check:', contractConfigs.map(c => ({ name: c.name, key: c.addressKey })));
+        const contractConfigs = getContractConfigs();
+        console.log('Contract configs to check:', contractConfigs.map(c => ({ name: c.name, key: c.addressKey })));
 
         const ownedConfigsPromises = contractConfigs.map(async (config) => {
           try {
             const contractAddress = addresses[config.addressKey];
 
-            console.log(`🔎 Checking ${config.name}:`, {
+            console.log(`Checking ${config.name}:`, {
               addressKey: config.addressKey,
               contractAddress,
               hasAddress: !!contractAddress,
             });
 
             if (!contractAddress) {
-              console.warn(`⚠️ ${config.name}: No address found for key "${config.addressKey}"`);
+              console.warn(`${config.name}: No address found for key "${config.addressKey}"`);
               return null;
             }
 
-            console.log(`🌐 ${config.name}: Calling owner() at ${contractAddress}...`);
+            console.log(`${config.name}: Calling owner() at ${contractAddress}...`);
 
             // Try to read the owner() function using wagmi's readContract
             try {
-              const ownerAddress = await readContract(wagmiConfig, {
+              const ownerAddr = await readContract(wagmiConfig, {
                 address: contractAddress as `0x${string}`,
                 abi: config.abi,
                 functionName: 'owner',
               });
 
-              console.log(`📡 ${config.name}: Successfully read owner address:`, ownerAddress);
+              console.log(`${config.name}: Successfully read owner address:`, ownerAddr);
 
-              console.log(`👤 ${config.name}: Owner check:`, {
-                contractOwner: ownerAddress,
+              console.log(`${config.name}: Owner check:`, {
+                contractOwner: ownerAddr,
                 walletAddress,
-                matches: (ownerAddress as string).toLowerCase() === walletAddress.toLowerCase(),
+                matches: (ownerAddr as string).toLowerCase() === walletAddress.toLowerCase(),
               });
 
               // Compare addresses (case-insensitive)
-              if ((ownerAddress as string).toLowerCase() === walletAddress.toLowerCase()) {
-                console.log(`✅ ${config.name}: Owned by connected wallet!`);
+              if ((ownerAddr as string).toLowerCase() === walletAddress.toLowerCase()) {
+                console.log(`${config.name}: Owned by connected wallet!`);
                 return config;
               } else {
-                console.log(`❌ ${config.name}: Not owned by connected wallet`);
+                console.log(`${config.name}: Not owned by connected wallet`);
               }
             } catch (ownerError) {
-              console.warn(`⚠️ ${config.name}: Failed to read owner() function:`, ownerError);
+              console.warn(`${config.name}: Failed to read owner() function:`, ownerError);
               // Contract might not have an owner() function, skip it
             }
 
             return null;
           } catch (error) {
-            console.error(`❌ Error checking ownership for ${config.name}:`, error);
+            console.error(`Error checking ownership for ${config.name}:`, error);
             return null;
           }
         });
@@ -360,7 +280,7 @@ export default function Admin() {
           (config): config is ContractConfig => config !== null
         );
 
-        console.log('✨ Ownership discovery complete:', {
+        console.log('Ownership discovery complete:', {
           totalChecked: contractConfigs.length,
           ownedCount: ownedConfigs.length,
           ownedContracts: ownedConfigs.map(c => c.name),
@@ -368,7 +288,7 @@ export default function Admin() {
 
         setOwnedContracts(ownedConfigs);
       } catch (error) {
-        console.error('💥 Error discovering owned contracts:', error);
+        console.error('Error discovering owned contracts:', error);
         addToast({
           type: 'error',
           title: 'Contract Discovery Failed',
@@ -398,19 +318,23 @@ export default function Admin() {
     if (selectedContract) {
       const functions = extractFunctionsFromAbi(selectedContract.abi);
       setAvailableFunctions(functions);
-    } else {
-      setAvailableFunctions([]);
+      setSelectedFunctionName('');
+      setSelectedFunction(null);
+      setParameterValues({});
+      setValidationErrors({});
+      setConversionErrors({});
     }
   }, [selectedContractKey, ownedContracts]);
 
   /**
-   * Extract function details when a function is selected
+   * Get function details when a function is selected
    */
   useEffect(() => {
     if (!selectedFunctionName || !selectedContractKey) {
       setSelectedFunction(null);
       setParameterValues({});
       setValidationErrors({});
+      setConversionErrors({});
       return;
     }
 
@@ -418,62 +342,35 @@ export default function Admin() {
       (contract) => contract.addressKey === selectedContractKey
     );
 
-    if (selectedContract) {
-      const functionAbi = selectedContract.abi.find(
-        (item): item is AbiFunction =>
-          item.type === 'function' && item.name === selectedFunctionName
-      );
+    if (!selectedContract) return;
 
-      if (functionAbi) {
-        setSelectedFunction(functionAbi);
-        // Initialize parameter values and validation state
-        const initialValues: Record<string, string> = {};
-        const initialErrors: Record<string, boolean> = {};
+    const func = (selectedContract.abi as AbiFunction[]).find(
+      (item): item is AbiFunction =>
+        item.type === 'function' && item.name === selectedFunctionName
+    );
 
-        functionAbi.inputs.forEach((input, index) => {
-          const key = input.name || `param${index}`;
-          initialValues[key] = '';
-          initialErrors[key] = false;
-        });
-
-        setParameterValues(initialValues);
-        setValidationErrors(initialErrors);
-        setConversionErrors({});
-      } else {
-        setSelectedFunction(null);
-        setParameterValues({});
-        setValidationErrors({});
-        setConversionErrors({});
-      }
+    if (func) {
+      setSelectedFunction(func);
+      // Initialize parameter values with empty strings
+      const initialValues: Record<string, string> = {};
+      func.inputs.forEach((input) => {
+        initialValues[input.name || `param_${func.inputs.indexOf(input)}`] = '';
+      });
+      setParameterValues(initialValues);
+      setValidationErrors({});
+      setConversionErrors({});
     }
   }, [selectedFunctionName, selectedContractKey, ownedContracts]);
 
   /**
-   * Reset selections when wallet changes or disconnects
+   * Handle transaction success
    */
   useEffect(() => {
-    if (!isConnected) {
-      setSelectedContractKey('');
-      setOwnedContracts([]);
-      setAvailableFunctions([]);
-      setSelectedFunctionName('');
-      setSelectedFunction(null);
-      setParameterValues({});
-      setValidationErrors({});
-      setConversionErrors({});
-    }
-  }, [isConnected]);
-
-  /**
-   * Handle transaction success for Execute button
-   */
-  useEffect(() => {
-    if (isTxSuccess && txHash && isExecuting) {
-      // Show success toast with transaction hash
+    if (isTxSuccess && txHash) {
       addToast({
         type: 'success',
-        title: 'Transaction Confirmed',
-        description: `Function executed successfully!`,
+        title: 'Transaction Successful',
+        description: 'Your transaction has been confirmed on the blockchain.',
         duration: 30000,
         action: {
           label: 'View Transaction',
@@ -481,162 +378,114 @@ export default function Admin() {
             const explorerUrl = networkType === 'mainnet'
               ? `https://etherscan.io/tx/${txHash}`
               : networkType === 'local'
-              ? `http://localhost:8545` // Anvil doesn't have a block explorer
+              ? `http://localhost:8545`
               : `https://sepolia.etherscan.io/tx/${txHash}`;
             window.open(explorerUrl, '_blank');
           }
         }
       });
-
-      // Refetch all affected blockchain data to update UI immediately
-      // This fixes the bug where balances didn't update after admin function execution
-      // Following the same pattern as the mint yield button (Admin.tsx lines 909-915)
-      // which uses a small delay to allow blockchain state to settle before refetch
-      setTimeout(async () => 
-        await Promise.all([
-          refetchVaultDolaBalance(), // DOLA balance in vault (for mint button)
-          refetchBondingCurveBalance(), // Total balance in bonding curve (for yield display)
-          refetchPrincipal(), // Principal in bonding curve (for principal display)
-        ])
-      , 1000); // Wait 1 second for blockchain state to settle
-
-      // Reset executing state
       setIsExecuting(false);
     }
-  }, [isTxSuccess, txHash, isExecuting, networkType, addToast, refetchVaultDolaBalance, refetchBondingCurveBalance, refetchPrincipal]);
+  }, [isTxSuccess, txHash, networkType, addToast]);
 
   /**
-   * Handle parameter input changes
+   * Handle parameter value change
    */
-  const handleParameterChange = (paramKey: string, value: string) => {
+  const handleParameterChange = (paramName: string, value: string) => {
     setParameterValues((prev) => ({
       ...prev,
-      [paramKey]: value,
+      [paramName]: value,
     }));
 
-    // Clear validation error when user types
-    if (validationErrors[paramKey]) {
-      setValidationErrors((prev) => ({
-        ...prev,
-        [paramKey]: false,
-      }));
-    }
+    // Clear any previous validation error for this parameter
+    setValidationErrors((prev) => ({
+      ...prev,
+      [paramName]: false,
+    }));
 
-    // Clear conversion error when user types
-    if (conversionErrors[paramKey]) {
-      setConversionErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[paramKey];
-        return newErrors;
-      });
-    }
-  };
-
-  /**
-   * Validate form - check that all parameters have values
-   */
-  const validateForm = (): boolean => {
-    if (!selectedFunction) return false;
-
-    const errors: Record<string, boolean> = {};
-    let hasErrors = false;
-
-    selectedFunction.inputs.forEach((input, index) => {
-      const key = input.name || `param${index}`;
-      const value = parameterValues[key] || '';
-
-      if (value.trim() === '') {
-        errors[key] = true;
-        hasErrors = true;
-      } else {
-        errors[key] = false;
-      }
+    // Clear any conversion error for this parameter
+    setConversionErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors[paramName];
+      return newErrors;
     });
-
-    setValidationErrors(errors);
-    return !hasErrors;
   };
 
   /**
-   * Convert and validate parameters for contract calls
-   * Returns converted parameters array or null if there are errors
+   * Build function arguments from parameter values
    */
-  const convertAndValidateParameters = (): any[] | null => {
+  const buildFunctionArgs = (): unknown[] | null => {
     if (!selectedFunction) return null;
 
-    // Validate form first
-    if (!validateForm()) {
-      return null;
-    }
-
-    // Convert e-notation values for numeric parameters and boolean values
-    const convertedValues: Record<string, string | boolean> = {};
+    const args: unknown[] = [];
+    const newValidationErrors: Record<string, boolean> = {};
     const newConversionErrors: Record<string, string> = {};
-    let hasConversionErrors = false;
+    let hasError = false;
 
-    selectedFunction.inputs.forEach((input, index) => {
-      const key = input.name || `param${index}`;
-      const value = parameterValues[key] || '';
-      const paramType = input.type;
+    for (const input of selectedFunction.inputs) {
+      const paramName = input.name || `param_${selectedFunction.inputs.indexOf(input)}`;
+      const value = parameterValues[paramName] || '';
 
-      console.log(`[Admin Panel] Parameter "${key}":`, {
-        type: paramType,
-        originalValue: value,
-        isNumeric: isNumericType(paramType),
-        isBoolean: isBooleanType(paramType),
-        hasENotation: /[eE]/.test(value),
-      });
-
-      // Check if parameter is boolean type
-      if (isBooleanType(paramType)) {
-        // Convert string to boolean
-        const boolValue = convertBooleanParameter(value);
-        convertedValues[key] = boolValue;
-        console.log(`[Admin Panel] ✅ Boolean converted "${value}" → ${boolValue}`);
+      // Check for empty required fields
+      if (!value && value !== '0') {
+        newValidationErrors[paramName] = true;
+        hasError = true;
+        continue;
       }
-      // Check if parameter is numeric type and contains e-notation
-      else if (isNumericType(paramType) && /[eE]/.test(value)) {
-        try {
-          // Convert e-notation to full integer string
-          const expandedValue = expandExpInt(value);
-          convertedValues[key] = expandedValue;
-          console.log(`[Admin Panel] ✅ Converted "${value}" → "${expandedValue}"`);
-        } catch (error) {
-          // Store conversion error
-          const errorMessage = error instanceof Error ? error.message : 'Conversion failed';
-          newConversionErrors[key] = errorMessage;
-          hasConversionErrors = true;
-          console.log(`[Admin Panel] ❌ Conversion failed for "${value}":`, errorMessage);
+
+      try {
+        // Handle numeric types (uint, int variants)
+        if (isNumericType(input.type)) {
+          // Expand any exponential notation
+          const expanded = expandExpInt(value);
+          args.push(BigInt(expanded));
         }
-      } else {
-        // Pass through non-numeric or non-e-notation values unchanged
-        convertedValues[key] = value;
-        console.log(`[Admin Panel] ⏭️ Passed through unchanged: "${value}"`);
+        // Handle boolean types
+        else if (isBooleanType(input.type)) {
+          args.push(convertBooleanParameter(value));
+        }
+        // Handle address types
+        else if (input.type === 'address') {
+          if (!/^0x[a-fA-F0-9]{40}$/.test(value)) {
+            newConversionErrors[paramName] = 'Invalid address format';
+            hasError = true;
+            continue;
+          }
+          args.push(value as `0x${string}`);
+        }
+        // Handle bytes types
+        else if (input.type.startsWith('bytes')) {
+          if (!/^0x[a-fA-F0-9]*$/.test(value)) {
+            newConversionErrors[paramName] = 'Invalid bytes format (must start with 0x)';
+            hasError = true;
+            continue;
+          }
+          args.push(value as `0x${string}`);
+        }
+        // Default: pass as string
+        else {
+          args.push(value);
+        }
+      } catch (error) {
+        newConversionErrors[paramName] = error instanceof Error ? error.message : 'Conversion failed';
+        hasError = true;
       }
-    });
-
-    // If there are conversion errors, update state and return null
-    if (hasConversionErrors) {
-      setConversionErrors(newConversionErrors);
-      return null;
     }
 
-    // Build args array in the correct order for the contract function
-    const args = selectedFunction.inputs.map((input, index) => {
-      const key = input.name || `param${index}`;
-      return convertedValues[key];
-    });
+    setValidationErrors(newValidationErrors);
+    setConversionErrors(newConversionErrors);
 
+    if (hasError) return null;
     return args;
   };
 
   /**
-   * Handle Call button - for read-only functions (view/pure)
+   * Handle read call (view/pure functions)
    */
-  const handleCall = async () => {
-    if (!selectedFunction || !selectedContractKey) return;
+  const handleCallFunction = async () => {
+    if (!selectedFunction) return;
 
-    const args = convertAndValidateParameters();
+    const args = buildFunctionArgs();
     if (!args) return;
 
     setIsCalling(true);
@@ -657,7 +506,6 @@ export default function Admin() {
 
       console.log(`[Admin Panel] Calling ${selectedFunction.name} with args:`, args);
 
-      // Call the contract function using readContract
       const result = await readContract(wagmiConfig, {
         address: contractAddress as `0x${string}`,
         abi: selectedContract.abi,
@@ -665,18 +513,28 @@ export default function Admin() {
         args: args as any,
       });
 
-      console.log(`[Admin Panel] ✅ Call result for ${selectedFunction.name}:`, result);
+      console.log(`[Admin Panel] Result:`, result);
 
-      // Show success toast
+      // Format result for display
+      let displayResult: string;
+      if (typeof result === 'bigint') {
+        displayResult = result.toString();
+      } else if (typeof result === 'object') {
+        displayResult = JSON.stringify(result, (_, v) =>
+          typeof v === 'bigint' ? v.toString() : v
+        , 2);
+      } else {
+        displayResult = String(result);
+      }
+
       addToast({
         type: 'success',
         title: 'Call Successful',
-        description: 'Function called successfully. Check console for results.',
-        duration: 6000,
+        description: `Result: ${displayResult}`,
+        duration: 30000,
       });
-
     } catch (error) {
-      console.error('[Admin Panel] ❌ Call error:', error);
+      console.error('[Admin Panel] Call error:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
@@ -691,12 +549,12 @@ export default function Admin() {
   };
 
   /**
-   * Handle Execute button - for state-changing functions
+   * Handle execute transaction (state-changing functions)
    */
-  const handleExecute = async () => {
-    if (!selectedFunction || !selectedContractKey) return;
+  const handleExecuteFunction = async () => {
+    if (!selectedFunction) return;
 
-    const args = convertAndValidateParameters();
+    const args = buildFunctionArgs();
     if (!args) return;
 
     if (!isConnected || !walletAddress) {
@@ -754,12 +612,12 @@ export default function Admin() {
         duration: 30000,
       });
 
-      console.log(`[Admin Panel] ✅ Transaction submitted:`, hash);
+      console.log(`[Admin Panel] Transaction submitted:`, hash);
 
       // Success will be handled by useEffect when transaction confirms
 
     } catch (error) {
-      console.error('[Admin Panel] ❌ Execute error:', error);
+      console.error('[Admin Panel] Execute error:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       addToast({
@@ -774,7 +632,7 @@ export default function Admin() {
 
   /**
    * Handle mint yield button click
-   * Mints 1% of current AutoDolaVault DOLA balance to the vault
+   * Mints DOLA to the YieldStrategyDola contract for testing
    */
   const handleMintYield = async () => {
     if (!isConnected || !walletAddress) {
@@ -786,7 +644,7 @@ export default function Admin() {
       return;
     }
 
-    if (!addresses?.Dola || !addresses?.autoDolaVault) {
+    if (!addresses?.Dola || !addresses?.YieldStrategyDola) {
       addToast({
         type: 'error',
         title: 'Contract Not Available',
@@ -795,21 +653,11 @@ export default function Admin() {
       return;
     }
 
-    if (!vaultDolaBalance || vaultDolaBalance === 0n) {
-
-      addToast({
-        type: 'error',
-        title: 'No Balance to Mint',
-        description: 'AutoDolaVault has no DOLA balance. Cannot mint yield.',
-      });
-      return;
-    }
-
     setIsMinting(true);
 
     try {
-      // Calculate 1% of current vault DOLA balance
-      const mintAmount = vaultDolaBalance / 100n;
+      // Mint a fixed amount for testing (1000 DOLA = 1000 * 1e18 wei)
+      const mintAmount = BigInt(1000) * BigInt(1e18);
 
       // Show pending toast
       const pendingToastId = addToast({
@@ -819,19 +667,19 @@ export default function Admin() {
         duration: 30000,
       });
 
-      // Call the mint function on the DOLA token contract, minting to AutoDolaVault
+      // Call the mint function on the DOLA token contract, minting to YieldStrategyDola
       const hash = await writeContractAsync({
         address: addresses.Dola as `0x${string}`,
         abi: mintableErc20Abi,
         functionName: 'mint',
-        args: [addresses.autoDolaVault as `0x${string}`, mintAmount],
+        args: [addresses.YieldStrategyDola as `0x${string}`, mintAmount],
       });
 
       // Remove pending toast
       removeToast(pendingToastId);
 
       // Show confirming toast
-      const confirmingToastId = addToast({
+      addToast({
         type: 'info',
         title: 'Transaction Submitted',
         description: 'Waiting for blockchain confirmation...',
@@ -842,26 +690,19 @@ export default function Admin() {
             const explorerUrl = networkType === 'mainnet'
               ? `https://etherscan.io/tx/${hash}`
               : networkType === 'local'
-              ? `http://localhost:8545` // Anvil doesn't have a block explorer
+              ? `http://localhost:8545`
               : `https://sepolia.etherscan.io/tx/${hash}`;
             window.open(explorerUrl, '_blank');
           }
         }
       });
 
-      // Wait for confirmation (simplified - just using setTimeout)
-      setTimeout(async () => {
-        removeToast(confirmingToastId);
-
-        // Refetch all balances to show updated amounts
-        await refetchVaultDolaBalance(); // DOLA balance in vault (for mint button)
-        await refetchBondingCurveBalance(); // Total balance in bonding curve (for yield display)
-        await refetchPrincipal(); // Principal in bonding curve
-
+      // Wait for confirmation
+      setTimeout(() => {
         addToast({
           type: 'success',
           title: 'Yield Minted Successfully',
-          description: `Successfully minted 1% of vault balance (${(Number(mintAmount) / 1e18).toFixed(2)} DOLA) to AutoDolaVault!`,
+          description: `Successfully minted 1000 DOLA to YieldStrategyDola!`,
           duration: 30000,
           action: {
             label: 'View Transaction',
@@ -898,7 +739,7 @@ export default function Admin() {
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-foreground mb-2">Admin Controls</h2>
         <p className="text-sm text-muted-foreground">
-          Administrative functions for bonding curve contract owner
+          Administrative functions for Phoenix Phase 2 protocol contracts
         </p>
       </div>
 
@@ -906,7 +747,7 @@ export default function Admin() {
       <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4 mb-6">
         <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-foreground">Contract Owner:</span>
+            <span className="text-sm text-foreground">PhlimboEA Owner:</span>
             <span className="text-xs font-mono text-accent">
               {ownerAddress ? `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)}` : 'Loading...'}
             </span>
@@ -926,55 +767,15 @@ export default function Admin() {
           <ActionButton
             disabled={!isConnected || isMinting}
             onAction={handleMintYield}
-            label={!isConnected ? "Connect Wallet" : "Mint Yield (1% of Vault Balance)"}
+            label={!isConnected ? "Connect Wallet" : "Mint Test Yield (1000 DOLA)"}
             variant="primary"
             isLoading={isMinting}
           />
-          {vaultDolaBalance !== undefined && (
-            <p className="text-xs text-muted-foreground mt-2 text-center">
-              Current vault DOLA balance: {(Number(vaultDolaBalance) / 1e18).toFixed(2)} DOLA
-              {vaultDolaBalance > 0n && ` → Will mint ${(Number(vaultDolaBalance / 100n) / 1e18).toFixed(2)} DOLA`}
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Mints 1000 DOLA to YieldStrategyDola for testing yield accumulation
+          </p>
         </div>
       )}
-
-      {/* AutoDola Vault Yield vs Principal Breakdown */}
-      <div className="bg-card border border-border rounded-lg p-4 mb-6">
-        <h3 className="text-sm font-semibold text-foreground mb-3">
-          AutoDola Vault Balance Breakdown
-        </h3>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Principal (Bonding Curve):</span>
-            <span className="text-sm font-mono text-foreground">
-              {principalDisplay} DOLA
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Yield Generated:</span>
-            <span className="text-sm font-mono text-accent">
-              {yieldDisplay} DOLA
-            </span>
-          </div>
-          <div className="flex justify-between items-center pt-2 border-t border-border">
-            <span className="text-sm font-medium text-foreground">Total Vault Balance:</span>
-            <span className="text-sm font-mono font-semibold text-foreground">
-              {totalDisplay} DOLA
-            </span>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-          <strong>Note:</strong> Principal represents DOLA deposited through the bonding curve.
-          Yield is vault balance growth beyond principal. The bonding curve values phUSD as though yield is 0%,
-          while the protocol utilizes yield separately.
-          <span className="block mt-2">
-            Values are fetched directly from AutoDolaYieldStrategy using the IYieldStrategy interface:
-            principalOf() returns principal only, totalBalanceOf() returns principal + yield.
-            Yield is calculated as: totalBalanceOf - principalOf.
-          </span>
-        </p>
-      </div>
 
       {/* Selected Contract Address Display */}
       {selectedContractKey && addresses && (
@@ -998,22 +799,20 @@ export default function Admin() {
         {/* Contracts Dropdown */}
         <div className="flex-1">
           <label className="block text-sm font-medium text-foreground mb-2">
-            Contracts {isLoadingOwnership && <span className="text-xs text-muted-foreground">(Loading...)</span>}
+            Select Contract
           </label>
           <select
-            className="w-full px-4 py-2 bg-card border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!isConnected || isLoadingOwnership || ownedContracts.length === 0}
             value={selectedContractKey}
             onChange={(e) => setSelectedContractKey(e.target.value)}
+            disabled={isLoadingOwnership || ownedContracts.length === 0}
+            className="w-full px-3 py-2 bg-card border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">
-              {!isConnected
-                ? 'Connect wallet to view contracts'
-                : isLoadingOwnership
-                ? 'Checking ownership...'
+              {isLoadingOwnership
+                ? 'Loading...'
                 : ownedContracts.length === 0
                 ? 'No owned contracts found'
-                : 'Select Contract...'}
+                : 'Select a contract'}
             </option>
             {ownedContracts.map((contract) => (
               <option key={contract.addressKey} value={contract.addressKey}>
@@ -1021,135 +820,106 @@ export default function Admin() {
               </option>
             ))}
           </select>
-          {ownedContracts.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {ownedContracts.length} owned contract{ownedContracts.length > 1 ? 's' : ''} found
-            </p>
-          )}
         </div>
 
         {/* Functions Dropdown */}
         <div className="flex-1">
           <label className="block text-sm font-medium text-foreground mb-2">
-            Functions
+            Select Function
           </label>
           <select
-            className="w-full px-4 py-2 bg-card border border-border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!selectedContractKey || availableFunctions.length === 0}
             value={selectedFunctionName}
             onChange={(e) => setSelectedFunctionName(e.target.value)}
+            disabled={!selectedContractKey || availableFunctions.length === 0}
+            className="w-full px-3 py-2 bg-card border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">
               {!selectedContractKey
                 ? 'Select a contract first'
-                : availableFunctions.length === 0
-                ? 'No functions available'
-                : 'Select Function...'}
+                : 'Select a function'}
             </option>
-            {availableFunctions.map((funcName, index) => (
-              <option key={`${funcName}-${index}`} value={funcName}>
+            {availableFunctions.map((funcName) => (
+              <option key={funcName} value={funcName}>
                 {funcName}
               </option>
             ))}
           </select>
-          {availableFunctions.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {availableFunctions.length} function{availableFunctions.length > 1 ? 's' : ''} available
-            </p>
-          )}
         </div>
       </div>
 
-      {/* Parameter Input Form */}
-      {selectedFunction && (
-        <div className="mb-6 p-4 bg-card border border-border rounded-lg">
-          <h3 className="text-sm font-semibold text-foreground mb-4">
-            Function Parameters
+      {/* Function Parameters */}
+      {selectedFunction && selectedFunction.inputs.length > 0 && (
+        <div className="bg-card border border-border rounded-lg p-4 mb-6">
+          <h3 className="text-sm font-semibold text-foreground mb-3">
+            Parameters for {selectedFunction.name}
           </h3>
+          <div className="space-y-4">
+            {selectedFunction.inputs.map((input, index) => {
+              const paramName = input.name || `param_${index}`;
+              return (
+                <div key={paramName}>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    {paramName} ({input.type})
+                  </label>
+                  <input
+                    type="text"
+                    value={parameterValues[paramName] || ''}
+                    onChange={(e) => handleParameterChange(paramName, e.target.value)}
+                    placeholder={`Enter ${input.type}`}
+                    className={`w-full px-3 py-2 bg-background border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${
+                      validationErrors[paramName] || conversionErrors[paramName]
+                        ? 'border-red-500'
+                        : 'border-border'
+                    }`}
+                  />
+                  {validationErrors[paramName] && (
+                    <p className="text-xs text-red-500 mt-1">This field is required</p>
+                  )}
+                  {conversionErrors[paramName] && (
+                    <p className="text-xs text-red-500 mt-1">{conversionErrors[paramName]}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-          {selectedFunction.inputs.length > 0 ? (
-            <div className="space-y-3">
-              {selectedFunction.inputs.map((input, index) => {
-                const key = input.name || `param${index}`;
-                const paramName = input.name || `parameter${index}`;
-                const paramType = input.type;
-                const hasError = validationErrors[key];
-                const conversionError = conversionErrors[key];
-
-                return (
-                  <div key={key}>
-                    <label className="block text-xs font-medium text-foreground mb-1">
-                      {paramName}({paramType})
-                    </label>
-                    <input
-                      type="text"
-                      className={`w-full px-3 py-2 bg-background border rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent ${
-                        hasError || conversionError
-                          ? 'border-red-500 focus:ring-red-500'
-                          : 'border-border'
-                      }`}
-                      value={parameterValues[key] || ''}
-                      onChange={(e) => handleParameterChange(key, e.target.value)}
-                      placeholder={`Enter ${paramName}`}
-                    />
-                    {hasError && (
-                      <p className="text-xs text-red-500 mt-1">
-                        This field is required
-                      </p>
-                    )}
-                    {conversionError && (
-                      <p className="text-xs text-red-500 mt-1">
-                        {conversionError}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground mb-3">
-              This function has no parameters
-            </p>
+      {/* Action Buttons */}
+      {selectedFunction && (
+        <div className="flex gap-4">
+          {/* Call button for view/pure functions */}
+          {(selectedFunction.stateMutability === 'view' || selectedFunction.stateMutability === 'pure') && (
+            <ActionButton
+              disabled={isCalling}
+              onAction={handleCallFunction}
+              label="Call"
+              variant="primary"
+              isLoading={isCalling}
+            />
           )}
 
-          <div className="mt-4">
-            {selectedFunction.stateMutability === 'view' ||
-            selectedFunction.stateMutability === 'pure' ? (
-              <ActionButton
-                disabled={!isConnected || isCalling}
-                onAction={handleCall}
-                label="Call"
-                variant="primary"
-                isLoading={isCalling}
-              />
-            ) : (
-              <ActionButton
-                disabled={!isConnected || isExecuting || isConfirming}
-                onAction={handleExecute}
-                label="Execute"
-                variant="primary"
-                isLoading={isExecuting || isConfirming}
-              />
-            )}
-          </div>
+          {/* Execute button for state-changing functions */}
+          {selectedFunction.stateMutability !== 'view' && selectedFunction.stateMutability !== 'pure' && (
+            <ActionButton
+              disabled={isExecuting || isConfirming}
+              onAction={handleExecuteFunction}
+              label="Execute"
+              variant="primary"
+              isLoading={isExecuting || isConfirming}
+            />
+          )}
         </div>
       )}
 
       {/* Admin Notice */}
       <div className="mt-6 p-4 bg-card border border-border rounded-lg">
         <p className="text-xs text-muted-foreground">
-          <strong>Note:</strong> This tab is only visible to the bonding curve contract owner.
-          {showMintYieldButton && (
-            <span className="block mt-2">
-              <strong>Mint Yield:</strong> This testnet-only feature simulates yield generation by minting DOLA tokens directly into the AutoDolaVault. This button is hidden on mainnet.
-            </span>
-          )}
+          <strong>Phase 2 Contracts:</strong> This admin panel manages the new Phoenix Phase 2 protocol contracts
+          including PhUSD, Pauser, YieldStrategies (Dola, USDT, USDS), PhusdStableMinter, and PhlimboEA.
         </p>
-        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-          <strong>Dynamic ABI Loading:</strong> ABIs are statically imported from <code className="px-1 py-0.5 bg-background rounded">@behodler/wagmi-hooks</code>.
-          To update contract ABIs, reinstall the wagmi-hooks package or rebuild it from source.
-          Changes to ABIs in the deployment contracts will NOT be reflected automatically - the package must be updated first.
-          Check browser console (F12) for detailed contract discovery logs.
+        <p className="text-xs text-muted-foreground mt-2">
+          <strong>Dynamic ABI Loading:</strong> ABIs are statically imported from <code className="px-1 py-0.5 bg-background rounded">@behodler/phase2-wagmi-hooks</code>.
         </p>
       </div>
     </div>

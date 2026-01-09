@@ -1,4 +1,4 @@
-export type Tab = "Deposit to Mint" | "Burn to Withdraw" | "Mint" | "Deposit" | "Withdraw" | "Yield Funnel" | "Testnet Faucet" | "Safety" | "Admin";
+export type Tab = "Mint" | "Deposit" | "Withdraw" | "Yield Funnel" | "Testnet Faucet" | "Safety" | "Admin";
 
 export interface VaultFormData {
   amount: string;
@@ -37,18 +37,6 @@ export interface TabNavigationProps {
   onTriggerFAQ?: (componentName: string) => void;
 }
 
-export interface DepositFormProps {
-  formData: VaultFormData;
-  onFormChange: (data: Partial<VaultFormData>) => void;
-  constants: VaultConstants;
-  tokenInfo: TokenInfo;
-  onDeposit: (bondingCurveOutput?: number) => void;
-  isTransacting?: boolean;
-  needsApproval?: boolean;
-  onApprove?: () => void;
-  isAllowanceLoading?: boolean;
-  isPaused?: boolean;
-}
 
 
 export interface AmountDisplayProps {
@@ -89,19 +77,6 @@ export interface ActionButtonProps {
   variant?: 'primary' | 'approve';
 }
 
-export interface WithdrawFormProps {
-  formData: VaultFormData;
-  onFormChange: (data: Partial<VaultFormData>) => void;
-  constants: VaultConstants;
-  positionInfo: PositionInfo;
-  onWithdraw: (bondingCurveOutput?: number) => void;
-  isTransacting?: boolean;
-  withdrawalFeeRate?: number; // Decimal rate (e.g., 0.02 = 2%)
-  needsApproval?: boolean; // Whether bonding token approval is needed
-  onApprove?: () => Promise<void>; // Callback for bonding token approval
-  isAllowanceLoading?: boolean; // Whether allowance is still loading
-  isPaused?: boolean;
-}
 
 export interface ContextBoxProps {
   children?: React.ReactNode;

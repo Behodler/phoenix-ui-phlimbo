@@ -42,17 +42,17 @@ export default function SafetyTab() {
     refetch: refetchAllowance
   } = useTokenAllowance(
     walletAddress,
-    addresses?.pauser as `0x${string}` | undefined,
+    addresses?.Pauser as `0x${string}` | undefined,
     addresses?.EYE as `0x${string}` | undefined
   );
 
   // Fetch required EYE amount from Pauser contract
   const { data: eyeBurnAmountRaw, isLoading: isLoadingEyeBurnAmount } = useReadContract({
-    address: addresses?.pauser as `0x${string}` | undefined,
+    address: addresses?.Pauser as `0x${string}` | undefined,
     abi: pauserAbi,
     functionName: 'eyeBurnAmount',
     query: {
-      enabled: !!addresses?.pauser,
+      enabled: !!addresses?.Pauser,
     },
   });
 
@@ -82,13 +82,13 @@ export default function SafetyTab() {
   // EYE approval transaction state management
   const approvalTransaction = useApprovalTransaction(
     async () => {
-      if (!addresses?.EYE || !addresses?.pauser) {
+      if (!addresses?.EYE || !addresses?.Pauser) {
         throw new Error('Contract addresses not loaded');
       }
       // Approve unlimited amount
       return approve(
         addresses.EYE as `0x${string}`,
-        addresses.pauser as `0x${string}`,
+        addresses.Pauser as `0x${string}`,
         maxUint256
       );
     },
@@ -146,7 +146,7 @@ export default function SafetyTab() {
       return;
     }
 
-    if (!addresses?.EYE || !addresses?.pauser || requiredEyeAmount === null) {
+    if (!addresses?.EYE || !addresses?.Pauser || requiredEyeAmount === null) {
       addToast({
         type: 'error',
         title: 'Contract Not Ready',
@@ -212,7 +212,7 @@ export default function SafetyTab() {
       return;
     }
 
-    if (!addresses?.pauser) {
+    if (!addresses?.Pauser) {
       addToast({
         type: 'error',
         title: 'Contract Not Available',
@@ -232,7 +232,7 @@ export default function SafetyTab() {
 
       // Call pause function
       const hash = await writePause({
-        address: addresses.pauser as `0x${string}`,
+        address: addresses.Pauser as `0x${string}`,
         abi: pauserAbi,
         functionName: 'pause',
       });
