@@ -97,7 +97,7 @@ function MyComponent() {
   return (
     <div>
       <p>Network: {networkType}</p>
-      <p>DOLA Token: {addresses.dolaToken}</p>
+      <p>DOLA Token: {addresses.Dola}</p>
       <p>AutoDola Vault: {addresses.autoDolaVault}</p>
       {/* ... use other addresses ... */}
     </div>

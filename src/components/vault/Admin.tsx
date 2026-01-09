@@ -184,11 +184,11 @@ export default function Admin() {
     address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
     abi: autoDolaYieldStrategyAbi,
     functionName: 'principalOf',
-    args: addresses?.dolaToken && addresses?.bondingCurve
-      ? [addresses.dolaToken as `0x${string}`, addresses.bondingCurve as `0x${string}`]
+    args: addresses?.Dola && addresses?.bondingCurve
+      ? [addresses.Dola as `0x${string}`, addresses.bondingCurve as `0x${string}`]
       : undefined,
     query: {
-      enabled: !!addresses?.autoDolaYieldStrategy && !!addresses?.dolaToken && !!addresses?.bondingCurve,
+      enabled: !!addresses?.autoDolaYieldStrategy && !!addresses?.Dola && !!addresses?.bondingCurve,
     },
   });
 
@@ -199,25 +199,25 @@ export default function Admin() {
     address: addresses?.autoDolaYieldStrategy as `0x${string}` | undefined,
     abi: autoDolaYieldStrategyAbi,
     functionName: 'totalBalanceOf',
-    args: addresses?.dolaToken && addresses?.bondingCurve
-      ? [addresses.dolaToken as `0x${string}`, addresses.bondingCurve as `0x${string}`]
+    args: addresses?.Dola && addresses?.bondingCurve
+      ? [addresses.Dola as `0x${string}`, addresses.bondingCurve as `0x${string}`]
       : undefined,
     query: {
-      enabled: !!addresses?.autoDolaYieldStrategy && !!addresses?.dolaToken && !!addresses?.bondingCurve,
+      enabled: !!addresses?.autoDolaYieldStrategy && !!addresses?.Dola && !!addresses?.bondingCurve,
     },
   });
 
   // Fetch DOLA balance IN the AutoDolaVault contract itself
   // This is used by the mint yield button to check if there's DOLA available to mint as yield
   const { data: vaultDolaBalance, refetch: refetchVaultDolaBalance } = useReadContract({
-    address: addresses?.dolaToken as `0x${string}` | undefined,
+    address: addresses?.Dola as `0x${string}` | undefined,
     abi: mintableErc20Abi,
     functionName: 'balanceOf',
     args: addresses?.autoDolaVault
       ? [addresses.autoDolaVault as `0x${string}`]
       : undefined,
     query: {
-      enabled: !!addresses?.dolaToken && !!addresses?.autoDolaVault,
+      enabled: !!addresses?.Dola && !!addresses?.autoDolaVault,
     },
   });
 
@@ -261,7 +261,7 @@ export default function Admin() {
       yield_: yield_.toString(),
       addresses: {
         autoDolaYieldStrategy: addresses?.autoDolaYieldStrategy,
-        dolaToken: addresses?.dolaToken,
+        dolaToken: addresses?.Dola,
         bondingCurve: addresses?.bondingCurve,
         autoDolaVault: addresses?.autoDolaVault,
       },
@@ -786,7 +786,7 @@ export default function Admin() {
       return;
     }
 
-    if (!addresses?.dolaToken || !addresses?.autoDolaVault) {
+    if (!addresses?.Dola || !addresses?.autoDolaVault) {
       addToast({
         type: 'error',
         title: 'Contract Not Available',
@@ -821,7 +821,7 @@ export default function Admin() {
 
       // Call the mint function on the DOLA token contract, minting to AutoDolaVault
       const hash = await writeContractAsync({
-        address: addresses.dolaToken as `0x${string}`,
+        address: addresses.Dola as `0x${string}`,
         abi: mintableErc20Abi,
         functionName: 'mint',
         args: [addresses.autoDolaVault as `0x${string}`, mintAmount],

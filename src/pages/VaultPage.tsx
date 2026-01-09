@@ -151,7 +151,7 @@ export default function VaultPage() {
     refetch: refetchDolaBalance
   } = useTokenBalance(
     walletAddress,
-    addresses?.dolaToken as `0x${string}` | undefined
+    addresses?.Dola as `0x${string}` | undefined
   );
 
   // Fetch phUSD balance from wallet's ERC20 token balance (following pattern from story 018)
@@ -172,7 +172,7 @@ export default function VaultPage() {
   } = useTokenAllowance(
     walletAddress,
     addresses?.bondingCurve as `0x${string}` | undefined,
-    addresses?.dolaToken as `0x${string}` | undefined
+    addresses?.Dola as `0x${string}` | undefined
   );
 
   // Fetch bonding token (phUSD) allowance for bonding curve contract
@@ -555,11 +555,11 @@ export default function VaultPage() {
   const approvalTransaction = useApprovalTransaction(
     async () => {
       // Execute the approval with addresses from context
-      if (!addresses?.dolaToken || !addresses?.bondingCurve) {
+      if (!addresses?.Dola || !addresses?.bondingCurve) {
         throw new Error('Contract addresses not loaded');
       }
       return approve(
-        addresses.dolaToken as `0x${string}`,
+        addresses.Dola as `0x${string}`,
         addresses.bondingCurve as `0x${string}`
         // Using default maxUint256 for unlimited approval
       );
@@ -908,7 +908,7 @@ export default function VaultPage() {
       return;
     }
 
-    if (!addresses?.dolaToken || !addresses?.bondingCurve) {
+    if (!addresses?.Dola || !addresses?.PhlimboEA || !addresses?.PhusdStableMinter || !addresses?.StableYieldAccumulator) {
       addToast({
         type: 'error',
         title: 'Contract Addresses Not Loaded',
@@ -938,25 +938,7 @@ export default function VaultPage() {
     }
   };
 
-  // Handle bonding token (phUSD) approval button click (for withdrawals)
-  const handleBondingTokenApprove = async (): Promise<void> => {
-    if (!isConnected) {
-      addToast({
-        type: 'error',
-        title: 'Wallet Not Connected',
-        description: 'Please connect your wallet using the button in the header.',
-      });
-      return;
-    }
 
-    if (!addresses?.bondingToken || !addresses?.bondingCurve) {
-      addToast({
-        type: 'error',
-        title: 'Contract Addresses Not Loaded',
-        description: 'Please wait for contract addresses to load and try again.',
-      });
-      return;
-    }
 
     try {
       await bondingTokenApprovalTransaction.execute();
@@ -1036,14 +1018,7 @@ export default function VaultPage() {
       return;
     }
 
-    if (!addresses?.bondingCurve) {
-      addToast({
-        type: 'error',
-        title: 'Contract Not Available',
-        description: 'Bonding curve contract address not loaded. Please try again.',
-      });
-      return;
-    }
+
 
     try {
       // Capture the deposit amount before transaction to prevent duplicate toasts

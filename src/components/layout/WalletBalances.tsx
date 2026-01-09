@@ -20,7 +20,7 @@ export default function WalletBalances() {
     isError: dolaError
   } = useTokenBalance(
     walletAddress,
-    addresses?.dolaToken as `0x${string}` | undefined
+    addresses?.Dola as `0x${string}` | undefined
   );
 
   // Fetch phUSD balance
