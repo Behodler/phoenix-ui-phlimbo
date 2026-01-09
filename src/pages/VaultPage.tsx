@@ -14,6 +14,7 @@ import DepositForm from '../components/vault/DepositForm';
 import WithdrawTab from '../components/vault/WithdrawTab';
 import MintForm from '../components/vault/MintForm';
 import DepositToYieldForm from '../components/vault/DepositToYieldForm';
+import WithdrawFromYieldForm from '../components/vault/WithdrawFromYieldForm';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
 import SafetyTab from '../components/vault/SafetyTab';
 import YieldFunnelTab from '../components/vault/YieldFunnelTab';
@@ -120,6 +121,10 @@ export default function VaultPage() {
 
   // State for mock deposit to yield transaction
   const [isDepositingToYield, setIsDepositingToYield] = useState(false);
+
+  // State for withdraw from yield amount and transaction
+  const [withdrawFromYieldAmount, setWithdrawFromYieldAmount] = useState<string>("");
+  const [isWithdrawingFromYield, setIsWithdrawingFromYield] = useState(false);
 
   // Sync formData.amount with the appropriate state variable when tab changes
   useEffect(() => {
@@ -813,6 +818,82 @@ export default function VaultPage() {
     }
   };
 
+  // Handle withdraw from yield amount change
+  const handleWithdrawFromYieldAmountChange = (amount: string) => {
+    setWithdrawFromYieldAmount(amount);
+  };
+
+  // Mock withdraw from yield handler - simulates a successful withdrawal without actual contract interaction
+  // This is a fully mocked flow - no wallet connection required
+  const handleWithdrawFromYield = async () => {
+    // Validate amount
+    if (!withdrawFromYieldAmount || withdrawFromYieldAmount === '0' || withdrawFromYieldAmount === '') {
+      addToast({
+        type: 'error',
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount greater than 0.',
+      });
+      return;
+    }
+
+    // Mock staked balance check (60 phUSD staked as per story spec)
+    const MOCK_STAKED_BALANCE = 60;
+    const parsedAmount = parseFloat(withdrawFromYieldAmount);
+    if (parsedAmount > MOCK_STAKED_BALANCE) {
+      addToast({
+        type: 'error',
+        title: 'Insufficient Staked Balance',
+        description: `You only have ${MOCK_STAKED_BALANCE.toFixed(4)} phUSD staked.`,
+      });
+      return;
+    }
+
+    try {
+      setIsWithdrawingFromYield(true);
+
+      // Calculate proportional yield (mock values from story)
+      const MOCK_PHUSD_YIELD = 2;
+      const MOCK_USDC_YIELD = 7.3;
+      const withdrawalPercentage = parsedAmount / MOCK_STAKED_BALANCE;
+      const phUsdYield = (MOCK_PHUSD_YIELD * withdrawalPercentage).toFixed(4);
+      const usdcYield = (MOCK_USDC_YIELD * withdrawalPercentage).toFixed(4);
+      const totalPhUsd = (parsedAmount + parseFloat(phUsdYield)).toFixed(4);
+
+      // Show pending toast
+      addToast({
+        type: 'info',
+        title: 'Claiming Yield',
+        description: 'Processing your withdrawal and claim transaction...',
+        duration: 3000,
+      });
+
+      // Simulate a delay to mimic transaction processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Show success toast
+      addToast({
+        type: 'success',
+        title: 'Claim Successful (Mock)',
+        description: `Successfully withdrew ${parsedAmount.toFixed(4)} phUSD principal + ${phUsdYield} phUSD yield + ${usdcYield} USDC yield (Total: ${totalPhUsd} phUSD + ${usdcYield} USDC)`,
+        duration: 8000,
+      });
+
+      // Clear the withdraw amount
+      setWithdrawFromYieldAmount("");
+
+    } catch (error) {
+      log.error('Mock withdraw from yield failed:', error);
+      addToast({
+        type: 'error',
+        title: 'Withdrawal Failed',
+        description: 'An error occurred during the withdrawal transaction.',
+        duration: 8000,
+      });
+    } finally {
+      setIsWithdrawingFromYield(false);
+    }
+  };
+
   // Handle DOLA approval button click (for deposits)
   const handleApprove = async (): Promise<void> => {
 
@@ -1252,9 +1333,15 @@ export default function VaultPage() {
                 />
               </ErrorBoundary>
             ) : activeTab === "Withdraw" ? (
-              <div className="p-6">
-                <h1 className="text-2xl font-bold text-card-foreground">Withdraw</h1>
-              </div>
+              <ErrorBoundary>
+                <WithdrawFromYieldForm
+                  amount={withdrawFromYieldAmount}
+                  onAmountChange={handleWithdrawFromYieldAmountChange}
+                  onWithdraw={handleWithdrawFromYield}
+                  isTransacting={isWithdrawingFromYield}
+                  isPaused={isPaused === true}
+                />
+              </ErrorBoundary>
             ) : activeTab === "Yield Funnel" ? (
               <ErrorBoundary>
                 <YieldFunnelTab />
