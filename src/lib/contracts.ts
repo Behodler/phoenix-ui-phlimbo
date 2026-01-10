@@ -8,7 +8,7 @@ import type { ContractAddresses } from '../types/contracts'
  *            bondingToken is the ERC20 token produced by the bonding curve
  */
 export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
-  PhUSD: '0x0000000000000000000000000000000000000000',
+  PhUSD: '0xf3B5B661b92B75C71fA5Aba8Fd95D7514A9CD605',
   USDC: '0x0000000000000000000000000000000000000000',
   USDT: '0x0000000000000000000000000000000000000000',
   Dola: '0x865377367054516e17014CcdED1e7d814EDC9ce4',
