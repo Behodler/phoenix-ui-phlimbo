@@ -8,7 +8,7 @@ set -e
 if [ -z "$DEPLOYMENT_SERVER_PATH" ]; then
   echo "ERROR: DEPLOYMENT_SERVER_PATH is not set"
   echo "Please create a .envrc file with:"
-  echo "  export DEPLOYMENT_SERVER_PATH=~/code/reflax-mint/deployment-staging"
+  echo "  export DEPLOYMENT_SERVER_PATH=~/code/reflax-mint/phase-2-staging"
   echo "Then source it: source .envrc"
   exit 1
 fi

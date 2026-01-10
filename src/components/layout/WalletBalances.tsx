@@ -9,10 +9,11 @@ import { useTokenBalance } from '../../hooks/useContractInteractions';
  * Displays DOLA and phUSD token balances for the connected wallet.
  * Only renders when a wallet is connected.
  */
+import { log } from '../../utils/logger';
 export default function WalletBalances() {
   const { isConnected, address: walletAddress } = useAccount();
   const { addresses } = useContractAddresses();
-
+log.warn("address: "+JSON.stringify(addresses))
   // Fetch DOLA balance
   const {
     balance: dolaBalanceRaw,

@@ -11,7 +11,7 @@ if [ -f "$PROJECT_ROOT/.envrc" ]; then
   source "$PROJECT_ROOT/.envrc"
 else
   echo "WARNING: No .envrc file found in $PROJECT_ROOT"
-  echo "Please create .envrc with: export DEPLOYMENT_SERVER_PATH=~/code/reflax-mint/deployment-staging"
+  echo "Please create .envrc with: export DEPLOYMENT_SERVER_PATH=~/code/reflax-mint/phase-2-staging"
 fi
 
 # Now run the actual start script
