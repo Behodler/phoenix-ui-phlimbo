@@ -186,6 +186,34 @@ export default function Admin() {
     },
   });
 
+  // Fetch principal from YieldStrategyDola (principal deposited via PhusdStableMinter)
+  const { data: phusdStableMinterPrincipal, refetch: refetchPrincipal, error: principalError } = useReadContract({
+    address: addresses?.YieldStrategyDola as `0x${string}` | undefined,
+    abi: iYieldStrategyAbi,
+    functionName: 'principalOf',
+    args: addresses?.Dola && addresses?.PhusdStableMinter
+      ? [addresses.Dola as `0x${string}`, addresses.PhusdStableMinter as `0x${string}`]
+      : undefined,
+    query: {
+      enabled: !!addresses?.YieldStrategyDola && !!addresses?.Dola && !!addresses?.PhusdStableMinter,
+    },
+  });
+
+  // Fetch total balance from YieldStrategyDola (principal + yield for PhusdStableMinter)
+  // Uses totalBalanceOf per IYieldStrategy interface specification
+  // This is used for calculating yield display: yield = totalBalanceOf - principalOf
+  const { data: phusdStableMinterTotalBalance, refetch: refetchTotalBalance, error: totalBalanceError } = useReadContract({
+    address: addresses?.YieldStrategyDola as `0x${string}` | undefined,
+    abi: iYieldStrategyAbi,
+    functionName: 'totalBalanceOf',
+    args: addresses?.Dola && addresses?.PhusdStableMinter
+      ? [addresses.Dola as `0x${string}`, addresses.PhusdStableMinter as `0x${string}`]
+      : undefined,
+    query: {
+      enabled: !!addresses?.YieldStrategyDola && !!addresses?.Dola && !!addresses?.PhusdStableMinter,
+    },
+  });
+
   // Wagmi hooks for contract write and transaction tracking
   const { data: txHash, writeContractAsync } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({
@@ -198,6 +226,46 @@ export default function Admin() {
   // Check if we should show mint yield button (hide on mainnet, chainID 1)
   const isMainnet = chainId === 1;
   const showMintYieldButton = !isMainnet;
+
+  // Calculate yield vs principal breakdown
+  // Total = phusdStableMinterTotalBalance (queries YieldStrategyDola.totalBalanceOf)
+  // Principal = principal tracked for PhusdStableMinter deposits (queries YieldStrategyDola.principalOf)
+  // Yield = Total - Principal (calculated from YieldStrategyDola's tracked principal + yield)
+  const principal = phusdStableMinterPrincipal !== undefined ? phusdStableMinterPrincipal : 0n;
+  const totalVaultBalance = phusdStableMinterTotalBalance !== undefined ? phusdStableMinterTotalBalance : 0n;
+  const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
+
+  // Format for display (convert from wei to DOLA)
+  const principalDisplay = (Number(principal) / 1e18).toFixed(2);
+  const yieldDisplay = (Number(yield_) / 1e18).toFixed(2);
+  const totalDisplay = (Number(totalVaultBalance) / 1e18).toFixed(2);
+
+  // Debug logging for balance queries
+  useEffect(() => {
+    console.log('[Admin] Balance Query Debug:', {
+      phusdStableMinterPrincipal: phusdStableMinterPrincipal?.toString(),
+      phusdStableMinterTotalBalance: phusdStableMinterTotalBalance?.toString(),
+      principal: principal.toString(),
+      totalVaultBalance: totalVaultBalance.toString(),
+      yield_: yield_.toString(),
+      addresses: {
+        YieldStrategyDola: addresses?.YieldStrategyDola,
+        Dola: addresses?.Dola,
+        PhusdStableMinter: addresses?.PhusdStableMinter,
+      },
+      errors: {
+        principalError: principalError?.message,
+        totalBalanceError: totalBalanceError?.message,
+      }
+    });
+
+    if (principalError) {
+      console.error('[Admin] Principal Query Error:', principalError);
+    }
+    if (totalBalanceError) {
+      console.error('[Admin] Total Balance Query Error:', totalBalanceError);
+    }
+  }, [phusdStableMinterPrincipal, phusdStableMinterTotalBalance, principal, totalVaultBalance, yield_, addresses, principalError, totalBalanceError]);
 
   /**
    * Discover owned contracts by checking ownership of each contract
@@ -697,7 +765,7 @@ export default function Admin() {
         }
       });
 
-      // Wait for confirmation
+      // Wait for confirmation and refetch balances
       setTimeout(() => {
         addToast({
           type: 'success',
@@ -716,6 +784,9 @@ export default function Admin() {
             }
           }
         });
+        // Refetch balance breakdown after minting yield
+        refetchPrincipal();
+        refetchTotalBalance();
         setIsMinting(false);
       }, 2000);
 
@@ -776,6 +847,54 @@ export default function Admin() {
           </p>
         </div>
       )}
+
+      {/* YieldStrategyDola Balance Breakdown */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-semibold text-foreground mb-3">
+          YieldStrategyDola Balance Breakdown
+        </h3>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Principal (PhusdStableMinter):</span>
+            <span className="text-sm font-mono text-foreground">
+              {principalDisplay} DOLA
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Yield Generated:</span>
+            <span className="text-sm font-mono text-accent">
+              {yieldDisplay} DOLA
+            </span>
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-foreground">Total Vault Balance:</span>
+            <span className="text-sm font-mono font-semibold text-foreground">
+              {totalDisplay} DOLA
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-border">
+          <button
+            onClick={() => {
+              refetchPrincipal();
+              refetchTotalBalance();
+            }}
+            className="text-xs text-accent hover:text-accent/80 underline"
+          >
+            Refresh Balances
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+          <strong>Note:</strong> Principal represents DOLA deposited through PhusdStableMinter.
+          Yield is vault balance growth beyond principal. PhUSD values are based on principal only,
+          while the protocol utilizes yield separately.
+          <span className="block mt-2">
+            Values are fetched directly from YieldStrategyDola using the IYieldStrategy interface:
+            principalOf() returns principal only, totalBalanceOf() returns principal + yield.
+            Yield is calculated as: totalBalanceOf - principalOf.
+          </span>
+        </p>
+      </div>
 
       {/* Selected Contract Address Display */}
       {selectedContractKey && addresses && (
