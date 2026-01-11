@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useChainId, useReadContract } from 'wagmi';
+import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import type { Tab, TokenInfo } from '../types/vault';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
-import { parseUnits } from 'viem';
-import { phlimboEaAbi } from '@behodler/phase2-wagmi-hooks';
+import { parseUnits, maxUint256 } from 'viem';
+import { phlimboEaAbi, phusdStableMinterAbi } from '@behodler/phase2-wagmi-hooks';
+import { useTokenBalance, useTokenAllowance, useTokenApproval } from '../hooks/useContractInteractions';
+import { useApprovalTransaction } from '../hooks/useTransaction';
+import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
 import Header from '../components/layout/Header';
 import TabNavigation from '../components/ui/TabNavigation';
 import MintForm from '../components/vault/MintForm';
@@ -45,6 +48,37 @@ export default function VaultPage() {
       chainId
     });
   }, [addresses, networkType, addressesLoading, addressesError, chainId]);
+
+  // Token approval hook for DOLA
+  const { approve } = useTokenApproval();
+
+  // Fetch DOLA balance for connected wallet
+  const {
+    balance: dolaBalanceRaw,
+    refetch: refetchDolaBalance
+  } = useTokenBalance(
+    walletAddress,
+    addresses?.Dola as `0x${string}` | undefined
+  );
+
+  // Fetch DOLA allowance for PhusdStableMinter contract
+  const {
+    allowance: dolaAllowanceRaw,
+    isLoading: dolaAllowanceLoading,
+    refetch: refetchDolaAllowance
+  } = useTokenAllowance(
+    walletAddress,
+    addresses?.PhusdStableMinter as `0x${string}` | undefined,
+    addresses?.Dola as `0x${string}` | undefined
+  );
+
+  // Fetch phUSD balance for connected wallet (to refetch after mint)
+  const {
+    refetch: refetchPhUsdBalance
+  } = useTokenBalance(
+    walletAddress,
+    addresses?.PhUSD as `0x${string}` | undefined
+  );
 
   // Fetch the owner address from the PhlimboEA contract (new architecture)
   const { data: ownerAddress } = useReadContract({
@@ -104,11 +138,13 @@ export default function VaultPage() {
   const [depositToYieldAmount, setDepositToYieldAmount] = useState<string>("");
   const [withdrawFromYieldAmount, setWithdrawFromYieldAmount] = useState<string>("");
 
-  // State for mock transactions
-  const [isMinting, setIsMinting] = useState(false);
+  // State for mock transactions (deposit/withdraw/claim still mocked, mint is now real)
   const [isDepositingToYield, setIsDepositingToYield] = useState(false);
   const [isWithdrawingFromYield, setIsWithdrawingFromYield] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+
+  // Mock balance for deposit/withdraw tabs (still mocked)
+  const MOCK_DOLA_BALANCE = 10000;
 
   // Pause state - in the new architecture, we'll use a simple mock for now
   // TODO: Fetch actual pause state from the appropriate Phase 2 contract
@@ -117,16 +153,99 @@ export default function VaultPage() {
   // Toast notifications
   const { addToast } = useToast();
 
-  // Mock token info for the Mint tab (fully mocked flow without blockchain)
-  // Provides 10,000 DOLA for testing the mock mint flow
-  const MOCK_DOLA_BALANCE = 10000;
+  // Convert DOLA balance from raw bigint to display format
+  const dolaBalance = dolaBalanceRaw ? parseFloat((Number(dolaBalanceRaw) / 1e18).toFixed(4)) : 0;
+
+  // Real token info for the Mint tab using actual DOLA balance
   const mintTokenInfo: TokenInfo = {
     name: "DOLA",
-    balance: MOCK_DOLA_BALANCE,
-    balanceUsd: MOCK_DOLA_BALANCE,
-    balanceRaw: parseUnits(MOCK_DOLA_BALANCE.toString(), 18),
+    balance: dolaBalance,
+    balanceUsd: dolaBalance, // 1:1 USD value assumption for stablecoins
+    balanceRaw: dolaBalanceRaw ?? 0n,
     icon: DOLA
   };
+
+  // Check if approval is needed for the current mint amount
+  // Convert mint amount to wei for comparison with allowance
+  const mintAmountWei = mintAmount && mintAmount !== '' && mintAmount !== '0'
+    ? (() => {
+        try {
+          return parseUnits(mintAmount, 18);
+        } catch {
+          return 0n;
+        }
+      })()
+    : 0n;
+
+  // Needs approval if allowance is less than the mint amount being requested
+  const needsDolaApproval = dolaAllowanceRaw !== undefined
+    ? dolaAllowanceRaw < mintAmountWei
+    : true; // Default to needing approval if allowance hasn't loaded yet
+
+  // Mint transaction state using wagmi hooks (similar to pause transaction in SafetyTab)
+  const { data: mintHash, writeContractAsync: writeMint, isPending: isMintPending } = useWriteContract();
+  const { isLoading: isMintConfirming, isSuccess: isMintSuccess } = useWaitForTransactionReceipt({
+    hash: mintHash,
+    query: {
+      enabled: !!mintHash,
+    },
+  });
+
+  // DOLA approval transaction state management
+  const approvalTransaction = useApprovalTransaction(
+    async () => {
+      if (!addresses?.Dola || !addresses?.PhusdStableMinter) {
+        throw new Error('Contract addresses not loaded');
+      }
+      // Approve unlimited amount for better UX (single approval)
+      return approve(
+        addresses.Dola as `0x${string}`,
+        addresses.PhusdStableMinter as `0x${string}`,
+        maxUint256
+      );
+    },
+    {
+      onSuccess: async (hash) => {
+        await refetchDolaAllowance();
+
+        addToast({
+          type: 'success',
+          title: 'Approval Successful',
+          description: 'DOLA spending has been approved for minting phUSD.',
+          duration: 30000,
+          action: {
+            label: 'View Transaction',
+            onClick: () => {
+              const explorerUrl = networkType === 'mainnet'
+                ? `https://etherscan.io/tx/${hash}`
+                : `https://sepolia.etherscan.io/tx/${hash}`;
+              window.open(explorerUrl, '_blank');
+            }
+          }
+        });
+      },
+      onError: (error) => {
+        log.error('DOLA approval failed:', error);
+      },
+      onStatusChange: (status) => {
+        if (status === 'PENDING_SIGNATURE') {
+          addToast({
+            type: 'info',
+            title: 'Confirm in Wallet',
+            description: 'Please confirm the approval transaction in your wallet.',
+            duration: 30000,
+          });
+        } else if (status === 'PENDING_CONFIRMATION') {
+          addToast({
+            type: 'info',
+            title: 'Transaction Submitted',
+            description: 'Waiting for blockchain confirmation...',
+            duration: 30000,
+          });
+        }
+      }
+    }
+  );
 
   // Mock yield/rewards data for YieldRewardsInfo component
   // These are placeholder values until real contract integration is implemented
@@ -186,8 +305,46 @@ export default function VaultPage() {
     setMintAmount(amount);
   };
 
-  // Mock mint handler - simulates a successful mint without actual contract interaction
-  // This is a fully mocked flow - no wallet connection required
+  // Handle DOLA approval for minting
+  const handleDolaApproval = async (): Promise<void> => {
+    if (!walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet using the button in the header.',
+      });
+      return;
+    }
+
+    if (!addresses?.Dola || !addresses?.PhusdStableMinter) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Ready',
+        description: 'Please wait for contract addresses to load.',
+      });
+      return;
+    }
+
+    try {
+      await approvalTransaction.execute();
+    } catch {
+      if (approvalTransaction.state.error) {
+        const { error: txError } = approvalTransaction.state;
+        addToast({
+          type: 'error',
+          title: getErrorTitle(txError.type),
+          description: txError.message,
+          duration: 16000,
+          action: shouldOfferRetry(txError.type) ? {
+            label: 'Retry',
+            onClick: () => approvalTransaction.retry()
+          } : undefined
+        });
+      }
+    }
+  };
+
+  // Real mint handler - executes PhusdStableMinter.mint(stablecoin, amount)
   const handleMint = async () => {
     // Validate amount
     if (!mintAmount || mintAmount === '0' || mintAmount === '') {
@@ -199,54 +356,129 @@ export default function VaultPage() {
       return;
     }
 
-    // Check against mock balance (no real blockchain balance needed)
+    // Check wallet connection
+    if (!walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet using the button in the header.',
+      });
+      return;
+    }
+
+    // Check contract addresses are loaded
+    if (!addresses?.PhusdStableMinter || !addresses?.Dola) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Ready',
+        description: 'Please wait for contract addresses to load.',
+      });
+      return;
+    }
+
+    // Check balance
     const parsedAmount = parseFloat(mintAmount);
-    if (parsedAmount > MOCK_DOLA_BALANCE) {
+    if (parsedAmount > dolaBalance) {
       addToast({
         type: 'error',
         title: 'Insufficient Balance',
-        description: `You only have ${MOCK_DOLA_BALANCE.toFixed(4)} DOLA available.`,
+        description: `You only have ${dolaBalance.toFixed(4)} DOLA available.`,
       });
       return;
     }
 
     try {
-      setIsMinting(true);
-
       // Show pending toast
       addToast({
         type: 'info',
-        title: 'Minting phUSD',
-        description: 'Processing your mint transaction...',
-        duration: 3000,
+        title: 'Confirm Transaction',
+        description: 'Please confirm the mint transaction in your wallet.',
+        duration: 30000,
       });
 
-      // Simulate a delay to mimic transaction processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Convert amount to wei (18 decimals for DOLA)
+      const amountWei = parseUnits(mintAmount, 18);
 
-      // Show success toast
+      // Execute mint: PhusdStableMinter.mint(stablecoinAddress, amount)
+      const hash = await writeMint({
+        address: addresses.PhusdStableMinter as `0x${string}`,
+        abi: phusdStableMinterAbi,
+        functionName: 'mint',
+        args: [addresses.Dola as `0x${string}`, amountWei],
+      });
+
+      // Show confirming toast
+      addToast({
+        type: 'info',
+        title: 'Transaction Submitted',
+        description: 'Waiting for blockchain confirmation...',
+        duration: 30000,
+        action: {
+          label: 'View on Etherscan',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${hash}`
+              : `https://sepolia.etherscan.io/tx/${hash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
+      });
+
+    } catch (error) {
+      log.error('Mint failed:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      // Check for user rejection
+      if (errorMessage.toLowerCase().includes('user rejected') ||
+          errorMessage.toLowerCase().includes('user denied')) {
+        addToast({
+          type: 'error',
+          title: 'Transaction Cancelled',
+          description: 'You cancelled the transaction. Please try again when ready.',
+          duration: 8000,
+        });
+      } else {
+        addToast({
+          type: 'error',
+          title: 'Mint Failed',
+          description: errorMessage,
+          duration: 16000,
+        });
+      }
+    }
+  };
+
+  // Handle mint success in useEffect to prevent infinite loop
+  useEffect(() => {
+    if (isMintSuccess && mintHash) {
+      const parsedAmount = parseFloat(mintAmount || '0');
+
       addToast({
         type: 'success',
-        title: 'Mint Successful (Mock)',
+        title: 'Mint Successful',
         description: `Successfully minted ${parsedAmount.toFixed(4)} phUSD from ${parsedAmount.toFixed(4)} DOLA at 1:1 rate`,
-        duration: 8000,
+        duration: 30000,
+        action: {
+          label: 'View Transaction',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${mintHash}`
+              : `https://sepolia.etherscan.io/tx/${mintHash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
       });
 
       // Clear the mint amount
       setMintAmount("");
 
-    } catch (error) {
-      log.error('Mock mint failed:', error);
-      addToast({
-        type: 'error',
-        title: 'Mint Failed',
-        description: 'An error occurred during the mint transaction.',
-        duration: 8000,
-      });
-    } finally {
-      setIsMinting(false);
+      // Refetch balances
+      refetchDolaBalance();
+      refetchPhUsdBalance();
+      refetchDolaAllowance();
     }
-  };
+  }, [isMintSuccess, mintHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle deposit to yield amount change
   const handleDepositToYieldAmountChange = (amount: string) => {
@@ -414,9 +646,10 @@ export default function VaultPage() {
                   onAmountChange={handleMintAmountChange}
                   tokenInfo={mintTokenInfo}
                   onMint={handleMint}
-                  isTransacting={isMinting}
-                  needsApproval={false}  // Mock flow - no approval needed
-                  isAllowanceLoading={false}  // Mock flow - no allowance check
+                  onApprove={handleDolaApproval}
+                  isTransacting={isMintPending || isMintConfirming || approvalTransaction.state.isPending || approvalTransaction.state.isConfirming}
+                  needsApproval={needsDolaApproval && mintAmountWei > 0n}
+                  isAllowanceLoading={dolaAllowanceLoading}
                   isPaused={isPaused === true}
                 />
               </ErrorBoundary>
