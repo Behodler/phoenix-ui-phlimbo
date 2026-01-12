@@ -48,7 +48,8 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       YieldStrategyUSDS: data.YieldStrategyUSDS || '0x0000000000000000000000000000000000000000',
       PhusdStableMinter: data.PhusdStableMinter || '0x0000000000000000000000000000000000000000',
       StableYieldAccumulator: data.StableYieldAccumulator || '0x0000000000000000000000000000000000000000',
-      PhlimboEA: data.PhlimboEA || '0x0000000000000000000000000000000000000000'
+      PhlimboEA: data.PhlimboEA || '0x0000000000000000000000000000000000000000',
+      AutoDOLA: data.AutoDOLA || '0x0000000000000000000000000000000000000000'
     }
     log.debug('📡 fetchLocalAddresses: Mapped addresses:', addresses)
 
