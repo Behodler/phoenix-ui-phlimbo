@@ -700,7 +700,7 @@ export default function Admin() {
 
   /**
    * Handle mint yield button click
-   * Mints DOLA to the YieldStrategyDola contract for testing
+   * Mints DOLA to the AutoDOLA underlying vault for testing
    */
   const handleMintYield = async () => {
     if (!isConnected || !walletAddress) {
@@ -712,7 +712,7 @@ export default function Admin() {
       return;
     }
 
-    if (!addresses?.Dola || !addresses?.YieldStrategyDola) {
+    if (!addresses?.Dola || !addresses?.AutoDOLA) {
       addToast({
         type: 'error',
         title: 'Contract Not Available',
@@ -735,12 +735,12 @@ export default function Admin() {
         duration: 30000,
       });
 
-      // Call the mint function on the DOLA token contract, minting to YieldStrategyDola
+      // Call the mint function on the DOLA token contract, minting to AutoDOLA vault
       const hash = await writeContractAsync({
         address: addresses.Dola as `0x${string}`,
         abi: mintableErc20Abi,
         functionName: 'mint',
-        args: [addresses.YieldStrategyDola as `0x${string}`, mintAmount],
+        args: [addresses.AutoDOLA as `0x${string}`, mintAmount],
       });
 
       // Remove pending toast
@@ -770,7 +770,7 @@ export default function Admin() {
         addToast({
           type: 'success',
           title: 'Yield Minted Successfully',
-          description: `Successfully minted 1000 DOLA to YieldStrategyDola!`,
+          description: `Successfully minted 1000 DOLA to AutoDOLA vault!`,
           duration: 30000,
           action: {
             label: 'View Transaction',
@@ -843,7 +843,7 @@ export default function Admin() {
             isLoading={isMinting}
           />
           <p className="text-xs text-muted-foreground mt-2 text-center">
-            Mints 1000 DOLA to YieldStrategyDola for testing yield accumulation
+            Mints 1000 DOLA to AutoDOLA vault for testing yield accumulation
           </p>
         </div>
       )}
