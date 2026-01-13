@@ -1,4 +1,4 @@
-import { createConfig, http } from 'wagmi'
+import { createConfig, http, fallback } from 'wagmi'
 import { mainnet, arbitrum, sepolia } from 'wagmi/chains'
 import { defineChain } from 'viem'
 import { connectorsForWallets } from '@rainbow-me/rainbowkit'
@@ -53,7 +53,10 @@ export const wagmiConfig = createConfig({
     [anvil.id]: http('http://127.0.0.1:8545'),
     [sepolia.id]: http(),
     [arbitrum.id]: http(),
-    [mainnet.id]: http(),
+    [mainnet.id]: fallback([
+      http('https://ethereum-rpc.publicnode.com'),
+      http('https://eth.llamarpc.com'),
+    ]),
   },
   ssr: false,
 })
