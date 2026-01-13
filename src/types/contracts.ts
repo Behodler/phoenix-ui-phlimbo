@@ -21,6 +21,7 @@ export interface ContractAddresses {
   PhusdStableMinter: string,
   StableYieldAccumulator: string,
   PhlimboEA: string
+  AutoDOLA:string
 }
 
 
