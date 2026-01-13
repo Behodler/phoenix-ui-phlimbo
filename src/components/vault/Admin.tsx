@@ -6,11 +6,13 @@ import {
   phlimboEaAbi,
   phusdStableMinterAbi,
   iYieldStrategyAbi,
+  stableYieldAccumulatorAbi,
 } from '@behodler/phase2-wagmi-hooks';
 import { pauserAbi } from '../../lib/pauserAbi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
+import { useTokenBalance } from '../../hooks/useContractInteractions';
 import type { Abi, AbiFunction } from 'viem';
 import type { ContractAddresses } from '../../types/contracts';
 
@@ -213,6 +215,73 @@ export default function Admin() {
       enabled: !!addresses?.YieldStrategyDola && !!addresses?.Dola && !!addresses?.PhusdStableMinter,
     },
   });
+
+  // ========== PHLIMBO STATISTICS SECTION ==========
+  // Fetch PhlimboEA pool info: (totalStaked, accPhUSDPerShare, accStablePerShare, phUSDPerSecond, lastRewardTime)
+  const { data: poolInfo, refetch: refetchPoolInfo, isLoading: poolInfoLoading } = useReadContract({
+    address: addresses?.PhlimboEA as `0x${string}` | undefined,
+    abi: phlimboEaAbi,
+    functionName: 'getPoolInfo',
+    query: {
+      enabled: !!addresses?.PhlimboEA,
+    },
+  });
+
+  // Fetch smoothedStablePerSecond from PhlimboEA (EMA-smoothed stable reward rate, scaled by 1e18)
+  const { data: smoothedStablePerSecond, refetch: refetchSmoothedStable, isLoading: smoothedStableLoading } = useReadContract({
+    address: addresses?.PhlimboEA as `0x${string}` | undefined,
+    abi: phlimboEaAbi,
+    functionName: 'smoothedStablePerSecond',
+    query: {
+      enabled: !!addresses?.PhlimboEA,
+    },
+  });
+
+  // Fetch USDC balance held by PhlimboEA contract
+  const { balance: phlimboUsdcBalance, refetch: refetchPhlimboUsdc, isLoading: phlimboUsdcLoading } = useTokenBalance(
+    addresses?.PhlimboEA as `0x${string}` | undefined,
+    addresses?.USDC as `0x${string}` | undefined
+  );
+
+  // Fetch YieldFunnel DOLA pending yield from StableYieldAccumulator.getYield(dolaStrategy)
+  const { data: dolaYield, refetch: refetchDolaYield, isLoading: dolaYieldLoading } = useReadContract({
+    address: addresses?.StableYieldAccumulator as `0x${string}` | undefined,
+    abi: stableYieldAccumulatorAbi,
+    functionName: 'getYield',
+    args: addresses?.YieldStrategyDola ? [addresses.YieldStrategyDola as `0x${string}`] : undefined,
+    query: {
+      enabled: !!addresses?.StableYieldAccumulator && !!addresses?.YieldStrategyDola,
+    },
+  });
+
+  // Extract values from poolInfo tuple
+  const phlimboTotalStaked = poolInfo ? poolInfo[0] : 0n;
+  const phlimboPhUSDPerSecond = poolInfo ? poolInfo[3] : 0n;
+
+  // Format Phlimbo statistics for display
+  const phUSDPerSecondDisplay = (Number(phlimboPhUSDPerSecond) / 1e18).toFixed(6);
+  const smoothedStablePerSecondDisplay = smoothedStablePerSecond
+    ? (Number(smoothedStablePerSecond) / 1e36).toFixed(12) // scaled by 1e18 twice per story spec
+    : '0.000000000000';
+  const totalStakedDisplay = (Number(phlimboTotalStaked) / 1e18).toFixed(2);
+  const phlimboUsdcDisplay = phlimboUsdcBalance
+    ? (Number(phlimboUsdcBalance) / 1e6).toFixed(2) // USDC has 6 decimals
+    : '0.00';
+  const dolaYieldDisplay = dolaYield
+    ? (Number(dolaYield) / 1e18).toFixed(2)
+    : '0.00';
+
+  // Combined loading state for Phlimbo statistics
+  const phlimboStatsLoading = poolInfoLoading || smoothedStableLoading || phlimboUsdcLoading || dolaYieldLoading;
+
+  // Refetch all Phlimbo statistics
+  const refetchPhlimboStats = () => {
+    refetchPoolInfo();
+    refetchSmoothedStable();
+    refetchPhlimboUsdc();
+    refetchDolaYield();
+  };
+  // ========== END PHLIMBO STATISTICS SECTION ==========
 
   // Wagmi hooks for contract write and transaction tracking
   const { data: txHash, writeContractAsync } = useWriteContract();
@@ -894,6 +963,63 @@ export default function Admin() {
             principalOf() returns principal only, totalBalanceOf() returns principal + yield.
             Yield is calculated as: totalBalanceOf - principalOf.
           </span>
+        </p>
+      </div>
+
+      {/* Phlimbo Statistics Section */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            Phlimbo Statistics
+          </h3>
+          {phlimboStatsLoading && (
+            <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
+          )}
+        </div>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">phUSDPerSecond:</span>
+            <span className="text-sm font-mono text-foreground">
+              {phUSDPerSecondDisplay} phUSD/sec
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">smoothedStablePerSecond:</span>
+            <span className="text-sm font-mono text-foreground">
+              {smoothedStablePerSecondDisplay}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Total Staked:</span>
+            <span className="text-sm font-mono text-foreground">
+              {totalStakedDisplay} phUSD
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">USDC Balance (PhlimboEA):</span>
+            <span className="text-sm font-mono text-foreground">
+              {phlimboUsdcDisplay} USDC
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">YieldFunnel DOLA (Pending):</span>
+            <span className="text-sm font-mono text-accent">
+              {dolaYieldDisplay} DOLA
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-border">
+          <button
+            onClick={refetchPhlimboStats}
+            className="text-xs text-accent hover:text-accent/80 underline"
+          >
+            Refresh Phlimbo Stats
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+          <strong>Note:</strong> phUSDPerSecond is the current phUSD emission rate.
+          smoothedStablePerSecond is the EMA-smoothed stable reward rate (scaled by 1e18).
+          YieldFunnel DOLA shows pending DOLA yield from the DOLA yield strategy.
         </p>
       </div>
 
