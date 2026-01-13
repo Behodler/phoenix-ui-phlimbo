@@ -735,6 +735,7 @@ export default function Admin() {
         duration: 30000,
       });
 
+ 
       // Call the mint function on the DOLA token contract, minting to AutoDOLA vault
       const hash = await writeContractAsync({
         address: addresses.Dola as `0x${string}`,

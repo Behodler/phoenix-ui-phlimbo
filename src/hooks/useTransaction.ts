@@ -68,27 +68,47 @@ export function useTransaction(
     },
   })
 
-  const { isLoading: isConfirming, isSuccess, isError: isReceiptError, error: receiptError } = receiptResult
+  const { isLoading: isConfirming, isSuccess, isError: isReceiptError, error: receiptError, data: receipt } = receiptResult
 
-  // Log receipt errors
+  // Debug logging for receipt watching
   useEffect(() => {
-    if (isReceiptError && receiptError) {
-      log.error('[useTransaction] Receipt watching error:', receiptError)
+    if (state.hash) {
+      log.debug('[useTransaction] Receipt watcher state:', {
+        hash: state.hash,
+        isConfirming,
+        isSuccess,
+        isReceiptError,
+        receiptStatus: receipt?.status,
+        currentStatus: state.status
+      })
     }
-  }, [isReceiptError, receiptError])
+  }, [state.hash, isConfirming, isSuccess, isReceiptError, receipt, state.status])
 
- 
-  // Update state when confirmation status changes
+  // Update state when confirmation status changes (including errors)
   useEffect(() => {
-
-
     if (!state.hash) {
-      
+      return
+    }
+
+    // Handle receipt watching errors - this prevents the transaction from hanging forever
+    if (isReceiptError && state.status !== 'FAILED') {
+      log.error('[useTransaction] Receipt watching error:', receiptError)
+      const parsedError = parseTransactionError(receiptError as Error)
+      setState(prev => ({
+        ...prev,
+        status: 'FAILED',
+        error: parsedError,
+        isConfirming: false,
+        isSuccess: false,
+        isError: true,
+        isPending: false,
+      }))
+      config?.onStatusChange?.('FAILED')
+      config?.onError?.(receiptError as Error)
       return
     }
 
     if (isConfirming && state.status !== 'PENDING_CONFIRMATION') {
-      
       setState(prev => ({
         ...prev,
         status: 'PENDING_CONFIRMATION',
@@ -99,7 +119,7 @@ export function useTransaction(
     }
 
     if (isSuccess && state.status !== 'SUCCESS') {
-      
+      log.debug('[useTransaction] Transaction confirmed! Transitioning to SUCCESS')
       setState(prev => ({
         ...prev,
         status: 'SUCCESS',
@@ -110,14 +130,20 @@ export function useTransaction(
       config?.onStatusChange?.('SUCCESS')
       config?.onSuccess?.(state.hash)
     }
-  }, [isConfirming, isSuccess, state.hash, state.status, config])
+  }, [isConfirming, isSuccess, isReceiptError, receiptError, state.hash, state.status, config])
 
   /**
    * Execute the transaction
    */
   const execute = useCallback(async () => {
+    // Prevent re-execution while transaction is in progress
+    if (state.status === 'PENDING_SIGNATURE' || state.status === 'PENDING_CONFIRMATION') {
+      log.warn('[useTransaction] Ignoring execute() call - transaction already in progress:', state.status)
+      return
+    }
+
     try {
-      
+      log.debug('[useTransaction] Starting transaction execution')
       // Set to pending signature state
       setState({
         status: 'PENDING_SIGNATURE',
@@ -129,9 +155,9 @@ export function useTransaction(
       config?.onStatusChange?.('PENDING_SIGNATURE')
 
       // Execute the transaction
-      
+      log.debug('[useTransaction] Calling transaction function...')
       const hash = await transactionFn()
-      
+      log.debug('[useTransaction] Transaction submitted, hash:', hash)
 
       // Transaction submitted - now waiting for confirmation
       setState(prev => ({
@@ -141,10 +167,10 @@ export function useTransaction(
         isPending: false,
         isConfirming: true,
       }))
-      
+      log.debug('[useTransaction] State updated to PENDING_CONFIRMATION')
       config?.onStatusChange?.('PENDING_CONFIRMATION')
     } catch (error) {
-      
+      log.error('[useTransaction] Transaction execution failed:', error)
       const parsedError = parseTransactionError(error as Error)
 
       // Determine if it was a cancellation or error
@@ -165,7 +191,7 @@ export function useTransaction(
       config?.onStatusChange?.(status)
       config?.onError?.(error as Error)
     }
-  }, [transactionFn, config])
+  }, [transactionFn, config, state.status])
 
   /**
    * Reset transaction state to idle
