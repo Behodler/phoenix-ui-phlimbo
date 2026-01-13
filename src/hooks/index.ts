@@ -7,3 +7,7 @@ export {
 
 // Transaction management hooks
 export { useTransaction, useApprovalTransaction } from './useTransaction';
+
+// Yield funnel hooks
+export { useYieldFunnelData } from './useYieldFunnelData';
+export type { PendingYieldItem, YieldFunnelData } from './useYieldFunnelData';
