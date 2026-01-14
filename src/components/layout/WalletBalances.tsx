@@ -6,7 +6,7 @@ import { useTokenBalance } from '../../hooks/useContractInteractions';
 /**
  * WalletBalances Component
  *
- * Displays DOLA and phUSD token balances for the connected wallet.
+ * Displays DOLA, phUSD, and USDC token balances for the connected wallet.
  * Only renders when a wallet is connected.
  */
 import { log } from '../../utils/logger';
@@ -34,14 +34,25 @@ log.warn("address: "+JSON.stringify(addresses))
     addresses?.PhUSD as `0x${string}` | undefined
   );
 
+  // Fetch USDC balance
+  const {
+    balance: usdcBalanceRaw,
+    isLoading: usdcLoading,
+    isError: usdcError
+  } = useTokenBalance(
+    walletAddress,
+    addresses?.USDC as `0x${string}` | undefined
+  );
+
   // Don't render if wallet not connected
   if (!isConnected || !walletAddress) {
     return null;
   }
 
-  // Convert balances from wei to decimal (18 decimals)
+  // Convert balances from wei to decimal (18 decimals for DOLA/phUSD, 6 decimals for USDC)
   const dolaBalance = dolaBalanceRaw ? parseFloat(formatUnits(dolaBalanceRaw, 18)) : 0;
   const phUSDBalance = phUSDBalanceRaw ? parseFloat(formatUnits(phUSDBalanceRaw, 18)) : 0;
+  const usdcBalance = usdcBalanceRaw ? parseFloat(formatUnits(usdcBalanceRaw, 6)) : 0;
 
   // Format balance with appropriate decimals
   const formatBalance = (balance: number): string => {
@@ -79,6 +90,20 @@ log.warn("address: "+JSON.stringify(addresses))
         ) : (
           <span className="text-sm font-semibold text-pxusd-white">
             {formatBalance(phUSDBalance)}
+          </span>
+        )}
+      </div>
+
+      {/* USDC Balance */}
+      <div className="flex items-center gap-2 justify-end">
+        <span className="text-xs text-muted-foreground">USDC:</span>
+        {usdcLoading ? (
+          <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
+        ) : usdcError ? (
+          <span className="text-xs text-red-400">Error</span>
+        ) : (
+          <span className="text-sm font-semibold text-pxusd-white">
+            {formatBalance(usdcBalance)}
           </span>
         )}
       </div>
