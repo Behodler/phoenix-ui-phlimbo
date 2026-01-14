@@ -61,7 +61,7 @@ export default function VaultPage() {
     addresses?.Dola as `0x${string}` | undefined
   );
 
-  // Fetch DOLA allowance for PhusdStableMinter contract
+  // Fetch DOLA allowance for PhusdStableMinter contract (for Mint tab)
   const {
     allowance: dolaAllowanceRaw,
     isLoading: dolaAllowanceLoading,
@@ -69,6 +69,17 @@ export default function VaultPage() {
   } = useTokenAllowance(
     walletAddress,
     addresses?.PhusdStableMinter as `0x${string}` | undefined,
+    addresses?.Dola as `0x${string}` | undefined
+  );
+
+  // Fetch DOLA allowance for PhlimboEA contract (for Deposit tab)
+  const {
+    allowance: dolaAllowanceForPhlimboRaw,
+    isLoading: dolaAllowanceForPhlimboLoading,
+    refetch: refetchDolaAllowanceForPhlimbo
+  } = useTokenAllowance(
+    walletAddress,
+    addresses?.PhlimboEA as `0x${string}` | undefined,
     addresses?.Dola as `0x${string}` | undefined
   );
 
@@ -138,13 +149,9 @@ export default function VaultPage() {
   const [depositToYieldAmount, setDepositToYieldAmount] = useState<string>("");
   const [withdrawFromYieldAmount, setWithdrawFromYieldAmount] = useState<string>("");
 
-  // State for mock transactions (deposit/withdraw/claim still mocked, mint is now real)
-  const [isDepositingToYield, setIsDepositingToYield] = useState(false);
+  // State for mock transactions (withdraw/claim still mocked, mint and deposit are now real)
   const [isWithdrawingFromYield, setIsWithdrawingFromYield] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
-
-  // Mock balance for deposit/withdraw tabs (still mocked)
-  const MOCK_DOLA_BALANCE = 10000;
 
   // Pause state - in the new architecture, we'll use a simple mock for now
   // TODO: Fetch actual pause state from the appropriate Phase 2 contract
@@ -180,6 +187,22 @@ export default function VaultPage() {
   // Needs approval if allowance is less than the mint amount being requested
   const needsDolaApproval = dolaAllowanceRaw !== undefined
     ? dolaAllowanceRaw < mintAmountWei
+    : true; // Default to needing approval if allowance hasn't loaded yet
+
+  // Convert deposit amount to wei for comparison with allowance (for Deposit tab)
+  const depositAmountWei = depositToYieldAmount && depositToYieldAmount !== '' && depositToYieldAmount !== '0'
+    ? (() => {
+        try {
+          return parseUnits(depositToYieldAmount, 18);
+        } catch {
+          return 0n;
+        }
+      })()
+    : 0n;
+
+  // Needs approval for deposit if allowance is less than the deposit amount being requested
+  const needsDolaApprovalForDeposit = dolaAllowanceForPhlimboRaw !== undefined
+    ? dolaAllowanceForPhlimboRaw < depositAmountWei
     : true; // Default to needing approval if allowance hasn't loaded yet
 
   // Mint transaction state using wagmi hooks (similar to pause transaction in SafetyTab)
@@ -246,6 +269,71 @@ export default function VaultPage() {
       }
     }
   );
+
+  // DOLA approval transaction for Deposit tab (approving PhlimboEA to spend DOLA)
+  const depositApprovalTransaction = useApprovalTransaction(
+    async () => {
+      if (!addresses?.Dola || !addresses?.PhlimboEA) {
+        throw new Error('Contract addresses not loaded');
+      }
+      // Approve unlimited amount for better UX (single approval)
+      return approve(
+        addresses.Dola as `0x${string}`,
+        addresses.PhlimboEA as `0x${string}`,
+        maxUint256
+      );
+    },
+    {
+      onSuccess: async (hash) => {
+        await refetchDolaAllowanceForPhlimbo();
+
+        addToast({
+          type: 'success',
+          title: 'Approval Successful',
+          description: 'DOLA spending has been approved for depositing to PhlimboEA.',
+          duration: 30000,
+          action: {
+            label: 'View Transaction',
+            onClick: () => {
+              const explorerUrl = networkType === 'mainnet'
+                ? `https://etherscan.io/tx/${hash}`
+                : `https://sepolia.etherscan.io/tx/${hash}`;
+              window.open(explorerUrl, '_blank');
+            }
+          }
+        });
+      },
+      onError: (error) => {
+        log.error('DOLA approval for deposit failed:', error);
+      },
+      onStatusChange: (status) => {
+        if (status === 'PENDING_SIGNATURE') {
+          addToast({
+            type: 'info',
+            title: 'Confirm in Wallet',
+            description: 'Please confirm the approval transaction in your wallet.',
+            duration: 30000,
+          });
+        } else if (status === 'PENDING_CONFIRMATION') {
+          addToast({
+            type: 'info',
+            title: 'Transaction Submitted',
+            description: 'Waiting for blockchain confirmation...',
+            duration: 30000,
+          });
+        }
+      }
+    }
+  );
+
+  // Stake transaction state for Deposit tab using wagmi hooks
+  const { data: stakeHash, writeContractAsync: writeStake, isPending: isStakePending } = useWriteContract();
+  const { isLoading: isStakeConfirming, isSuccess: isStakeSuccess } = useWaitForTransactionReceipt({
+    hash: stakeHash,
+    query: {
+      enabled: !!stakeHash,
+    },
+  });
 
   // Mock yield/rewards data for YieldRewardsInfo component
   // These are placeholder values until real contract integration is implemented
@@ -485,8 +573,46 @@ export default function VaultPage() {
     setDepositToYieldAmount(amount);
   };
 
-  // Mock deposit to yield handler - simulates a successful deposit without actual contract interaction
-  // This is a fully mocked flow - no wallet connection required
+  // Handle DOLA approval for depositing to PhlimboEA
+  const handleDolaApprovalForDeposit = async (): Promise<void> => {
+    if (!walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet using the button in the header.',
+      });
+      return;
+    }
+
+    if (!addresses?.Dola || !addresses?.PhlimboEA) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Ready',
+        description: 'Please wait for contract addresses to load.',
+      });
+      return;
+    }
+
+    try {
+      await depositApprovalTransaction.execute();
+    } catch {
+      if (depositApprovalTransaction.state.error) {
+        const { error: txError } = depositApprovalTransaction.state;
+        addToast({
+          type: 'error',
+          title: getErrorTitle(txError.type),
+          description: txError.message,
+          duration: 16000,
+          action: shouldOfferRetry(txError.type) ? {
+            label: 'Retry',
+            onClick: () => depositApprovalTransaction.retry()
+          } : undefined
+        });
+      }
+    }
+  };
+
+  // Real deposit to yield handler - executes PhlimboEA.stake(amount, userAddress)
   const handleDepositToYield = async () => {
     // Validate amount
     if (!depositToYieldAmount || depositToYieldAmount === '0' || depositToYieldAmount === '') {
@@ -498,54 +624,128 @@ export default function VaultPage() {
       return;
     }
 
-    // Check against mock balance (no real blockchain balance needed)
+    // Check wallet connection
+    if (!walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet using the button in the header.',
+      });
+      return;
+    }
+
+    // Check contract addresses are loaded
+    if (!addresses?.PhlimboEA || !addresses?.Dola) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Ready',
+        description: 'Please wait for contract addresses to load.',
+      });
+      return;
+    }
+
+    // Check balance
     const parsedAmount = parseFloat(depositToYieldAmount);
-    if (parsedAmount > MOCK_DOLA_BALANCE) {
+    if (parsedAmount > dolaBalance) {
       addToast({
         type: 'error',
         title: 'Insufficient Balance',
-        description: `You only have ${MOCK_DOLA_BALANCE.toFixed(4)} DOLA available.`,
+        description: `You only have ${dolaBalance.toFixed(4)} DOLA available.`,
       });
       return;
     }
 
     try {
-      setIsDepositingToYield(true);
-
       // Show pending toast
       addToast({
         type: 'info',
-        title: 'Depositing DOLA',
-        description: 'Processing your deposit transaction...',
-        duration: 3000,
+        title: 'Confirm Transaction',
+        description: 'Please confirm the deposit transaction in your wallet.',
+        duration: 30000,
       });
 
-      // Simulate a delay to mimic transaction processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Convert amount to wei (18 decimals for DOLA)
+      const amountWei = parseUnits(depositToYieldAmount, 18);
 
-      // Show success toast
+      // Execute stake: PhlimboEA.stake(amount, recipient)
+      const hash = await writeStake({
+        address: addresses.PhlimboEA as `0x${string}`,
+        abi: phlimboEaAbi,
+        functionName: 'stake',
+        args: [amountWei, walletAddress],
+      });
+
+      // Show confirming toast
+      addToast({
+        type: 'info',
+        title: 'Transaction Submitted',
+        description: 'Waiting for blockchain confirmation...',
+        duration: 30000,
+        action: {
+          label: 'View on Etherscan',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${hash}`
+              : `https://sepolia.etherscan.io/tx/${hash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
+      });
+
+    } catch (error) {
+      log.error('Deposit to yield failed:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      // Check for user rejection
+      if (errorMessage.toLowerCase().includes('user rejected') ||
+          errorMessage.toLowerCase().includes('user denied')) {
+        addToast({
+          type: 'error',
+          title: 'Transaction Cancelled',
+          description: 'You cancelled the transaction. Please try again when ready.',
+          duration: 8000,
+        });
+      } else {
+        addToast({
+          type: 'error',
+          title: 'Deposit Failed',
+          description: errorMessage,
+          duration: 16000,
+        });
+      }
+    }
+  };
+
+  // Handle stake success in useEffect to prevent infinite loop
+  useEffect(() => {
+    if (isStakeSuccess && stakeHash) {
+      const parsedAmount = parseFloat(depositToYieldAmount || '0');
+
       addToast({
         type: 'success',
-        title: 'Deposit Successful (Mock)',
-        description: `Successfully deposited ${parsedAmount.toFixed(4)} DOLA to earn yield in phUSD and USDC`,
-        duration: 8000,
+        title: 'Deposit Successful',
+        description: `Successfully deposited ${parsedAmount.toFixed(4)} DOLA to earn yield in PhlimboEA`,
+        duration: 30000,
+        action: {
+          label: 'View Transaction',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${stakeHash}`
+              : `https://sepolia.etherscan.io/tx/${stakeHash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
       });
 
       // Clear the deposit amount
       setDepositToYieldAmount("");
 
-    } catch (error) {
-      log.error('Mock deposit to yield failed:', error);
-      addToast({
-        type: 'error',
-        title: 'Deposit Failed',
-        description: 'An error occurred during the deposit transaction.',
-        duration: 8000,
-      });
-    } finally {
-      setIsDepositingToYield(false);
+      // Refetch balances
+      refetchDolaBalance();
+      refetchDolaAllowanceForPhlimbo();
     }
-  };
+  }, [isStakeSuccess, stakeHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle withdraw from yield amount change
   const handleWithdrawFromYieldAmountChange = (amount: string) => {
@@ -668,9 +868,10 @@ export default function VaultPage() {
                   onAmountChange={handleDepositToYieldAmountChange}
                   tokenInfo={mintTokenInfo}
                   onDeposit={handleDepositToYield}
-                  isTransacting={isDepositingToYield}
-                  needsApproval={false}  // Mock flow - no approval needed
-                  isAllowanceLoading={false}  // Mock flow - no allowance check
+                  onApprove={handleDolaApprovalForDeposit}
+                  isTransacting={isStakePending || isStakeConfirming || depositApprovalTransaction.state.isPending || depositApprovalTransaction.state.isConfirming}
+                  needsApproval={needsDolaApprovalForDeposit && depositAmountWei > 0n}
+                  isAllowanceLoading={dolaAllowanceForPhlimboLoading}
                   isPaused={isPaused === true}
                 />
               </ErrorBoundary>
