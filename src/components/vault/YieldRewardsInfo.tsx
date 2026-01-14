@@ -18,13 +18,15 @@ export default function YieldRewardsInfo({
   isLoading = false,
   isConnected = false,
   onClaim,
-  isClaiming = false
+  isClaiming = false,
+  isUsdcDecimals6 = false
 }: YieldRewardsInfoProps) {
   // Format pending rewards - handle both bigint and string types
-  const formatPendingAmount = (amount: bigint | string): string => {
+  // decimals: number of decimal places for the token (18 for phUSD/DOLA, 6 for USDC)
+  const formatPendingAmount = (amount: bigint | string, decimals: number = 18): string => {
     if (typeof amount === 'bigint') {
-      // Convert from 18 decimal wei to human-readable format
-      const formatted = parseFloat(formatUnits(amount, 18));
+      // Convert from specified decimal wei to human-readable format
+      const formatted = parseFloat(formatUnits(amount, decimals));
       return formatted.toFixed(2);
     }
     // Already a string - parse and format
@@ -144,7 +146,7 @@ export default function YieldRewardsInfo({
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-foreground">USDC</span>
                   <span className="text-sm font-medium text-pxusd-yellow-400">
-                    {formatPendingAmount(pendingUsdc)} USDC
+                    {formatPendingAmount(pendingUsdc, isUsdcDecimals6 ? 6 : 18)} USDC
                   </span>
                 </div>
 

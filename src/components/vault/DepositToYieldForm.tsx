@@ -167,7 +167,7 @@ export default function DepositToYieldForm({
     buttonLabel = "Insufficient Balance";
   } else if (isAmountValid) {
     if (needsApproval) {
-      buttonLabel = "Approve DOLA";
+      buttonLabel = "Approve phUSD";
       buttonVariant = 'approve';
       buttonAction = handleApprove;
       buttonLoading = isApproving;
@@ -185,7 +185,7 @@ export default function DepositToYieldForm({
         <div className="bg-pxusd-teal-700 border border-pxusd-teal-500 rounded-lg p-4 mb-6">
           <h3 className="text-lg font-semibold text-pxusd-teal-300 mb-1">Deposit to Earn Yield</h3>
           <p className="text-sm text-muted-foreground">
-            Deposit your DOLA to earn yield in both phUSD and USDC
+            Deposit your phUSD to earn yield in both phUSD and USDC
           </p>
         </div>
 

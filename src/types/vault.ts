@@ -108,11 +108,12 @@ export interface YieldRewardsInfoProps {
   totalApy: number; // Combined yield percentage
   phUsdApy: number; // PhUSD yield percentage (fixed)
   usdcApy: number; // USDC yield percentage (variable)
-  pendingPhUsd: bigint | string; // Pending PhUSD rewards
-  pendingUsdc: bigint | string; // Pending USDC rewards
-  stakedBalance: bigint | string; // User's staked phUSD balance
+  pendingPhUsd: bigint | string; // Pending PhUSD rewards (18 decimals)
+  pendingUsdc: bigint | string; // Pending USDC rewards (6 decimals when isUsdcDecimals6=true)
+  stakedBalance: bigint | string; // User's staked phUSD balance (18 decimals)
   isLoading?: boolean; // Loading state
   isConnected?: boolean; // Whether wallet is connected (for rewards display)
   onClaim?: () => void; // Callback for claim button action
   isClaiming?: boolean; // Loading state for claim button
+  isUsdcDecimals6?: boolean; // If true, pendingUsdc uses 6 decimals (USDC), otherwise 18 (default)
 }
