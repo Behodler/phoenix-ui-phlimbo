@@ -22,6 +22,7 @@ import YieldRewardsInfo from '../components/vault/YieldRewardsInfo';
 import FAQ from '../components/vault/FAQ';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
 import DOLA from "../assets/sDOLA.png";
+import phUSDIcon from "../assets/phUSD.png";
 import { log } from '../utils/logger';
 
 export default function VaultPage() {
@@ -52,13 +53,22 @@ export default function VaultPage() {
   // Token approval hook for DOLA
   const { approve } = useTokenApproval();
 
-  // Fetch DOLA balance for connected wallet
+  // Fetch DOLA balance for connected wallet (used by Mint tab)
   const {
     balance: dolaBalanceRaw,
     refetch: refetchDolaBalance
   } = useTokenBalance(
     walletAddress,
     addresses?.Dola as `0x${string}` | undefined
+  );
+
+  // Fetch phUSD balance for connected wallet (used by Deposit tab)
+  const {
+    balance: phUsdBalanceRaw,
+    refetch: refetchPhUsdBalanceForDeposit
+  } = useTokenBalance(
+    walletAddress,
+    addresses?.PhUSD as `0x${string}` | undefined
   );
 
   // Fetch DOLA allowance for PhusdStableMinter contract (for Mint tab)
@@ -72,15 +82,15 @@ export default function VaultPage() {
     addresses?.Dola as `0x${string}` | undefined
   );
 
-  // Fetch DOLA allowance for PhlimboEA contract (for Deposit tab)
+  // Fetch phUSD allowance for PhlimboEA contract (for Deposit tab)
   const {
-    allowance: dolaAllowanceForPhlimboRaw,
-    isLoading: dolaAllowanceForPhlimboLoading,
-    refetch: refetchDolaAllowanceForPhlimbo
+    allowance: phUsdAllowanceForPhlimboRaw,
+    isLoading: phUsdAllowanceForPhlimboLoading,
+    refetch: refetchPhUsdAllowanceForPhlimbo
   } = useTokenAllowance(
     walletAddress,
     addresses?.PhlimboEA as `0x${string}` | undefined,
-    addresses?.Dola as `0x${string}` | undefined
+    addresses?.PhUSD as `0x${string}` | undefined
   );
 
   // Fetch phUSD balance for connected wallet (to refetch after mint)
@@ -105,6 +115,124 @@ export default function VaultPage() {
   const isOwner = isMounted && walletAddress && ownerAddress
     ? walletAddress.toLowerCase() === ownerAddress.toLowerCase()
     : false;
+
+  // ========== YIELD DATA READS FOR CONTEXTBOX ==========
+  // Fetch pending phUSD rewards for connected user
+  const { data: pendingPhUsdRaw, isLoading: pendingPhUsdLoading } = useReadContract({
+    address: addresses?.PhlimboEA as `0x${string}` | undefined,
+    abi: phlimboEaAbi,
+    functionName: 'pendingPhUSD',
+    args: walletAddress ? [walletAddress] : undefined,
+    query: {
+      enabled: !!addresses?.PhlimboEA && !!walletAddress,
+    },
+  });
+
+  // Fetch pending USDC (stable) rewards for connected user
+  const { data: pendingStableRaw, isLoading: pendingStableLoading } = useReadContract({
+    address: addresses?.PhlimboEA as `0x${string}` | undefined,
+    abi: phlimboEaAbi,
+    functionName: 'pendingStable',
+    args: walletAddress ? [walletAddress] : undefined,
+    query: {
+      enabled: !!addresses?.PhlimboEA && !!walletAddress,
+    },
+  });
+
+  // Fetch user info to get staked balance: userInfo returns (amount, phUSDDebt, stableDebt)
+  const { data: userInfoData, isLoading: userInfoLoading } = useReadContract({
+    address: addresses?.PhlimboEA as `0x${string}` | undefined,
+    abi: phlimboEaAbi,
+    functionName: 'userInfo',
+    args: walletAddress ? [walletAddress] : undefined,
+    query: {
+      enabled: !!addresses?.PhlimboEA && !!walletAddress,
+    },
+  });
+
+  // Fetch pool info to get totalStaked: getPoolInfo returns (totalStaked, accPhUSDPerShare, accStablePerShare, phUSDPerSecond, lastRewardTime)
+  const { data: poolInfoData, isLoading: poolInfoLoading } = useReadContract({
+    address: addresses?.PhlimboEA as `0x${string}` | undefined,
+    abi: phlimboEaAbi,
+    functionName: 'getPoolInfo',
+    query: {
+      enabled: !!addresses?.PhlimboEA,
+    },
+  });
+
+  // Fetch smoothedStablePerSecond for USDC APY calculation (EMA-smoothed rate, pre-scaled by 1e18)
+  const { data: smoothedStablePerSecondRaw, isLoading: smoothedStableLoading } = useReadContract({
+    address: addresses?.PhlimboEA as `0x${string}` | undefined,
+    abi: phlimboEaAbi,
+    functionName: 'smoothedStablePerSecond',
+    query: {
+      enabled: !!addresses?.PhlimboEA,
+    },
+  });
+
+  // Fetch desiredAPYBps for fixed phUSD APY (value in basis points, e.g., 1000 = 10%)
+  const { data: desiredAPYBpsRaw, isLoading: desiredAPYBpsLoading } = useReadContract({
+    address: addresses?.PhlimboEA as `0x${string}` | undefined,
+    abi: phlimboEaAbi,
+    functionName: 'desiredAPYBps',
+    query: {
+      enabled: !!addresses?.PhlimboEA,
+    },
+  });
+
+  // Extract values from contract reads
+  const stakedBalanceRaw = userInfoData ? (userInfoData as [bigint, bigint, bigint])[0] : 0n;
+  const totalStakedRaw = poolInfoData ? (poolInfoData as [bigint, bigint, bigint, bigint, bigint])[0] : 0n;
+
+  // Calculate phUSD APY: desiredAPYBps / 100 gives percentage
+  const phUsdApyCalculated = desiredAPYBpsRaw
+    ? Number(desiredAPYBpsRaw) / 100
+    : 0;
+
+  // Calculate USDC APY: (smoothedStablePerSecond / 1e18 * 31536000 / totalStaked) * 100
+  // smoothedStablePerSecond is pre-scaled by 1e18
+  // Note: smoothedStablePerSecond is in USDC per second (6 decimals) scaled by 1e18
+  // totalStaked is in phUSD (18 decimals)
+  const usdcApyCalculated = (() => {
+    const smoothed = smoothedStablePerSecondRaw ? Number(smoothedStablePerSecondRaw) : 0;
+    const secondsPerYear = 31536000;
+
+    // Determine denominator: use totalStaked if non-zero, otherwise use user's phUSD balance
+    let denominator: number;
+    if (totalStakedRaw > 0n) {
+      // totalStaked is 18 decimals, convert to number
+      denominator = Number(totalStakedRaw) / 1e18;
+    } else if (phUsdBalanceRaw && phUsdBalanceRaw > 0n) {
+      // Fallback to user's phUSD balance if totalStaked is 0
+      denominator = Number(phUsdBalanceRaw) / 1e18;
+    } else {
+      return 0; // No valid denominator
+    }
+
+    if (denominator === 0) return 0;
+
+    // smoothedStablePerSecond is scaled by 1e18, and represents USDC (6 decimals) per second
+    // Annual USDC yield = (smoothed / 1e18) * secondsPerYear
+    // APY = (annualYield / totalStaked) * 100
+    // Since USDC has 6 decimals and phUSD has 18 decimals, we need to normalize:
+    // annualUsdcInUsdValue = (smoothed / 1e18) * secondsPerYear / 1e6 (to get USDC value)
+    // But totalStaked is already in phUSD value (1 phUSD = 1 USD)
+    // So: APY = ((smoothed / 1e18) * secondsPerYear / 1e6) / denominator * 100
+    const annualUsdcRaw = (smoothed / 1e18) * secondsPerYear;
+    // Convert from 6 decimals to actual USDC value
+    const annualUsdcValue = annualUsdcRaw / 1e6;
+    const apy = (annualUsdcValue / denominator) * 100;
+
+    return apy;
+  })();
+
+  // Total APY is the sum of phUSD and USDC APYs
+  const totalApyCalculated = phUsdApyCalculated + usdcApyCalculated;
+
+  // Combined loading state for yield data
+  const yieldDataLoading = pendingPhUsdLoading || pendingStableLoading || userInfoLoading ||
+    poolInfoLoading || smoothedStableLoading || desiredAPYBpsLoading;
+  // ========== END YIELD DATA READS FOR CONTEXTBOX ==========
 
   // Determine tabs based on network and owner status
   // - Show Admin tab if user is the owner
@@ -163,6 +291,9 @@ export default function VaultPage() {
   // Convert DOLA balance from raw bigint to display format
   const dolaBalance = dolaBalanceRaw ? parseFloat((Number(dolaBalanceRaw) / 1e18).toFixed(4)) : 0;
 
+  // Convert phUSD balance from raw bigint to display format (for Deposit tab)
+  const phUsdBalance = phUsdBalanceRaw ? parseFloat((Number(phUsdBalanceRaw) / 1e18).toFixed(4)) : 0;
+
   // Real token info for the Mint tab using actual DOLA balance
   const mintTokenInfo: TokenInfo = {
     name: "DOLA",
@@ -170,6 +301,15 @@ export default function VaultPage() {
     balanceUsd: dolaBalance, // 1:1 USD value assumption for stablecoins
     balanceRaw: dolaBalanceRaw ?? 0n,
     icon: DOLA
+  };
+
+  // Real token info for the Deposit tab using actual phUSD balance
+  const depositTokenInfo: TokenInfo = {
+    name: "phUSD",
+    balance: phUsdBalance,
+    balanceUsd: phUsdBalance, // 1:1 USD value assumption for stablecoins
+    balanceRaw: phUsdBalanceRaw ?? 0n,
+    icon: phUSDIcon
   };
 
   // Check if approval is needed for the current mint amount
@@ -200,9 +340,9 @@ export default function VaultPage() {
       })()
     : 0n;
 
-  // Needs approval for deposit if allowance is less than the deposit amount being requested
-  const needsDolaApprovalForDeposit = dolaAllowanceForPhlimboRaw !== undefined
-    ? dolaAllowanceForPhlimboRaw < depositAmountWei
+  // Needs approval for deposit if phUSD allowance is less than the deposit amount being requested
+  const needsPhUsdApprovalForDeposit = phUsdAllowanceForPhlimboRaw !== undefined
+    ? phUsdAllowanceForPhlimboRaw < depositAmountWei
     : true; // Default to needing approval if allowance hasn't loaded yet
 
   // Mint transaction state using wagmi hooks (similar to pause transaction in SafetyTab)
@@ -270,27 +410,27 @@ export default function VaultPage() {
     }
   );
 
-  // DOLA approval transaction for Deposit tab (approving PhlimboEA to spend DOLA)
+  // phUSD approval transaction for Deposit tab (approving PhlimboEA to spend phUSD)
   const depositApprovalTransaction = useApprovalTransaction(
     async () => {
-      if (!addresses?.Dola || !addresses?.PhlimboEA) {
+      if (!addresses?.PhUSD || !addresses?.PhlimboEA) {
         throw new Error('Contract addresses not loaded');
       }
       // Approve unlimited amount for better UX (single approval)
       return approve(
-        addresses.Dola as `0x${string}`,
+        addresses.PhUSD as `0x${string}`,
         addresses.PhlimboEA as `0x${string}`,
         maxUint256
       );
     },
     {
       onSuccess: async (hash) => {
-        await refetchDolaAllowanceForPhlimbo();
+        await refetchPhUsdAllowanceForPhlimbo();
 
         addToast({
           type: 'success',
           title: 'Approval Successful',
-          description: 'DOLA spending has been approved for depositing to PhlimboEA.',
+          description: 'phUSD spending has been approved for depositing to PhlimboEA.',
           duration: 30000,
           action: {
             label: 'View Transaction',
@@ -304,7 +444,7 @@ export default function VaultPage() {
         });
       },
       onError: (error) => {
-        log.error('DOLA approval for deposit failed:', error);
+        log.error('phUSD approval for deposit failed:', error);
       },
       onStatusChange: (status) => {
         if (status === 'PENDING_SIGNATURE') {
@@ -335,21 +475,19 @@ export default function VaultPage() {
     },
   });
 
-  // Mock yield/rewards data for YieldRewardsInfo component
-  // These are placeholder values until real contract integration is implemented
-  const mockYieldData = {
-    totalApy: 12.5,      // 12.5% total APY
-    phUsdApy: 10.0,      // 10% fixed PhUSD APY
-    usdcApy: 2.5,        // 2.5% variable USDC APY
-    pendingPhUsd: "125.50",  // Mock pending PhUSD rewards
-    pendingUsdc: "18.75",    // Mock pending USDC rewards
-    stakedBalance: "1250.00", // Mock staked phUSD balance
-  };
-
   // Mock claim handler - simulates claiming rewards without actual contract interaction
+  // TODO: Story 014.3+ will implement real claim functionality
   const handleClaim = async () => {
     try {
       setIsClaiming(true);
+
+      // Format pending values for display in toast
+      const pendingPhUsdDisplay = pendingPhUsdRaw
+        ? (Number(pendingPhUsdRaw) / 1e18).toFixed(2)
+        : '0.00';
+      const pendingUsdcDisplay = pendingStableRaw
+        ? (Number(pendingStableRaw) / 1e6).toFixed(2)  // USDC has 6 decimals
+        : '0.00';
 
       // Show pending toast
       addToast({
@@ -366,13 +504,13 @@ export default function VaultPage() {
       addToast({
         type: 'success',
         title: 'Claim Successful (Mock)',
-        description: `Successfully claimed ${mockYieldData.pendingPhUsd} phUSD and ${mockYieldData.pendingUsdc} USDC rewards`,
+        description: `Successfully claimed ${pendingPhUsdDisplay} phUSD and ${pendingUsdcDisplay} USDC rewards`,
         duration: 8000,
       });
 
       log.debug('Mock claim completed:', {
-        pendingPhUsd: mockYieldData.pendingPhUsd,
-        pendingUsdc: mockYieldData.pendingUsdc,
+        pendingPhUsd: pendingPhUsdDisplay,
+        pendingUsdc: pendingUsdcDisplay,
       });
 
     } catch (error) {
@@ -573,8 +711,8 @@ export default function VaultPage() {
     setDepositToYieldAmount(amount);
   };
 
-  // Handle DOLA approval for depositing to PhlimboEA
-  const handleDolaApprovalForDeposit = async (): Promise<void> => {
+  // Handle phUSD approval for depositing to PhlimboEA
+  const handlePhUsdApprovalForDeposit = async (): Promise<void> => {
     if (!walletAddress) {
       addToast({
         type: 'error',
@@ -584,7 +722,7 @@ export default function VaultPage() {
       return;
     }
 
-    if (!addresses?.Dola || !addresses?.PhlimboEA) {
+    if (!addresses?.PhUSD || !addresses?.PhlimboEA) {
       addToast({
         type: 'error',
         title: 'Contract Not Ready',
@@ -635,7 +773,7 @@ export default function VaultPage() {
     }
 
     // Check contract addresses are loaded
-    if (!addresses?.PhlimboEA || !addresses?.Dola) {
+    if (!addresses?.PhlimboEA || !addresses?.PhUSD) {
       addToast({
         type: 'error',
         title: 'Contract Not Ready',
@@ -646,11 +784,11 @@ export default function VaultPage() {
 
     // Check balance
     const parsedAmount = parseFloat(depositToYieldAmount);
-    if (parsedAmount > dolaBalance) {
+    if (parsedAmount > phUsdBalance) {
       addToast({
         type: 'error',
         title: 'Insufficient Balance',
-        description: `You only have ${dolaBalance.toFixed(4)} DOLA available.`,
+        description: `You only have ${phUsdBalance.toFixed(4)} phUSD available.`,
       });
       return;
     }
@@ -664,7 +802,7 @@ export default function VaultPage() {
         duration: 30000,
       });
 
-      // Convert amount to wei (18 decimals for DOLA)
+      // Convert amount to wei (18 decimals for phUSD)
       const amountWei = parseUnits(depositToYieldAmount, 18);
 
       // Execute stake: PhlimboEA.stake(amount, recipient)
@@ -725,7 +863,7 @@ export default function VaultPage() {
       addToast({
         type: 'success',
         title: 'Deposit Successful',
-        description: `Successfully deposited ${parsedAmount.toFixed(4)} DOLA to earn yield in PhlimboEA`,
+        description: `Successfully deposited ${parsedAmount.toFixed(4)} phUSD to earn yield in PhlimboEA`,
         duration: 30000,
         action: {
           label: 'View Transaction',
@@ -742,8 +880,8 @@ export default function VaultPage() {
       setDepositToYieldAmount("");
 
       // Refetch balances
-      refetchDolaBalance();
-      refetchDolaAllowanceForPhlimbo();
+      refetchPhUsdBalanceForDeposit();
+      refetchPhUsdAllowanceForPhlimbo();
     }
   }, [isStakeSuccess, stakeHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -866,12 +1004,12 @@ export default function VaultPage() {
                 <DepositToYieldForm
                   amount={depositToYieldAmount}
                   onAmountChange={handleDepositToYieldAmountChange}
-                  tokenInfo={mintTokenInfo}
+                  tokenInfo={depositTokenInfo}
                   onDeposit={handleDepositToYield}
-                  onApprove={handleDolaApprovalForDeposit}
+                  onApprove={handlePhUsdApprovalForDeposit}
                   isTransacting={isStakePending || isStakeConfirming || depositApprovalTransaction.state.isPending || depositApprovalTransaction.state.isConfirming}
-                  needsApproval={needsDolaApprovalForDeposit && depositAmountWei > 0n}
-                  isAllowanceLoading={dolaAllowanceForPhlimboLoading}
+                  needsApproval={needsPhUsdApprovalForDeposit && depositAmountWei > 0n}
+                  isAllowanceLoading={phUsdAllowanceForPhlimboLoading}
                   isPaused={isPaused === true}
                 />
               </ErrorBoundary>
@@ -898,16 +1036,17 @@ export default function VaultPage() {
           <ContextBox visible={activeTab === "Deposit" || activeTab === "Withdraw"}>
             {(activeTab === "Deposit" || activeTab === "Withdraw") && (
               <YieldRewardsInfo
-                totalApy={mockYieldData.totalApy}
-                phUsdApy={mockYieldData.phUsdApy}
-                usdcApy={mockYieldData.usdcApy}
-                pendingPhUsd={mockYieldData.pendingPhUsd}
-                pendingUsdc={mockYieldData.pendingUsdc}
-                stakedBalance={mockYieldData.stakedBalance}
-                isLoading={false}
-                isConnected={true} // Mock: always show fake rewards data for now
+                totalApy={totalApyCalculated}
+                phUsdApy={phUsdApyCalculated}
+                usdcApy={usdcApyCalculated}
+                pendingPhUsd={pendingPhUsdRaw ?? 0n}
+                pendingUsdc={pendingStableRaw ?? 0n}
+                stakedBalance={stakedBalanceRaw}
+                isLoading={yieldDataLoading}
+                isConnected={!!walletAddress}
                 onClaim={handleClaim}
                 isClaiming={isClaiming}
+                isUsdcDecimals6={true}
               />
             )}
           </ContextBox>
