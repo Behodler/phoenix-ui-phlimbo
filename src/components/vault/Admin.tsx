@@ -227,11 +227,21 @@ export default function Admin() {
     },
   });
 
-  // Fetch smoothedStablePerSecond from PhlimboEA (EMA-smoothed stable reward rate, scaled by 1e18)
-  const { data: smoothedStablePerSecond, refetch: refetchSmoothedStable, isLoading: smoothedStableLoading } = useReadContract({
+  // Fetch rewardPerSecond from PhlimboEA (linear depletion reward rate)
+  const { data: rewardPerSecond, refetch: refetchRewardsPerSecond, isLoading: rewardPerSecondLoading } = useReadContract({
     address: addresses?.PhlimboEA as `0x${string}` | undefined,
     abi: phlimboEaAbi,
-    functionName: 'smoothedStablePerSecond',
+    functionName: 'rewardPerSecond',
+    query: {
+      enabled: !!addresses?.PhlimboEA,
+    },
+  });
+
+  // Fetch depletionDuration from PhlimboEA (duration over which rewards are depleted, in seconds)
+  const { data: depletionDuration, refetch: refetchDepletionDuration, isLoading: depletionDurationLoading } = useReadContract({
+    address: addresses?.PhlimboEA as `0x${string}` | undefined,
+    abi: phlimboEaAbi,
+    functionName: 'depletionDuration',
     query: {
       enabled: !!addresses?.PhlimboEA,
     },
@@ -258,11 +268,32 @@ export default function Admin() {
   const phlimboTotalStaked = poolInfo ? poolInfo[0] : 0n;
   const phlimboPhUSDPerSecond = poolInfo ? poolInfo[3] : 0n;
 
+  // Helper function to format duration in human-readable format
+  const formatDuration = (seconds: bigint | undefined): string => {
+    if (!seconds) return '0 seconds';
+    const secs = Number(seconds);
+    if (secs === 0) return '0 seconds';
+
+    const days = Math.floor(secs / 86400);
+    const hours = Math.floor((secs % 86400) / 3600);
+    const minutes = Math.floor((secs % 3600) / 60);
+    const remainingSecs = secs % 60;
+
+    const parts: string[] = [];
+    if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+    if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
+    if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
+    if (remainingSecs > 0 && parts.length === 0) parts.push(`${remainingSecs} second${remainingSecs !== 1 ? 's' : ''}`);
+
+    return parts.length > 0 ? parts.join(', ') : '0 seconds';
+  };
+
   // Format Phlimbo statistics for display
   const phUSDPerSecondDisplay = (Number(phlimboPhUSDPerSecond) / 1e18).toFixed(6);
-  const smoothedStablePerSecondDisplay = smoothedStablePerSecond
-    ? (Number(smoothedStablePerSecond) / 1e36).toFixed(12) // scaled by 1e18 twice per story spec
+  const rewardPerSecondDisplay = rewardPerSecond
+    ? (Number(rewardPerSecond) / 1e18).toFixed(12)
     : '0.000000000000';
+  const depletionDurationDisplay = formatDuration(depletionDuration as bigint | undefined);
   const totalStakedDisplay = (Number(phlimboTotalStaked) / 1e18).toFixed(2);
   const phlimboUsdcDisplay = phlimboUsdcBalance
     ? (Number(phlimboUsdcBalance) / 1e6).toFixed(2) // USDC has 6 decimals
@@ -272,12 +303,13 @@ export default function Admin() {
     : '0.00';
 
   // Combined loading state for Phlimbo statistics
-  const phlimboStatsLoading = poolInfoLoading || smoothedStableLoading || phlimboUsdcLoading || dolaYieldLoading;
+  const phlimboStatsLoading = poolInfoLoading || rewardPerSecondLoading || depletionDurationLoading || phlimboUsdcLoading || dolaYieldLoading;
 
   // Refetch all Phlimbo statistics
   const refetchPhlimboStats = () => {
     refetchPoolInfo();
-    refetchSmoothedStable();
+    refetchRewardsPerSecond();
+    refetchDepletionDuration();
     refetchPhlimboUsdc();
     refetchDolaYield();
   };
@@ -984,9 +1016,15 @@ export default function Admin() {
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">smoothedStablePerSecond:</span>
+            <span className="text-sm text-muted-foreground">rewardPerSecond:</span>
             <span className="text-sm font-mono text-foreground">
-              {smoothedStablePerSecondDisplay}
+              {rewardPerSecondDisplay}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">depletionDuration:</span>
+            <span className="text-sm font-mono text-foreground">
+              {depletionDurationDisplay}
             </span>
           </div>
           <div className="flex justify-between items-center">
@@ -1018,7 +1056,8 @@ export default function Admin() {
         </div>
         <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
           <strong>Note:</strong> phUSDPerSecond is the current phUSD emission rate.
-          smoothedStablePerSecond is the EMA-smoothed stable reward rate (scaled by 1e18).
+          rewardPerSecond is the current USDC reward distribution rate (scaled by 1e18), recalculated when users stake/unstake or USDC yield is injected.
+          depletionDuration is the configurable duration over which rewards are linearly depleted.
           YieldFunnel DOLA shows pending DOLA yield from the DOLA yield strategy.
         </p>
       </div>
