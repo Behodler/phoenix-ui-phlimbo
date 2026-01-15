@@ -160,11 +160,11 @@ export default function VaultPage() {
     },
   });
 
-  // Fetch smoothedStablePerSecond for USDC APY calculation (EMA-smoothed rate, pre-scaled by 1e18)
-  const { data: smoothedStablePerSecondRaw, isLoading: smoothedStableLoading } = useReadContract({
+  // Fetch rewardPerSecond for USDC APY calculation (linear depletion rate)
+  const { data: rewardPerSecondRaw, isLoading: rewardPerSecondLoading } = useReadContract({
     address: addresses?.PhlimboEA as `0x${string}` | undefined,
     abi: phlimboEaAbi,
-    functionName: 'smoothedStablePerSecond',
+    functionName: 'rewardPerSecond',
     query: {
       enabled: !!addresses?.PhlimboEA,
     },
@@ -189,12 +189,12 @@ export default function VaultPage() {
     ? Number(desiredAPYBpsRaw) / 100
     : 0;
 
-  // Calculate USDC APY: (smoothedStablePerSecond / 1e18 * 31536000 / totalStaked) * 100
-  // smoothedStablePerSecond is pre-scaled by 1e18
-  // Note: smoothedStablePerSecond is in USDC per second (6 decimals) scaled by 1e18
+  // Calculate USDC APY using linear depletion model
+  // rewardPerSecond is the current rate of USDC rewards distribution
+  // Note: rewardPerSecond is in USDC per second (6 decimals), scaled by 1e18
   // totalStaked is in phUSD (18 decimals)
   const usdcApyCalculated = (() => {
-    const smoothed = smoothedStablePerSecondRaw ? Number(smoothedStablePerSecondRaw) : 0;
+    const rewardsRate = rewardPerSecondRaw ? Number(rewardPerSecondRaw) : 0;
     const secondsPerYear = 31536000;
 
     // Determine denominator: use totalStaked if non-zero, otherwise use user's phUSD balance
@@ -211,14 +211,14 @@ export default function VaultPage() {
 
     if (denominator === 0) return 0;
 
-    // smoothedStablePerSecond is scaled by 1e18, and represents USDC (6 decimals) per second
-    // Annual USDC yield = (smoothed / 1e18) * secondsPerYear
+    // rewardPerSecond is scaled by 1e18, and represents USDC (6 decimals) per second
+    // Annual USDC yield = (rewardsRate / 1e18) * secondsPerYear
     // APY = (annualYield / totalStaked) * 100
     // Since USDC has 6 decimals and phUSD has 18 decimals, we need to normalize:
-    // annualUsdcInUsdValue = (smoothed / 1e18) * secondsPerYear / 1e6 (to get USDC value)
+    // annualUsdcInUsdValue = (rewardsRate / 1e18) * secondsPerYear / 1e6 (to get USDC value)
     // But totalStaked is already in phUSD value (1 phUSD = 1 USD)
-    // So: APY = ((smoothed / 1e18) * secondsPerYear / 1e6) / denominator * 100
-    const annualUsdcRaw = (smoothed / 1e18) * secondsPerYear;
+    // So: APY = ((rewardsRate / 1e18) * secondsPerYear / 1e6) / denominator * 100
+    const annualUsdcRaw = (rewardsRate / 1e18) * secondsPerYear;
     // Convert from 6 decimals to actual USDC value
     const annualUsdcValue = annualUsdcRaw / 1e6;
     const apy = (annualUsdcValue / denominator) * 100;
@@ -231,7 +231,7 @@ export default function VaultPage() {
 
   // Combined loading state for yield data
   const yieldDataLoading = pendingPhUsdLoading || pendingStableLoading || userInfoLoading ||
-    poolInfoLoading || smoothedStableLoading || desiredAPYBpsLoading;
+    poolInfoLoading || rewardPerSecondLoading || desiredAPYBpsLoading;
   // ========== END YIELD DATA READS FOR CONTEXTBOX ==========
 
   // Determine tabs based on network and owner status
