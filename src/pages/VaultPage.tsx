@@ -5,7 +5,7 @@ import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { parseUnits, maxUint256 } from 'viem';
 import { phlimboEaAbi, phusdStableMinterAbi } from '@behodler/phase2-wagmi-hooks';
-import { useTokenBalance, useTokenAllowance, useTokenApproval } from '../hooks/useContractInteractions';
+import { useTokenBalance, useTokenAllowance, useTokenApproval, useDepositViewPolling } from '../hooks';
 import { useApprovalTransaction } from '../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
 import Header from '../components/layout/Header';
@@ -62,14 +62,8 @@ export default function VaultPage() {
     addresses?.Dola as `0x${string}` | undefined
   );
 
-  // Fetch phUSD balance for connected wallet (used by Deposit tab)
-  const {
-    balance: phUsdBalanceRaw,
-    refetch: refetchPhUsdBalanceForDeposit
-  } = useTokenBalance(
-    walletAddress,
-    addresses?.PhUSD as `0x${string}` | undefined
-  );
+  // NOTE: phUSD balance for Deposit tab now comes from DepositView polling hook (phUsdBalanceFromView)
+  // This individual hook is kept as fallback for non-Deposit tab contexts
 
   // Fetch DOLA allowance for PhusdStableMinter contract (for Mint tab)
   const {
@@ -82,16 +76,8 @@ export default function VaultPage() {
     addresses?.Dola as `0x${string}` | undefined
   );
 
-  // Fetch phUSD allowance for PhlimboEA contract (for Deposit tab)
-  const {
-    allowance: phUsdAllowanceForPhlimboRaw,
-    isLoading: phUsdAllowanceForPhlimboLoading,
-    refetch: refetchPhUsdAllowanceForPhlimbo
-  } = useTokenAllowance(
-    walletAddress,
-    addresses?.PhlimboEA as `0x${string}` | undefined,
-    addresses?.PhUSD as `0x${string}` | undefined
-  );
+  // NOTE: phUSD allowance for PhlimboEA now comes from DepositView polling hook (phUsdAllowanceFromView)
+  // Loading state for allowance comes from DepositView
 
   // Fetch phUSD balance for connected wallet (to refetch after mint)
   const {
@@ -116,55 +102,38 @@ export default function VaultPage() {
     ? walletAddress.toLowerCase() === ownerAddress.toLowerCase()
     : false;
 
+  // Tab state needs to be declared early for DepositView polling
+  const [activeTab, setActiveTab] = useState<Tab>("Mint");
+
+  // ========== DEPOSITVIEW POLLING ==========
+  // Use DepositView contract for consolidated Deposit tab data
+  // Polling is active only when Deposit or Withdraw tab is selected
+  const isDepositTabActive = activeTab === "Deposit" || activeTab === "Withdraw";
+  const {
+    data: depositViewData,
+    isLoading: depositViewLoading,
+    refresh: refreshDepositView,
+  } = useDepositViewPolling(isDepositTabActive);
+
+  // Extract values from DepositView data (replaces individual contract calls)
+  const phUsdBalanceFromView = depositViewData?.userPhUSDBalance ?? 0n;
+  const pendingPhUsdFromView = depositViewData?.pendingPhUSDRewards ?? 0n;
+  const pendingStableFromView = depositViewData?.pendingStableRewards ?? 0n;
+  const stakedBalanceFromView = depositViewData?.stakedBalance ?? 0n;
+  const phUsdAllowanceFromView = depositViewData?.userAllowance ?? 0n;
+  // phUSDRewardsPerSecond is available but not currently used (fixed APY from desiredAPYBps)
+  const stableRewardsPerSecondFromView = depositViewData?.stableRewardsPerSecond ?? 0n;
+  // ========== END DEPOSITVIEW POLLING ==========
+
   // ========== YIELD DATA READS FOR CONTEXTBOX ==========
-  // Fetch pending phUSD rewards for connected user
-  const { data: pendingPhUsdRaw, isLoading: pendingPhUsdLoading } = useReadContract({
-    address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboEaAbi,
-    functionName: 'pendingPhUSD',
-    args: walletAddress ? [walletAddress] : undefined,
-    query: {
-      enabled: !!addresses?.PhlimboEA && !!walletAddress,
-    },
-  });
-
-  // Fetch pending USDC (stable) rewards for connected user
-  const { data: pendingStableRaw, isLoading: pendingStableLoading } = useReadContract({
-    address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboEaAbi,
-    functionName: 'pendingStable',
-    args: walletAddress ? [walletAddress] : undefined,
-    query: {
-      enabled: !!addresses?.PhlimboEA && !!walletAddress,
-    },
-  });
-
-  // Fetch user info to get staked balance: userInfo returns (amount, phUSDDebt, stableDebt)
-  const { data: userInfoData, isLoading: userInfoLoading } = useReadContract({
-    address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboEaAbi,
-    functionName: 'userInfo',
-    args: walletAddress ? [walletAddress] : undefined,
-    query: {
-      enabled: !!addresses?.PhlimboEA && !!walletAddress,
-    },
-  });
+  // Most yield data now comes from DepositView polling hook
+  // We still need poolInfo for totalStaked and desiredAPYBps for phUSD APY
 
   // Fetch pool info to get totalStaked: getPoolInfo returns (totalStaked, accPhUSDPerShare, accStablePerShare, phUSDPerSecond, lastRewardTime)
   const { data: poolInfoData, isLoading: poolInfoLoading } = useReadContract({
     address: addresses?.PhlimboEA as `0x${string}` | undefined,
     abi: phlimboEaAbi,
     functionName: 'getPoolInfo',
-    query: {
-      enabled: !!addresses?.PhlimboEA,
-    },
-  });
-
-  // Fetch rewardPerSecond for USDC APY calculation (linear depletion rate)
-  const { data: rewardPerSecondRaw, isLoading: rewardPerSecondLoading } = useReadContract({
-    address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboEaAbi,
-    functionName: 'rewardPerSecond',
     query: {
       enabled: !!addresses?.PhlimboEA,
     },
@@ -180,8 +149,7 @@ export default function VaultPage() {
     },
   });
 
-  // Extract values from contract reads
-  const stakedBalanceRaw = userInfoData ? (userInfoData as [bigint, bigint, bigint])[0] : 0n;
+  // Extract totalStaked from poolInfo (still needed for APY denominator)
   const totalStakedRaw = poolInfoData ? (poolInfoData as [bigint, bigint, bigint, bigint, bigint])[0] : 0n;
 
   // Calculate phUSD APY: desiredAPYBps / 100 gives percentage
@@ -189,12 +157,10 @@ export default function VaultPage() {
     ? Number(desiredAPYBpsRaw) / 100
     : 0;
 
-  // Calculate USDC APY using linear depletion model
-  // rewardPerSecond is the current rate of USDC rewards distribution
-  // Note: rewardPerSecond is in USDC per second (6 decimals), scaled by 1e18
-  // totalStaked is in phUSD (18 decimals)
+  // Calculate USDC APY using linear depletion model with DepositView data
+  // stableRewardsPerSecond from DepositView represents the USDC rewards rate
   const usdcApyCalculated = (() => {
-    const rewardsRate = rewardPerSecondRaw ? Number(rewardPerSecondRaw) : 0;
+    const rewardsRate = stableRewardsPerSecondFromView ? Number(stableRewardsPerSecondFromView) : 0;
     const secondsPerYear = 31536000;
 
     // Determine denominator: use totalStaked if non-zero, otherwise use user's phUSD balance
@@ -202,9 +168,9 @@ export default function VaultPage() {
     if (totalStakedRaw > 0n) {
       // totalStaked is 18 decimals, convert to number
       denominator = Number(totalStakedRaw) / 1e18;
-    } else if (phUsdBalanceRaw && phUsdBalanceRaw > 0n) {
+    } else if (phUsdBalanceFromView > 0n) {
       // Fallback to user's phUSD balance if totalStaked is 0
-      denominator = Number(phUsdBalanceRaw) / 1e18;
+      denominator = Number(phUsdBalanceFromView) / 1e18;
     } else {
       return 0; // No valid denominator
     }
@@ -229,9 +195,8 @@ export default function VaultPage() {
   // Total APY is the sum of phUSD and USDC APYs
   const totalApyCalculated = phUsdApyCalculated + usdcApyCalculated;
 
-  // Combined loading state for yield data
-  const yieldDataLoading = pendingPhUsdLoading || pendingStableLoading || userInfoLoading ||
-    poolInfoLoading || rewardPerSecondLoading || desiredAPYBpsLoading;
+  // Combined loading state for yield data (now using DepositView loading state)
+  const yieldDataLoading = depositViewLoading || poolInfoLoading || desiredAPYBpsLoading;
   // ========== END YIELD DATA READS FOR CONTEXTBOX ==========
 
   // Determine tabs based on network and owner status
@@ -262,8 +227,6 @@ export default function VaultPage() {
     return tabList;
   })();
 
-  const [activeTab, setActiveTab] = useState<Tab>("Mint");
-
   // FAQ state - tracks which FAQ context to display
   const [faqComponent, setFaqComponent] = useState<string | undefined>("DepositTab");
 
@@ -292,7 +255,8 @@ export default function VaultPage() {
   const dolaBalance = dolaBalanceRaw ? parseFloat((Number(dolaBalanceRaw) / 1e18).toFixed(4)) : 0;
 
   // Convert phUSD balance from raw bigint to display format (for Deposit tab)
-  const phUsdBalance = phUsdBalanceRaw ? parseFloat((Number(phUsdBalanceRaw) / 1e18).toFixed(4)) : 0;
+  // Now using DepositView data (phUsdBalanceFromView)
+  const phUsdBalance = phUsdBalanceFromView ? parseFloat((Number(phUsdBalanceFromView) / 1e18).toFixed(4)) : 0;
 
   // Real token info for the Mint tab using actual DOLA balance
   const mintTokenInfo: TokenInfo = {
@@ -303,12 +267,12 @@ export default function VaultPage() {
     icon: DOLA
   };
 
-  // Real token info for the Deposit tab using actual phUSD balance
+  // Real token info for the Deposit tab using DepositView phUSD balance
   const depositTokenInfo: TokenInfo = {
     name: "phUSD",
     balance: phUsdBalance,
     balanceUsd: phUsdBalance, // 1:1 USD value assumption for stablecoins
-    balanceRaw: phUsdBalanceRaw ?? 0n,
+    balanceRaw: phUsdBalanceFromView ?? 0n,
     icon: phUSDIcon
   };
 
@@ -341,8 +305,9 @@ export default function VaultPage() {
     : 0n;
 
   // Needs approval for deposit if phUSD allowance is less than the deposit amount being requested
-  const needsPhUsdApprovalForDeposit = phUsdAllowanceForPhlimboRaw !== undefined
-    ? phUsdAllowanceForPhlimboRaw < depositAmountWei
+  // Using DepositView data (phUsdAllowanceFromView) instead of individual contract call
+  const needsPhUsdApprovalForDeposit = phUsdAllowanceFromView !== undefined
+    ? phUsdAllowanceFromView < depositAmountWei
     : true; // Default to needing approval if allowance hasn't loaded yet
 
   // Mint transaction state using wagmi hooks (similar to pause transaction in SafetyTab)
@@ -425,7 +390,8 @@ export default function VaultPage() {
     },
     {
       onSuccess: async (hash) => {
-        await refetchPhUsdAllowanceForPhlimbo();
+        // Refresh DepositView data to get updated allowance
+        refreshDepositView();
 
         addToast({
           type: 'success',
@@ -477,16 +443,17 @@ export default function VaultPage() {
 
   // Mock claim handler - simulates claiming rewards without actual contract interaction
   // TODO: Story 014.3+ will implement real claim functionality
+  // Triggers DepositView refresh on completion for future-proofing
   const handleClaim = async () => {
     try {
       setIsClaiming(true);
 
-      // Format pending values for display in toast
-      const pendingPhUsdDisplay = pendingPhUsdRaw
-        ? (Number(pendingPhUsdRaw) / 1e18).toFixed(2)
+      // Format pending values for display in toast (using DepositView data)
+      const pendingPhUsdDisplay = pendingPhUsdFromView
+        ? (Number(pendingPhUsdFromView) / 1e18).toFixed(2)
         : '0.00';
-      const pendingUsdcDisplay = pendingStableRaw
-        ? (Number(pendingStableRaw) / 1e6).toFixed(2)  // USDC has 6 decimals
+      const pendingUsdcDisplay = pendingStableFromView
+        ? (Number(pendingStableFromView) / 1e6).toFixed(2)  // USDC has 6 decimals
         : '0.00';
 
       // Show pending toast
@@ -499,6 +466,9 @@ export default function VaultPage() {
 
       // Simulate a delay to mimic transaction processing
       await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Trigger DepositView refresh after claim (future-proofing for real implementation)
+      refreshDepositView();
 
       // Show success toast
       addToast({
@@ -879,9 +849,8 @@ export default function VaultPage() {
       // Clear the deposit amount
       setDepositToYieldAmount("");
 
-      // Refetch balances
-      refetchPhUsdBalanceForDeposit();
-      refetchPhUsdAllowanceForPhlimbo();
+      // Trigger DepositView refresh to update balance and allowance
+      refreshDepositView();
     }
   }, [isStakeSuccess, stakeHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1009,7 +978,7 @@ export default function VaultPage() {
                   onApprove={handlePhUsdApprovalForDeposit}
                   isTransacting={isStakePending || isStakeConfirming || depositApprovalTransaction.state.isPending || depositApprovalTransaction.state.isConfirming}
                   needsApproval={needsPhUsdApprovalForDeposit && depositAmountWei > 0n}
-                  isAllowanceLoading={phUsdAllowanceForPhlimboLoading}
+                  isAllowanceLoading={depositViewLoading}
                   isPaused={isPaused === true}
                 />
               </ErrorBoundary>
@@ -1039,9 +1008,9 @@ export default function VaultPage() {
                 totalApy={totalApyCalculated}
                 phUsdApy={phUsdApyCalculated}
                 usdcApy={usdcApyCalculated}
-                pendingPhUsd={pendingPhUsdRaw ?? 0n}
-                pendingUsdc={pendingStableRaw ?? 0n}
-                stakedBalance={stakedBalanceRaw}
+                pendingPhUsd={pendingPhUsdFromView}
+                pendingUsdc={pendingStableFromView}
+                stakedBalance={stakedBalanceFromView}
                 isLoading={yieldDataLoading}
                 isConnected={!!walletAddress}
                 onClaim={handleClaim}
