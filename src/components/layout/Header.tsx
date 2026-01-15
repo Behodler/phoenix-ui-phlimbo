@@ -1,6 +1,7 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import phoenixLogo from '../../assets/phUSD-nobackground.png';
 import WalletBalances from './WalletBalances';
+import PollingToggle from '../ui/PollingToggle';
 
 export default function Header() {
   return (
@@ -19,7 +20,8 @@ export default function Header() {
             <div className="text-sm text-muted-foreground font-semibold italic hidden sm:block">B3 Tech</div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          <PollingToggle />
           <WalletBalances />
           <ConnectButton />
         </div>

@@ -7,6 +7,7 @@ import { wagmiConfig } from './wagmiConfig'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
 import { ContractAddressProvider } from './contexts/ContractAddressContext'
+import { PollingProvider } from './contexts/PollingContext'
 import App from './App'
 
 const qc = new QueryClient()
@@ -17,7 +18,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={qc}>
         <RainbowKitProvider theme={darkTheme()}>
           <ContractAddressProvider>
-            <App />
+            <PollingProvider>
+              <App />
+            </PollingProvider>
           </ContractAddressProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
