@@ -22,6 +22,7 @@ export interface ContractAddresses {
   StableYieldAccumulator: string,
   PhlimboEA: string
   AutoDOLA:string
+  DepositView:string
 }
 
 
