@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { parseUnits } from 'viem';
+import { parseUnits, formatUnits } from 'viem';
 import { safeMaxForDisplay } from '../../utils/bigIntDisplay';
 import AmountDisplay from '../ui/AmountDisplay';
 import AmountInput from '../ui/AmountInput';
@@ -8,11 +8,6 @@ import WithdrawFromYieldConfirmationDialog from './WithdrawFromYieldConfirmation
 import { log } from '../../utils/logger';
 import phUSD from "../../assets/phUSD.png";
 
-// Mock constants for staked balance and earned yield
-const MOCK_STAKED_PHUSD_BALANCE = 60; // 60 phUSD staked
-const MOCK_PHUSD_YIELD = 2; // 2 phUSD earned yield
-const MOCK_USDC_YIELD = 7.3; // 7.3 USDC earned yield
-
 // Props interface for WithdrawFromYieldForm
 export interface WithdrawFromYieldFormProps {
   amount: string;
@@ -20,6 +15,11 @@ export interface WithdrawFromYieldFormProps {
   onWithdraw: () => void;
   isTransacting?: boolean;
   isPaused?: boolean;
+  // Real data props from DepositView polling
+  stakedBalance: bigint;  // User's staked phUSD amount (18 decimals)
+  pendingPhUsdRewards: bigint;  // Pending phUSD yield (18 decimals)
+  pendingStableRewards: bigint;  // Pending USDC yield (6 decimals)
+  onRefresh?: () => void;  // Callback to trigger data refresh after transaction
 }
 
 export default function WithdrawFromYieldForm({
@@ -27,13 +27,19 @@ export default function WithdrawFromYieldForm({
   onAmountChange,
   onWithdraw,
   isTransacting = false,
-  isPaused = false
+  isPaused = false,
+  stakedBalance,
+  pendingPhUsdRewards,
+  pendingStableRewards,
+  onRefresh: _onRefresh  // Prefixed with underscore - refresh is currently handled in VaultPage after mock transaction
 }: WithdrawFromYieldFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
 
-  // Mock staked balance info
-  const stakedBalanceRaw = parseUnits(MOCK_STAKED_PHUSD_BALANCE.toString(), 18);
+  // Convert bigint values to display numbers
+  const stakedBalanceDisplay = Number(formatUnits(stakedBalance, 18));
+  const pendingPhUsdDisplay = Number(formatUnits(pendingPhUsdRewards, 18));
+  const pendingStableDisplay = Number(formatUnits(pendingStableRewards, 6));  // USDC has 6 decimals
 
   // Validate input and parse to BigInt with error handling
   let inputAmountWei = 0n;
@@ -53,13 +59,13 @@ export default function WithdrawFromYieldForm({
   const parsedAmountForDisplay = parseFloat(amount) || 0;
 
   // Calculate proportional yield based on withdrawal percentage
-  const withdrawalPercentage = parsedAmountForDisplay > 0 && MOCK_STAKED_PHUSD_BALANCE > 0
-    ? Math.min(parsedAmountForDisplay / MOCK_STAKED_PHUSD_BALANCE, 1)
+  const withdrawalPercentage = parsedAmountForDisplay > 0 && stakedBalanceDisplay > 0
+    ? Math.min(parsedAmountForDisplay / stakedBalanceDisplay, 1)
     : 0;
 
-  // Calculate proportional yield amounts
-  const proportionalPhUsdYield = MOCK_PHUSD_YIELD * withdrawalPercentage;
-  const proportionalUsdcYield = MOCK_USDC_YIELD * withdrawalPercentage;
+  // Calculate proportional yield amounts using real data
+  const proportionalPhUsdYield = pendingPhUsdDisplay * withdrawalPercentage;
+  const proportionalUsdcYield = pendingStableDisplay * withdrawalPercentage;
   const totalPhUsdToReceive = parsedAmountForDisplay + proportionalPhUsdYield;
 
   // Validate input format and decimal places
@@ -115,8 +121,8 @@ export default function WithdrawFromYieldForm({
   };
 
   const handleMaxClick = () => {
-    // Subtract 1 wei to ensure we never round up
-    const truncatedBalanceWei = stakedBalanceRaw - BigInt(1);
+    // Subtract 1 wei to ensure we never round up (handle zero balance case)
+    const truncatedBalanceWei = stakedBalance > 0n ? stakedBalance - 1n : 0n;
     // Use safe display truncation to prevent validation errors
     const displayValue = safeMaxForDisplay(truncatedBalanceWei, 18);
     log.debug('MAX CLICKED - safeMaxForDisplay returned:', displayValue);
@@ -137,8 +143,10 @@ export default function WithdrawFromYieldForm({
   };
 
   // Determine button state and properties
-  // Validate against the maximum value that the max button would produce
-  const maxAllowedWei = parseUnits(safeMaxForDisplay(stakedBalanceRaw - 1n, 18), 18);
+  // Validate against the maximum value that the max button would produce (handle zero balance case)
+  const maxAllowedWei = stakedBalance > 0n
+    ? parseUnits(safeMaxForDisplay(stakedBalance - 1n, 18), 18)
+    : 0n;
 
   const isAmountValid = inputAmountWei > 0n && inputAmountWei <= maxAllowedWei;
   const hasValidationError = validationError !== '' || parseError;
@@ -191,7 +199,7 @@ export default function WithdrawFromYieldForm({
             <div className="min-w-0 flex-1">
               <div className="text-base font-semibold text-foreground">phUSD (Staked)</div>
               <div className="text-xs sm:text-sm text-muted-foreground break-words">
-                Staked {formatNumber(MOCK_STAKED_PHUSD_BALANCE)} (${formatNumber(MOCK_STAKED_PHUSD_BALANCE)})
+                Staked {formatNumber(stakedBalanceDisplay)} (${formatNumber(stakedBalanceDisplay)})
               </div>
             </div>
           </div>
