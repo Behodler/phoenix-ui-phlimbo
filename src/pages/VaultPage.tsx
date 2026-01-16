@@ -240,7 +240,7 @@ export default function VaultPage() {
   const [depositToYieldAmount, setDepositToYieldAmount] = useState<string>("");
   const [withdrawFromYieldAmount, setWithdrawFromYieldAmount] = useState<string>("");
 
-  // State for mock transactions (withdraw/claim still mocked, mint and deposit are now real)
+  // State for transaction UI (all core transactions are now real: mint, deposit, withdraw, claim)
   const [isWithdrawingFromYield, setIsWithdrawingFromYield] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
 
@@ -447,6 +447,15 @@ export default function VaultPage() {
     hash: claimHash,
     query: {
       enabled: !!claimHash,
+    },
+  });
+
+  // Withdraw transaction state for PhlimboEA.withdraw()
+  const { data: withdrawHash, writeContractAsync: writeWithdraw, isPending: isWithdrawPending } = useWriteContract();
+  const { isLoading: isWithdrawConfirming, isSuccess: isWithdrawSuccess } = useWaitForTransactionReceipt({
+    hash: withdrawHash,
+    query: {
+      enabled: !!withdrawHash,
     },
   });
 
@@ -937,9 +946,8 @@ export default function VaultPage() {
     setWithdrawFromYieldAmount(amount);
   };
 
-  // Mock withdraw from yield handler - simulates a successful withdrawal without actual contract interaction
-  // This is a fully mocked flow - no wallet connection required
-  // Uses real data from DepositView polling but simulates the transaction
+  // Real withdraw from yield handler - calls PhlimboEA.withdraw(amount)
+  // Withdraws staked phUSD and claims proportional pending rewards
   const handleWithdrawFromYield = async () => {
     // Validate amount
     if (!withdrawFromYieldAmount || withdrawFromYieldAmount === '0' || withdrawFromYieldAmount === '') {
@@ -947,6 +955,26 @@ export default function VaultPage() {
         type: 'error',
         title: 'Invalid Amount',
         description: 'Please enter a valid amount greater than 0.',
+      });
+      return;
+    }
+
+    // Check wallet connection
+    if (!walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet using the button in the header.',
+      });
+      return;
+    }
+
+    // Check contract addresses are loaded
+    if (!addresses?.PhlimboEA) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Ready',
+        description: 'Please wait for contract addresses to load.',
       });
       return;
     }
@@ -966,31 +994,82 @@ export default function VaultPage() {
     try {
       setIsWithdrawingFromYield(true);
 
-      // Calculate proportional yield using real data from DepositView
+      // Show signing toast
+      addToast({
+        type: 'info',
+        title: 'Confirm Transaction',
+        description: 'Please confirm the withdrawal transaction in your wallet.',
+        duration: 30000,
+      });
+
+      // Convert amount to wei (18 decimals for phUSD)
+      const amountWei = parseUnits(withdrawFromYieldAmount, 18);
+
+      // Execute withdraw: PhlimboEA.withdraw(amount)
+      const hash = await writeWithdraw({
+        address: addresses.PhlimboEA as `0x${string}`,
+        abi: phlimboEaAbi,
+        functionName: 'withdraw',
+        args: [amountWei],
+      });
+
+      // Show pending confirmation toast
+      addToast({
+        type: 'info',
+        title: 'Transaction Submitted',
+        description: 'Waiting for blockchain confirmation...',
+        duration: 30000,
+        action: {
+          label: 'View on Etherscan',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${hash}`
+              : `https://sepolia.etherscan.io/tx/${hash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
+      });
+
+    } catch (error) {
+      log.error('Withdraw from yield failed:', error);
+      addToast({
+        type: 'error',
+        title: 'Withdrawal Failed',
+        description: error instanceof Error ? error.message : 'An error occurred during the withdrawal transaction.',
+        duration: 8000,
+      });
+    } finally {
+      setIsWithdrawingFromYield(false);
+    }
+  };
+
+  // Handle withdraw success in useEffect to prevent infinite loop
+  useEffect(() => {
+    if (isWithdrawSuccess && withdrawHash) {
+      const parsedAmount = parseFloat(withdrawFromYieldAmount || '0');
+
+      // Calculate proportional yield for display using real data from DepositView
+      const stakedBalanceDisplay = Number(stakedBalanceFromView) / 1e18;
       const pendingPhUsdDisplay = Number(pendingPhUsdFromView) / 1e18;
       const pendingStableDisplay = Number(pendingStableFromView) / 1e6;  // USDC has 6 decimals
       const withdrawalPercentage = stakedBalanceDisplay > 0 ? parsedAmount / stakedBalanceDisplay : 0;
       const phUsdYield = (pendingPhUsdDisplay * withdrawalPercentage).toFixed(4);
       const usdcYield = (pendingStableDisplay * withdrawalPercentage).toFixed(4);
-      const totalPhUsd = (parsedAmount + parseFloat(phUsdYield)).toFixed(4);
 
-      // Show pending toast
-      addToast({
-        type: 'info',
-        title: 'Withdrawing',
-        description: 'Processing your withdrawal transaction...',
-        duration: 3000,
-      });
-
-      // Simulate a delay to mimic transaction processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Show success toast
       addToast({
         type: 'success',
-        title: 'Withdrawal Successful (Mock)',
-        description: `Successfully withdrew ${parsedAmount.toFixed(4)} phUSD principal + ${phUsdYield} phUSD yield + ${usdcYield} USDC yield (Total: ${totalPhUsd} phUSD + ${usdcYield} USDC)`,
-        duration: 8000,
+        title: 'Withdrawal Successful',
+        description: `Successfully withdrew ${parsedAmount.toFixed(4)} phUSD + ${phUsdYield} phUSD yield + ${usdcYield} USDC yield`,
+        duration: 30000,
+        action: {
+          label: 'View Transaction',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${withdrawHash}`
+              : `https://sepolia.etherscan.io/tx/${withdrawHash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
       });
 
       // Clear the withdraw amount
@@ -998,19 +1077,8 @@ export default function VaultPage() {
 
       // Trigger DepositView refresh after successful withdrawal
       refreshDepositView();
-
-    } catch (error) {
-      log.error('Mock withdraw from yield failed:', error);
-      addToast({
-        type: 'error',
-        title: 'Withdrawal Failed',
-        description: 'An error occurred during the withdrawal transaction.',
-        duration: 8000,
-      });
-    } finally {
-      setIsWithdrawingFromYield(false);
     }
-  };
+  }, [isWithdrawSuccess, withdrawHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen bg-background text-foreground antialiased">
@@ -1070,7 +1138,7 @@ export default function VaultPage() {
                   amount={withdrawFromYieldAmount}
                   onAmountChange={handleWithdrawFromYieldAmountChange}
                   onWithdraw={handleWithdrawFromYield}
-                  isTransacting={isWithdrawingFromYield}
+                  isTransacting={isWithdrawingFromYield || isWithdrawPending || isWithdrawConfirming}
                   isPaused={isPaused === true}
                   stakedBalance={stakedBalanceFromView}
                   pendingPhUsdRewards={pendingPhUsdFromView}
