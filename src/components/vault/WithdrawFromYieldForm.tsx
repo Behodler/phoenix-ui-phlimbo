@@ -12,7 +12,7 @@ import phUSD from "../../assets/phUSD.png";
 export interface WithdrawFromYieldFormProps {
   amount: string;
   onAmountChange: (amount: string) => void;
-  onWithdraw: () => void;
+  onWithdraw: () => void | Promise<void>;  // Can be sync or async
   isTransacting?: boolean;
   isPaused?: boolean;
   // Real data props from DepositView polling
@@ -31,7 +31,7 @@ export default function WithdrawFromYieldForm({
   stakedBalance,
   pendingPhUsdRewards,
   pendingStableRewards,
-  onRefresh: _onRefresh  // Prefixed with underscore - refresh is currently handled in VaultPage after mock transaction
+  onRefresh: _onRefresh  // Currently unused - refresh is called in VaultPage's handleWithdrawFromYield
 }: WithdrawFromYieldFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
@@ -135,7 +135,7 @@ export default function WithdrawFromYieldForm({
 
   const handleConfirmWithdraw = async () => {
     setShowConfirmation(false);
-    onWithdraw();
+    await onWithdraw();
   };
 
   const handleCancelWithdraw = () => {
@@ -160,7 +160,7 @@ export default function WithdrawFromYieldForm({
   if (!isAmountValid && inputAmountWei > 0n) {
     buttonLabel = "Insufficient Balance";
   } else if (isAmountValid) {
-    buttonLabel = "Claim";
+    buttonLabel = "Withdraw";
     buttonAction = handleInitiateWithdraw;
     buttonLoading = isTransacting;
   }
