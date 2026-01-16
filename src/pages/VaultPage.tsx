@@ -939,6 +939,7 @@ export default function VaultPage() {
 
   // Mock withdraw from yield handler - simulates a successful withdrawal without actual contract interaction
   // This is a fully mocked flow - no wallet connection required
+  // Uses real data from DepositView polling but simulates the transaction
   const handleWithdrawFromYield = async () => {
     // Validate amount
     if (!withdrawFromYieldAmount || withdrawFromYieldAmount === '0' || withdrawFromYieldAmount === '') {
@@ -950,14 +951,14 @@ export default function VaultPage() {
       return;
     }
 
-    // Mock staked balance check (60 phUSD staked as per story spec)
-    const MOCK_STAKED_BALANCE = 60;
+    // Use real staked balance from DepositView polling
+    const stakedBalanceDisplay = Number(stakedBalanceFromView) / 1e18;
     const parsedAmount = parseFloat(withdrawFromYieldAmount);
-    if (parsedAmount > MOCK_STAKED_BALANCE) {
+    if (parsedAmount > stakedBalanceDisplay) {
       addToast({
         type: 'error',
         title: 'Insufficient Staked Balance',
-        description: `You only have ${MOCK_STAKED_BALANCE.toFixed(4)} phUSD staked.`,
+        description: `You only have ${stakedBalanceDisplay.toFixed(4)} phUSD staked.`,
       });
       return;
     }
@@ -965,12 +966,12 @@ export default function VaultPage() {
     try {
       setIsWithdrawingFromYield(true);
 
-      // Calculate proportional yield (mock values from story)
-      const MOCK_PHUSD_YIELD = 2;
-      const MOCK_USDC_YIELD = 7.3;
-      const withdrawalPercentage = parsedAmount / MOCK_STAKED_BALANCE;
-      const phUsdYield = (MOCK_PHUSD_YIELD * withdrawalPercentage).toFixed(4);
-      const usdcYield = (MOCK_USDC_YIELD * withdrawalPercentage).toFixed(4);
+      // Calculate proportional yield using real data from DepositView
+      const pendingPhUsdDisplay = Number(pendingPhUsdFromView) / 1e18;
+      const pendingStableDisplay = Number(pendingStableFromView) / 1e6;  // USDC has 6 decimals
+      const withdrawalPercentage = stakedBalanceDisplay > 0 ? parsedAmount / stakedBalanceDisplay : 0;
+      const phUsdYield = (pendingPhUsdDisplay * withdrawalPercentage).toFixed(4);
+      const usdcYield = (pendingStableDisplay * withdrawalPercentage).toFixed(4);
       const totalPhUsd = (parsedAmount + parseFloat(phUsdYield)).toFixed(4);
 
       // Show pending toast
@@ -994,6 +995,9 @@ export default function VaultPage() {
 
       // Clear the withdraw amount
       setWithdrawFromYieldAmount("");
+
+      // Trigger DepositView refresh after successful withdrawal
+      refreshDepositView();
 
     } catch (error) {
       log.error('Mock withdraw from yield failed:', error);
@@ -1068,6 +1072,10 @@ export default function VaultPage() {
                   onWithdraw={handleWithdrawFromYield}
                   isTransacting={isWithdrawingFromYield}
                   isPaused={isPaused === true}
+                  stakedBalance={stakedBalanceFromView}
+                  pendingPhUsdRewards={pendingPhUsdFromView}
+                  pendingStableRewards={pendingStableFromView}
+                  onRefresh={refreshDepositView}
                 />
               </ErrorBoundary>
             ) : activeTab === "Yield Funnel" ? (
