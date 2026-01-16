@@ -6,6 +6,7 @@ import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { parseUnits, maxUint256 } from 'viem';
 import { phlimboEaAbi, phusdStableMinterAbi } from '@behodler/phase2-wagmi-hooks';
 import { useTokenBalance, useTokenAllowance, useTokenApproval, useDepositViewPolling } from '../hooks';
+import { useWalletBalances } from '../contexts/WalletBalancesContext';
 import { useApprovalTransaction } from '../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
 import Header from '../components/layout/Header';
@@ -38,6 +39,9 @@ export default function VaultPage() {
 
   // Contract addresses context
   const { addresses, networkType, loading: addressesLoading, error: addressesError } = useContractAddresses();
+
+  // Wallet balances context - for refreshing navbar balances after transactions
+  const { refreshWalletBalances } = useWalletBalances();
 
   // Debug logging for contract addresses
   useEffect(() => {
@@ -580,6 +584,9 @@ export default function VaultPage() {
         pendingUsdc: pendingUsdcDisplay,
         txHash: claimHash,
       });
+
+      // Refresh navbar wallet balances (phUSD and USDC balances increase from claimed rewards)
+      refreshWalletBalances();
     }
   }, [isClaimSuccess, claimHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -756,10 +763,13 @@ export default function VaultPage() {
       // Clear the mint amount
       setMintAmount("");
 
-      // Refetch balances
+      // Refetch balances (page-level for Mint tab functionality)
       refetchDolaBalance();
       refetchPhUsdBalance();
       refetchDolaAllowance();
+
+      // Refresh navbar wallet balances
+      refreshWalletBalances();
     }
   }, [isMintSuccess, mintHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -938,6 +948,9 @@ export default function VaultPage() {
 
       // Trigger DepositView refresh to update balance and allowance
       refreshDepositView();
+
+      // Refresh navbar wallet balances (phUSD balance decreases when deposited)
+      refreshWalletBalances();
     }
   }, [isStakeSuccess, stakeHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1077,6 +1090,9 @@ export default function VaultPage() {
 
       // Trigger DepositView refresh after successful withdrawal
       refreshDepositView();
+
+      // Refresh navbar wallet balances (phUSD balance increases, USDC may increase from rewards)
+      refreshWalletBalances();
     }
   }, [isWithdrawSuccess, withdrawHash]); // eslint-disable-line react-hooks/exhaustive-deps
 

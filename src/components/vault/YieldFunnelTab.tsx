@@ -5,6 +5,7 @@ import { stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
 import ActionButton from '../ui/ActionButton';
 import ConfirmationDialog from '../ui/ConfirmationDialog';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
+import { useWalletBalances } from '../../contexts/WalletBalancesContext';
 import { useYieldFunnelData, type PendingYieldItem } from '../../hooks/useYieldFunnelData';
 import { useTokenAllowance, useTokenApproval } from '../../hooks/useContractInteractions';
 import { useApprovalTransaction } from '../../hooks/useTransaction';
@@ -20,6 +21,9 @@ export default function YieldFunnelTab() {
 
   // Contract addresses context
   const { addresses, networkType } = useContractAddresses();
+
+  // Wallet balances context - for refreshing navbar balances after transactions
+  const { refreshWalletBalances } = useWalletBalances();
 
   // Toast notifications
   const { addToast } = useToast();
@@ -277,6 +281,9 @@ export default function YieldFunnelTab() {
       // Refetch data
       refetchYieldData();
       refetchAllowance();
+
+      // Refresh navbar wallet balances (USDC balance decreases, yield tokens received)
+      refreshWalletBalances();
     }
   }, [isClaimSuccess, claimHash]); // eslint-disable-line react-hooks/exhaustive-deps
 

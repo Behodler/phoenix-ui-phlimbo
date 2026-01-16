@@ -1,48 +1,29 @@
 import { useAccount } from 'wagmi';
 import { formatUnits } from 'viem';
-import { useContractAddresses } from '../../contexts/ContractAddressContext';
-import { useTokenBalance } from '../../hooks/useContractInteractions';
+import { useWalletBalances } from '../../contexts/WalletBalancesContext';
 
 /**
  * WalletBalances Component
  *
  * Displays DOLA, phUSD, and USDC token balances for the connected wallet.
+ * Now consumes balances from WalletBalancesContext for centralized refresh support.
  * Only renders when a wallet is connected.
  */
-import { log } from '../../utils/logger';
 export default function WalletBalances() {
   const { isConnected, address: walletAddress } = useAccount();
-  const { addresses } = useContractAddresses();
-log.warn("address: "+JSON.stringify(addresses))
-  // Fetch DOLA balance
-  const {
-    balance: dolaBalanceRaw,
-    isLoading: dolaLoading,
-    isError: dolaError
-  } = useTokenBalance(
-    walletAddress,
-    addresses?.Dola as `0x${string}` | undefined
-  );
 
-  // Fetch phUSD balance
+  // Get balances from context (moved from local useTokenBalance hooks)
   const {
-    balance: phUSDBalanceRaw,
-    isLoading: phUSDLoading,
-    isError: phUSDError
-  } = useTokenBalance(
-    walletAddress,
-    addresses?.PhUSD as `0x${string}` | undefined
-  );
-
-  // Fetch USDC balance
-  const {
-    balance: usdcBalanceRaw,
-    isLoading: usdcLoading,
-    isError: usdcError
-  } = useTokenBalance(
-    walletAddress,
-    addresses?.USDC as `0x${string}` | undefined
-  );
+    dolaBalanceRaw,
+    phUsdBalanceRaw,
+    usdcBalanceRaw,
+    dolaLoading,
+    phUsdLoading,
+    usdcLoading,
+    dolaError,
+    phUsdError,
+    usdcError
+  } = useWalletBalances();
 
   // Don't render if wallet not connected
   if (!isConnected || !walletAddress) {
@@ -51,7 +32,7 @@ log.warn("address: "+JSON.stringify(addresses))
 
   // Convert balances from wei to decimal (18 decimals for DOLA/phUSD, 6 decimals for USDC)
   const dolaBalance = dolaBalanceRaw ? parseFloat(formatUnits(dolaBalanceRaw, 18)) : 0;
-  const phUSDBalance = phUSDBalanceRaw ? parseFloat(formatUnits(phUSDBalanceRaw, 18)) : 0;
+  const phUSDBalance = phUsdBalanceRaw ? parseFloat(formatUnits(phUsdBalanceRaw, 18)) : 0;
   const usdcBalance = usdcBalanceRaw ? parseFloat(formatUnits(usdcBalanceRaw, 6)) : 0;
 
   // Format balance with appropriate decimals
@@ -83,9 +64,9 @@ log.warn("address: "+JSON.stringify(addresses))
       {/* phUSD Balance */}
       <div className="flex items-center gap-2 justify-end">
         <span className="text-xs text-muted-foreground">phUSD:</span>
-        {phUSDLoading ? (
+        {phUsdLoading ? (
           <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
-        ) : phUSDError ? (
+        ) : phUsdError ? (
           <span className="text-xs text-red-400">Error</span>
         ) : (
           <span className="text-sm font-semibold text-pxusd-white">
