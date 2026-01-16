@@ -441,14 +441,103 @@ export default function VaultPage() {
     },
   });
 
-  // Mock claim handler - simulates claiming rewards without actual contract interaction
-  // TODO: Story 014.3+ will implement real claim functionality
-  // Triggers DepositView refresh on completion for future-proofing
+  // Claim transaction state for PhlimboEA.claim()
+  const { data: claimHash, writeContractAsync: writeClaim, isPending: isClaimPending } = useWriteContract();
+  const { isLoading: isClaimConfirming, isSuccess: isClaimSuccess } = useWaitForTransactionReceipt({
+    hash: claimHash,
+    query: {
+      enabled: !!claimHash,
+    },
+  });
+
+  // Real claim handler - calls PhlimboEA.claim() to claim pending phUSD and USDC rewards
   const handleClaim = async () => {
+    // Check wallet connection
+    if (!walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet using the button in the header.',
+      });
+      return;
+    }
+
+    // Check contract addresses are loaded
+    if (!addresses?.PhlimboEA) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Ready',
+        description: 'Please wait for contract addresses to load.',
+      });
+      return;
+    }
+
     try {
       setIsClaiming(true);
 
-      // Format pending values for display in toast (using DepositView data)
+      // Show signing toast
+      addToast({
+        type: 'info',
+        title: 'Confirm Transaction',
+        description: 'Please confirm the claim transaction in your wallet.',
+        duration: 30000,
+      });
+
+      // Execute claim: PhlimboEA.claim()
+      const hash = await writeClaim({
+        address: addresses.PhlimboEA as `0x${string}`,
+        abi: phlimboEaAbi,
+        functionName: 'claim',
+      });
+
+      // Show pending confirmation toast
+      addToast({
+        type: 'info',
+        title: 'Transaction Submitted',
+        description: 'Waiting for blockchain confirmation...',
+        duration: 30000,
+        action: {
+          label: 'View on Etherscan',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${hash}`
+              : `https://sepolia.etherscan.io/tx/${hash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
+      });
+
+    } catch (error) {
+      log.error('Claim failed:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      // Check for user rejection
+      if (errorMessage.toLowerCase().includes('user rejected') ||
+          errorMessage.toLowerCase().includes('user denied')) {
+        addToast({
+          type: 'error',
+          title: 'Transaction Cancelled',
+          description: 'You cancelled the transaction. Please try again when ready.',
+          duration: 8000,
+        });
+      } else {
+        addToast({
+          type: 'error',
+          title: 'Claim Failed',
+          description: errorMessage,
+          duration: 16000,
+        });
+      }
+
+      setIsClaiming(false);
+    }
+  };
+
+  // Handle claim success in useEffect to prevent infinite loop
+  useEffect(() => {
+    if (isClaimSuccess && claimHash) {
+      // Format pending values for display in toast (these were the values before claim)
       const pendingPhUsdDisplay = pendingPhUsdFromView
         ? (Number(pendingPhUsdFromView) / 1e18).toFixed(2)
         : '0.00';
@@ -456,45 +545,34 @@ export default function VaultPage() {
         ? (Number(pendingStableFromView) / 1e6).toFixed(2)  // USDC has 6 decimals
         : '0.00';
 
-      // Show pending toast
-      addToast({
-        type: 'info',
-        title: 'Claiming Rewards',
-        description: 'Processing your claim transaction...',
-        duration: 3000,
-      });
-
-      // Simulate a delay to mimic transaction processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Trigger DepositView refresh after claim (future-proofing for real implementation)
+      // Trigger DepositView refresh after successful claim
       refreshDepositView();
 
-      // Show success toast
       addToast({
         type: 'success',
-        title: 'Claim Successful (Mock)',
+        title: 'Claim Successful',
         description: `Successfully claimed ${pendingPhUsdDisplay} phUSD and ${pendingUsdcDisplay} USDC rewards`,
-        duration: 8000,
+        duration: 30000,
+        action: {
+          label: 'View Transaction',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${claimHash}`
+              : `https://sepolia.etherscan.io/tx/${claimHash}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
       });
 
-      log.debug('Mock claim completed:', {
+      setIsClaiming(false);
+
+      log.debug('Claim completed:', {
         pendingPhUsd: pendingPhUsdDisplay,
         pendingUsdc: pendingUsdcDisplay,
+        txHash: claimHash,
       });
-
-    } catch (error) {
-      log.error('Mock claim failed:', error);
-      addToast({
-        type: 'error',
-        title: 'Claim Failed',
-        description: 'An error occurred during the claim transaction.',
-        duration: 8000,
-      });
-    } finally {
-      setIsClaiming(false);
     }
-  };
+  }, [isClaimSuccess, claimHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle mint amount change for the Mint tab (simplified - no slippage)
   const handleMintAmountChange = (amount: string) => {
@@ -1014,7 +1092,7 @@ export default function VaultPage() {
                 isLoading={yieldDataLoading}
                 isConnected={!!walletAddress}
                 onClaim={handleClaim}
-                isClaiming={isClaiming}
+                isClaiming={isClaiming || isClaimPending || isClaimConfirming}
                 isUsdcDecimals6={true}
               />
             )}
