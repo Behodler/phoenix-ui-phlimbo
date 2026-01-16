@@ -34,7 +34,7 @@ export default function WithdrawFromYieldConfirmationDialog({
       onClose={onClose}
       onConfirm={onConfirm}
       title="Confirm Withdrawal & Claim"
-      confirmLabel="Confirm Claim"
+      confirmLabel="Confirm Withdraw"
       isLoading={isLoading}
     >
       <div className="space-y-4">

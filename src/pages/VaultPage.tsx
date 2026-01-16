@@ -977,8 +977,8 @@ export default function VaultPage() {
       // Show pending toast
       addToast({
         type: 'info',
-        title: 'Claiming Yield',
-        description: 'Processing your withdrawal and claim transaction...',
+        title: 'Withdrawing',
+        description: 'Processing your withdrawal transaction...',
         duration: 3000,
       });
 
@@ -988,7 +988,7 @@ export default function VaultPage() {
       // Show success toast
       addToast({
         type: 'success',
-        title: 'Claim Successful (Mock)',
+        title: 'Withdrawal Successful (Mock)',
         description: `Successfully withdrew ${parsedAmount.toFixed(4)} phUSD principal + ${phUsdYield} phUSD yield + ${usdcYield} USDC yield (Total: ${totalPhUsd} phUSD + ${usdcYield} USDC)`,
         duration: 8000,
       });
