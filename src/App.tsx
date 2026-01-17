@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { ToastProvider } from './components/ui/ToastProvider'
+import { DisclaimerModal } from './components/ui/DisclaimerModal'
 import VaultPage from './pages/VaultPage'
 
 export default function App() {
@@ -11,6 +12,7 @@ export default function App() {
 
   return (
     <ToastProvider>
+      <DisclaimerModal />
       <VaultPage />
     </ToastProvider>
   )
