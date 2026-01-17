@@ -13,7 +13,12 @@ import { useToast } from '../ui/ToastProvider';
 import { getErrorTitle, shouldOfferRetry } from '../../utils/transactionErrors';
 import { log } from '../../utils/logger';
 
-export default function YieldFunnelTab() {
+// Props interface for YieldFunnelTab
+interface YieldFunnelTabProps {
+  isPaused?: boolean;
+}
+
+export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   // Wagmi hooks for wallet connection
@@ -376,13 +381,20 @@ export default function YieldFunnelTab() {
           </p>
         </div>
 
-        <ActionButton
-          disabled={true}
-          onAction={() => {}}
-          label="Unable to load"
-          variant="primary"
-          isLoading={false}
-        />
+        {/* Conditionally render button or pause message based on pause state */}
+        {isPaused === true ? (
+          <div className="bg-pxusd-orange-900/20 border border-pxusd-orange-500 rounded-lg p-4 text-center">
+            <p className="text-pxusd-orange-300 font-semibold">Protocol Paused</p>
+          </div>
+        ) : (
+          <ActionButton
+            disabled={true}
+            onAction={() => {}}
+            label="Unable to load"
+            variant="primary"
+            isLoading={false}
+          />
+        )}
       </div>
     );
   }
@@ -424,13 +436,20 @@ export default function YieldFunnelTab() {
           </div>
         </div>
 
-        <ActionButton
-          disabled={true}
-          onAction={() => {}}
-          label="No yield available"
-          variant="primary"
-          isLoading={false}
-        />
+        {/* Conditionally render button or pause message based on pause state */}
+        {isPaused === true ? (
+          <div className="bg-pxusd-orange-900/20 border border-pxusd-orange-500 rounded-lg p-4 text-center">
+            <p className="text-pxusd-orange-300 font-semibold">Protocol Paused</p>
+          </div>
+        ) : (
+          <ActionButton
+            disabled={true}
+            onAction={() => {}}
+            label="No yield available"
+            variant="primary"
+            isLoading={false}
+          />
+        )}
       </div>
     );
   }
@@ -485,14 +504,20 @@ export default function YieldFunnelTab() {
           </div>
         </div>
 
-        {/* Action Button */}
-        <ActionButton
-          disabled={buttonDisabled}
-          onAction={buttonAction}
-          label={buttonLabel}
-          variant={buttonVariant}
-          isLoading={buttonLoading}
-        />
+        {/* Conditionally render button or pause message based on pause state */}
+        {isPaused === true ? (
+          <div className="bg-pxusd-orange-900/20 border border-pxusd-orange-500 rounded-lg p-4 text-center">
+            <p className="text-pxusd-orange-300 font-semibold">Protocol Paused</p>
+          </div>
+        ) : (
+          <ActionButton
+            disabled={buttonDisabled}
+            onAction={buttonAction}
+            label={buttonLabel}
+            variant={buttonVariant}
+            isLoading={buttonLoading}
+          />
+        )}
       </div>
 
       {/* Confirmation Dialog */}
