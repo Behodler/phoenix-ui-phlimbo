@@ -248,9 +248,24 @@ export default function VaultPage() {
   const [isWithdrawingFromYield, setIsWithdrawingFromYield] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
 
-  // Pause state - in the new architecture, we'll use a simple mock for now
-  // TODO: Fetch actual pause state from the appropriate Phase 2 contract
-  const [isPaused] = useState(false);
+  // Pause state - read from PhusdStableMinter contract (all pausable contracts are paused/unpaused together)
+  // Standard OpenZeppelin Pausable ABI fragment
+  const pausableAbi = [{
+    type: 'function',
+    name: 'paused',
+    inputs: [],
+    outputs: [{ type: 'bool' }],
+    stateMutability: 'view'
+  }] as const;
+
+  const { data: isPaused } = useReadContract({
+    address: addresses?.PhusdStableMinter as `0x${string}` | undefined,
+    abi: pausableAbi,
+    functionName: 'paused',
+    query: {
+      enabled: !!addresses?.PhusdStableMinter,
+    },
+  });
 
   // Toast notifications
   const { addToast } = useToast();
@@ -1164,7 +1179,7 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "Yield Funnel" ? (
               <ErrorBoundary>
-                <YieldFunnelTab />
+                <YieldFunnelTab isPaused={isPaused === true} />
               </ErrorBoundary>
             ) : null}
           </div>

@@ -220,7 +220,7 @@ export default function DepositToYieldForm({
         {/* Conditionally render button or pause message based on pause state */}
         {isPaused === true ? (
           <div className="bg-pxusd-orange-900/20 border border-pxusd-orange-500 rounded-lg p-4 text-center">
-            <p className="text-pxusd-orange-300 font-semibold">Phoenix is currently paused</p>
+            <p className="text-pxusd-orange-300 font-semibold">Protocol Paused</p>
           </div>
         ) : (
           <ActionButton
