@@ -99,7 +99,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div className="close-all-enter animate-fade-in flex justify-end">
             <button
               onClick={clearAllToasts}
-              className="pointer-events-auto text-xs text-pxusd-teal-400 hover:text-pxusd-orange-400 transition-colors duration-200 py-1 px-2 opacity-70 hover:opacity-100"
+              className="pointer-events-auto text-xs text-pxusd-orange-300 hover:text-pxusd-orange-400 transition-colors duration-200 py-1 px-2 opacity-80 hover:opacity-100"
             >
               Close all
             </button>
