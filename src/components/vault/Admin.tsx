@@ -290,9 +290,11 @@ export default function Admin() {
 
   // Format Phlimbo statistics for display
   const phUSDPerSecondDisplay = (Number(phlimboPhUSDPerSecond) / 1e18).toFixed(6);
+  // rewardPerSecond is stored with 1e18 precision scaling AND is in raw USDC (6 decimals)
+  // So divide by 1e18 (precision) and 1e6 (USDC decimals) = 1e24 total
   const rewardPerSecondDisplay = rewardPerSecond
-    ? (Number(rewardPerSecond) / 1e18).toFixed(12)
-    : '0.000000000000';
+    ? (Number(rewardPerSecond) / 1e24).toFixed(8)
+    : '0.00000000';
   const depletionDurationDisplay = formatDuration(depletionDuration as bigint | undefined);
   const totalStakedDisplay = (Number(phlimboTotalStaked) / 1e18).toFixed(2);
   const phlimboUsdcDisplay = phlimboUsdcBalance
@@ -1018,7 +1020,7 @@ export default function Admin() {
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">rewardPerSecond:</span>
             <span className="text-sm font-mono text-foreground">
-              {rewardPerSecondDisplay}
+              {rewardPerSecondDisplay} USDC/sec
             </span>
           </div>
           <div className="flex justify-between items-center">
@@ -1056,7 +1058,7 @@ export default function Admin() {
         </div>
         <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
           <strong>Note:</strong> phUSDPerSecond is the current phUSD emission rate.
-          rewardPerSecond is the current USDC reward distribution rate (scaled by 1e18), recalculated when users stake/unstake or USDC yield is injected.
+          rewardPerSecond is the current USDC reward distribution rate (stored with 1e18 precision in contract), recalculated when users stake/unstake or USDC yield is injected.
           depletionDuration is the configurable duration over which rewards are linearly depleted.
           YieldFunnel DOLA shows pending DOLA yield from the DOLA yield strategy.
         </p>
