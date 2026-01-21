@@ -232,7 +232,7 @@ export default function VaultPage() {
   })();
 
   // FAQ state - tracks which FAQ context to display
-  const [faqComponent, setFaqComponent] = useState<string | undefined>("DepositTab");
+  const [faqComponent, setFaqComponent] = useState<string | undefined>(undefined);
 
   // Set mounted state after initial render to prevent flickering
   useEffect(() => {
