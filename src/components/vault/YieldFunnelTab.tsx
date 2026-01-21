@@ -28,7 +28,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   const { addresses, networkType } = useContractAddresses();
 
   // Wallet balances context - for refreshing navbar balances after transactions
-  const { refreshWalletBalances } = useWalletBalances();
+  const { refreshWalletBalances, usdcBalanceRaw, usdcLoading } = useWalletBalances();
 
   // Toast notifications
   const { addToast } = useToast();
@@ -317,7 +317,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   let buttonLoading = false;
 
   if (isConnected) {
-    if (isDataLoading || usdcAllowanceLoading) {
+    if (isDataLoading || usdcAllowanceLoading || usdcLoading) {
       buttonLabel = 'Loading...';
       buttonLoading = true;
       buttonDisabled = true;
@@ -333,6 +333,9 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       buttonAction = handleApprove;
       buttonDisabled = false;
       buttonLoading = isTransacting;
+    } else if (usdcBalanceRaw !== undefined && usdcBalanceRaw < claimAmount) {
+      buttonLabel = 'Insufficient USDC Balance';
+      buttonDisabled = true;
     } else {
       buttonLabel = `Supply ${claimAmountFormatted} USDC`;
       buttonAction = handleInitiateSupply;
