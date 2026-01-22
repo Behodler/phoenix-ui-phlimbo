@@ -1,46 +1,99 @@
 {
+  "MintTab": {
+    "componentName": "MintTab",
+    "items": [
+      {
+        "title": "Does the mint price change?",
+        "body": "No, the mint price is fixed at 1 Dola."
+      },
+      {
+        "title": "What if you add other tokens for minting like USDS or USDT?",
+        "body": "The price will always be 1 of those dollar stablecoins. This peg confidence simplifies the code by forgoing the need for oracles."
+      },
+      {
+        "title": "What if an input token depegs?",
+        "body": "Input tokens can be disabled."
+      },
+      {
+        "title": "Does the market price change?",
+        "body": "Yes, phUSD trades on Uniswap and the price varies according to market conditions."
+      },
+      {
+        "title": "What happens if the market price drops below the mint price?",
+        "body": "PhUSD has a number of incentives drawing the price back up to $1. If the price does drop below $1, we'd recommend buying on Uniswap instead of minting so that you can acquire at a discount until the price is restored."
+      },
+      {
+        "title": "What happens if the market price rises above $1?",
+        "body": "An arbitrage opportunity will open for minting at $1 and selling above $1."
+      },
+      {
+        "title": "Where does the Dola go?",
+        "body": "Into a yield bearing vault. The yield from the vault can be claimed by staking on the Deposit tab."
+      },
+      {
+        "title": "Do I have to stake for yield once I've minted?",
+        "body": "No you can just keep your token or use it for payments. Depositing to earn yield is purely optional."
+      },
+      {
+        "title": "Can I redeem or unwrap my phUSD?",
+        "body": "No, rather than relying on redeemable collateral, all of the mint capital is put to work generating yield which indirectly raises liquidity and protects the price."
+      },
+      {
+        "title": "If I can't redeem, how do I sell?",
+        "body": "A Uniswap pool of concentrated liquidity is cultivated by the external yield in order to eventually over collaterize phUSD so that the entire circulating supply can be sold without slippage."
+      },
+      {
+        "title": "There seems to be some slippage currently.",
+        "body": "This is a necessary consequence of moving from phase 1 of Phoenix where capital is raised for phUSD to phase 2, where the capital is split into liquidity and yield bearing vaults. No matter the raise in phase 1, this splitting means that initially the circulating supply of phUSD will not be fully collateralized by the Uniswap pool."
+      }
+    ]
+  },
   "DepositTab": {
     "componentName": "DepositTab",
     "items": [
       {
-        "title": "How do I deposit DOLA to mint phUSD?",
-        "body": "Enter the amount of DOLA you want to deposit. If this is your first time, you'll need to approve the smart contract to spend your DOLA tokens. After approval, click Deposit to mint phUSD at the current bonding curve price."
+        "title": "What am I depositing into?",
+        "body": "A contract which contains a quantity of USDC and which can mint phUSD. Both are issued to users for staking (aka depositing)."
       },
       {
-        "title": "What is the current exchange rate?",
-        "body": "The exchange rate is determined by the bonding curve and changes as more tokens are minted. You'll see the exact rate displayed below the amount input, along with the minimum amount you'll receive based on your slippage tolerance."
+        "title": "Are deposits locked for any duration?",
+        "body": "No users may deposit or withdraw phUSD at any time."
       },
       {
-        "title": "Why do I need to approve tokens first?",
-        "body": "Token approval is a standard security measure in DeFi. It grants the smart contract permission to spend your DOLA tokens. You only need to approve once, and the approval remains valid for future deposits."
+        "title": "Is this a yield farm or vault?",
+        "body": "Technically a yield farm as it is an implementation of the battle tested MasterChef contract made famous by Sushiswap."
       },
       {
-        "title": "What is slippage tolerance?",
-        "body": "Slippage tolerance is the maximum price change you're willing to accept. If the bonding curve price moves beyond this tolerance before your transaction is confirmed, the transaction will revert to protect you from unfavorable rates."
+        "title": "Why is it not a vault?",
+        "body": "A vault in defi typically follows the ERC4626 standard which issues shares. Those shares act as secondary tokens which can be used elsewhere in DeFi. This contract does not issue tokens or shares of any kind."
       },
       {
-        "title": "What is phUSD?",
-        "body": "phUSD is Phoenix's Evergreen Stablecoin — a new kind of stablecoin whose backing grows stronger over time. Phoenix takes yield from the wider DeFi ecosystem, captures it permanently using protocol-owned liquidity, and uses that yield in the Behodler ecosystem. For more info, see: phUSD Overview (https://github.com/Behodler/docs-public/blob/main/phUSD.md)"
+        "title": "A vault reminds me of PyroTokens",
+        "body": "Yes, for Behodler veterans, the concept is almost identical."
       },
       {
-        "title": "How do I mint phUSD?",
-        "body": "Connect your wallet, deposit DOLA, and the bonding curve mints phUSD at the current curve price. During Phase 1 (Ignition), the curve price gradually increases toward $1. When parity is reached, the bonding curve disables and phUSD mints at a fixed $1 price. For more info on Phase 1, see: Phoenix Phase 1 — Ignition (https://github.com/Behodler/docs-public/blob/main/Phoenix%20Phase%201%3A%20Ignition%20%E2%80%94%20Capitalising%20phUSD%20with%20the%20Behodler%203%20Bonding%20Curve.md)"
+        "title": "Is there a plan to move to a vault?",
+        "body": "Absolutely! The purpose of this yield farm is to establish the velocity, liquidity and credibility of phUSD. Think of it as the first stage of a rocket launch. Once phUSD is well underway, phUSD will be regarded as a token worth earning on its own. At that point a vault will be launched which only rewards phUSD. Under the hood it will still derive its yield from the external DeFi vaults. This pivot will create a sphUSD token. For Behoblins, essentially PyroPhUSD, a token that redeems for phUSD and acts as a thriftcoin."
       },
       {
-        "title": "Why can't I use ETH/USDC etc to mint phUSD?",
-        "body": "Phoenix requires DOLA because all minting must flow into the AutoDOLA Vault. While Phoenix could auto-swap other tokens (ETH, USDC, etc.) into DOLA, adding that routing at launch would have required additional development time and delayed release. Future versions may support multi-asset minting, but for now phUSD mints exclusively from DOLA."
+        "title": "Is depositing the same as staking?",
+        "body": "Depositing and staking are synonyms."
       },
       {
-        "title": "What backs phUSD?",
-        "body": "All phUSD minted through the bonding curve is backed by DOLA deposited into the AutoDOLA Vault. This vault compounds yield and provides the foundation for phUSD's stability."
+        "title": "Are there any entry or exit fees?",
+        "body": "No."
       },
       {
-        "title": "What is the AutoDOLA Vault?",
-        "body": "The AutoDOLA vault is a yield vault provided by the Autofinance team (formerly Tokemak). It accepts DOLA and automatically stakes it into sDOLA to generate sustainable on-chain yield. Phoenix uses this vault as the destination for all DOLA minted through phUSD, turning that yield into permanent backing and liquidity. For more info on Auto Pools, see: Autofinance Auto Pools TL;DR (https://docs.auto.finance/auto-pools-protocol/autopools-tl-dr)"
+        "title": "Why does the phUSD APY say Fixed?",
+        "body": "Regardless of how much you deposit, the stated APY for phUSD remains the same. It is independent of the quantity of phUSD staked."
       },
       {
-        "title": "Where can I use phUSD?",
-        "body": "During Phase 1, phUSD can be traded on the bonding curve. In later stages, phUSD can be staked to earn yield, and as supply grows, additional integrations across DeFi will become available."
+        "title": "Can the fixed rate ever change?",
+        "body": "Yes, the number can change but user activity does not change it."
+      },
+      {
+        "title": "What is variable APY?",
+        "body": "All USDC yield comes from external DeFi vaults. The quantity of yield arriving at one one point in time is independent of phUSD activity. For this reason, as users stake more, the yield is distributed among more tokens and so the APY consequently falls."
       }
     ]
   },
@@ -48,28 +101,74 @@
     "componentName": "WithdrawTab",
     "items": [
       {
-        "title": "How do withdrawals work?",
-        "body": "Enter the amount of phUSD you want to burn to withdraw DOLA. The system calculates how much DOLA you'll receive based on the current bonding curve price, minus the withdrawal fee. Click Withdraw to complete the transaction."
+        "title": "Are deposits locked for any duration?",
+        "body": "No users may deposit or withdraw phUSD at any time."
       },
       {
-        "title": "How long does a withdrawal take?",
-        "body": "Withdrawals are processed immediately on the blockchain. Once your transaction is confirmed (typically 12-15 seconds), you'll receive your DOLA tokens. The actual time may vary based on network congestion."
+        "title": "Is depositing the same as staking?",
+        "body": "Depositing and staking are synonyms."
       },
       {
-        "title": "Can I withdraw any amount?",
-        "body": "Yes, you can withdraw any amount up to your total phUSD balance. Use the Max button to automatically select your entire balance for withdrawal if you want to exit your position completely."
+        "title": "Are there any entry or exit fees?",
+        "body": "No."
       },
       {
-        "title": "Is the slippage on Withdraw worse than on deposit",
-        "body":"The deposits are stored in vaults owned and controlled by external protocols. Depending on the vault, there may be additional slippage but this is usually less than 0.1%."
+        "title": "Why does the phUSD APY say Fixed?",
+        "body": "Regardless of how much you deposit, the stated APY for phUSD remains the same. It is independent of the quantity of phUSD staked."
       },
       {
-        "title": "Can I redeem phUSD or exit the system?",
-        "body": "Yes. You can sell your phUSD on the bonding curve to redeem DOLA."
+        "title": "Can the fixed rate ever change?",
+        "body": "Yes, the number can change but user activity does not change it."
       },
       {
-        "title": "Can the system be paused? If so, what happens to my funds?",
-        "body": "Yes. Anyone can burn 1,000 EYE to trigger a temporary pause if they detect a severe issue. During a Pause, minting and redeeming are disabled, but funds inside the vault remain safe. The Pause is removed once the issue is resolved."
+        "title": "What is variable APY?",
+        "body": "All USDC yield comes from external DeFi vaults. The quantity of yield arriving at one one point in time is independent of phUSD activity. For this reason, as users stake more, the yield is distributed among more tokens and so the APY consequently falls."
+      }
+    ]
+  },
+  "YieldFunnelTab": {
+    "componentName": "YieldFunnelTab",
+    "items": [
+      {
+        "title": "Why does this exist?",
+        "body": "Yield for staking is drawn in from a number of vaults, each with different reward tokens. Yield funnel gathers all these tokens together and converts them into one reward token. Currently that token is USDC."
+      },
+      {
+        "title": "What is that Total Yield Value?",
+        "body": "The dollar value of all the reward tokens aggregated together. For instance, one vault may have 20 Dola and another 30 USDS. Together, their Total Yield Value would be $50."
+      },
+      {
+        "title": "What is the Claim button?",
+        "body": "Anyone can invoke the yield funnel contract if they have USDC equal in quantity to the total yield value. When they call claim, their USDC is swapped for all the reward tokens."
+      },
+      {
+        "title": "What is the Discount?",
+        "body": "Swapping in USDC is a valuable service. To create an incentive for USDC holders to swap in their USDC for the reward tokens, a discount is applied to the USDC required. For instance, if the Total Yield Value is $100 and the discount is 2% then one only needs 98 USDC to claim the reward tokens, incurring a $2 profit."
+      }
+    ]
+  },
+  "SafetyTab": {
+    "componentName": "SafetyTab",
+    "items": [
+      {
+        "title": "What is this tab for?",
+        "body": "DeFi is risky and you should always do your research and not commit funds you can't afford to lose. While we take extreme care in keeping the attack surface area small and applying all the best practices to eliminate dangers, we like to be prepared for any eventuality. We've provided an emergency pause button that anyone can call. It stops the entire app in its tracks using the audited OpenZeppelin Pausable contract standard."
+      },
+      {
+        "title": "Why is EYE mentioned?",
+        "body": "EYE, the governance token for the Behodler Ecosystem is required to pause the app. Presently 1000 EYE is required. This quantity is burnt. The purpose of the burning is to prevent a kind of social attack called griefing where bad actors find a way to gum up the works in a dapp. In this case, doing so is possible but each time it will cost the attacker 1000 EYE."
+      },
+      {
+        "title": "What if I had a legitimate reason to pause? Is my EYE still lost?",
+        "body": "If the reason you paused was for a good reason, be sure to let the team or even the whole community know. If your intention was good, you will have your EYE restored. It may be that your concern was not valid in the end but if your intent was pure, we will be sure to restore your lost EYE. This decision is entirely up to the discretion of the team. Please do not hesitate to pause if you suspect an exploit of any kind."
+      },
+      {
+        "title": "What about if one of the external protocols you rely on fails such as Tokemak or Sky protocol?",
+        "body": "We would appreciate pausing in that instance too just in case. But it must be noted that the failure of any one of these protocols will not kill Phoenix. It will just incur an economic setback. It would require the simultaneous failure of all external protocols to bring everything down."
+      },
+      {
+        "title": "What if I have phUSD staked? I don't want that to be locked.",
+        "body": "The staking dapp has a special emergency-unstake-when-paused feature precisely for this eventuality. It may be the case that you forfeit pending rewards but the principal will still be intact."
       }
     ]
   }
