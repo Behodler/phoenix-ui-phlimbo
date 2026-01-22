@@ -5,7 +5,7 @@ import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { parseUnits, maxUint256 } from 'viem';
 import { phlimboEaAbi, phusdStableMinterAbi } from '@behodler/phase2-wagmi-hooks';
-import { useTokenBalance, useTokenAllowance, useTokenApproval, useDepositViewPolling } from '../hooks';
+import { useTokenBalance, useTokenAllowance, useTokenApproval, useDepositViewPolling, useUniswapPrice } from '../hooks';
 import { useWalletBalances } from '../contexts/WalletBalancesContext';
 import { useApprovalTransaction } from '../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
@@ -17,6 +17,7 @@ import WithdrawFromYieldForm from '../components/vault/WithdrawFromYieldForm';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
 import SafetyTab from '../components/vault/SafetyTab';
 import YieldFunnelTab from '../components/vault/YieldFunnelTab';
+import MarketTab from '../components/vault/MarketTab';
 import Admin from '../components/vault/Admin';
 import ContextBox from '../components/vault/ContextBox';
 import YieldRewardsInfo from '../components/vault/YieldRewardsInfo';
@@ -203,9 +204,20 @@ export default function VaultPage() {
   const yieldDataLoading = depositViewLoading || poolInfoLoading || desiredAPYBpsLoading;
   // ========== END YIELD DATA READS FOR CONTEXTBOX ==========
 
+  // ========== UNISWAP PRICE FOR MARKET TAB ==========
+  // Fetch phUSD market price from Uniswap V4 pools
+  // This hook is called at VaultPage level so price data can be shared with other tabs in future
+  const {
+    price: phUsdMarketPrice,
+    isLoading: isMarketPriceLoading,
+    isError: isMarketPriceError,
+  } = useUniswapPrice();
+  // ========== END UNISWAP PRICE FOR MARKET TAB ==========
+
   // Determine tabs based on network and owner status
   // - Show Admin tab if user is the owner
   // - Show Testnet Faucet if not on mainnet
+  // - Show Market tab only on mainnet (between Yield Funnel and Safety)
   // - Show Safety tab on all networks
   // - Show Mint tab for 1:1 DOLA to phUSD minting
   // - Show Deposit and Withdraw tabs for ContextBox-driven content
@@ -219,6 +231,11 @@ export default function VaultPage() {
 
     if (!isMainnet) {
       tabList.push("Testnet Faucet");
+    }
+
+    // Market tab is only available on mainnet (positioned between Yield Funnel and Safety)
+    if (isMainnet) {
+      tabList.push("Market");
     }
 
     // Safety tab is available on all networks
@@ -1181,6 +1198,14 @@ export default function VaultPage() {
             ) : activeTab === "Yield Funnel" ? (
               <ErrorBoundary>
                 <YieldFunnelTab isPaused={isPaused === true} />
+              </ErrorBoundary>
+            ) : activeTab === "Market" ? (
+              <ErrorBoundary>
+                <MarketTab
+                  price={phUsdMarketPrice}
+                  isLoading={isMarketPriceLoading}
+                  isError={isMarketPriceError}
+                />
               </ErrorBoundary>
             ) : null}
           </div>

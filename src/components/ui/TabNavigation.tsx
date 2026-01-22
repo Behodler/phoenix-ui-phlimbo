@@ -10,6 +10,7 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
       case "Deposit": return "DepositTab";
       case "Withdraw": return "WithdrawTab";
       case "Yield Funnel": return "YieldFunnelTab";
+      case "Market": return "MarketTab";
       case "Safety": return "SafetyTab";
       default: return null;
     }
