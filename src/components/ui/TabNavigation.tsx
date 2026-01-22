@@ -5,8 +5,14 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
 
   // Map tab names to FAQ component types
   const getFAQComponentType = (tab: string): string | null => {
-    if (tab === "Mint") return "MintTab";
-    return null;
+    switch (tab) {
+      case "Mint": return "MintTab";
+      case "Deposit": return "DepositTab";
+      case "Withdraw": return "WithdrawTab";
+      case "Yield Funnel": return "YieldFunnelTab";
+      case "Safety": return "SafetyTab";
+      default: return null;
+    }
   };
 
   return (
