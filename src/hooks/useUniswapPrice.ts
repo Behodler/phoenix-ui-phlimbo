@@ -90,39 +90,33 @@ export function useUniswapPrice(): UseUniswapPriceResult {
   if (phUsdSusdsSlot0 && usdcSusdsSlot0) {
     try {
       // sqrtPriceX96 conversion: price = (sqrtPriceX96 / 2^96)^2
-      // Note: This gives price of token1 in terms of token0
-
-      // For phUSD/sUSDS pool
-      // Token ordering matters - need to check token0
-      // The pool ID encodes the token ordering
-      // phUSD address: 0xf3B5B661b92B75C71fA5Aba8Fd95D7514A9CD605
-      // sUSDS comes before phUSD alphabetically when sorted by address
-      // sUSDS: 0xa3931d71877c0e7a3148cb7eb4463524fec27fbd (lower, so token0)
-      // phUSD: 0xf3B5B661b92B75C71fA5Aba8Fd95D7514A9CD605 (higher, so token1)
-      // So sqrtPriceX96 gives us price of phUSD in sUSDS terms directly
+      // This gives ratio of token1/token0 in raw amounts
+      //
+      // For phUSD/sUSDS pool:
+      // - token0 = sUSDS (0xa39... lower address)
+      // - token1 = phUSD (0xf3B... higher address)
+      // - sqrtPriceX96 gives phUSD_per_sUSDS (how many phUSD you get per sUSDS)
+      // - To get phUSD value in sUSDS: invert to get sUSDS_per_phUSD = 1/phUsd_per_sUsds
 
       const sqrtPricePhUsd = Number(phUsdSusdsSlot0[0]);
-      const pricePhUsdInSusds = Math.pow(sqrtPricePhUsd / Math.pow(2, 96), 2);
+      const phUsdPerSusds = Math.pow(sqrtPricePhUsd / Math.pow(2, 96), 2);
+      const phUsdValueInSusds = 1 / phUsdPerSusds; // How many sUSDS one phUSD is worth
 
-      // For USDC/sUSDS pool
-      // USDC: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 (lower, so token0)
-      // sUSDS: 0xa3931d71877c0e7a3148cb7eb4463524fec27fbd (higher, so token1)
-      // So sqrtPriceX96 gives us price of sUSDS in USDC terms
+      // For USDC/sUSDS pool:
+      // - token0 = USDC (0xA0b... lower address)
+      // - token1 = sUSDS (0xa39... higher address)
+      // - sqrtPriceX96 gives sUSDS_per_USDC in raw amounts
+      // - Raw ratio needs decimal adjustment: sUSDS(18 decimals) / USDC(6 decimals)
+      // - Human readable: sUsds_per_usdc_human = sUsds_per_usdc_raw / 10^12
+      // - To get sUSDS value in USD: invert to get USDC_per_sUSDS = 1/sUsds_per_usdc_human
 
       const sqrtPriceUsdc = Number(usdcSusdsSlot0[0]);
-      const priceSusdsInUsdc = Math.pow(sqrtPriceUsdc / Math.pow(2, 96), 2);
+      const susdsPerUsdcRaw = Math.pow(sqrtPriceUsdc / Math.pow(2, 96), 2);
+      const susdsPerUsdcHuman = susdsPerUsdcRaw / Math.pow(10, 12); // Adjust for decimal difference
+      const susdsValueInUsd = 1 / susdsPerUsdcHuman; // How many USD (USDC) one sUSDS is worth
 
-      // phUSD has 18 decimals, sUSDS has 18 decimals, USDC has 6 decimals
-      // Need to adjust for decimal differences
-      // Price from pool is in terms of raw token amounts
-      // For phUSD/sUSDS: price = (phUSD_amount * 10^18) / (sUSDS_amount * 10^18) - no adjustment needed
-      // For USDC/sUSDS: price = (sUSDS_amount * 10^18) / (USDC_amount * 10^6)
-      // So we need to multiply by 10^12 to normalize
-
-      const priceSusdsInUsd = priceSusdsInUsdc * Math.pow(10, 12); // Adjust for USDC's 6 decimals
-
-      // phUSD dollar price = phUSD price in sUSDS * sUSDS price in USD
-      price = pricePhUsdInSusds * priceSusdsInUsd;
+      // phUSD dollar price = phUSD value in sUSDS * sUSDS value in USD
+      price = phUsdValueInSusds * susdsValueInUsd;
 
     } catch (e) {
       console.error('Error calculating price:', e);
