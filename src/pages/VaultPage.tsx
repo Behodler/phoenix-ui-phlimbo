@@ -232,7 +232,8 @@ export default function VaultPage() {
   })();
 
   // FAQ state - tracks which FAQ context to display
-  const [faqComponent, setFaqComponent] = useState<string | undefined>(undefined);
+  // Initialize to "MintTab" to match the default activeTab ("Mint")
+  const [faqComponent, setFaqComponent] = useState<string | undefined>("MintTab");
 
   // Set mounted state after initial render to prevent flickering
   useEffect(() => {
