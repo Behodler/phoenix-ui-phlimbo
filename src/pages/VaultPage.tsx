@@ -164,35 +164,54 @@ export default function VaultPage() {
 
   // Calculate USDC APY using linear depletion model with DepositView data
   // stableRewardsPerSecond from DepositView represents the USDC rewards rate
+  // On mainnet (chainId === 1), adjust denominator by phUSD market price
   const usdcApyCalculated = (() => {
     const rewardsRate = stableRewardsPerSecondFromView ? Number(stableRewardsPerSecondFromView) : 0;
     const secondsPerYear = 31536000;
 
     // Determine denominator: use totalStaked if non-zero, otherwise use user's phUSD balance
-    let denominator: number;
+    let denominatorInPhUsd: number;
     if (totalStakedRaw > 0n) {
       // totalStaked is 18 decimals, convert to number
-      denominator = Number(totalStakedRaw) / 1e18;
+      denominatorInPhUsd = Number(totalStakedRaw) / 1e18;
     } else if (phUsdBalanceFromView > 0n) {
       // Fallback to user's phUSD balance if totalStaked is 0
-      denominator = Number(phUsdBalanceFromView) / 1e18;
+      denominatorInPhUsd = Number(phUsdBalanceFromView) / 1e18;
     } else {
       return 0; // No valid denominator
     }
 
-    if (denominator === 0) return 0;
+    if (denominatorInPhUsd === 0) return 0;
+
+    // Determine phUSD price multiplier for mainnet adjustment
+    // On mainnet: use actual market price if valid, otherwise default to $1
+    // On testnets: always use $1 (original behavior)
+    let phUsdPriceMultiplier = 1.0;
+    if (isMainnet && phUsdMarketPrice !== null) {
+      // Bounds checking: only use market price if within reasonable range (0 < price <= 2.0)
+      // Price of 0 or negative would cause division issues
+      // Price > 2.0 is unreasonable and likely an oracle error
+      if (phUsdMarketPrice > 0 && phUsdMarketPrice <= 2.0) {
+        phUsdPriceMultiplier = phUsdMarketPrice;
+      }
+      // If price is outside bounds, fallback to 1.0 (already set)
+    }
+
+    // Convert phUSD denominator to USD value
+    // When phUSD < $1, this reduces the denominator, increasing the effective APY
+    const denominatorInUsd = denominatorInPhUsd * phUsdPriceMultiplier;
 
     // rewardPerSecond is scaled by 1e18, and represents USDC (6 decimals) per second
     // Annual USDC yield = (rewardsRate / 1e18) * secondsPerYear
     // APY = (annualYield / totalStaked) * 100
     // Since USDC has 6 decimals and phUSD has 18 decimals, we need to normalize:
     // annualUsdcInUsdValue = (rewardsRate / 1e18) * secondsPerYear / 1e6 (to get USDC value)
-    // But totalStaked is already in phUSD value (1 phUSD = 1 USD)
-    // So: APY = ((rewardsRate / 1e18) * secondsPerYear / 1e6) / denominator * 100
+    // denominator is now in USD terms (phUSD quantity * phUSD price)
+    // So: APY = ((rewardsRate / 1e18) * secondsPerYear / 1e6) / denominatorInUsd * 100
     const annualUsdcRaw = (rewardsRate / 1e18) * secondsPerYear;
     // Convert from 6 decimals to actual USDC value
     const annualUsdcValue = annualUsdcRaw / 1e6;
-    const apy = (annualUsdcValue / denominator) * 100;
+    const apy = (annualUsdcValue / denominatorInUsd) * 100;
 
     return apy;
   })();
