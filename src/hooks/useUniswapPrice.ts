@@ -105,16 +105,33 @@ export function useUniswapPrice(): UseUniswapPriceResult {
       // For USDC/sUSDS pool:
       // - token0 = USDC (0xA0b... lower address)
       // - token1 = sUSDS (0xa39... higher address)
-      // - sqrtPriceX96 gives sUSDS_per_USDC ratio
-      // - Uniswap V4 StateView appears to return normalized values (no decimal adjustment needed)
-      // - To get sUSDS value in USD: invert to get USDC_per_sUSDS
+      // - sqrtPriceX96 gives token1/token0 = sUSDS/USDC ratio
+      // - For tokens with different decimals, raw ratio = (sUSDS * 10^18) / (USDC * 10^6)
+      // - To get human-readable: divide by 10^(18-6) = 10^12
+      // - Then invert to get USDC per sUSDS (USD value of sUSDS)
 
       const sqrtPriceUsdc = Number(usdcSusdsSlot0[0]);
-      const susdsPerUsdc = Math.pow(sqrtPriceUsdc / Math.pow(2, 96), 2);
-      const susdsValueInUsd = 1 / susdsPerUsdc; // How many USD (USDC) one sUSDS is worth
+      const susdsPerUsdcRaw = Math.pow(sqrtPriceUsdc / Math.pow(2, 96), 2);
+
+      // Debug: log the raw values to understand what we're getting
+      console.log('USDC/sUSDS pool sqrtPriceX96:', usdcSusdsSlot0[0]?.toString());
+      console.log('susdsPerUsdcRaw:', susdsPerUsdcRaw);
+
+      // The raw ratio appears to be ~1 from the pool data.
+      // For debugging, try different interpretations:
+      // Option A: Use raw ratio directly (if V4 normalizes decimals)
+      // Option B: Invert the raw ratio
+      // Option C: Apply decimal adjustment then invert
+
+      // Currently trying: invert the raw ratio (if it represents sUSDS/USDC ≈ 0.926)
+      const susdsValueInUsd = 1 / susdsPerUsdcRaw;
+
+      console.log('susdsValueInUsd:', susdsValueInUsd);
 
       // phUSD dollar price = phUSD value in sUSDS * sUSDS value in USD
       price = phUsdValueInSusds * susdsValueInUsd;
+
+      console.log('Final price calculation:', phUsdValueInSusds, '*', susdsValueInUsd, '=', price);
 
     } catch (e) {
       console.error('Error calculating price:', e);
