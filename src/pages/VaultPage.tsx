@@ -162,6 +162,16 @@ export default function VaultPage() {
     ? Number(desiredAPYBpsRaw) / 100
     : 0;
 
+  // ========== UNISWAP PRICE FOR MARKET TAB ==========
+  // Fetch phUSD market price from Uniswap V4 pools
+  // This hook is called here so price data can be used in USDC APY calculation on mainnet
+  const {
+    price: phUsdMarketPrice,
+    isLoading: isMarketPriceLoading,
+    isError: isMarketPriceError,
+  } = useUniswapPrice();
+  // ========== END UNISWAP PRICE FOR MARKET TAB ==========
+
   // Calculate USDC APY using linear depletion model with DepositView data
   // stableRewardsPerSecond from DepositView represents the USDC rewards rate
   // On mainnet (chainId === 1), adjust denominator by phUSD market price
@@ -222,16 +232,6 @@ export default function VaultPage() {
   // Combined loading state for yield data (now using DepositView loading state)
   const yieldDataLoading = depositViewLoading || poolInfoLoading || desiredAPYBpsLoading;
   // ========== END YIELD DATA READS FOR CONTEXTBOX ==========
-
-  // ========== UNISWAP PRICE FOR MARKET TAB ==========
-  // Fetch phUSD market price from Uniswap V4 pools
-  // This hook is called at VaultPage level so price data can be shared with other tabs in future
-  const {
-    price: phUsdMarketPrice,
-    isLoading: isMarketPriceLoading,
-    isError: isMarketPriceError,
-  } = useUniswapPrice();
-  // ========== END UNISWAP PRICE FOR MARKET TAB ==========
 
   // Determine tabs based on network and owner status
   // - Show Admin tab if user is the owner
