@@ -105,15 +105,13 @@ export function useUniswapPrice(): UseUniswapPriceResult {
       // For USDC/sUSDS pool:
       // - token0 = USDC (0xA0b... lower address)
       // - token1 = sUSDS (0xa39... higher address)
-      // - sqrtPriceX96 gives sUSDS_per_USDC in raw amounts
-      // - Raw ratio needs decimal adjustment: sUSDS(18 decimals) / USDC(6 decimals)
-      // - Human readable: sUsds_per_usdc_human = sUsds_per_usdc_raw / 10^12
-      // - To get sUSDS value in USD: invert to get USDC_per_sUSDS = 1/sUsds_per_usdc_human
+      // - sqrtPriceX96 gives sUSDS_per_USDC ratio
+      // - Uniswap V4 StateView appears to return normalized values (no decimal adjustment needed)
+      // - To get sUSDS value in USD: invert to get USDC_per_sUSDS
 
       const sqrtPriceUsdc = Number(usdcSusdsSlot0[0]);
-      const susdsPerUsdcRaw = Math.pow(sqrtPriceUsdc / Math.pow(2, 96), 2);
-      const susdsPerUsdcHuman = susdsPerUsdcRaw / Math.pow(10, 12); // Adjust for decimal difference
-      const susdsValueInUsd = 1 / susdsPerUsdcHuman; // How many USD (USDC) one sUSDS is worth
+      const susdsPerUsdc = Math.pow(sqrtPriceUsdc / Math.pow(2, 96), 2);
+      const susdsValueInUsd = 1 / susdsPerUsdc; // How many USD (USDC) one sUSDS is worth
 
       // phUSD dollar price = phUSD value in sUSDS * sUSDS value in USD
       price = phUsdValueInSusds * susdsValueInUsd;
