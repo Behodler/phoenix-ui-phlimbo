@@ -55,9 +55,6 @@ export default function ActionButton({
         {isLoading && <LoadingSpinner />}
         {label}
       </button>
-      <div className="mt-3 text-xs text-muted-foreground">
-        Withdraw at any time • 0% Deposit Fee
-      </div>
     </div>
   );
 }
