@@ -1,15 +1,15 @@
 import { useReadContract } from 'wagmi';
+import { log } from '../utils/logger';
 
-// Pool IDs for Uniswap V4 pools (these are poolIds, not contract addresses)
-// phUSD/sUSDS pool
+// Pool ID for Uniswap V4 phUSD/sUSDS pool
 const PHUSD_SUSDS_POOL_ID = '0x114bcf3588537bba82c7e31fb8caf355921edb29971fedde97221b5c843a3e05';
-// USDC/sUSDS pool (for getting sUSDS price in USD)
-const USDC_SUSDS_POOL_ID = '0x251a9b67c78e6ef5f9be63f91d6a8ef814663bf03fc14602e41c34bd8bbb1392';
 
-// Token addresses (used in comments for documentation of pool ordering)
+// Token addresses
 // phUSD: 0xf3B5B661b92B75C71fA5Aba8Fd95D7514A9CD605
-// sUSDS: 0xa3931d71877c0e7a3148cb7eb4463524fec27fbd
-// USDC: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+// sUSDS: 0xa3931d71877c0e7a3148cb7eb4463524fec27fbd (ERC4626 vault, underlying is USDS worth $1)
+
+// sUSDS ERC4626 contract address
+const SUSDS_ADDRESS = '0xa3931d71877c0e7a3148cb7eb4463524fec27fbd' as const;
 
 // Minimal ABI for Uniswap V4 StateView
 const stateViewAbi = [
@@ -27,6 +27,17 @@ const stateViewAbi = [
   },
 ] as const;
 
+// ERC4626 ABI fragment for convertToAssets
+const erc4626Abi = [
+  {
+    name: 'convertToAssets',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'shares', type: 'uint256' }],
+    outputs: [{ name: 'assets', type: 'uint256' }],
+  },
+] as const;
+
 // Uniswap V4 StateView contract on mainnet
 const STATE_VIEW_ADDRESS = '0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227';
 
@@ -38,17 +49,18 @@ export interface UseUniswapPriceResult {
 }
 
 /**
- * Hook to fetch phUSD price from Uniswap V4 pools
+ * Hook to fetch phUSD price in USD
  *
  * Price calculation:
- * 1. Read phUSD/sUSDS pool to get phUSD price in sUSDS
- * 2. Read USDC/sUSDS pool to get sUSDS price in USDC (=USD)
- * 3. Combine: phUSD_USD_price = phUSD_sUSDS_price * sUSDS_USD_price
+ * 1. Read phUSD/sUSDS pool to get phUSD value in sUSDS
+ * 2. Read sUSDS ERC4626 convertToAssets to get sUSDS value in USD (underlying USDS = $1)
+ * 3. Combine: phUSD_USD_price = phUSD_sUSDS_value * sUSDS_USD_value
  *
- * Uniswap V4 sqrtPriceX96 math:
- * - sqrtPriceX96 = sqrt(price) * 2^96, where price = token1 / token0
- * - token0 is the token with the lower address (lexicographically)
- * - The resulting ratio appears usable directly without decimal adjustment
+ * Using ERC4626 convertToAssets instead of USDC/sUSDS Uniswap pool because:
+ * - Avoids decimal mismatch issues (USDC=6, sUSDS=18)
+ * - Avoids JavaScript Number precision loss
+ * - Immune to pool manipulation
+ * - Direct oracle from the sUSDS vault itself
  */
 export function useUniswapPrice(): UseUniswapPriceResult {
   // Read slot0 for phUSD/sUSDS pool
@@ -68,83 +80,73 @@ export function useUniswapPrice(): UseUniswapPriceResult {
     },
   });
 
-  // Read slot0 for USDC/sUSDS pool
+  // Read sUSDS ERC4626 convertToAssets to get USD value of 1 sUSDS
+  // 1e18 shares (1 sUSDS) converts to X USDS (underlying), where USDS = $1
   const {
-    data: usdcSusdsSlot0,
-    isLoading: isLoadingUsdcPool,
-    isError: isErrorUsdcPool,
-    error: errorUsdcPool,
+    data: sUsdsConvertResult,
+    isLoading: isLoadingSusdsConvert,
+    isError: isErrorSusdsConvert,
+    error: errorSusdsConvert,
   } = useReadContract({
-    address: STATE_VIEW_ADDRESS as `0x${string}`,
-    abi: stateViewAbi,
-    functionName: 'getSlot0',
-    args: [USDC_SUSDS_POOL_ID as `0x${string}`],
+    address: SUSDS_ADDRESS,
+    abi: erc4626Abi,
+    functionName: 'convertToAssets',
+    args: [BigInt('1000000000000000000')], // 1e18 shares
     query: {
       enabled: true,
       refetchInterval: 30000, // Refresh every 30 seconds
     },
   });
 
-  const isLoading = isLoadingPhUsdPool || isLoadingUsdcPool;
-  const isError = isErrorPhUsdPool || isErrorUsdcPool;
-  const error = errorPhUsdPool || errorUsdcPool;
+  const isLoading = isLoadingPhUsdPool || isLoadingSusdsConvert;
+  const isError = isErrorPhUsdPool || isErrorSusdsConvert;
+  const error = errorPhUsdPool || errorSusdsConvert;
 
-  // Calculate price from sqrtPriceX96 values
+  // Calculate price from sqrtPriceX96 and ERC4626 convertToAssets
   let price: number | null = null;
 
-  if (phUsdSusdsSlot0 && usdcSusdsSlot0) {
+  if (phUsdSusdsSlot0 && sUsdsConvertResult !== undefined) {
     try {
-      // ========== PHUSD/SUSDS POOL CALCULATION ==========
-      // Pool: phUSD/sUSDS
-      // - token0 = sUSDS (0xa39... lower address) - 18 decimals
-      // - token1 = phUSD (0xf3B... higher address) - 18 decimals
-      // - sqrtPriceX96 gives: token1_raw / token0_raw = phUSD_raw / sUSDS_raw
-      // - Since both tokens have 18 decimals, no decimal adjustment needed
-      // - The ratio represents: how many phUSD per sUSDS
-      // - To get phUSD value in sUSDS, we invert: sUSDS_per_phUSD = 1 / phUSD_per_sUSDS
+      // ========== STEP 1: Get raw sqrtPriceX96 from phUSD/sUSDS pool ==========
+      const sqrtPriceX96Raw = phUsdSusdsSlot0[0];
+      log.debug('[useUniswapPrice] Step 1: Raw sqrtPriceX96 from phUSD/sUSDS pool:', sqrtPriceX96Raw.toString());
 
-      const sqrtPricePhUsd = Number(phUsdSusdsSlot0[0]);
-      const phUsdPerSusdsRaw = Math.pow(sqrtPricePhUsd / Math.pow(2, 96), 2);
-      // No decimal adjustment needed (both 18 decimals)
-      const phUsdPerSusds = phUsdPerSusdsRaw;
-      // How many sUSDS one phUSD is worth
+      // ========== STEP 2: Convert sqrtPriceX96 to Number and divide by 2^96 ==========
+      const sqrtPricePhUsd = Number(sqrtPriceX96Raw);
+      const TWO_POW_96 = Math.pow(2, 96);
+      const sqrtPriceNormalized = sqrtPricePhUsd / TWO_POW_96;
+      log.debug('[useUniswapPrice] Step 2: sqrtPriceX96 / 2^96 =', sqrtPriceNormalized);
+
+      // ========== STEP 3: Square to get phUSD per sUSDS ratio ==========
+      // Pool ordering: token0 = sUSDS (lower address), token1 = phUSD (higher address)
+      // sqrtPriceX96 gives: sqrt(token1/token0) = sqrt(phUSD/sUSDS)
+      // Squared: phUSD/sUSDS = how many phUSD per 1 sUSDS
+      const phUsdPerSusds = Math.pow(sqrtPriceNormalized, 2);
+      log.debug('[useUniswapPrice] Step 3: Squared to get phUsdPerSusds =', phUsdPerSusds);
+
+      // ========== STEP 4: Invert to get sUSDS value of 1 phUSD ==========
+      // We want: how many sUSDS is 1 phUSD worth?
       const phUsdValueInSusds = 1 / phUsdPerSusds;
+      log.debug('[useUniswapPrice] Step 4: Inverted to get phUsdValueInSusds =', phUsdValueInSusds);
 
-      // Debug logging
-      console.log('[useUniswapPrice] phUSD/sUSDS pool sqrtPriceX96:', phUsdSusdsSlot0[0]?.toString());
-      console.log('[useUniswapPrice] phUsdPerSusdsRaw:', phUsdPerSusdsRaw);
-      console.log('[useUniswapPrice] phUsdValueInSusds (sUSDS per phUSD):', phUsdValueInSusds);
+      // ========== STEP 5: Get sUSDS to USD ratio from ERC4626 convertToAssets ==========
+      // sUSDS is an ERC4626 vault with USDS as underlying (USDS = $1)
+      // convertToAssets(1e18) returns how many USDS (wei) 1 sUSDS is worth
+      const rawConvertResult = sUsdsConvertResult;
+      log.debug('[useUniswapPrice] Step 5: sUSDS convertToAssets(1e18) raw result =', rawConvertResult.toString());
 
-      // ========== USDC/SUSDS POOL CALCULATION ==========
-      // Pool: USDC/sUSDS
-      // - token0 = USDC (0xA0b... lower address) - 6 decimals
-      // - token1 = sUSDS (0xa39... higher address) - 18 decimals
-      // - sqrtPriceX96 gives: token1/token0 = sUSDS/USDC ratio
-      // - Invert to get USD value of sUSDS (USDC per sUSDS)
-      //
-      // NOTE: No decimal adjustment applied - the sqrtPriceX96 math appears to
-      // produce usable ratios directly. The 91c bug was due to showing sUSDS price
-      // instead of properly chaining phUSD -> sUSDS -> USD.
+      // ========== STEP 6: Calculate sUSDS to USD ratio ==========
+      // Divide by 1e18 to get the ratio (since USDS has 18 decimals and is worth $1)
+      const sUsdsToUsdRatio = Number(rawConvertResult) / 1e18;
+      log.debug('[useUniswapPrice] Step 6: sUsdsToUsdRatio = rawResult / 1e18 =', sUsdsToUsdRatio);
 
-      const sqrtPriceUsdc = Number(usdcSusdsSlot0[0]);
-      const susdsPerUsdcRaw = Math.pow(sqrtPriceUsdc / Math.pow(2, 96), 2);
-
-      // Invert to get USDC per sUSDS (USD value of 1 sUSDS)
-      const susdsValueInUsd = 1 / susdsPerUsdcRaw;
-
-      // Debug logging
-      console.log('[useUniswapPrice] USDC/sUSDS pool sqrtPriceX96:', usdcSusdsSlot0[0]?.toString());
-      console.log('[useUniswapPrice] susdsPerUsdcRaw:', susdsPerUsdcRaw);
-      console.log('[useUniswapPrice] susdsValueInUsd (USDC per sUSDS):', susdsValueInUsd);
-
-      // ========== FINAL PRICE CALCULATION ==========
-      // phUSD dollar price = phUSD value in sUSDS * sUSDS value in USD
-      price = phUsdValueInSusds * susdsValueInUsd;
-
-      console.log('[useUniswapPrice] Final phUSD price:', phUsdValueInSusds, '*', susdsValueInUsd, '=', price);
+      // ========== STEP 7: Calculate final phUSD price in USD ==========
+      // phUSD dollar price = (sUSDS per phUSD) * (USD per sUSDS)
+      price = phUsdValueInSusds * sUsdsToUsdRatio;
+      log.debug('[useUniswapPrice] Step 7: Final price = phUsdValueInSusds * sUsdsToUsdRatio =', phUsdValueInSusds, '*', sUsdsToUsdRatio, '=', price);
 
     } catch (e) {
-      console.error('[useUniswapPrice] Error calculating price:', e);
+      log.error('[useUniswapPrice] Error calculating price:', e);
     }
   }
 
