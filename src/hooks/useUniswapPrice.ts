@@ -44,6 +44,13 @@ export interface UseUniswapPriceResult {
  * 1. Read phUSD/sUSDS pool to get phUSD price in sUSDS
  * 2. Read USDC/sUSDS pool to get sUSDS price in USDC (=USD)
  * 3. Combine: phUSD_USD_price = phUSD_sUSDS_price * sUSDS_USD_price
+ *
+ * IMPORTANT: Uniswap V4 sqrtPriceX96 math
+ * - sqrtPriceX96 = sqrt(price) * 2^96, where price = token1_raw / token0_raw
+ * - token0 is the token with the lower address (lexicographically)
+ * - The raw ratio includes decimal differences: for USDC(6)/sUSDS(18),
+ *   raw_ratio = (sUSDS * 10^18) / (USDC * 10^6), so we must divide by 10^12
+ *   to get human-readable values
  */
 export function useUniswapPrice(): UseUniswapPriceResult {
   // Read slot0 for phUSD/sUSDS pool
@@ -89,52 +96,61 @@ export function useUniswapPrice(): UseUniswapPriceResult {
 
   if (phUsdSusdsSlot0 && usdcSusdsSlot0) {
     try {
-      // sqrtPriceX96 conversion: price = (sqrtPriceX96 / 2^96)^2
-      // This gives ratio of token1/token0 in raw amounts
-      //
-      // For phUSD/sUSDS pool:
-      // - token0 = sUSDS (0xa39... lower address)
-      // - token1 = phUSD (0xf3B... higher address)
-      // - sqrtPriceX96 gives phUSD_per_sUSDS (how many phUSD you get per sUSDS)
-      // - To get phUSD value in sUSDS: invert to get sUSDS_per_phUSD = 1/phUsd_per_sUsds
+      // ========== PHUSD/SUSDS POOL CALCULATION ==========
+      // Pool: phUSD/sUSDS
+      // - token0 = sUSDS (0xa39... lower address) - 18 decimals
+      // - token1 = phUSD (0xf3B... higher address) - 18 decimals
+      // - sqrtPriceX96 gives: token1_raw / token0_raw = phUSD_raw / sUSDS_raw
+      // - Since both tokens have 18 decimals, no decimal adjustment needed
+      // - The ratio represents: how many phUSD per sUSDS
+      // - To get phUSD value in sUSDS, we invert: sUSDS_per_phUSD = 1 / phUSD_per_sUSDS
 
       const sqrtPricePhUsd = Number(phUsdSusdsSlot0[0]);
-      const phUsdPerSusds = Math.pow(sqrtPricePhUsd / Math.pow(2, 96), 2);
-      const phUsdValueInSusds = 1 / phUsdPerSusds; // How many sUSDS one phUSD is worth
+      const phUsdPerSusdsRaw = Math.pow(sqrtPricePhUsd / Math.pow(2, 96), 2);
+      // No decimal adjustment needed (both 18 decimals)
+      const phUsdPerSusds = phUsdPerSusdsRaw;
+      // How many sUSDS one phUSD is worth
+      const phUsdValueInSusds = 1 / phUsdPerSusds;
 
-      // For USDC/sUSDS pool:
-      // - token0 = USDC (0xA0b... lower address)
-      // - token1 = sUSDS (0xa39... higher address)
-      // - sqrtPriceX96 gives token1/token0 = sUSDS/USDC ratio
-      // - For tokens with different decimals, raw ratio = (sUSDS * 10^18) / (USDC * 10^6)
-      // - To get human-readable: divide by 10^(18-6) = 10^12
-      // - Then invert to get USDC per sUSDS (USD value of sUSDS)
+      // Debug logging
+      console.log('[useUniswapPrice] phUSD/sUSDS pool sqrtPriceX96:', phUsdSusdsSlot0[0]?.toString());
+      console.log('[useUniswapPrice] phUsdPerSusdsRaw:', phUsdPerSusdsRaw);
+      console.log('[useUniswapPrice] phUsdValueInSusds (sUSDS per phUSD):', phUsdValueInSusds);
+
+      // ========== USDC/SUSDS POOL CALCULATION ==========
+      // Pool: USDC/sUSDS
+      // - token0 = USDC (0xA0b... lower address) - 6 decimals
+      // - token1 = sUSDS (0xa39... higher address) - 18 decimals
+      // - sqrtPriceX96 gives: token1_raw / token0_raw = sUSDS_raw / USDC_raw
+      // - Raw ratio = (sUSDS * 10^18) / (USDC * 10^6)
+      // - To get human-readable sUSDS per USDC: divide raw by 10^(18-6) = 10^12
+      // - To get USD value of sUSDS (USDC per sUSDS): invert the human-readable ratio
 
       const sqrtPriceUsdc = Number(usdcSusdsSlot0[0]);
       const susdsPerUsdcRaw = Math.pow(sqrtPriceUsdc / Math.pow(2, 96), 2);
 
-      // Debug: log the raw values to understand what we're getting
-      console.log('USDC/sUSDS pool sqrtPriceX96:', usdcSusdsSlot0[0]?.toString());
-      console.log('susdsPerUsdcRaw:', susdsPerUsdcRaw);
+      // Apply decimal adjustment: raw ratio is inflated by 10^12 due to decimal difference
+      // Decimal adjustment factor: 10^(sUSDS_decimals - USDC_decimals) = 10^(18-6) = 10^12
+      const DECIMAL_ADJUSTMENT = 1e12;
+      const susdsPerUsdcHuman = susdsPerUsdcRaw / DECIMAL_ADJUSTMENT;
 
-      // The raw ratio appears to be ~1 from the pool data.
-      // For debugging, try different interpretations:
-      // Option A: Use raw ratio directly (if V4 normalizes decimals)
-      // Option B: Invert the raw ratio
-      // Option C: Apply decimal adjustment then invert
+      // Invert to get USDC per sUSDS (USD value of 1 sUSDS)
+      const susdsValueInUsd = 1 / susdsPerUsdcHuman;
 
-      // Currently trying: invert the raw ratio (if it represents sUSDS/USDC ≈ 0.926)
-      const susdsValueInUsd = 1 / susdsPerUsdcRaw;
+      // Debug logging
+      console.log('[useUniswapPrice] USDC/sUSDS pool sqrtPriceX96:', usdcSusdsSlot0[0]?.toString());
+      console.log('[useUniswapPrice] susdsPerUsdcRaw:', susdsPerUsdcRaw);
+      console.log('[useUniswapPrice] susdsPerUsdcHuman (after /10^12):', susdsPerUsdcHuman);
+      console.log('[useUniswapPrice] susdsValueInUsd (USDC per sUSDS):', susdsValueInUsd);
 
-      console.log('susdsValueInUsd:', susdsValueInUsd);
-
+      // ========== FINAL PRICE CALCULATION ==========
       // phUSD dollar price = phUSD value in sUSDS * sUSDS value in USD
       price = phUsdValueInSusds * susdsValueInUsd;
 
-      console.log('Final price calculation:', phUsdValueInSusds, '*', susdsValueInUsd, '=', price);
+      console.log('[useUniswapPrice] Final phUSD price:', phUsdValueInSusds, '*', susdsValueInUsd, '=', price);
 
     } catch (e) {
-      console.error('Error calculating price:', e);
+      console.error('[useUniswapPrice] Error calculating price:', e);
     }
   }
 
