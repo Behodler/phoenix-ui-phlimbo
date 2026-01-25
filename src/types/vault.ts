@@ -42,6 +42,7 @@ export interface TabNavigationProps {
 export interface AmountDisplayProps {
   amount: number;
   showDollarEstimate?: boolean; // If true, shows dollar estimate below amount (defaults to false)
+  priceMultiplier?: number; // Optional price multiplier for dollar estimate (e.g., phUSD market price). Defaults to 1.0 (1:1 ratio)
 }
 
 export interface TokenRowProps {

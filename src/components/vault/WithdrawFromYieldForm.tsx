@@ -20,6 +20,7 @@ export interface WithdrawFromYieldFormProps {
   pendingPhUsdRewards: bigint;  // Pending phUSD yield (18 decimals)
   pendingStableRewards: bigint;  // Pending USDC yield (6 decimals)
   onRefresh?: () => void;  // Callback to trigger data refresh after transaction
+  phUsdMarketPrice?: number | null; // Optional market price for dollar estimates (mainnet only)
 }
 
 export default function WithdrawFromYieldForm({
@@ -31,8 +32,14 @@ export default function WithdrawFromYieldForm({
   stakedBalance,
   pendingPhUsdRewards,
   pendingStableRewards,
-  onRefresh: _onRefresh  // Currently unused - refresh is called in VaultPage's handleWithdrawFromYield
+  onRefresh: _onRefresh,  // Currently unused - refresh is called in VaultPage's handleWithdrawFromYield
+  phUsdMarketPrice = null
 }: WithdrawFromYieldFormProps) {
+  // Determine price multiplier for dollar estimates
+  // Use market price if available and valid (between 0 and 2.0), otherwise default to 1.0
+  const priceMultiplier = (phUsdMarketPrice !== null && phUsdMarketPrice > 0 && phUsdMarketPrice <= 2.0)
+    ? phUsdMarketPrice
+    : 1.0;
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
 
@@ -184,7 +191,7 @@ export default function WithdrawFromYieldForm({
           </p>
         </div>
 
-        <AmountDisplay amount={parsedAmountForDisplay} showDollarEstimate={true} />
+        <AmountDisplay amount={parsedAmountForDisplay} showDollarEstimate={true} priceMultiplier={priceMultiplier} />
 
         <div className="h-px w-full bg-border mb-6" />
 
@@ -199,7 +206,7 @@ export default function WithdrawFromYieldForm({
             <div className="min-w-0 flex-1">
               <div className="text-base font-semibold text-foreground">phUSD (Staked)</div>
               <div className="text-xs sm:text-sm text-muted-foreground break-words">
-                Staked {formatNumber(stakedBalanceDisplay)} (${formatNumber(stakedBalanceDisplay)})
+                Staked {formatNumber(stakedBalanceDisplay)} (${formatNumber(stakedBalanceDisplay * priceMultiplier)})
               </div>
             </div>
           </div>

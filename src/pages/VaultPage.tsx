@@ -172,7 +172,19 @@ export default function VaultPage() {
   } = useUniswapPrice();
   // ========== END UNISWAP PRICE FOR MARKET TAB ==========
 
-  // Calculate USDC APY using linear depletion model with DepositView data
+  // ========== USDC APY CALCULATION ==========
+  // APY Methodology: Per-second reward rate extrapolated to annual yield
+  //
+  // Formula: APY = (rewardsPerSecond * secondsPerYear / totalStaked) * 100
+  //
+  // Key points:
+  // 1. rewardsPerSecond comes from the contract (scaled by 1e18)
+  // 2. USDC rewards have 6 decimals, so we divide by 1e6 to get human values
+  // 3. On mainnet, we adjust the denominator by phUSD market price to express
+  //    APY in terms of USD value rather than token quantity
+  // 4. When phUSD trades below $1, the USD-denominated APY increases because
+  //    the same phUSD quantity represents less USD value
+  //
   // stableRewardsPerSecond from DepositView represents the USDC rewards rate
   // On mainnet (chainId === 1), adjust denominator by phUSD market price
   const usdcApyCalculated = (() => {
@@ -1198,6 +1210,7 @@ export default function VaultPage() {
                   needsApproval={needsPhUsdApprovalForDeposit && depositAmountWei > 0n}
                   isAllowanceLoading={depositViewLoading}
                   isPaused={isPaused === true}
+                  phUsdMarketPrice={isMainnet ? phUsdMarketPrice : null}
                 />
               </ErrorBoundary>
             ) : activeTab === "Withdraw" ? (
@@ -1212,6 +1225,7 @@ export default function VaultPage() {
                   pendingPhUsdRewards={pendingPhUsdFromView}
                   pendingStableRewards={pendingStableFromView}
                   onRefresh={refreshDepositView}
+                  phUsdMarketPrice={isMainnet ? phUsdMarketPrice : null}
                 />
               </ErrorBoundary>
             ) : activeTab === "Yield Funnel" ? (

@@ -20,6 +20,7 @@ export interface DepositToYieldFormProps {
   onApprove?: () => void;
   isAllowanceLoading?: boolean;
   isPaused?: boolean;
+  phUsdMarketPrice?: number | null; // Optional market price for dollar estimates (mainnet only)
 }
 
 export default function DepositToYieldForm({
@@ -31,8 +32,14 @@ export default function DepositToYieldForm({
   needsApproval = false,
   onApprove,
   isAllowanceLoading = false,
-  isPaused = false
+  isPaused = false,
+  phUsdMarketPrice = null
 }: DepositToYieldFormProps) {
+  // Determine price multiplier for dollar estimates
+  // Use market price if available and valid (between 0 and 2.0), otherwise default to 1.0
+  const priceMultiplier = (phUsdMarketPrice !== null && phUsdMarketPrice > 0 && phUsdMarketPrice <= 2.0)
+    ? phUsdMarketPrice
+    : 1.0;
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
@@ -189,7 +196,7 @@ export default function DepositToYieldForm({
           </p>
         </div>
 
-        <AmountDisplay amount={parsedAmountForDisplay} showDollarEstimate={true} />
+        <AmountDisplay amount={parsedAmountForDisplay} showDollarEstimate={true} priceMultiplier={priceMultiplier} />
 
         <div className="h-px w-full bg-border mb-6" />
 
