@@ -109,45 +109,37 @@ export function useUniswapPrice(): UseUniswapPriceResult {
     try {
       // ========== STEP 1: Get raw sqrtPriceX96 from phUSD/sUSDS pool ==========
       const sqrtPriceX96Raw = phUsdSusdsSlot0[0];
-      log.debug('[useUniswapPrice] Step 1: Raw sqrtPriceX96 from phUSD/sUSDS pool:', sqrtPriceX96Raw.toString());
-
+   
       // ========== STEP 2: Convert sqrtPriceX96 to Number and divide by 2^96 ==========
       const sqrtPricePhUsd = Number(sqrtPriceX96Raw);
       const TWO_POW_96 = Math.pow(2, 96);
       const sqrtPriceNormalized = sqrtPricePhUsd / TWO_POW_96;
-      log.debug('[useUniswapPrice] Step 2: sqrtPriceX96 / 2^96 =', sqrtPriceNormalized);
-
+  
       // ========== STEP 3: Square to get phUSD per sUSDS ratio ==========
       // Pool ordering: token0 = sUSDS (lower address), token1 = phUSD (higher address)
       // sqrtPriceX96 gives: sqrt(token1/token0) = sqrt(phUSD/sUSDS)
       // Squared: phUSD/sUSDS = how many phUSD per 1 sUSDS
       const phUsdPerSusds = Math.pow(sqrtPriceNormalized, 2);
-      log.debug('[useUniswapPrice] Step 3: Squared to get phUsdPerSusds =', phUsdPerSusds);
-
+ 
       // ========== STEP 4: Invert to get sUSDS value of 1 phUSD ==========
       // We want: how many sUSDS is 1 phUSD worth?
       const phUsdValueInSusds = 1 / phUsdPerSusds;
-      log.debug('[useUniswapPrice] Step 4: Inverted to get phUsdValueInSusds =', phUsdValueInSusds);
-
+ 
       // ========== STEP 5: Get sUSDS to USD ratio from ERC4626 convertToAssets ==========
       // sUSDS is an ERC4626 vault with USDS as underlying (USDS = $1)
       // convertToAssets(1e18) returns how many USDS (wei) 1 sUSDS is worth
       const rawConvertResult = sUsdsConvertResult;
-      log.debug('[useUniswapPrice] Step 5: sUSDS convertToAssets(1e18) raw result =', rawConvertResult.toString());
 
       // ========== STEP 6: Calculate sUSDS to USD ratio ==========
       // Divide by 1e18 to get the ratio (since USDS has 18 decimals and is worth $1)
       const sUsdsToUsdRatio = Number(rawConvertResult) / 1e18;
-      log.debug('[useUniswapPrice] Step 6: sUsdsToUsdRatio = rawResult / 1e18 =', sUsdsToUsdRatio);
 
       // ========== STEP 7: Calculate final phUSD price in USD ==========
       // phUSD dollar price = (sUSDS per phUSD) * (USD per sUSDS)
       price = phUsdValueInSusds * sUsdsToUsdRatio;
-      log.debug('[useUniswapPrice] Step 7: Final price = phUsdValueInSusds * sUsdsToUsdRatio =', phUsdValueInSusds, '*', sUsdsToUsdRatio, '=', price);
 
     } catch (e) {
-      log.error('[useUniswapPrice] Error calculating price:', e);
-    }
+   }
   }
 
   return {
