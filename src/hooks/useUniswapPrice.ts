@@ -45,12 +45,10 @@ export interface UseUniswapPriceResult {
  * 2. Read USDC/sUSDS pool to get sUSDS price in USDC (=USD)
  * 3. Combine: phUSD_USD_price = phUSD_sUSDS_price * sUSDS_USD_price
  *
- * IMPORTANT: Uniswap V4 sqrtPriceX96 math
- * - sqrtPriceX96 = sqrt(price) * 2^96, where price = token1_raw / token0_raw
+ * Uniswap V4 sqrtPriceX96 math:
+ * - sqrtPriceX96 = sqrt(price) * 2^96, where price = token1 / token0
  * - token0 is the token with the lower address (lexicographically)
- * - The raw ratio includes decimal differences: for USDC(6)/sUSDS(18),
- *   raw_ratio = (sUSDS * 10^18) / (USDC * 10^6), so we must divide by 10^12
- *   to get human-readable values
+ * - The resulting ratio appears usable directly without decimal adjustment
  */
 export function useUniswapPrice(): UseUniswapPriceResult {
   // Read slot0 for phUSD/sUSDS pool
@@ -121,26 +119,22 @@ export function useUniswapPrice(): UseUniswapPriceResult {
       // Pool: USDC/sUSDS
       // - token0 = USDC (0xA0b... lower address) - 6 decimals
       // - token1 = sUSDS (0xa39... higher address) - 18 decimals
-      // - sqrtPriceX96 gives: token1_raw / token0_raw = sUSDS_raw / USDC_raw
-      // - Raw ratio = (sUSDS * 10^18) / (USDC * 10^6)
-      // - To get human-readable sUSDS per USDC: divide raw by 10^(18-6) = 10^12
-      // - To get USD value of sUSDS (USDC per sUSDS): invert the human-readable ratio
+      // - sqrtPriceX96 gives: token1/token0 = sUSDS/USDC ratio
+      // - Invert to get USD value of sUSDS (USDC per sUSDS)
+      //
+      // NOTE: No decimal adjustment applied - the sqrtPriceX96 math appears to
+      // produce usable ratios directly. The 91c bug was due to showing sUSDS price
+      // instead of properly chaining phUSD -> sUSDS -> USD.
 
       const sqrtPriceUsdc = Number(usdcSusdsSlot0[0]);
       const susdsPerUsdcRaw = Math.pow(sqrtPriceUsdc / Math.pow(2, 96), 2);
 
-      // Apply decimal adjustment: raw ratio is inflated by 10^12 due to decimal difference
-      // Decimal adjustment factor: 10^(sUSDS_decimals - USDC_decimals) = 10^(18-6) = 10^12
-      const DECIMAL_ADJUSTMENT = 1e12;
-      const susdsPerUsdcHuman = susdsPerUsdcRaw / DECIMAL_ADJUSTMENT;
-
       // Invert to get USDC per sUSDS (USD value of 1 sUSDS)
-      const susdsValueInUsd = 1 / susdsPerUsdcHuman;
+      const susdsValueInUsd = 1 / susdsPerUsdcRaw;
 
       // Debug logging
       console.log('[useUniswapPrice] USDC/sUSDS pool sqrtPriceX96:', usdcSusdsSlot0[0]?.toString());
       console.log('[useUniswapPrice] susdsPerUsdcRaw:', susdsPerUsdcRaw);
-      console.log('[useUniswapPrice] susdsPerUsdcHuman (after /10^12):', susdsPerUsdcHuman);
       console.log('[useUniswapPrice] susdsValueInUsd (USDC per sUSDS):', susdsValueInUsd);
 
       // ========== FINAL PRICE CALCULATION ==========
