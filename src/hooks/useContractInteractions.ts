@@ -12,6 +12,11 @@ export function useTokenBalance(address: Address | undefined, token: Address | u
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && !!token,
+      refetchOnWindowFocus: false,
+      staleTime: 30_000, // 30 seconds
+    },
   })
 
   return {
@@ -36,6 +41,11 @@ export function useTokenAllowance(
     abi: erc20Abi,
     functionName: 'allowance',
     args: owner && spender ? [owner, spender] : undefined,
+    query: {
+      enabled: !!owner && !!spender && !!token,
+      refetchOnWindowFocus: false,
+      staleTime: 30_000, // 30 seconds
+    },
   })
 
   return {

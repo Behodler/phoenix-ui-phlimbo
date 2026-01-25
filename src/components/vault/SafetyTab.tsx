@@ -29,6 +29,7 @@ export default function SafetyTab() {
   // Fetch EYE balance
   const {
     balance: eyeBalanceRaw,
+    isLoading: eyeBalanceLoading,
     refetch: refetchEyeBalance
   } = useTokenBalance(
     walletAddress,
@@ -308,7 +309,7 @@ export default function SafetyTab() {
   let buttonLoading = false;
 
   if (isConnected) {
-    if (isLoadingEyeBurnAmount || eyeAllowanceLoading || requiredEyeAmount === null) {
+    if (isLoadingEyeBurnAmount || eyeAllowanceLoading || eyeBalanceLoading || requiredEyeAmount === null) {
       buttonLabel = "Loading contract configuration...";
       buttonLoading = true;
       buttonDisabled = true;
@@ -345,7 +346,9 @@ export default function SafetyTab() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between items-start">
               <span className="text-foreground">Your EYE Balance:</span>
-              <span className="font-medium text-pxusd-yellow-400">{eyeBalance.toFixed(4)} EYE</span>
+              <span className="font-medium text-pxusd-yellow-400">
+                {eyeBalanceLoading ? 'Loading...' : `${eyeBalance.toFixed(4)} EYE`}
+              </span>
             </div>
 
             <div className="flex justify-between items-start">
