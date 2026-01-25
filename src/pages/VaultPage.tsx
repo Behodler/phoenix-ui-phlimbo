@@ -336,10 +336,14 @@ export default function VaultPage() {
   };
 
   // Real token info for the Deposit tab using DepositView phUSD balance
+  // Use market price for USD value on mainnet, fallback to 1:1 for testnets
+  const phUsdPriceForBalance = (isMainnet && phUsdMarketPrice !== null && phUsdMarketPrice > 0 && phUsdMarketPrice <= 2.0)
+    ? phUsdMarketPrice
+    : 1.0;
   const depositTokenInfo: TokenInfo = {
     name: "phUSD",
     balance: phUsdBalance,
-    balanceUsd: phUsdBalance, // 1:1 USD value assumption for stablecoins
+    balanceUsd: phUsdBalance * phUsdPriceForBalance,
     balanceRaw: phUsdBalanceFromView ?? 0n,
     icon: phUSDIcon
   };
