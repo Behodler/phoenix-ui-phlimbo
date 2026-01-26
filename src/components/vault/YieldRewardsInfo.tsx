@@ -1,5 +1,7 @@
 import { formatUnits } from 'viem';
 import type { YieldRewardsInfoProps } from '../../types/vault';
+import phUsdLogo from '../../assets/phUSD-nobackground.png';
+import usdcLogo from '../../assets/usdc-logo.svg';
 
 /**
  * YieldRewardsInfo Component
@@ -87,6 +89,7 @@ export default function YieldRewardsInfo({
           {/* PhUSD APY Line */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
+              <img src={phUsdLogo} alt="phUSD" className="w-5 h-5 rounded-full" />
               <span className="text-sm text-foreground">phUSD</span>
               <span className="px-2 py-0.5 text-xs font-medium rounded bg-pxusd-teal-700 text-pxusd-teal-300 border border-pxusd-teal-600">
                 Fixed
@@ -100,6 +103,7 @@ export default function YieldRewardsInfo({
           {/* USDC APY Line */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
+              <img src={usdcLogo} alt="USDC" className="w-5 h-5 rounded-full" />
               <span className="text-sm text-foreground">USDC</span>
               <span className="px-2 py-0.5 text-xs font-medium rounded bg-pxusd-orange-900/30 text-pxusd-orange-300 border border-pxusd-orange-500/50">
                 Variable
@@ -136,7 +140,10 @@ export default function YieldRewardsInfo({
               <div className="space-y-3">
                 {/* PhUSD Pending Rewards */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground">phUSD</span>
+                  <div className="flex items-center gap-1.5">
+                    <img src={phUsdLogo} alt="phUSD" className="w-5 h-5 rounded-full" />
+                    <span className="text-sm text-foreground">phUSD</span>
+                  </div>
                   <span className="text-sm font-medium text-pxusd-yellow-400">
                     {formatPendingAmount(pendingPhUsd)} phUSD
                   </span>
@@ -144,7 +151,10 @@ export default function YieldRewardsInfo({
 
                 {/* USDC Pending Rewards */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground">USDC</span>
+                  <div className="flex items-center gap-1.5">
+                    <img src={usdcLogo} alt="USDC" className="w-5 h-5 rounded-full" />
+                    <span className="text-sm text-foreground">USDC</span>
+                  </div>
                   <span className="text-sm font-medium text-pxusd-yellow-400">
                     {formatPendingAmount(pendingUsdc, isUsdcDecimals6 ? 6 : 18)} USDC
                   </span>
