@@ -1,5 +1,4 @@
 import { useReadContract } from 'wagmi';
-import { log } from '../utils/logger';
 
 // Pool ID for Uniswap V4 phUSD/sUSDS pool
 const PHUSD_SUSDS_POOL_ID = '0x114bcf3588537bba82c7e31fb8caf355921edb29971fedde97221b5c843a3e05';
