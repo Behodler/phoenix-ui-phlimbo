@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { parseUnits } from 'viem';
 import type { TokenInfo } from '../../types/vault';
 import { safeMaxForDisplay } from '../../utils/bigIntDisplay';
 import AmountDisplay from '../ui/AmountDisplay';
-import TokenRow from '../ui/TokenRow';
 import AmountInput from '../ui/AmountInput';
 import ActionButton from '../ui/ActionButton';
 import MintConfirmationDialog from './MintConfirmationDialog';
 import { log } from '../../utils/logger';
+
+// Mint token type
+type MintTokenType = 'DOLA' | 'USDC';
 
 // Props interface for MintForm - simplified from DepositFormProps
 export interface MintFormProps {
@@ -20,6 +22,10 @@ export interface MintFormProps {
   onApprove?: () => void;
   isAllowanceLoading?: boolean;
   isPaused?: boolean;
+  // New props for token switching
+  mintTokenType?: MintTokenType;
+  onToggleMintToken?: () => void;
+  tokenDecimals?: number;
 }
 
 export default function MintForm({
@@ -31,11 +37,43 @@ export default function MintForm({
   needsApproval = false,
   onApprove,
   isAllowanceLoading = false,
-  isPaused = false
+  isPaused = false,
+  mintTokenType = 'DOLA',
+  onToggleMintToken,
+  tokenDecimals = 18
 }: MintFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
+  const [isSwapping, setIsSwapping] = useState(false);
+  const swapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (swapTimeoutRef.current) {
+        clearTimeout(swapTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handle token logo click with animation
+  const handleTokenSwap = () => {
+    // Prevent rapid clicking during animation
+    if (isSwapping || !onToggleMintToken) return;
+
+    setIsSwapping(true);
+
+    // Swap the token at the midpoint of the animation (150ms = half of 300ms)
+    swapTimeoutRef.current = setTimeout(() => {
+      onToggleMintToken();
+    }, 150);
+
+    // Reset swapping state after animation completes
+    swapTimeoutRef.current = setTimeout(() => {
+      setIsSwapping(false);
+    }, 300);
+  };
 
   // Validate input and parse to BigInt with error handling
   let inputAmountWei = 0n;
@@ -43,7 +81,7 @@ export default function MintForm({
 
   if (amount && amount !== '0' && amount !== '') {
     try {
-      inputAmountWei = parseUnits(amount, 18);
+      inputAmountWei = parseUnits(amount, tokenDecimals);
     } catch (error) {
       // Handle parsing errors gracefully without crashing
       parseError = true;
@@ -114,14 +152,15 @@ export default function MintForm({
     if (tokenInfo.balanceRaw !== undefined) {
       // Subtract 1 wei to ensure we never round up
       const truncatedBalanceWei = tokenInfo.balanceRaw - BigInt(1);
-      // Use safe display truncation to prevent validation errors
-      const displayValue = safeMaxForDisplay(truncatedBalanceWei, 18);
+      // Use safe display truncation to prevent validation errors (use appropriate decimals)
+      const displayValue = safeMaxForDisplay(truncatedBalanceWei, tokenDecimals);
       log.debug('MAX CLICKED - safeMaxForDisplay returned:', displayValue);
       log.debug('MAX CLICKED - truncatedBalanceWei:', truncatedBalanceWei.toString());
       onAmountChange(displayValue);
     } else {
       // Fallback to previous flooring logic if raw balance not available
-      const flooredBalance = Math.floor(tokenInfo.balance * 1e18) / 1e18;
+      const multiplier = Math.pow(10, tokenDecimals);
+      const flooredBalance = Math.floor(tokenInfo.balance * multiplier) / multiplier;
       log.debug('MAX CLICKED - fallback value:', flooredBalance.toString());
       onAmountChange(flooredBalance.toString());
     }
@@ -154,8 +193,8 @@ export default function MintForm({
   // Determine button state and properties
   // Validate against the maximum value that the max button would produce
   const maxAllowedWei = tokenInfo.balanceRaw !== undefined
-    ? parseUnits(safeMaxForDisplay(tokenInfo.balanceRaw - 1n, 18), 18)
-    : parseUnits(String(tokenInfo.balance), 18);
+    ? parseUnits(safeMaxForDisplay(tokenInfo.balanceRaw - 1n, tokenDecimals), tokenDecimals)
+    : parseUnits(String(tokenInfo.balance), tokenDecimals);
 
   const isAmountValid = inputAmountWei > 0n && inputAmountWei <= maxAllowedWei;
   const hasValidationError = validationError !== '' || parseError;
@@ -170,7 +209,7 @@ export default function MintForm({
     buttonLabel = "Insufficient Balance";
   } else if (isAmountValid) {
     if (needsApproval) {
-      buttonLabel = "Approve DOLA";
+      buttonLabel = `Approve ${mintTokenType}`;
       buttonVariant = 'approve';
       buttonAction = handleApprove;
       buttonLoading = isApproving;
@@ -181,6 +220,15 @@ export default function MintForm({
     }
   }
 
+  // Format balance for display
+  const formatBalance = (balance: number): string => {
+    if (balance === 0) return '0.00';
+    if (balance < 0.01) return balance.toFixed(4);
+    if (balance < 1) return balance.toFixed(3);
+    if (balance < 1000) return balance.toFixed(2);
+    return balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   return (
     <>
       <div className="p-6">
@@ -188,7 +236,50 @@ export default function MintForm({
 
         <div className="h-px w-full bg-border mb-6" />
 
-        <TokenRow token={tokenInfo} />
+        {/* Custom token row with clickable logo */}
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* Clickable token logo with animation */}
+            <button
+              onClick={handleTokenSwap}
+              disabled={!onToggleMintToken || isSwapping}
+              className="relative focus:outline-none focus:ring-2 focus:ring-primary rounded-full disabled:cursor-default"
+              title={onToggleMintToken ? `Click to switch to ${mintTokenType === 'DOLA' ? 'USDC' : 'DOLA'}` : undefined}
+            >
+              <img
+                src={tokenInfo.icon}
+                alt={`${tokenInfo.name} icon`}
+                className={`h-10 w-10 rounded-full flex-shrink-0 object-cover ${
+                  onToggleMintToken ? 'token-logo-clickable' : ''
+                } ${isSwapping ? 'animate-token-swap' : ''}`}
+              />
+              {/* Visual indicator that token is clickable */}
+              {onToggleMintToken && (
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-pxusd-teal-700 rounded-full flex items-center justify-center border border-border">
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-muted-foreground"
+                  >
+                    <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16" />
+                  </svg>
+                </div>
+              )}
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-semibold text-foreground">{tokenInfo.name}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground break-words">
+                Balance {formatBalance(tokenInfo.balance)} (${formatBalance(tokenInfo.balanceUsd)})
+              </div>
+            </div>
+          </div>
+        </div>
 
         <AmountInput
           amount={amount}
@@ -213,7 +304,7 @@ export default function MintForm({
         {/* Fixed 1:1 Rate Info - no slippage controls */}
         <div className="space-y-3 text-sm mb-6">
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">1 DOLA</span>
+            <span className="text-muted-foreground">1 {mintTokenType}</span>
             <span className="font-medium text-foreground">= 1 phUSD</span>
           </div>
           <div className="flex items-center justify-between">
@@ -247,7 +338,7 @@ export default function MintForm({
         isLoading={isTransacting}
         data={{
           inputAmount: parsedAmountForDisplay,
-          inputToken: 'DOLA',
+          inputToken: mintTokenType,
           outputAmount: estPhUSD,
           outputToken: 'phUSD',
         }}

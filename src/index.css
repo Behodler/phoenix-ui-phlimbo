@@ -224,3 +224,30 @@ body {
 .close-all-enter {
   transition: all 0.3s ease;
 }
+
+/* Token swap animation for mint token switching */
+@keyframes token-swap {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0; transform: scale(0.8); }
+  51% { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-token-swap {
+  animation: token-swap 0.3s ease-in-out;
+}
+
+/* Clickable token logo styles */
+.token-logo-clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.token-logo-clickable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 12px rgba(255, 138, 66, 0.4);
+}
+
+.token-logo-clickable:active {
+  transform: scale(0.95);
+}
