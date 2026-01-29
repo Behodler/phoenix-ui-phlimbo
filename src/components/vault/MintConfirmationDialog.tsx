@@ -34,14 +34,14 @@ export default function MintConfirmationDialog({
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}
-      title="Confirm Mint"
+      title={`Confirm ${data.inputToken} to ${data.outputToken} Mint`}
       confirmLabel="Confirm Mint"
       isLoading={isLoading}
     >
       <div className="space-y-4">
-        {/* Deposit Summary */}
+        {/* Input Token Summary */}
         <div className="bg-pxusd-teal-700 rounded-lg p-4">
-          <div className="text-sm text-muted-foreground mb-2">You're depositing</div>
+          <div className="text-sm text-muted-foreground mb-2">You're minting with</div>
           <div className="flex justify-between items-center">
             <span className="text-lg font-medium">{formatNumber(data.inputAmount)} {data.inputToken}</span>
             <span className="text-sm text-muted-foreground">${formatNumber(data.inputAmount)}</span>
