@@ -13,16 +13,21 @@ export interface ContractAddresses {
   USDT: string,
   Dola: string,
   USDS: string,
+  Toke: string,
   EYE: string,
   Pauser: string,
   YieldStrategyUSDT: string,
   YieldStrategyDola: string,
   YieldStrategyUSDS: string,
+  YieldStrategyUSDC: string,
   PhusdStableMinter: string,
   StableYieldAccumulator: string,
-  PhlimboEA: string
-  AutoDOLA:string
-  DepositView:string
+  PhlimboEA: string,
+  AutoDOLA: string,
+  AutoUSDC: string,
+  MainRewarder: string,
+  MainRewarderUSDC: string,
+  DepositView: string,
 }
 
 

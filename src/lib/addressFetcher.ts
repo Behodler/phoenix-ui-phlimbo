@@ -35,10 +35,11 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
     // "bondingCurve" for cleaner internal naming. This is the minter contract that accepts
     // DOLA deposits. bondingToken is the ERC20 token it produces.
     const addresses: ContractAddresses = {
-
       Dola: data.Dola || '0x0000000000000000000000000000000000000000',
+      Toke: data.Toke || '0x0000000000000000000000000000000000000000',
       EYE: data.EYE || '0x0000000000000000000000000000000000000000',
       YieldStrategyDola: data.YieldStrategyDola ||  '0x0000000000000000000000000000000000000000',
+      YieldStrategyUSDC: data.YieldStrategyUSDC || '0x0000000000000000000000000000000000000000',
       Pauser: data.Pauser || '0x0000000000000000000000000000000000000000',
       PhUSD: data.PhUSD || '0x0000000000000000000000000000000000000000',
       USDC: data.USDC || '0x0000000000000000000000000000000000000000',
@@ -50,6 +51,9 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       StableYieldAccumulator: data.StableYieldAccumulator || '0x0000000000000000000000000000000000000000',
       PhlimboEA: data.PhlimboEA || '0x0000000000000000000000000000000000000000',
       AutoDOLA: data.AutoDOLA || '0x0000000000000000000000000000000000000000',
+      AutoUSDC: data.AutoUSDC || '0x0000000000000000000000000000000000000000',
+      MainRewarder: data.MainRewarder || '0x0000000000000000000000000000000000000000',
+      MainRewarderUSDC: data.MainRewarderUSDC || '0x0000000000000000000000000000000000000000',
       DepositView: data.DepositView || '0x0000000000000000000000000000000000000000'
     }
     log.debug('📡 fetchLocalAddresses: Mapped addresses:', addresses)
