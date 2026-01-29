@@ -61,6 +61,7 @@ export interface YieldFunnelData {
  */
 function getTokenInfoMap(addresses: {
   Dola?: string;
+  USDC?: string;
   USDT?: string;
   USDS?: string;
 } | null): Map<string, TokenInfo> {
@@ -73,6 +74,14 @@ function getTokenInfoMap(addresses: {
       symbol: 'DOLA',
       name: 'Dola USD',
       decimals: 18,
+    });
+  }
+
+  if (addresses.USDC) {
+    map.set(addresses.USDC.toLowerCase(), {
+      symbol: 'USDC',
+      name: 'USD Coin',
+      decimals: 6,
     });
   }
 
