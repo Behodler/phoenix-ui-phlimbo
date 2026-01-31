@@ -216,6 +216,32 @@ export default function Admin() {
     },
   });
 
+  // Fetch principal from YieldStrategyUSDC (autoUSD - principal deposited via PhusdStableMinter)
+  const { data: autoUsdPrincipal, refetch: refetchAutoUsdPrincipal, error: autoUsdPrincipalError } = useReadContract({
+    address: addresses?.YieldStrategyUSDC as `0x${string}` | undefined,
+    abi: iYieldStrategyAbi,
+    functionName: 'principalOf',
+    args: addresses?.USDC && addresses?.PhusdStableMinter
+      ? [addresses.USDC as `0x${string}`, addresses.PhusdStableMinter as `0x${string}`]
+      : undefined,
+    query: {
+      enabled: !!addresses?.YieldStrategyUSDC && !!addresses?.USDC && !!addresses?.PhusdStableMinter,
+    },
+  });
+
+  // Fetch total balance from YieldStrategyUSDC (autoUSD - principal + yield for PhusdStableMinter)
+  const { data: autoUsdTotalBalance, refetch: refetchAutoUsdTotalBalance, error: autoUsdTotalBalanceError } = useReadContract({
+    address: addresses?.YieldStrategyUSDC as `0x${string}` | undefined,
+    abi: iYieldStrategyAbi,
+    functionName: 'totalBalanceOf',
+    args: addresses?.USDC && addresses?.PhusdStableMinter
+      ? [addresses.USDC as `0x${string}`, addresses.PhusdStableMinter as `0x${string}`]
+      : undefined,
+    query: {
+      enabled: !!addresses?.YieldStrategyUSDC && !!addresses?.USDC && !!addresses?.PhusdStableMinter,
+    },
+  });
+
   // ========== PHLIMBO STATISTICS SECTION ==========
   // Fetch PhlimboEA pool info: (totalStaked, accPhUSDPerShare, accStablePerShare, phUSDPerSecond, lastRewardTime)
   const { data: poolInfo, refetch: refetchPoolInfo, isLoading: poolInfoLoading } = useReadContract({
@@ -343,32 +369,58 @@ export default function Admin() {
   const yieldDisplay = (Number(yield_) / 1e18).toFixed(2);
   const totalDisplay = (Number(totalVaultBalance) / 1e18).toFixed(2);
 
+  // Calculate USDC yield vs principal breakdown (YieldStrategyUSDC / autoUSD)
+  // Uses same pattern as DOLA but with USDC 6 decimals
+  const usdcPrincipal = autoUsdPrincipal !== undefined ? autoUsdPrincipal : 0n;
+  const usdcTotalBalance = autoUsdTotalBalance !== undefined ? autoUsdTotalBalance : 0n;
+  const usdcYield = usdcTotalBalance > usdcPrincipal ? usdcTotalBalance - usdcPrincipal : 0n;
+
+  // Format for display (convert from 6 decimals to USDC)
+  const usdcPrincipalDisplay = (Number(usdcPrincipal) / 1e6).toFixed(2);
+  const usdcYieldDisplay = (Number(usdcYield) / 1e6).toFixed(2);
+  const usdcTotalDisplay = (Number(usdcTotalBalance) / 1e6).toFixed(2);
+
   // Debug logging for balance queries
   useEffect(() => {
     console.log('[Admin] Balance Query Debug:', {
-      phusdStableMinterPrincipal: phusdStableMinterPrincipal?.toString(),
-      phusdStableMinterTotalBalance: phusdStableMinterTotalBalance?.toString(),
-      principal: principal.toString(),
-      totalVaultBalance: totalVaultBalance.toString(),
-      yield_: yield_.toString(),
+      dola: {
+        principal: phusdStableMinterPrincipal?.toString(),
+        totalBalance: phusdStableMinterTotalBalance?.toString(),
+        yield_: yield_.toString(),
+      },
+      usdc: {
+        principal: autoUsdPrincipal?.toString(),
+        totalBalance: autoUsdTotalBalance?.toString(),
+        yield_: usdcYield.toString(),
+      },
       addresses: {
         YieldStrategyDola: addresses?.YieldStrategyDola,
+        YieldStrategyUSDC: addresses?.YieldStrategyUSDC,
         Dola: addresses?.Dola,
+        USDC: addresses?.USDC,
         PhusdStableMinter: addresses?.PhusdStableMinter,
       },
       errors: {
         principalError: principalError?.message,
         totalBalanceError: totalBalanceError?.message,
+        autoUsdPrincipalError: autoUsdPrincipalError?.message,
+        autoUsdTotalBalanceError: autoUsdTotalBalanceError?.message,
       }
     });
 
     if (principalError) {
-      console.error('[Admin] Principal Query Error:', principalError);
+      console.error('[Admin] DOLA Principal Query Error:', principalError);
     }
     if (totalBalanceError) {
-      console.error('[Admin] Total Balance Query Error:', totalBalanceError);
+      console.error('[Admin] DOLA Total Balance Query Error:', totalBalanceError);
     }
-  }, [phusdStableMinterPrincipal, phusdStableMinterTotalBalance, principal, totalVaultBalance, yield_, addresses, principalError, totalBalanceError]);
+    if (autoUsdPrincipalError) {
+      console.error('[Admin] USDC Principal Query Error:', autoUsdPrincipalError);
+    }
+    if (autoUsdTotalBalanceError) {
+      console.error('[Admin] USDC Total Balance Query Error:', autoUsdTotalBalanceError);
+    }
+  }, [phusdStableMinterPrincipal, phusdStableMinterTotalBalance, principal, totalVaultBalance, yield_, autoUsdPrincipal, autoUsdTotalBalance, usdcYield, addresses, principalError, totalBalanceError, autoUsdPrincipalError, autoUsdTotalBalanceError]);
 
   /**
    * Discover owned contracts by checking ownership of each contract
@@ -994,6 +1046,54 @@ export default function Admin() {
           while the protocol utilizes yield separately.
           <span className="block mt-2">
             Values are fetched directly from YieldStrategyDola using the IYieldStrategy interface:
+            principalOf() returns principal only, totalBalanceOf() returns principal + yield.
+            Yield is calculated as: totalBalanceOf - principalOf.
+          </span>
+        </p>
+      </div>
+
+      {/* YieldStrategyUSDC Balance Breakdown (autoUSD) */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-semibold text-foreground mb-3">
+          YieldStrategyUSDC Balance Breakdown
+        </h3>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Principal (PhusdStableMinter):</span>
+            <span className="text-sm font-mono text-foreground">
+              {usdcPrincipalDisplay} USDC
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Yield Generated:</span>
+            <span className="text-sm font-mono text-accent">
+              {usdcYieldDisplay} USDC
+            </span>
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-foreground">Total Vault Balance:</span>
+            <span className="text-sm font-mono font-semibold text-foreground">
+              {usdcTotalDisplay} USDC
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-border">
+          <button
+            onClick={() => {
+              refetchAutoUsdPrincipal();
+              refetchAutoUsdTotalBalance();
+            }}
+            className="text-xs text-accent hover:text-accent/80 underline"
+          >
+            Refresh Balances
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+          <strong>Note:</strong> Principal represents USDC deposited through PhusdStableMinter via autoUSD pool.
+          Yield is vault balance growth beyond principal. PhUSD values are based on principal only,
+          while the protocol utilizes yield separately.
+          <span className="block mt-2">
+            Values are fetched directly from YieldStrategyUSDC using the IYieldStrategy interface:
             principalOf() returns principal only, totalBalanceOf() returns principal + yield.
             Yield is calculated as: totalBalanceOf - principalOf.
           </span>
