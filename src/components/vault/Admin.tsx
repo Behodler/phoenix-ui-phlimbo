@@ -13,6 +13,7 @@ import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
 import { useTokenBalance } from '../../hooks/useContractInteractions';
+import { useSolvencyInfo } from '../../hooks/useSolvencyInfo';
 import type { Abi, AbiFunction } from 'viem';
 import type { ContractAddresses } from '../../types/contracts';
 
@@ -342,6 +343,33 @@ export default function Admin() {
     refetchDolaYield();
   };
   // ========== END PHLIMBO STATISTICS SECTION ==========
+
+  // ========== SOLVENCY STATUS SECTION ==========
+  // Use the custom solvency info hook for calculating solvency metrics
+  const {
+    actualBalanceFormatted: solvencyActualBalance,
+    owedToStakersFormatted,
+    runwayFormatted,
+    runwayTimeFormatted,
+    runwayHealth,
+    isLoading: solvencyLoading,
+    refetch: refetchSolvency,
+  } = useSolvencyInfo();
+
+  // Helper function to get color class based on runway health
+  const getRunwayHealthColor = (health: 'healthy' | 'warning' | 'critical'): string => {
+    switch (health) {
+      case 'healthy':
+        return 'text-green-500';
+      case 'warning':
+        return 'text-yellow-500';
+      case 'critical':
+        return 'text-red-500';
+      default:
+        return 'text-foreground';
+    }
+  };
+  // ========== END SOLVENCY STATUS SECTION ==========
 
   // Wagmi hooks for contract write and transaction tracking
   const { data: txHash, writeContractAsync } = useWriteContract();
@@ -1161,6 +1189,67 @@ export default function Admin() {
           rewardPerSecond is the current USDC reward distribution rate (stored with 1e18 precision in contract), recalculated when users stake/unstake or USDC yield is injected.
           depletionDuration is the configurable duration over which rewards are linearly depleted.
           YieldFunnel DOLA shows pending DOLA yield from the DOLA yield strategy.
+        </p>
+      </div>
+
+      {/* Solvency Status Section */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            Solvency Status
+          </h3>
+          {solvencyLoading && (
+            <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
+          )}
+        </div>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Actual Balance (USDC held):</span>
+            <span className="text-sm font-mono text-foreground">
+              {solvencyActualBalance} USDC
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Owed to Stakers:</span>
+            <span className="text-sm font-mono text-foreground">
+              {owedToStakersFormatted} USDC
+            </span>
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-foreground">Runway (Available for Distribution):</span>
+            <span className={`text-sm font-mono font-semibold ${getRunwayHealthColor(runwayHealth)}`}>
+              {runwayFormatted} USDC
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Runway Time Estimate:</span>
+            <span className={`text-sm font-mono ${getRunwayHealthColor(runwayHealth)}`}>
+              {runwayTimeFormatted}
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-border">
+          <button
+            onClick={refetchSolvency}
+            className="text-xs text-accent hover:text-accent/80 underline"
+          >
+            Refresh Solvency Status
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+          <strong>Solvency Calculation:</strong> Projects the reward balance as if _updatePool() ran now.
+          <span className="block mt-1">
+            <strong>Owed to Stakers</strong> = Actual Balance - Projected Reward Balance (rewards already accrued but not claimed)
+          </span>
+          <span className="block mt-1">
+            <strong>Runway</strong> = Projected Reward Balance (buffer available for future distribution)
+          </span>
+          <span className="block mt-2">
+            <strong>Health Indicators:</strong>{' '}
+            <span className="text-green-500">Green</span> = 14+ days runway,{' '}
+            <span className="text-yellow-500">Yellow</span> = 3-14 days,{' '}
+            <span className="text-red-500">Red</span> = less than 3 days
+          </span>
         </p>
       </div>
 
