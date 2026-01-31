@@ -19,3 +19,7 @@ export type { DepositViewData, UseDepositViewPollingReturn } from './useDepositV
 // Uniswap price hook
 export { useUniswapPrice } from './useUniswapPrice';
 export type { UseUniswapPriceResult } from './useUniswapPrice';
+
+// Solvency info hook
+export { useSolvencyInfo } from './useSolvencyInfo';
+export type { SolvencyInfo, RunwayHealth } from './useSolvencyInfo';
