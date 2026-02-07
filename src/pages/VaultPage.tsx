@@ -26,6 +26,7 @@ import ErrorBoundary from '../components/ui/ErrorBoundary';
 import DOLA from "../assets/sDOLA.png";
 import USDC from "../assets/usdc-logo.svg";
 import phUSDIcon from "../assets/phUSD.png";
+import { isAllowlistedAdmin } from '../lib/adminAllowlist';
 import { log } from '../utils/logger';
 
 // Mint token type for switching between DOLA and USDC
@@ -130,6 +131,9 @@ export default function VaultPage() {
   const isOwner = isMounted && walletAddress && ownerAddress
     ? walletAddress.toLowerCase() === ownerAddress.toLowerCase()
     : false;
+
+  // Check if wallet has admin access (owner OR allowlisted)
+  const hasAdminAccess = isOwner || isAllowlistedAdmin(chainId, walletAddress);
 
   // Tab state needs to be declared early for DepositView polling
   const [activeTab, setActiveTab] = useState<Tab>("Mint");
@@ -296,7 +300,7 @@ export default function VaultPage() {
     // Safety tab is available on all networks
     tabList.push("Safety");
 
-    if (isOwner) {
+    if (hasAdminAccess) {
       tabList.push("Admin");
     }
 
@@ -318,7 +322,7 @@ export default function VaultPage() {
   const [withdrawFromYieldAmount, setWithdrawFromYieldAmount] = useState<string>("");
 
   // Mint token type state - for switching between DOLA and USDC
-  const [mintTokenType, setMintTokenType] = useState<MintTokenType>('DOLA');
+  const [mintTokenType, setMintTokenType] = useState<MintTokenType>('USDC');
 
   // Toggle function for mint token switching
   const toggleMintToken = () => {
