@@ -2,15 +2,15 @@ import ActionButton from '../ui/ActionButton';
 
 // Token addresses for Uniswap URLs
 const PHUSD_ADDRESS = '0xf3B5B661b92B75C71fA5Aba8Fd95D7514A9CD605';
-const USDS_ADDRESS = '0xdC035D45d973E3EC169d2276DDab16f1e407384F';
+const SUSDS_ADDRESS = '0xa3931d71877c0e7a3148cb7eb4463524fec27fbd';
 
 // Uniswap URLs
 const ADD_LIQUIDITY_URL = 'https://app.uniswap.org/positions/create/v4?currencyA=0xa3931d71877c0e7a3148cb7eb4463524fec27fbd&currencyB=0xf3b5b661b92b75c71fa5aba8fd95d7514a9cd605&chain=ethereum&fee={%22feeAmount%22:3000,%22tickSpacing%22:60,%22isDynamic%22:false}&hook=undefined&priceRangeState={%22priceInverted%22:false,%22fullRange%22:false,%22minPrice%22:%22%22,%22maxPrice%22:%22%22,%22initialPrice%22:%22%22,%22inputMode%22:%22price%22}&depositState={%22exactField%22:%22TOKEN0%22,%22exactAmounts%22:{}}';
 
 // Generate swap URL based on buy/sell direction
 const getSwapUrl = (isBuy: boolean): string => {
-  const inputCurrency = isBuy ? USDS_ADDRESS : PHUSD_ADDRESS;
-  const outputCurrency = isBuy ? PHUSD_ADDRESS : USDS_ADDRESS;
+  const inputCurrency = isBuy ? SUSDS_ADDRESS : PHUSD_ADDRESS;
+  const outputCurrency = isBuy ? PHUSD_ADDRESS : SUSDS_ADDRESS;
   return `https://app.uniswap.org/swap?chain=ethereum&inputCurrency=${inputCurrency}&outputCurrency=${outputCurrency}`;
 };
 
