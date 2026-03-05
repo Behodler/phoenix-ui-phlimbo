@@ -5,6 +5,7 @@ import { CHAIN_IDS } from './networkDetection';
 const ADMIN_ALLOWLIST: Record<number, string[]> = {
   [CHAIN_IDS.MAINNET]: [
     '0x186c77B80Bbfd21b01C7D7FA44bA27031322a77F',
+    '0x630966B668b321Cc6441754f96519a55F72Cd476',
   ],
   [CHAIN_IDS.SEPOLIA]: [],
   [CHAIN_IDS.ANVIL]: [],
