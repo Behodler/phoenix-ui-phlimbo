@@ -15,7 +15,7 @@ import MintForm from '../components/vault/MintForm';
 import DepositToYieldForm from '../components/vault/DepositToYieldForm';
 import WithdrawFromYieldForm from '../components/vault/WithdrawFromYieldForm';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
-import SafetyTab from '../components/vault/SafetyTab';
+import EmergencyPauseFooter from '../components/vault/EmergencyPauseFooter';
 import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
 import Admin from '../components/vault/Admin';
@@ -276,11 +276,11 @@ export default function VaultPage() {
   // Determine tabs based on network and owner status
   // - Show Admin tab if user is the owner
   // - Show Testnet Faucet if not on mainnet
-  // - Show Market tab only on mainnet (between Yield Funnel and Safety)
-  // - Show Safety tab on all networks
+  // - Show Market tab only on mainnet
   // - Show Mint tab for 1:1 DOLA to phUSD minting
   // - Show Deposit and Withdraw tabs for ContextBox-driven content
   // - Show Yield Funnel tab for claiming accumulated yield at a discount
+  // - Safety/Emergency Pause is handled by the fixed footer, not a tab
   const tabs: readonly Tab[] = (() => {
     if (!isMounted) {
       return ["Mint", "Deposit", "Withdraw", "Yield Funnel"];
@@ -292,13 +292,10 @@ export default function VaultPage() {
       tabList.push("Testnet Faucet");
     }
 
-    // Market tab is only available on mainnet (positioned between Yield Funnel and Safety)
+    // Market tab is only available on mainnet
     if (isMainnet) {
       tabList.push("Market");
     }
-
-    // Safety tab is available on all networks
-    tabList.push("Safety");
 
     if (hasAdminAccess) {
       tabList.push("Admin");
@@ -1292,7 +1289,7 @@ export default function VaultPage() {
     <div className="min-h-screen bg-background text-foreground antialiased">
       <Header />
 
-      <main className="mx-auto max-w-5xl px-4 py-8 grid lg:grid-cols-3 gap-6">
+      <main className="mx-auto max-w-5xl px-4 py-8 pb-20 grid lg:grid-cols-3 gap-6">
         {/* Left: Main card */}
         <section className="lg:col-span-2">
           <div className="phoenix-card p-0 overflow-hidden">
@@ -1323,10 +1320,6 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "Testnet Faucet" ? (
               <TestnetFaucet />
-            ) : activeTab === "Safety" ? (
-              <ErrorBoundary>
-                <SafetyTab />
-              </ErrorBoundary>
             ) : activeTab === "Admin" ? (
               <Admin />
             ) : activeTab === "Deposit" ? (
@@ -1399,6 +1392,8 @@ export default function VaultPage() {
           <FAQ componentName={faqComponent} />
         </aside>
       </main>
+
+      <EmergencyPauseFooter />
     </div>
   );
 }

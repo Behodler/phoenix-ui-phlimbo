@@ -8,11 +8,19 @@ import { useToast } from '../ui/ToastProvider';
 import { useApprovalTransaction } from '../../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../../utils/transactionErrors';
 import ActionButton from '../ui/ActionButton';
-import PauseConfirmationDialog from './PauseConfirmationDialog';
 import { log } from '../../utils/logger';
 
-export default function SafetyTab() {
-  const [showConfirmation, setShowConfirmation] = useState(false);
+interface SafetyTabProps {
+  resetKey?: number;
+}
+
+export default function SafetyTab({ resetKey }: SafetyTabProps) {
+  const [warningAccepted, setWarningAccepted] = useState(false);
+
+  // Reset checkbox state when resetKey changes (modal opens)
+  useEffect(() => {
+    setWarningAccepted(false);
+  }, [resetKey]);
 
   // Wagmi hooks for wallet connection
   const { isConnected, address: walletAddress } = useAccount();
@@ -175,35 +183,8 @@ export default function SafetyTab() {
     }
   };
 
-  // Handle pause button click
-  const handleInitiatePause = () => {
-    if (requiredEyeAmount === null) {
-      addToast({
-        type: 'error',
-        title: 'Contract Not Ready',
-        description: 'Please wait for contract configuration to load.',
-      });
-      return;
-    }
-
-    // Check if user has sufficient EYE balance
-    if (eyeBalance < requiredEyeAmount) {
-      addToast({
-        type: 'error',
-        title: 'Insufficient EYE Balance',
-        description: `You need ${requiredEyeAmount} EYE to pause the application. Current balance: ${eyeBalance.toFixed(4)} EYE`,
-        duration: 16000,
-      });
-      return;
-    }
-
-    setShowConfirmation(true);
-  };
-
-  // Handle pause confirmation
-  const handleConfirmPause = async () => {
-    setShowConfirmation(false);
-
+  // Handle pause button click — directly triggers transaction (no confirmation dialog)
+  const handlePause = async () => {
     if (!isConnected) {
       addToast({
         type: 'error',
@@ -292,15 +273,18 @@ export default function SafetyTab() {
     }
   }, [isPauseSuccess, pauseHash, addToast, requiredEyeAmount, networkType, refetchEyeBalance, refetchAllowance]); // Only run when dependencies change
 
-  const handleCancelPause = () => {
-    setShowConfirmation(false);
-  };
-
   // Determine button state and properties
   const isTransacting = approvalTransaction.state.isPending ||
                        approvalTransaction.state.isConfirming ||
                        isPausePending ||
                        isPauseConfirming;
+
+  // Determine if this is the pause state (not approve)
+  const isPauseState = isConnected &&
+    !isLoadingEyeBurnAmount && !eyeAllowanceLoading && !eyeBalanceLoading &&
+    requiredEyeAmount !== null &&
+    eyeBalance >= requiredEyeAmount &&
+    !needsApproval;
 
   let buttonLabel = "Connect Wallet";
   let buttonVariant: 'primary' | 'approve' = 'primary';
@@ -324,73 +308,79 @@ export default function SafetyTab() {
       buttonLoading = isTransacting;
     } else {
       buttonLabel = "Pause Application";
-      buttonAction = handleInitiatePause;
-      buttonDisabled = false;
+      buttonAction = handlePause;
+      // Pause button is disabled unless checkbox is checked
+      buttonDisabled = !warningAccepted;
       buttonLoading = isTransacting;
     }
   }
 
   return (
-    <>
-      <div className="p-6">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground mb-2">Emergency Pause</h2>
-          <p className="text-sm text-muted-foreground">
-            Pause the entire application in case of suspected exploits or security vulnerabilities.
-          </p>
-        </div>
-
-        <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4 mb-6">
-          <h3 className="text-lg font-semibold text-pxusd-orange-300 mb-3">Safety Information</h3>
-
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between items-start">
-              <span className="text-foreground">Your EYE Balance:</span>
-              <span className="font-medium text-pxusd-yellow-400">
-                {eyeBalanceLoading ? 'Loading...' : `${eyeBalance.toFixed(4)} EYE`}
-              </span>
-            </div>
-
-            <div className="flex justify-between items-start">
-              <span className="text-foreground">Required to Pause:</span>
-              <span className="font-medium text-pxusd-pink-400">
-                {requiredEyeAmount !== null ? `${requiredEyeAmount} EYE` : 'Loading...'}
-              </span>
-            </div>
-
-            <div className="flex justify-between items-start">
-              <span className="text-foreground">Current Allowance:</span>
-              <span className="font-medium text-pxusd-green-400">{eyeAllowance.toFixed(4)} EYE</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-red-900/20 border border-red-500 rounded-lg p-4 mb-6">
-          <p className="text-red-400 font-bold text-sm mb-2">⚠️ WARNING</p>
-          <ul className="text-sm text-foreground space-y-1 list-disc list-inside">
-            <li>This will pause ALL deposit and withdrawal operations</li>
-            <li>{requiredEyeAmount !== null ? `${requiredEyeAmount} EYE` : 'A configured amount of EYE'} will be permanently burnt from your wallet</li>
-            <li>Only use in case of security emergencies</li>
-            <li>The owner must unpause the application to restore functionality</li>
-          </ul>
-        </div>
-
-        <ActionButton
-          disabled={buttonDisabled}
-          onAction={buttonAction}
-          label={buttonLabel}
-          variant={buttonVariant}
-          isLoading={buttonLoading}
-        />
+    <div className="p-6">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-foreground mb-2">Emergency Pause</h2>
+        <p className="text-sm text-muted-foreground">
+          Pause the entire application in case of suspected exploits or security vulnerabilities.
+        </p>
       </div>
 
-      <PauseConfirmationDialog
-        isOpen={showConfirmation}
-        onClose={handleCancelPause}
-        onConfirm={handleConfirmPause}
-        isLoading={isTransacting}
-        eyeAmount={requiredEyeAmount}
+      <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4 mb-6">
+        <h3 className="text-lg font-semibold text-pxusd-orange-300 mb-3">Safety Information</h3>
+
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between items-start">
+            <span className="text-foreground">Your EYE Balance:</span>
+            <span className="font-medium text-pxusd-yellow-400">
+              {eyeBalanceLoading ? 'Loading...' : `${eyeBalance.toFixed(4)} EYE`}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-start">
+            <span className="text-foreground">Required to Pause:</span>
+            <span className="font-medium text-pxusd-pink-400">
+              {requiredEyeAmount !== null ? `${requiredEyeAmount} EYE` : 'Loading...'}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-start">
+            <span className="text-foreground">Current Allowance:</span>
+            <span className="font-medium text-pxusd-green-400">{eyeAllowance.toFixed(4)} EYE</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-red-900/20 border border-red-500 rounded-lg p-4 mb-6">
+        <p className="text-red-400 font-bold text-sm mb-2">WARNING</p>
+        <ul className="text-sm text-foreground space-y-1 list-disc list-inside">
+          <li>This will pause ALL deposit and withdrawal operations</li>
+          <li>{requiredEyeAmount !== null ? `${requiredEyeAmount} EYE` : 'A configured amount of EYE'} will be permanently burnt from your wallet</li>
+          <li>Only use in case of security emergencies</li>
+          <li>The owner must unpause the application to restore functionality</li>
+        </ul>
+      </div>
+
+      {/* Checkbox gating for pause button - only shown when in pause state */}
+      {isPauseState && (
+        <label className="flex items-start gap-3 mb-4 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={warningAccepted}
+            onChange={(e) => setWarningAccepted(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-red-500 text-red-600 focus:ring-red-500 accent-red-600"
+          />
+          <span className="text-sm text-red-400">
+            I understand that this action is irreversible, will pause the entire application, and will permanently burn EYE from my wallet.
+          </span>
+        </label>
+      )}
+
+      <ActionButton
+        disabled={buttonDisabled}
+        onAction={buttonAction}
+        label={buttonLabel}
+        variant={buttonVariant}
+        isLoading={buttonLoading}
       />
-    </>
+    </div>
   );
 }

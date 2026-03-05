@@ -1,4 +1,4 @@
-export type Tab = "Mint" | "Deposit" | "Withdraw" | "Yield Funnel" | "Testnet Faucet" | "Market" | "Safety" | "Admin";
+export type Tab = "Mint" | "Deposit" | "Withdraw" | "Yield Funnel" | "Testnet Faucet" | "Market" | "Admin";
 
 export interface VaultFormData {
   amount: string;
