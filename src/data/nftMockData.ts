@@ -11,6 +11,7 @@ export interface NFTData {
   action: string;
   reason: string;
   tokenName: string;
+  mockTokenPrice: number;
   mockPrice: number;
   mockBalance: number;
 }
@@ -23,6 +24,7 @@ export const nftMockData: NFTData[] = [
     action: "EYE is burnt",
     reason: "Returning value to the OG Behoblins. Patience has been rewarded!",
     tokenName: "EYE",
+    mockTokenPrice: 5000,
     mockPrice: 0.0042,
     mockBalance: 15000,
   },
@@ -33,6 +35,7 @@ export const nftMockData: NFTData[] = [
     action: "Balancer liquidity boosted",
     reason: "More liquidity with price tilting means more minting which means more yield which means more liquidity which means... you get the idea.",
     tokenName: "sUSDS",
+    mockTokenPrice: 200,
     mockPrice: 1.08,
     mockBalance: 500,
   },
@@ -43,6 +46,7 @@ export const nftMockData: NFTData[] = [
     action: "SCX is burnt",
     reason: "All time low set by the Seychelles; all time high set by Phoenix",
     tokenName: "SCX",
+    mockTokenPrice: 10,
     mockPrice: 12.5,
     mockBalance: 25,
   },
@@ -53,6 +57,7 @@ export const nftMockData: NFTData[] = [
     action: "BTC is stockpiled in case of emergency",
     reason: "Antifragility reserve in case an external protocol fails.",
     tokenName: "BTC",
+    mockTokenPrice: 0.005,
     mockPrice: 97500,
     mockBalance: 0.015,
   },
@@ -63,6 +68,7 @@ export const nftMockData: NFTData[] = [
     action: "Flax is burnt",
     reason: "Flax was a seed which grew into phUSD. DeFi will pay back that investment.",
     tokenName: "FLAX",
+    mockTokenPrice: 2000,
     mockPrice: 0.085,
     mockBalance: 8500,
   },
