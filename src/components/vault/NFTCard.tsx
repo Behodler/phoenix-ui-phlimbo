@@ -46,12 +46,14 @@ export default function NFTCard({ nft, onMintClick }: NFTCardProps) {
         </div>
 
         {/* Mint button */}
-        <button
-          onClick={() => onMintClick(nft)}
-          className="w-full phoenix-btn-primary py-2 text-sm font-medium rounded-lg"
-        >
-          Mint
-        </button>
+        <div className="flex justify-center">
+          <button
+            onClick={() => onMintClick(nft)}
+            className="w-96 phoenix-btn-primary py-2 text-sm font-medium rounded-lg"
+          >
+            Mint
+          </button>
+        </div>
 
         {/* Reason */}
         <p className="text-sm text-muted-foreground italic">{nft.reason}</p>
