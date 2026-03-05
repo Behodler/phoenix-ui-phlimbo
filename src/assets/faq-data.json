@@ -147,6 +147,59 @@
       }
     ]
   },
+  "NFTTab": {
+    "componentName": "NFTTab",
+    "items": [
+      {
+        "title": "What are these NFTs for?",
+        "body": "The Yield Funnel claim button can only be called by holders of an NFT listed here"
+      },
+      {
+        "title": "Why do I need an NFT to claim yield?",
+        "body": "The NFT requirement ensures that every yield claim is paired with an action that strengthens the protocol. Instead of a free claim, you contribute value first — by burning governance tokens, boosting liquidity, or building reserves — and the NFT is your receipt. The yield in the funnel is your reward."
+      },
+      {
+        "title": "What happens to the tokens I pay to mint?",
+        "body": "It depends on the NFT. Burn-type NFTs (EYE, SCX, Flax) permanently destroy the tokens, reducing supply. The Balancer liquidity NFT donates your tokens into the phUSD liquidity pool. The stockpile NFT sends tokens to an antifragility reserve fund."
+      },
+      {
+        "title": "Does the mint price change?",
+        "body": "Yes. Each NFT type has an independent price that grows slightly after every mint. This growth rate acts as a balancing mechanism — more popular NFT types become gradually more expensive, encouraging users to spread across different types."
+      },
+      {
+        "title": "Can I hold multiple NFTs?",
+        "body": "Yes, you can mint and accumulate as many NFTs as you like. Each one entitles you to exactly one yield claim. If you plan to claim yield regularly, stocking up on NFTs lets you claim multiple times without re-minting each time."
+      },
+      {
+        "title": "What happens to my NFT when I claim yield?",
+        "body": "Exactly one NFT is burned each time you claim. The system checks all NFT types you hold and burns whichever valid one it finds first. After burning, the yield is released to you."
+      },
+      {
+        "title": "Does it matter which NFT type I hold for claiming?",
+        "body": "No. Any valid NFT type works as a claim ticket. The system checks all types and uses whichever one you hold. Choose your NFT type based on which ecosystem action you want to support, not based on claiming."
+      },
+      {
+        "title": "What is the difference between 'burnt', 'stockpiled', and 'contributed'?",
+        "body": "These describe what happens to your tokens. 'Burnt' means permanently destroyed (EYE, SCX, Flax). 'Stockpiled' means sent to a reserve for protocol safety (BTC). 'Contributed' means donated as liquidity to the Balancer pool (sUSDS)."
+      },
+      {
+        "title": "Why would I burn EYE or SCX instead of just adding liquidity?",
+        "body": "Burning governance tokens directly reduces circulating supply, rewarding long-term holders. If you hold EYE or SCX, burning them through NFT minting creates buy pressure and deflation — a way to give back to the community that supported Behodler from the start."
+      },
+      {
+        "title": "What if I don't have any of these tokens?",
+        "body": "You'll need to acquire one of the listed tokens first. Each NFT type accepts a specific token. Choose whichever token is most accessible or affordable for you — they all produce an equally valid claim NFT."
+      },
+      {
+        "title": "Can I transfer or sell my NFTs?",
+        "body": "The NFTs follow the ERC-1155 standard, so they are transferable. Since the prices all rise, listing them on secondary markets like OpenSea is a great opportunity for sellers and for future buyers who wish to acquire the NFTs at a discount."
+      },
+      {
+        "title": "What if the system is paused?",
+        "body": "Both minting and claiming respect the global pause mechanism. If the protocol is paused for safety, NFT minting and yield claiming will be temporarily unavailable until the pause is lifted."
+      }
+    ]
+  },
   "SafetyTab": {
     "componentName": "SafetyTab",
     "items": [
