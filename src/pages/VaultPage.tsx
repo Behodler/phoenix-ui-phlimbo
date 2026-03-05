@@ -5,7 +5,7 @@ import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { parseUnits, maxUint256 } from 'viem';
 import { phlimboEaAbi, phusdStableMinterAbi } from '@behodler/phase2-wagmi-hooks';
-import { useTokenBalance, useTokenAllowance, useTokenApproval, useDepositViewPolling, useUniswapPrice } from '../hooks';
+import { useTokenBalance, useTokenAllowance, useTokenApproval, useDepositViewPolling, useBalancerPrice } from '../hooks';
 import { useWalletBalances } from '../contexts/WalletBalancesContext';
 import { useApprovalTransaction } from '../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
@@ -190,15 +190,15 @@ export default function VaultPage() {
     ? Number(desiredAPYBpsRaw) / 100
     : 0;
 
-  // ========== UNISWAP PRICE FOR MARKET TAB ==========
-  // Fetch phUSD market price from Uniswap V4 pools
+  // ========== BALANCER PRICE FOR MARKET TAB ==========
+  // Fetch phUSD market price from Balancer e-CLP pool
   // This hook is called here so price data can be used in USDC APY calculation on mainnet
   const {
     price: phUsdMarketPrice,
     isLoading: isMarketPriceLoading,
     isError: isMarketPriceError,
-  } = useUniswapPrice();
-  // ========== END UNISWAP PRICE FOR MARKET TAB ==========
+  } = useBalancerPrice();
+  // ========== END BALANCER PRICE FOR MARKET TAB ==========
 
   // ========== USDC APY CALCULATION ==========
   // APY Methodology: Per-second reward rate extrapolated to annual yield
