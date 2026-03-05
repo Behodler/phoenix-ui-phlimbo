@@ -140,6 +140,10 @@ When executing stories:
 4. Ensure big number conversions are correct (10^18 scaling)
 5. Verify contract address loading works for both mainnet and local
 
+## NFT Tab — Mock Data Only
+
+The NFT tab (`src/components/vault/NFTTab.tsx`) uses **entirely mocked data** from `src/data/nftMockData.ts`. There are no contract calls, wagmi hooks, or on-chain interactions for NFT operations. All wallet balances, token prices, approval states, and minting actions are simulated in local component state. Do not add real contract integration to the NFT tab without explicit instruction to do so.
+
 ## Questions?
 
 If unclear about:
