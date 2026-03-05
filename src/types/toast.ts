@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react';
+
 export interface Toast {
   id: string;
   type: 'success' | 'error' | 'info' | 'warning';
   title: string;
-  description?: string;
+  description?: ReactNode;
   duration?: number; // in milliseconds, 0 means no auto-dismiss
   action?: {
     label: string;

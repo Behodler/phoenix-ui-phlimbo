@@ -25,8 +25,8 @@ export default function NFTTab() {
 
     addToast({
       type: 'success',
-      title: `${nft.name} minted!`,
-      description: `1.00 ${nft.tokenName} ${actionVerb}!`,
+      title: 'NFT Minted!',
+      description: <><em>{nft.name}</em> minted! {nft.mockPrice} {nft.tokenName} {actionVerb}!</>,
     });
 
     setIsModalOpen(false);
@@ -42,22 +42,14 @@ export default function NFTTab() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-foreground mb-2">NFT Collection</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Mint an NFT to gain access to the yield funnel</h2>
         <p className="text-sm text-muted-foreground">
-          Mint NFTs that contribute to the Phoenix protocol. Each NFT performs a unique action and holding one grants access to the yield funnel.
+          Each NFT strengthens the ecosystem in a different way
         </p>
       </div>
 
-      {/* Info panel */}
-      <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4 mb-6">
-        <h3 className="text-lg font-semibold text-pxusd-orange-300 mb-2">How it works</h3>
-        <p className="text-sm text-muted-foreground">
-          Each NFT type contributes to the protocol in a different way. Minting requires the specified token which is then used for the described action. NFTs are ERC-1155 tokens, so you can hold multiple of each type.
-        </p>
-      </div>
-
-      {/* NFT Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {/* NFT List */}
+      <div className="flex flex-col items-center gap-4 max-w-2xl mx-auto">
         {nftMockData.map((nft) => (
           <NFTCard
             key={nft.id}
