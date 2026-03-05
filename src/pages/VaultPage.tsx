@@ -18,6 +18,7 @@ import TestnetFaucet from '../components/vault/TestnetFaucet';
 import EmergencyPauseFooter from '../components/vault/EmergencyPauseFooter';
 import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
+import NFTTab from '../components/vault/NFTTab';
 import Admin from '../components/vault/Admin';
 import ContextBox from '../components/vault/ContextBox';
 import YieldRewardsInfo from '../components/vault/YieldRewardsInfo';
@@ -296,6 +297,8 @@ export default function VaultPage() {
     if (isMainnet) {
       tabList.push("Market");
     }
+
+    tabList.push("NFT");
 
     if (hasAdminAccess) {
       tabList.push("Admin");
@@ -1363,6 +1366,10 @@ export default function VaultPage() {
                   isLoading={isMarketPriceLoading}
                   isError={isMarketPriceError}
                 />
+              </ErrorBoundary>
+            ) : activeTab === "NFT" ? (
+              <ErrorBoundary>
+                <NFTTab />
               </ErrorBoundary>
             ) : null}
           </div>
