@@ -16,15 +16,21 @@ export default function NFTCard({ nft, onMintClick }: NFTCardProps) {
         <div className="flex flex-col items-center">
           <div className="w-96">
             <div className="flex items-center justify-center p-4 bg-pxusd-teal-800/50 rounded-t-lg">
-              <img
-                src={nft.image}
-                alt={nft.name}
-                className="w-96 h-96 object-contain rounded-lg"
-              />
+              <div className="w-96 h-96 rounded-2xl overflow-hidden">
+                <img
+                  src={nft.image}
+                  alt={nft.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
             </div>
 
             {/* Stats */}
             <div className="bg-pxusd-teal-900/60 rounded-b-lg p-3 space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Wallet balance:</span>
+                <span className="text-foreground">{Math.floor(nft.mockBalance)}</span>
+              </div>
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Action:</span>
                 <span className="text-foreground">{nft.action}</span>
@@ -35,11 +41,7 @@ export default function NFTCard({ nft, onMintClick }: NFTCardProps) {
               </div>
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Price:</span>
-                <span className="text-foreground">${nft.mockPrice.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Wallet balance:</span>
-                <span className="text-foreground">{nft.mockBalance.toLocaleString()} {nft.tokenName}</span>
+                <span className="text-foreground">{nft.mockTokenPrice.toLocaleString()} {nft.tokenName} (${(nft.mockTokenPrice * nft.mockPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
               </div>
             </div>
           </div>
