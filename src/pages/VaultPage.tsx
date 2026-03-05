@@ -1299,7 +1299,13 @@ export default function VaultPage() {
             <TabNavigation
               tabs={tabs}
               activeTab={activeTab}
-              onTabChange={setActiveTab}
+              onTabChange={(tab) => {
+                setActiveTab(tab);
+                // Clear FAQ when switching to a tab that has no FAQ data
+                if (!["Mint", "Deposit", "Withdraw", "Yield Funnel", "Market", "NFT"].includes(tab)) {
+                  setFaqComponent(undefined);
+                }
+              }}
               onTriggerFAQ={setFaqComponent}
             />
 

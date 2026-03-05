@@ -11,6 +11,7 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
       case "Withdraw": return "WithdrawTab";
       case "Yield Funnel": return "YieldFunnelTab";
       case "Market": return "MarketTab";
+      case "NFT": return "NFTTab";
       default: return null;
     }
   };
