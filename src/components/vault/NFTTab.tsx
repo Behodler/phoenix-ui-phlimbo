@@ -41,8 +41,8 @@ export default function NFTTab() {
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-foreground mb-2">Mint an NFT to gain access to the yield funnel</h2>
+      <div className="bg-pxusd-teal-700 border border-pxusd-teal-500 rounded-lg p-4 mb-6">
+        <h3 className="text-lg font-semibold text-pxusd-teal-300 mb-1">Mint an NFT to gain access to the yield funnel</h3>
         <p className="text-sm text-muted-foreground">
           Each NFT strengthens the ecosystem in a different way
         </p>
