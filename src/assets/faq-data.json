@@ -16,11 +16,11 @@
       },
       {
         "title": "Does the market price change?",
-        "body": "Yes, phUSD trades on Uniswap and the price varies according to market conditions."
+        "body": "Yes, phUSD trades on Balancer and the price varies according to market conditions."
       },
       {
         "title": "What happens if the market price drops below the mint price?",
-        "body": "PhUSD has a number of incentives drawing the price back up to $1. If the price does drop below $1, we'd recommend buying on Uniswap instead of minting so that you can acquire at a discount until the price is restored."
+        "body": "PhUSD has a number of incentives drawing the price back up to $1. If the price does drop below $1, we'd recommend buying on Balancer instead of minting so that you can acquire at a discount until the price is restored."
       },
       {
         "title": "What happens if the market price rises above $1?",
@@ -40,11 +40,11 @@
       },
       {
         "title": "If I can't redeem, how do I sell?",
-        "body": "A Uniswap pool of concentrated liquidity is cultivated by the external yield in order to eventually over collaterize phUSD so that the entire circulating supply can be sold without slippage."
+        "body": "A Balancer pool of concentrated liquidity is cultivated by the external yield in order to eventually over collaterize phUSD so that the entire circulating supply can be sold without slippage."
       },
       {
         "title": "There seems to be some slippage currently.",
-        "body": "This is a necessary consequence of moving from phase 1 of Phoenix where capital is raised for phUSD to phase 2, where the capital is split into liquidity and yield bearing vaults. No matter the raise in phase 1, this splitting means that initially the circulating supply of phUSD will not be fully collateralized by the Uniswap pool."
+        "body": "This is a necessary consequence of moving from phase 1 of Phoenix where capital is raised for phUSD to phase 2, where the capital is split into liquidity and yield bearing vaults. No matter the raise in phase 1, this splitting means that initially the circulating supply of phUSD will not be fully collateralized by the Balancer pool."
       }
     ]
   },

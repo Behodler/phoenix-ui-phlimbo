@@ -16,9 +16,9 @@ export type { PendingYieldItem, YieldFunnelData } from './useYieldFunnelData';
 export { useDepositViewPolling } from './useDepositViewPolling';
 export type { DepositViewData, UseDepositViewPollingReturn } from './useDepositViewPolling';
 
-// Uniswap price hook
-export { useUniswapPrice } from './useUniswapPrice';
-export type { UseUniswapPriceResult } from './useUniswapPrice';
+// Balancer price hook
+export { useBalancerPrice } from './useBalancerPrice';
+export type { UseBalancerPriceResult } from './useBalancerPrice';
 
 // Solvency info hook
 export { useSolvencyInfo } from './useSolvencyInfo';
