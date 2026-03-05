@@ -7,32 +7,26 @@ interface NFTCardProps {
 
 export default function NFTCard({ nft, onMintClick }: NFTCardProps) {
   return (
-    <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden hover:border-pxusd-orange-400/50 transition-colors">
-      {/* NFT Image */}
-      <div className="flex items-center justify-center p-4 bg-pxusd-teal-800/50">
-        <img
-          src={nft.image}
-          alt={nft.name}
-          className="w-24 h-24 object-contain rounded-lg"
-        />
-      </div>
-
+    <div className="w-full bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden hover:border-pxusd-orange-400/50 transition-colors">
       {/* NFT Info */}
       <div className="p-4 space-y-3">
         <h3 className="text-lg font-semibold text-foreground">{nft.name}</h3>
 
-        <div className="space-y-1">
-          <p className="text-xs text-pxusd-orange-300 font-medium uppercase tracking-wide">Action</p>
-          <p className="text-sm text-foreground">{nft.action}</p>
+        {/* NFT Image */}
+        <div className="flex items-center justify-center p-4 bg-pxusd-teal-800/50 rounded-lg">
+          <img
+            src={nft.image}
+            alt={nft.name}
+            className="w-24 h-24 object-contain rounded-lg"
+          />
         </div>
 
-        <div className="space-y-1">
-          <p className="text-xs text-pxusd-orange-300 font-medium uppercase tracking-wide">Why?</p>
-          <p className="text-sm text-muted-foreground">{nft.reason}</p>
-        </div>
-
-        {/* Mock token info */}
+        {/* Stats */}
         <div className="bg-pxusd-teal-800/50 rounded-md p-3 space-y-1">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Action:</span>
+            <span className="text-foreground">{nft.action}</span>
+          </div>
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Token:</span>
             <span className="text-foreground">{nft.tokenName}</span>
@@ -42,7 +36,7 @@ export default function NFTCard({ nft, onMintClick }: NFTCardProps) {
             <span className="text-foreground">${nft.mockPrice.toLocaleString()}</span>
           </div>
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Your Balance:</span>
+            <span>Wallet balance:</span>
             <span className="text-foreground">{nft.mockBalance.toLocaleString()} {nft.tokenName}</span>
           </div>
         </div>
@@ -54,6 +48,9 @@ export default function NFTCard({ nft, onMintClick }: NFTCardProps) {
         >
           Mint
         </button>
+
+        {/* Reason */}
+        <p className="text-sm text-muted-foreground italic">{nft.reason}</p>
       </div>
     </div>
   );
