@@ -51,8 +51,17 @@ export default function NFTListTab() {
         </p>
       </div>
 
+      {/* Column Headings */}
+      <div className="flex items-center px-4 py-2 text-[0.75rem] text-muted-foreground uppercase tracking-wider max-w-4xl mx-auto">
+        <span className="w-10 flex-shrink-0" /> {/* image spacer */}
+        <span className="w-[11rem] pl-3">Name</span>
+        <span className="w-[16rem]">Action</span>
+        <span className="w-[12rem] text-right pr-4">Price</span>
+        <span className="ml-auto flex-shrink-0 w-[4.5rem] text-center">Mint</span>
+      </div>
+
       {/* NFT List */}
-      <div className="flex flex-col gap-2 max-w-2xl mx-auto">
+      <div className="flex flex-col gap-2 max-w-4xl mx-auto">
         {sortedNfts.map((nft) => (
           <NFTListItem
             key={nft.id}
