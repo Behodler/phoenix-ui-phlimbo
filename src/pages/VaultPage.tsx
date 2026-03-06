@@ -19,6 +19,7 @@ import EmergencyPauseFooter from '../components/vault/EmergencyPauseFooter';
 import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
 import NFTTab from '../components/vault/NFTTab';
+import NFTListTab from '../components/vault/NFTListTab';
 import Admin from '../components/vault/Admin';
 import ContextBox from '../components/vault/ContextBox';
 import YieldRewardsInfo from '../components/vault/YieldRewardsInfo';
@@ -299,6 +300,7 @@ export default function VaultPage() {
     }
 
     tabList.push("NFT");
+    tabList.push("NFT List");
 
     if (hasAdminAccess) {
       tabList.push("Admin");
@@ -1376,6 +1378,10 @@ export default function VaultPage() {
             ) : activeTab === "NFT" ? (
               <ErrorBoundary>
                 <NFTTab />
+              </ErrorBoundary>
+            ) : activeTab === "NFT List" ? (
+              <ErrorBoundary>
+                <NFTListTab />
               </ErrorBoundary>
             ) : null}
           </div>

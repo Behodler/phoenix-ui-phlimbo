@@ -32,7 +32,7 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
             ].join(" ")}
           >
             {tab}
-            {tab === "NFT" && (
+            {(tab === "NFT" || tab === "NFT List") && (
               <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-gradient-to-r from-pink-400 via-orange-400 to-yellow-400 text-white shadow-sm animate-pulse">
                 NEW
               </span>
