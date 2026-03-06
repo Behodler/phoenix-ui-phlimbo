@@ -54,10 +54,10 @@ export default function NFTListTab() {
       {/* Column Headings */}
       <div className="flex items-center px-4 py-2 text-[0.75rem] text-muted-foreground uppercase tracking-wider max-w-4xl mx-auto">
         <span className="w-10 flex-shrink-0" /> {/* image spacer */}
-        <span className="w-[11rem] pl-3">Name</span>
-        <span className="w-[16rem]">Action</span>
-        <span className="w-[12rem] text-right pr-4">Price</span>
-        <span className="ml-auto flex-shrink-0 w-[4.5rem] text-center">Mint</span>
+        <span className="flex-1 pl-3">Name</span>
+        <span className="hidden sm:inline flex-1 pl-3">Action</span>
+        <span className="w-[5rem] sm:w-[12rem] text-right pr-4">Price</span>
+        <span className="flex-shrink-0 w-[4.5rem] text-center">Mint</span>
       </div>
 
       {/* NFT List */}
