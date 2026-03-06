@@ -6,26 +6,38 @@ interface NFTListItemProps {
 }
 
 export default function NFTListItem({ nft, onMintClick }: NFTListItemProps) {
+  const dollarValue = (nft.mockTokenPrice * nft.mockPrice).toLocaleString(undefined, { maximumFractionDigits: 2 });
+
   return (
-    <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg px-4 py-3 flex items-center gap-4 hover:border-pxusd-orange-400/50 transition-colors">
+    <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg px-4 py-2 flex items-center hover:border-pxusd-orange-400/50 transition-colors text-xs">
       {/* Small NFT image */}
       <img
         src={nft.image}
         alt={nft.name}
-        className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+        className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
       />
 
       {/* NFT name */}
-      <span className="text-sm font-medium text-foreground flex-1 min-w-0 truncate">
+      <span className="font-medium text-foreground w-[11rem] min-w-0 truncate pl-3">
         {nft.name}
       </span>
 
-      {/* Mint button with price */}
+      {/* Action */}
+      <span className="text-muted-foreground w-[16rem] min-w-0 truncate">
+        {nft.action}
+      </span>
+
+      {/* Price */}
+      <span className="text-foreground w-[12rem] min-w-0 truncate text-right pr-4">
+        {nft.mockTokenPrice.toLocaleString()} {nft.tokenName} (${dollarValue})
+      </span>
+
+      {/* Mint button */}
       <button
         onClick={() => onMintClick(nft)}
-        className="phoenix-btn-primary px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap flex-shrink-0"
+        className="phoenix-btn-primary px-2 py-0.5 font-medium rounded-sm whitespace-nowrap flex-shrink-0 ml-auto"
       >
-        Mint for {nft.mockTokenPrice.toLocaleString()} {nft.tokenName}
+        Mint6
       </button>
     </div>
   );

@@ -1294,9 +1294,9 @@ export default function VaultPage() {
     <div className="min-h-screen bg-background text-foreground antialiased">
       <Header />
 
-      <main className="mx-auto max-w-5xl px-4 py-8 pb-20 grid lg:grid-cols-3 gap-6">
+      <main className="mx-auto max-w-6xl px-4 py-8 pb-20 grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6">
         {/* Left: Main card */}
-        <section className="lg:col-span-2">
+        <section className="min-w-0">
           <div className="phoenix-card p-0 overflow-hidden">
             <TabNavigation
               tabs={tabs}
@@ -1388,7 +1388,7 @@ export default function VaultPage() {
         </section>
 
         {/* Right: ContextBox (tab-driven) and FAQ */}
-        <aside className="lg:col-span-1 space-y-6">
+        <aside className="space-y-6">
           <ContextBox visible={activeTab === "Deposit" || activeTab === "Withdraw"}>
             {(activeTab === "Deposit" || activeTab === "Withdraw") && (
               <YieldRewardsInfo
