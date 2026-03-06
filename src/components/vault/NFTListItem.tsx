@@ -35,9 +35,9 @@ export default function NFTListItem({ nft, onMintClick }: NFTListItemProps) {
       {/* Mint button */}
       <button
         onClick={() => onMintClick(nft)}
-        className="phoenix-btn-primary px-2 py-0.5 font-medium rounded-sm whitespace-nowrap flex-shrink-0 ml-auto"
+        className="phoenix-btn-primary !px-4 !py-2 font-medium !rounded-[4px] whitespace-nowrap flex-shrink-0 ml-auto"
       >
-        Mint6
+        Mint
       </button>
     </div>
   );
