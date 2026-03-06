@@ -15,9 +15,9 @@ export default function NFTCard({ nft, onMintClick, showMintButton = true }: NFT
 
         {/* NFT Image + Stats */}
         <div className="flex flex-col items-center">
-          <div className="w-96">
+          <div className="max-w-96 w-full">
             <div className="flex items-center justify-center p-4 bg-pxusd-teal-800/50 rounded-t-lg">
-              <div className="w-96 h-96 rounded-2xl overflow-hidden">
+              <div className="w-full aspect-square rounded-2xl overflow-hidden">
                 <img
                   src={nft.image}
                   alt={nft.name}
@@ -53,7 +53,7 @@ export default function NFTCard({ nft, onMintClick, showMintButton = true }: NFT
           <div className="flex justify-center">
             <button
               onClick={() => onMintClick(nft)}
-              className="w-96 phoenix-btn-primary py-2 text-sm font-medium rounded-lg"
+              className="max-w-96 w-full phoenix-btn-primary py-2 text-sm font-medium rounded-lg"
             >
               Mint
             </button>
