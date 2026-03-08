@@ -42,26 +42,10 @@ export default function NFTListMintModal({ isOpen, onClose, nft, onMint }: NFTLi
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-background border border-border rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={handleClose}>
+      <div className="bg-background border border-border rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Full NFTCard at top (without its own mint button) */}
         <NFTCard nft={nft} showMintButton={false} />
-
-        {/* Details panel */}
-        <div className="mt-4 bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-3 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Token Required:</span>
-            <span className="text-foreground">{nft.tokenName}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Amount:</span>
-            <span className="text-foreground">{nft.mockTokenPrice.toLocaleString()} {nft.tokenName}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Your Balance:</span>
-            <span className="text-foreground">{nft.mockBalance.toLocaleString()} {nft.tokenName}</span>
-          </div>
-        </div>
 
         {/* Action buttons */}
         <div className="mt-4 flex gap-3">

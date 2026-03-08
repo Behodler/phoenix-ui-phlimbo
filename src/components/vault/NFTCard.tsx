@@ -29,7 +29,7 @@ export default function NFTCard({ nft, onMintClick, showMintButton = true }: NFT
             {/* Stats */}
             <div className="bg-pxusd-teal-900/60 rounded-b-lg p-3 space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Wallet balance:</span>
+                <span>{nft.tokenName} balance:</span>
                 <span className="text-foreground">{Math.floor(nft.mockBalance)}</span>
               </div>
               <div className="flex justify-between text-xs text-muted-foreground">
