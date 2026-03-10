@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useToast } from '../ui/ToastProvider';
 import { nftMockData } from '../../data/nftMockData';
 import type { NFTData } from '../../data/nftMockData';
+import { useNFTPrices } from '../../hooks/useNFTPrices';
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 
@@ -9,9 +10,14 @@ export default function NFTListTab() {
   const { addToast } = useToast();
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { prices } = useNFTPrices();
 
-  // Sort by mockPrice ascending (dollar price order)
-  const sortedNfts = [...nftMockData].sort((a, b) => a.mockPrice - b.mockPrice);
+  // Sort by total dollar value ascending: mockTokenPrice * price
+  const sortedNfts = [...nftMockData].sort((a, b) => {
+    const aValue = a.mockTokenPrice * (prices[a.tokenName] ?? 0);
+    const bValue = b.mockTokenPrice * (prices[b.tokenName] ?? 0);
+    return aValue - bValue;
+  });
 
   const handleMintClick = (nft: NFTData) => {
     setSelectedNft(nft);
@@ -29,7 +35,7 @@ export default function NFTListTab() {
     addToast({
       type: 'success',
       title: 'NFT Minted!',
-      description: <><em>{nft.name}</em> minted! {nft.mockPrice} {nft.tokenName} {actionVerb}!</>,
+      description: <><em>{nft.name}</em> minted! {nft.mockTokenPrice} {nft.tokenName} {actionVerb}!</>,
     });
 
     setIsModalOpen(false);
@@ -66,6 +72,7 @@ export default function NFTListTab() {
           <NFTListItem
             key={nft.id}
             nft={nft}
+            price={prices[nft.tokenName] ?? null}
             onMintClick={handleMintClick}
           />
         ))}
@@ -76,6 +83,7 @@ export default function NFTListTab() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         nft={selectedNft}
+        price={selectedNft ? (prices[selectedNft.tokenName] ?? null) : null}
         onMint={handleMint}
       />
     </div>

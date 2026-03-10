@@ -2,11 +2,16 @@ import type { NFTData } from '../../data/nftMockData';
 
 interface NFTCardProps {
   nft: NFTData;
+  price?: number | null;
   onMintClick?: (nft: NFTData) => void;
   showMintButton?: boolean;
 }
 
-export default function NFTCard({ nft, onMintClick, showMintButton = true }: NFTCardProps) {
+export default function NFTCard({ nft, price, onMintClick, showMintButton = true }: NFTCardProps) {
+  const dollarValue = price != null
+    ? (nft.mockTokenPrice * price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : null;
+
   return (
     <div className="w-full bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden hover:border-pxusd-orange-400/50 transition-colors">
       {/* NFT Info */}
@@ -42,7 +47,10 @@ export default function NFTCard({ nft, onMintClick, showMintButton = true }: NFT
               </div>
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Price:</span>
-                <span className="text-foreground">{nft.mockTokenPrice.toLocaleString()} {nft.tokenName} (${(nft.mockTokenPrice * nft.mockPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                <span className="text-foreground">
+                  {nft.mockTokenPrice.toLocaleString()} {nft.tokenName}
+                  {dollarValue !== null && ` ($${dollarValue})`}
+                </span>
               </div>
             </div>
           </div>
