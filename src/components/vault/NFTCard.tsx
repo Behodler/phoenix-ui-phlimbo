@@ -52,6 +52,12 @@ export default function NFTCard({ nft, price, onMintClick, showMintButton = true
                   {dollarValue !== null && ` ($${dollarValue})`}
                 </span>
               </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Quantity Owned:</span>
+                <span className={nft.mockQuantityOwned > 0 ? "text-green-500" : "text-red-500"}>
+                  {nft.mockQuantityOwned.toLocaleString()}
+                </span>
+              </div>
             </div>
           </div>
         </div>

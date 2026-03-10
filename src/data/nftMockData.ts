@@ -13,6 +13,7 @@ export interface NFTData {
   tokenName: string;
   mockTokenPrice: number;
   mockBalance: number;
+  mockQuantityOwned: number;
 }
 
 export const nftMockData: NFTData[] = [
@@ -25,6 +26,7 @@ export const nftMockData: NFTData[] = [
     tokenName: "EYE",
     mockTokenPrice: 5000,
     mockBalance: 15000,
+    mockQuantityOwned: 3,
   },
   {
     id: 2,
@@ -35,6 +37,7 @@ export const nftMockData: NFTData[] = [
     tokenName: "sUSDS",
     mockTokenPrice: 200,
     mockBalance: 500,
+    mockQuantityOwned: 0,
   },
   {
     id: 3,
@@ -45,6 +48,7 @@ export const nftMockData: NFTData[] = [
     tokenName: "SCX",
     mockTokenPrice: 10,
     mockBalance: 25,
+    mockQuantityOwned: 7,
   },
   {
     id: 4,
@@ -55,6 +59,7 @@ export const nftMockData: NFTData[] = [
     tokenName: "BTC",
     mockTokenPrice: 0.005,
     mockBalance: 0.015,
+    mockQuantityOwned: 0,
   },
   {
     id: 5,
@@ -65,5 +70,6 @@ export const nftMockData: NFTData[] = [
     tokenName: "FLAX",
     mockTokenPrice: 2000,
     mockBalance: 8500,
+    mockQuantityOwned: 12,
   },
 ];
