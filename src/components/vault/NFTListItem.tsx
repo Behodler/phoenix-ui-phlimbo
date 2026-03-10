@@ -2,11 +2,14 @@ import type { NFTData } from '../../data/nftMockData';
 
 interface NFTListItemProps {
   nft: NFTData;
+  price: number | null;
   onMintClick: (nft: NFTData) => void;
 }
 
-export default function NFTListItem({ nft, onMintClick }: NFTListItemProps) {
-  const dollarValue = (nft.mockTokenPrice * nft.mockPrice).toLocaleString(undefined, { maximumFractionDigits: 2 });
+export default function NFTListItem({ nft, price, onMintClick }: NFTListItemProps) {
+  const dollarValue = price !== null
+    ? (nft.mockTokenPrice * price).toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : null;
 
   return (
     <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg px-4 flex items-center hover:border-pxusd-orange-400/50 transition-colors text-xs min-h-[3.5rem]">
@@ -30,7 +33,9 @@ export default function NFTListItem({ nft, onMintClick }: NFTListItemProps) {
       {/* Price */}
       <span className="text-foreground w-[5rem] sm:w-[12rem] min-w-0 text-right pr-4">
         <span className="truncate">{nft.mockTokenPrice.toLocaleString()} {nft.tokenName}</span>
-        <span className="block sm:inline text-muted-foreground"> (${dollarValue})</span>
+        {dollarValue !== null && (
+          <span className="block sm:inline text-muted-foreground"> (${dollarValue})</span>
+        )}
       </span>
 
       {/* Mint button */}

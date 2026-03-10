@@ -15,6 +15,8 @@ export interface ContractAddresses {
   USDS: string,
   Toke: string,
   EYE: string,
+  SCX: string,
+  FLAX: string,
   Pauser: string,
   YieldStrategyUSDT: string,
   YieldStrategyDola: string,

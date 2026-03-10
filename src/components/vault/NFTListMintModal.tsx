@@ -7,10 +7,11 @@ interface NFTListMintModalProps {
   isOpen: boolean;
   onClose: () => void;
   nft: NFTData | null;
+  price: number | null;
   onMint: (nft: NFTData) => void;
 }
 
-export default function NFTListMintModal({ isOpen, onClose, nft, onMint }: NFTListMintModalProps) {
+export default function NFTListMintModal({ isOpen, onClose, nft, price, onMint }: NFTListMintModalProps) {
   const [isApproved, setIsApproved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -45,7 +46,7 @@ export default function NFTListMintModal({ isOpen, onClose, nft, onMint }: NFTLi
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={handleClose}>
       <div className="bg-background border border-border rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Full NFTCard at top (without its own mint button) */}
-        <NFTCard nft={nft} showMintButton={false} />
+        <NFTCard nft={nft} price={price} showMintButton={false} />
 
         {/* Action buttons */}
         <div className="mt-4 flex gap-3">
