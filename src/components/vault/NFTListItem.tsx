@@ -38,11 +38,6 @@ export default function NFTListItem({ nft, price, onMintClick }: NFTListItemProp
         )}
       </span>
 
-      {/* Quantity Owned */}
-      <span className={`w-[3rem] text-right pr-4 ${nft.mockQuantityOwned > 0 ? "text-green-500" : "text-red-500"}`}>
-        {nft.mockQuantityOwned.toLocaleString()}
-      </span>
-
       {/* Mint button */}
       <button
         onClick={() => onMintClick(nft)}
