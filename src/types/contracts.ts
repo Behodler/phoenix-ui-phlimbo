@@ -8,29 +8,40 @@
  * - surplusWithdrawer: Handles withdrawal of accumulated surplus yield
  */
 export interface ContractAddresses {
-  PhUSD: string,
-  USDC: string,
-  USDT: string,
-  Dola: string,
-  USDS: string,
-  Toke: string,
-  EYE: string,
-  SCX: string,
-  FLAX: string,
-  Pauser: string,
-  YieldStrategyUSDT: string,
-  YieldStrategyDola: string,
-  YieldStrategyUSDS: string,
-  YieldStrategyUSDC: string,
-  PhusdStableMinter: string,
-  StableYieldAccumulator: string,
-  PhlimboEA: string,
-  AutoDOLA: string,
-  AutoUSDC: string,
-  MainRewarder: string,
-  MainRewarderUSDC: string,
-  DepositView: string,
+  PhUSD: string;
+  USDC: string;
+  USDS: string;
+  Dola: string;
+  Toke: string;
+  EYE: string;
+  SCX: string;
+  Flax: string;
+  WBTC: string;
+  Pauser: string;
+  AutoDOLA: string;
+  MainRewarder: string;
+  YieldStrategyDola: string;
+  AutoUSDC: string;
+  MainRewarderUSDC: string;
+  YieldStrategyUSDC: string;
+  PhusdStableMinter: string;
+  PhlimboEA: string;
+  StableYieldAccumulator: string;
+  BalancerPool: string;
+  BalancerVault: string;
+  NFTMinter: string;
+  BurnRecorder: string;
+  BurnerEYE: string;
+  BurnerSCX: string;
+  BurnerFlax: string;
+  BalancerPooler: string;
+  GatherWBTC: string;
+  DepositView: string;
+  ViewRouter: string;
+  DepositPageView: string;
+  MintPageView: string;
 }
+
 
 
 /**
