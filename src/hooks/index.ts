@@ -23,3 +23,7 @@ export type { UseBalancerPriceResult } from './useBalancerPrice';
 // Solvency info hook
 export { useSolvencyInfo } from './useSolvencyInfo';
 export type { SolvencyInfo, RunwayHealth } from './useSolvencyInfo';
+
+// Minter page view hook
+export { useMinterPageView } from './useMinterPageView';
+export type { MinterPageViewData, TokenMintData, UseMinterPageViewReturn } from './useMinterPageView';

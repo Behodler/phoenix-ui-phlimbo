@@ -7,9 +7,12 @@ interface NFTListItemProps {
 }
 
 export default function NFTListItem({ nft, price, onMintClick }: NFTListItemProps) {
+  const tokenPrice = parseFloat(nft.price);
   const dollarValue = price !== null
-    ? (nft.mockTokenPrice * price).toLocaleString(undefined, { maximumFractionDigits: 2 })
+    ? (tokenPrice * price).toLocaleString(undefined, { maximumFractionDigits: 2 })
     : null;
+
+  const priceDisplay = tokenPrice.toLocaleString(undefined, { maximumFractionDigits: 4 });
 
   return (
     <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg px-4 flex items-center hover:border-pxusd-orange-400/50 transition-colors text-xs min-h-[3.5rem]">
@@ -32,7 +35,7 @@ export default function NFTListItem({ nft, price, onMintClick }: NFTListItemProp
 
       {/* Price */}
       <span className="text-foreground w-[5rem] sm:w-[12rem] min-w-0 text-right pr-4">
-        <span className="truncate">{nft.mockTokenPrice.toLocaleString()} {nft.tokenName}</span>
+        <span className="truncate">{priceDisplay} {nft.tokenDisplayName}</span>
         {dollarValue !== null && (
           <span className="block sm:inline text-muted-foreground"> (${dollarValue})</span>
         )}
