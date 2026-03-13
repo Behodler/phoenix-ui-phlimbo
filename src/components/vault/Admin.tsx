@@ -66,16 +66,7 @@ const getContractConfigs = (): ContractConfig[] => [
     addressKey: 'YieldStrategyDola',
     abi: iYieldStrategyAbi as Abi,
   },
-  {
-    name: 'YieldStrategyUSDT',
-    addressKey: 'YieldStrategyUSDT',
-    abi: iYieldStrategyAbi as Abi,
-  },
-  {
-    name: 'YieldStrategyUSDS',
-    addressKey: 'YieldStrategyUSDS',
-    abi: iYieldStrategyAbi as Abi,
-  },
+
   {
     name: 'PhusdStableMinter',
     addressKey: 'PhusdStableMinter',
