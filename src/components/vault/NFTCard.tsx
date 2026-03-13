@@ -8,9 +8,16 @@ interface NFTCardProps {
 }
 
 export default function NFTCard({ nft, price, onMintClick, showMintButton = true }: NFTCardProps) {
+  const tokenPrice = parseFloat(nft.price);
   const dollarValue = price != null
-    ? (nft.mockTokenPrice * price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    ? (tokenPrice * price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : null;
+
+  const growthPercent = (nft.growthBasisPoints / 100).toFixed(2);
+
+  // Format balance for display
+  const balanceDisplay = parseFloat(nft.balance).toLocaleString(undefined, { maximumFractionDigits: 4 });
+  const priceDisplay = parseFloat(nft.price).toLocaleString(undefined, { maximumFractionDigits: 4 });
 
   return (
     <div className="w-full bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden hover:border-pxusd-orange-400/50 transition-colors">
@@ -34,8 +41,8 @@ export default function NFTCard({ nft, price, onMintClick, showMintButton = true
             {/* Stats */}
             <div className="bg-pxusd-teal-900/60 rounded-b-lg p-3 space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{nft.tokenName} balance:</span>
-                <span className="text-foreground">{Math.floor(nft.mockBalance)}</span>
+                <span>{nft.tokenDisplayName} balance:</span>
+                <span className="text-foreground">{balanceDisplay}</span>
               </div>
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Action:</span>
@@ -43,21 +50,33 @@ export default function NFTCard({ nft, price, onMintClick, showMintButton = true
               </div>
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Token:</span>
-                <span className="text-foreground">{nft.tokenName}</span>
+                <span className="text-foreground">{nft.tokenDisplayName}</span>
               </div>
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Price:</span>
                 <span className="text-foreground">
-                  {nft.mockTokenPrice.toLocaleString()} {nft.tokenName}
+                  {priceDisplay} {nft.tokenDisplayName}
                   {dollarValue !== null && ` ($${dollarValue})`}
                 </span>
               </div>
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Quantity Owned:</span>
-                <span className={nft.mockQuantityOwned > 0 ? "text-green-500" : "text-red-500"}>
-                  {nft.mockQuantityOwned.toLocaleString()}
+                <span>Owned:</span>
+                <span className={nft.nftBalance > 0 ? "text-green-500" : "text-red-500"}>
+                  {nft.nftBalance.toLocaleString()}
                 </span>
               </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Growth:</span>
+                <span className="text-pxusd-orange-300">{growthPercent}%</span>
+              </div>
+              {nft.totalBurnt !== undefined && (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Total Burnt:</span>
+                  <span className="text-pxusd-yellow-400">
+                    {parseFloat(nft.totalBurnt).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

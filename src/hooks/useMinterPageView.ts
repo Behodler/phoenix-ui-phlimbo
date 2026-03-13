@@ -1,0 +1,135 @@
+import { useReadContract } from 'wagmi';
+import { useAccount } from 'wagmi';
+import { formatUnits } from 'viem';
+import { mintPageViewAbi } from '@behodler/phase2-wagmi-hooks';
+import { useContractAddresses } from '../contexts/ContractAddressContext';
+
+/**
+ * Per-token data parsed from MinterPageView.getData()
+ */
+export interface TokenMintData {
+  /** Raw allowance as bigint (for comparison with price) */
+  allowanceRaw: bigint;
+  /** Raw price as bigint (for comparison with allowance) */
+  priceRaw: bigint;
+  /** Formatted allowance (18 decimals) */
+  allowance: string;
+  /** Formatted price in input token amount (18 decimals) */
+  price: string;
+  /** Growth rate in basis points (raw number, e.g. 250 = 2.5%) */
+  growthBasisPoints: number;
+  /** Formatted user token balance (18 decimals) */
+  balance: string;
+  /** NFT balance (quantity owned, integer) */
+  nftBalance: number;
+}
+
+/**
+ * All parsed data from MinterPageView
+ */
+export interface MinterPageViewData {
+  EYE: TokenMintData;
+  SCX: TokenMintData;
+  Flax: TokenMintData;
+  sUSDS: TokenMintData;
+  WBTC: TokenMintData;
+  eyeTotalBurnt: string;
+  scxTotalBurnt: string;
+  flaxTotalBurnt: string;
+}
+
+export interface UseMinterPageViewReturn {
+  data: MinterPageViewData | null;
+  isLoading: boolean;
+  isError: boolean;
+  error: Error | null;
+  refetch: () => void;
+}
+
+/**
+ * Field index mapping from MinterPageView.getData()
+ * Each token has 5 consecutive fields: allowance, price, growthBasisPoints, balance, nftBalance
+ */
+const TOKEN_OFFSETS = {
+  EYE: 0,
+  SCX: 5,
+  Flax: 10,
+  sUSDS: 15,
+  WBTC: 20,
+} as const;
+
+const BURN_INDICES = {
+  eyeTotalBurnt: 25,
+  scxTotalBurnt: 26,
+  flaxTotalBurnt: 27,
+} as const;
+
+function parseTokenData(data: readonly bigint[], offset: number): TokenMintData {
+  const allowanceRaw = data[offset];
+  const priceRaw = data[offset + 1];
+  const growthBasisPointsRaw = data[offset + 2];
+  const balanceRaw = data[offset + 3];
+  const nftBalanceRaw = data[offset + 4];
+
+  return {
+    allowanceRaw,
+    priceRaw,
+    allowance: formatUnits(allowanceRaw, 18),
+    price: formatUnits(priceRaw, 18),
+    growthBasisPoints: Number(growthBasisPointsRaw),
+    balance: formatUnits(balanceRaw, 18),
+    nftBalance: Number(nftBalanceRaw),
+  };
+}
+
+/**
+ * Hook to fetch and parse MinterPageView contract data.
+ * Calls getData(userAddress) and parses the uint256[] into structured token data.
+ */
+export function useMinterPageView(): UseMinterPageViewReturn {
+  const { address: userAddress } = useAccount();
+  const { addresses } = useContractAddresses();
+
+  const mintPageViewAddress = addresses?.MintPageView as `0x${string}` | undefined;
+
+  const {
+    data: rawData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useReadContract({
+    address: mintPageViewAddress,
+    abi: mintPageViewAbi,
+    functionName: 'getData',
+    args: userAddress ? [userAddress] : undefined,
+    query: {
+      enabled: !!userAddress && !!mintPageViewAddress && mintPageViewAddress !== '0x0000000000000000000000000000000000000000',
+      refetchOnWindowFocus: false,
+      staleTime: 15_000, // 15 seconds
+    },
+  });
+
+  let parsedData: MinterPageViewData | null = null;
+
+  if (rawData && Array.isArray(rawData) && rawData.length >= 28) {
+    parsedData = {
+      EYE: parseTokenData(rawData, TOKEN_OFFSETS.EYE),
+      SCX: parseTokenData(rawData, TOKEN_OFFSETS.SCX),
+      Flax: parseTokenData(rawData, TOKEN_OFFSETS.Flax),
+      sUSDS: parseTokenData(rawData, TOKEN_OFFSETS.sUSDS),
+      WBTC: parseTokenData(rawData, TOKEN_OFFSETS.WBTC),
+      eyeTotalBurnt: formatUnits(rawData[BURN_INDICES.eyeTotalBurnt], 18),
+      scxTotalBurnt: formatUnits(rawData[BURN_INDICES.scxTotalBurnt], 18),
+      flaxTotalBurnt: formatUnits(rawData[BURN_INDICES.flaxTotalBurnt], 18),
+    };
+  }
+
+  return {
+    data: parsedData,
+    isLoading,
+    isError,
+    error: error as Error | null,
+    refetch,
+  };
+}

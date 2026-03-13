@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useToast } from '../ui/ToastProvider';
-import { nftMockData } from '../../data/nftMockData';
+import { nftStaticConfig, tokenPrefixToPriceKey } from '../../data/nftMockData';
 import type { NFTData } from '../../data/nftMockData';
 import { useNFTPrices } from '../../hooks/useNFTPrices';
+import { useMinterPageView } from '../../hooks/useMinterPageView';
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 
@@ -11,21 +12,50 @@ export default function NFTListTab() {
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { prices } = useNFTPrices();
+  const { data: minterData, isLoading, refetch: refetchMinterData } = useMinterPageView();
 
-  // Sort by total dollar value ascending: mockTokenPrice * price
-  const sortedNfts = [...nftMockData].sort((a, b) => {
-    const aValue = a.mockTokenPrice * (prices[a.tokenName] ?? 0);
-    const bValue = b.mockTokenPrice * (prices[b.tokenName] ?? 0);
-    return aValue - bValue;
-  });
+  // Merge static config with live contract data
+  const nftDataList: NFTData[] = useMemo(() => {
+    return nftStaticConfig.map((config) => {
+      const tokenData = minterData?.[config.tokenPrefix];
+      // Determine totalBurnt for EYE, SCX, Flax
+      let totalBurnt: string | undefined;
+      if (minterData) {
+        if (config.tokenPrefix === 'EYE') totalBurnt = minterData.eyeTotalBurnt;
+        else if (config.tokenPrefix === 'SCX') totalBurnt = minterData.scxTotalBurnt;
+        else if (config.tokenPrefix === 'Flax') totalBurnt = minterData.flaxTotalBurnt;
+      }
+
+      return {
+        ...config,
+        price: tokenData?.price ?? '0',
+        balance: tokenData?.balance ?? '0',
+        nftBalance: tokenData?.nftBalance ?? 0,
+        allowanceRaw: tokenData?.allowanceRaw ?? 0n,
+        priceRaw: tokenData?.priceRaw ?? 0n,
+        growthBasisPoints: tokenData?.growthBasisPoints ?? 0,
+        totalBurnt,
+      };
+    });
+  }, [minterData]);
+
+  // Sort by total dollar value ascending: price * USD price
+  const sortedNfts = useMemo(() => {
+    return [...nftDataList].sort((a, b) => {
+      const priceKeyA = tokenPrefixToPriceKey[a.tokenPrefix] ?? a.tokenPrefix;
+      const priceKeyB = tokenPrefixToPriceKey[b.tokenPrefix] ?? b.tokenPrefix;
+      const aValue = parseFloat(a.price) * (prices[priceKeyA] ?? 0);
+      const bValue = parseFloat(b.price) * (prices[priceKeyB] ?? 0);
+      return aValue - bValue;
+    });
+  }, [nftDataList, prices]);
 
   const handleMintClick = (nft: NFTData) => {
     setSelectedNft(nft);
     setIsModalOpen(true);
   };
 
-  const handleMint = (nft: NFTData) => {
-    // Determine toast description based on NFT action
+  const handleMintSuccess = (nft: NFTData) => {
     const actionVerb = nft.action.toLowerCase().includes('burnt')
       ? 'burnt'
       : nft.action.toLowerCase().includes('stockpiled')
@@ -35,17 +65,36 @@ export default function NFTListTab() {
     addToast({
       type: 'success',
       title: 'NFT Minted!',
-      description: <><em>{nft.name}</em> minted! {nft.mockTokenPrice} {nft.tokenName} {actionVerb}!</>,
+      description: <><em>{nft.name}</em> minted! {nft.tokenDisplayName} {actionVerb}!</>,
     });
 
     setIsModalOpen(false);
     setSelectedNft(null);
+    // Refetch data to update balances
+    refetchMinterData();
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedNft(null);
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="bg-pxusd-teal-700 border border-pxusd-teal-500 rounded-lg p-4 mb-6">
+          <h3 className="text-lg font-semibold text-pxusd-teal-300 mb-1">Mint an NFT to gain access to the yield funnel</h3>
+          <p className="text-sm text-muted-foreground">Loading NFT data from contract...</p>
+        </div>
+        <div className="flex flex-col gap-2 max-w-4xl mx-auto">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg px-4 h-14 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -68,14 +117,17 @@ export default function NFTListTab() {
 
       {/* NFT List */}
       <div className="flex flex-col gap-2 max-w-4xl mx-auto">
-        {sortedNfts.map((nft) => (
-          <NFTListItem
-            key={nft.id}
-            nft={nft}
-            price={prices[nft.tokenName] ?? null}
-            onMintClick={handleMintClick}
-          />
-        ))}
+        {sortedNfts.map((nft) => {
+          const priceKey = tokenPrefixToPriceKey[nft.tokenPrefix] ?? nft.tokenPrefix;
+          return (
+            <NFTListItem
+              key={nft.id}
+              nft={nft}
+              price={prices[priceKey] ?? null}
+              onMintClick={handleMintClick}
+            />
+          );
+        })}
       </div>
 
       {/* Mint Modal */}
@@ -83,8 +135,9 @@ export default function NFTListTab() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         nft={selectedNft}
-        price={selectedNft ? (prices[selectedNft.tokenName] ?? null) : null}
-        onMint={handleMint}
+        price={selectedNft ? (prices[tokenPrefixToPriceKey[selectedNft.tokenPrefix] ?? selectedNft.tokenPrefix] ?? null) : null}
+        onMintSuccess={handleMintSuccess}
+        refetchMinterData={refetchMinterData}
       />
     </div>
   );

@@ -67,15 +67,15 @@ export default function NFTMintModal({ isOpen, onClose, nft, onMint }: NFTMintMo
           <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-3 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Token Required:</span>
-              <span className="text-foreground">{nft.tokenName}</span>
+              <span className="text-foreground">{nft.tokenDisplayName}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Amount:</span>
-              <span className="text-foreground">1.00 {nft.tokenName}</span>
+              <span className="text-foreground">1.00 {nft.tokenDisplayName}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Your Balance:</span>
-              <span className="text-foreground">{nft.mockBalance.toLocaleString()} {nft.tokenName}</span>
+              <span className="text-foreground">{parseFloat(nft.balance).toLocaleString()} {nft.tokenDisplayName}</span>
             </div>
           </div>
 
