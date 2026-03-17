@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useToast } from '../ui/ToastProvider';
 import { nftStaticConfig, tokenPrefixToPriceKey } from '../../data/nftMockData';
 import type { NFTData } from '../../data/nftMockData';
@@ -49,6 +49,18 @@ export default function NFTListTab() {
       return aValue - bValue;
     });
   }, [nftDataList, prices]);
+
+  // Keep selectedNft in sync with fresh minterData after refetch.
+  // Without this, the modal holds a stale snapshot with old allowanceRaw,
+  // so the button never updates from "Approve" to "Mint" after approval.
+  useEffect(() => {
+    if (selectedNft) {
+      const updated = nftDataList.find((n) => n.id === selectedNft.id);
+      if (updated && updated.allowanceRaw !== selectedNft.allowanceRaw) {
+        setSelectedNft(updated);
+      }
+    }
+  }, [nftDataList, selectedNft]);
 
   const handleMintClick = (nft: NFTData) => {
     setSelectedNft(nft);
