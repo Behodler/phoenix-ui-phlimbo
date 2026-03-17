@@ -22,12 +22,29 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   const [isApproving, setIsApproving] = useState(false);
   const [isMinting, setIsMinting] = useState(false);
   const [mintTxHash, setMintTxHash] = useState<`0x${string}` | undefined>(undefined);
+  const [approvalTxHash, setApprovalTxHash] = useState<`0x${string}` | undefined>(undefined);
 
   const { address: walletAddress } = useAccount();
   const { addresses } = useContractAddresses();
   const { approve } = useTokenApproval();
   const { addToast } = useToast();
   const { writeContractAsync } = useWriteContract();
+
+  // Wait for approval transaction confirmation
+  const { isSuccess: isApprovalSuccess } = useWaitForTransactionReceipt({
+    hash: approvalTxHash,
+    query: { enabled: !!approvalTxHash },
+  });
+
+  // Handle approval success — refetch only after tx is confirmed on-chain
+  useEffect(() => {
+    if (isApprovalSuccess && approvalTxHash) {
+      setIsApproving(false);
+      setApprovalTxHash(undefined);
+      refetchMinterData();
+      addToast({ type: 'success', title: 'Approval Confirmed', description: 'Token approval confirmed on-chain. You can now mint.' });
+    }
+  }, [isApprovalSuccess, approvalTxHash, refetchMinterData, addToast]);
 
   // Wait for mint transaction confirmation
   const { isSuccess: isMintSuccess } = useWaitForTransactionReceipt({
@@ -40,9 +57,10 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
     if (isMintSuccess && mintTxHash && nft) {
       setIsMinting(false);
       setMintTxHash(undefined);
+      refetchMinterData();
       onMintSuccess(nft);
     }
-  }, [isMintSuccess, mintTxHash, nft, onMintSuccess]);
+  }, [isMintSuccess, mintTxHash, nft, onMintSuccess, refetchMinterData]);
 
   if (!isOpen || !nft) return null;
 
@@ -77,19 +95,17 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
     setIsApproving(true);
     try {
       addToast({ type: 'info', title: 'Confirm in Wallet', description: `Please confirm the ${nft.tokenDisplayName} approval in your wallet.`, duration: 30000 });
-      await approve(tokenAddress, addresses.NFTMinter as `0x${string}`);
-      addToast({ type: 'success', title: 'Approval Successful', description: `${nft.tokenDisplayName} spending approved for NFT minting.` });
-      // Refetch minter data to update allowance
-      refetchMinterData();
+      const hash = await approve(tokenAddress, addresses.NFTMinter as `0x${string}`);
+      setApprovalTxHash(hash);
+      addToast({ type: 'info', title: 'Transaction Submitted', description: 'Waiting for approval confirmation...' });
     } catch (error) {
+      setIsApproving(false);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       if (errorMessage.toLowerCase().includes('user rejected') || errorMessage.toLowerCase().includes('user denied')) {
         addToast({ type: 'error', title: 'Transaction Cancelled', description: 'You cancelled the approval transaction.' });
       } else {
         addToast({ type: 'error', title: 'Approval Failed', description: errorMessage });
       }
-    } finally {
-      setIsApproving(false);
     }
   };
 
@@ -136,6 +152,7 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
       setIsApproving(false);
       setIsMinting(false);
       setMintTxHash(undefined);
+      setApprovalTxHash(undefined);
       onClose();
     }
   };
