@@ -126,12 +126,12 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
       addToast({ type: 'info', title: 'Confirm in Wallet', description: `Please confirm the mint transaction in your wallet.`, duration: 30000 });
 
       // mint(address token, uint256 index, address recipient)
-      // The index corresponds to the NFT's id (1-indexed in the contract)
+      // The index is the dispatcherIndex from MintPageView, NOT the static nft.id
       const hash = await writeContractAsync({
         address: addresses.NFTMinter as `0x${string}`,
         abi: nftMinterAbi,
         functionName: 'mint',
-        args: [tokenAddress, BigInt(nft.id), walletAddress],
+        args: [tokenAddress, BigInt(nft.dispatcherIndex), walletAddress],
       });
 
       setMintTxHash(hash);

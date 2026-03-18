@@ -50,6 +50,8 @@ export interface NFTData {
   priceRaw: bigint;
   /** Growth rate in basis points (e.g., 250 = 2.5%) */
   growthBasisPoints: number;
+  /** Dispatcher index used by NFTMinter.mint() to identify this token's dispatcher */
+  dispatcherIndex: number;
   /** Formatted total burnt (only for EYE, SCX, Flax) */
   totalBurnt?: string;
 }

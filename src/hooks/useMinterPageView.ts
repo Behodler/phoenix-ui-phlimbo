@@ -22,6 +22,8 @@ export interface TokenMintData {
   balance: string;
   /** NFT balance (quantity owned, integer) */
   nftBalance: number;
+  /** Dispatcher index used by NFTMinter.mint() to identify this token's dispatcher */
+  dispatcherIndex: number;
 }
 
 /**
@@ -48,20 +50,20 @@ export interface UseMinterPageViewReturn {
 
 /**
  * Field index mapping from MinterPageView.getData()
- * Each token has 5 consecutive fields: allowance, price, growthBasisPoints, balance, nftBalance
+ * Each token has 6 consecutive fields: allowance, price, growthBasisPoints, balance, nftBalance, dispatcherIndex
  */
 const TOKEN_OFFSETS = {
   EYE: 0,
-  SCX: 5,
-  Flax: 10,
-  sUSDS: 15,
-  WBTC: 20,
+  SCX: 6,
+  Flax: 12,
+  sUSDS: 18,
+  WBTC: 24,
 } as const;
 
 const BURN_INDICES = {
-  eyeTotalBurnt: 25,
-  scxTotalBurnt: 26,
-  flaxTotalBurnt: 27,
+  eyeTotalBurnt: 30,
+  scxTotalBurnt: 31,
+  flaxTotalBurnt: 32,
 } as const;
 
 function parseTokenData(data: readonly bigint[], offset: number): TokenMintData {
@@ -70,6 +72,7 @@ function parseTokenData(data: readonly bigint[], offset: number): TokenMintData 
   const growthBasisPointsRaw = data[offset + 2];
   const balanceRaw = data[offset + 3];
   const nftBalanceRaw = data[offset + 4];
+  const dispatcherIndexRaw = data[offset + 5];
 
   return {
     allowanceRaw,
@@ -79,6 +82,7 @@ function parseTokenData(data: readonly bigint[], offset: number): TokenMintData 
     growthBasisPoints: Number(growthBasisPointsRaw),
     balance: formatUnits(balanceRaw, 18),
     nftBalance: Number(nftBalanceRaw),
+    dispatcherIndex: Number(dispatcherIndexRaw),
   };
 }
 
@@ -112,7 +116,7 @@ export function useMinterPageView(): UseMinterPageViewReturn {
 
   let parsedData: MinterPageViewData | null = null;
 
-  if (rawData && Array.isArray(rawData) && rawData.length >= 28) {
+  if (rawData && Array.isArray(rawData) && rawData.length >= 33) {
     parsedData = {
       EYE: parseTokenData(rawData, TOKEN_OFFSETS.EYE),
       SCX: parseTokenData(rawData, TOKEN_OFFSETS.SCX),
