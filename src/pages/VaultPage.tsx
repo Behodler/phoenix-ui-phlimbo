@@ -16,7 +16,7 @@ import DepositToYieldForm from '../components/vault/DepositToYieldForm';
 import WithdrawFromYieldForm from '../components/vault/WithdrawFromYieldForm';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
 import EmergencyPauseFooter from '../components/vault/EmergencyPauseFooter';
-// import YieldFunnelTab from '../components/vault/YieldFunnelTab'; // Temporarily disabled: ABI for StableYieldAccumulator has changed, will be fixed in a future story
+import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
 import NFTListTab from '../components/vault/NFTListTab';
 import Admin from '../components/vault/Admin';
@@ -1363,12 +1363,7 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "Yield Funnel" ? (
               <ErrorBoundary>
-                <div className="p-6">
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Yield Funnel</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Yield Funnel is temporarily unavailable while contract updates are in progress. Please check back soon.
-                  </p>
-                </div>
+                <YieldFunnelTab isPaused={isPaused === true} />
               </ErrorBoundary>
             ) : activeTab === "Market" ? (
               <ErrorBoundary>

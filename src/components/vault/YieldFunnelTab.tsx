@@ -408,6 +408,23 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
     }
   }
 
+  // Log rendering decision
+  log.info('YieldFunnelTab: render decision', {
+    isDataLoading,
+    isDataError,
+    dataError: dataError?.message ?? null,
+    pendingYieldCount: pendingYield.length,
+    claimAmount: claimAmount.toString(),
+    isConnected,
+    hasAddresses: !!addresses,
+    accumulatorAddress: addresses?.StableYieldAccumulator ?? 'MISSING',
+    isMinterLoading,
+    minterPageData: minterPageData ? Object.keys(minterPageData) : 'null',
+    nftListCount: nftList.length,
+    selectedNft: selectedNft?.name ?? 'none',
+    isPaused,
+  });
+
   // Render loading state
   if (isDataLoading && !isDataError) {
     return (

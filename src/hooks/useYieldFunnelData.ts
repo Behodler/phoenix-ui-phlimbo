@@ -120,6 +120,13 @@ export function useYieldFunnelData(): YieldFunnelData {
 
   const accumulatorAddress = addresses?.StableYieldAccumulator as `0x${string}` | undefined;
 
+  log.info('YieldFunnel: address resolution', {
+    addressesLoading,
+    hasAddresses: !!addresses,
+    accumulatorAddress: accumulatorAddress ?? 'MISSING',
+    availableKeys: addresses ? Object.keys(addresses) : [],
+  });
+
   // Token info map for resolving symbols
   const tokenInfoMap = useMemo(() => getTokenInfoMap(addresses), [addresses]);
 
@@ -329,13 +336,26 @@ export function useYieldFunnelData(): YieldFunnelData {
     refetchStrategyData();
   };
 
-  // Debug logging
-  log.debug('useYieldFunnelData:', {
-    strategies: strategies?.length ?? 0,
+  // Detailed debug logging
+  log.info('YieldFunnel: query results', {
+    strategies: strategies ?? 'undefined',
+    strategiesLoading,
+    strategiesError,
+    strategiesErrorObj: strategiesErrorObj?.message ?? null,
+    discountRate: discountRate?.toString() ?? 'undefined',
+    discountLoading,
+    discountError,
+    claimAmount: claimAmount?.toString() ?? 'undefined',
+    claimAmountLoading,
+    claimAmountError,
+    totalYield: totalYield?.toString() ?? 'undefined',
+    totalYieldLoading,
+    totalYieldError,
+    strategyDataLoading,
+    strategyDataError,
+    strategyContracts: strategyContracts.length,
+    strategyData: strategyData?.map(d => ({ status: d.status, error: d.error?.message })) ?? 'undefined',
     pendingYield: pendingYield.length,
-    discountPercent,
-    claimAmountFormatted,
-    totalYieldFormatted,
     isLoading,
     isError,
   });
