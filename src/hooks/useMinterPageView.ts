@@ -12,6 +12,8 @@ export interface TokenMintData {
   allowanceRaw: bigint;
   /** Raw price as bigint (for comparison with allowance) */
   priceRaw: bigint;
+  /** Raw user token balance as bigint (for balance guard comparisons) */
+  balanceRaw: bigint;
   /** Formatted allowance (18 decimals) */
   allowance: string;
   /** Formatted price in input token amount (18 decimals) */
@@ -77,6 +79,7 @@ function parseTokenData(data: readonly bigint[], offset: number): TokenMintData 
   return {
     allowanceRaw,
     priceRaw,
+    balanceRaw,
     allowance: formatUnits(allowanceRaw, 18),
     price: formatUnits(priceRaw, 18),
     growthBasisPoints: Number(growthBasisPointsRaw),

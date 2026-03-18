@@ -67,6 +67,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   const {
     data: minterPageData,
     isLoading: isMinterLoading,
+    refetch: refetchMinterData,
   } = useMinterPageView();
 
   // Merge static NFT config with live MinterPageView data
@@ -85,6 +86,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
           nftBalance: live.nftBalance,
           allowanceRaw: live.allowanceRaw,
           priceRaw: live.priceRaw,
+          balanceRaw: live.balanceRaw,
           growthBasisPoints: live.growthBasisPoints,
           dispatcherIndex: live.dispatcherIndex,
           totalBurnt: totalBurntMap[cfg.tokenPrefix],
@@ -96,6 +98,18 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   const handleNftSelect = useCallback((nft: NFTData) => {
     setSelectedNft(nft);
   }, []);
+
+  // After minter data refetch (e.g., post-claim), invalidate selected NFT if its balance dropped to 0
+  useEffect(() => {
+    if (selectedNft && nftList.length > 0) {
+      const updated = nftList.find((n) => n.id === selectedNft.id);
+      if (updated && updated.nftBalance === 0) {
+        // Selected NFT was burned to zero — pick the next available or clear
+        const nextOwned = nftList.find((n) => n.nftBalance > 0);
+        setSelectedNft(nextOwned ?? null);
+      }
+    }
+  }, [nftList]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Token approval hook for USDC
   const { approve } = useTokenApproval();
@@ -350,6 +364,9 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
 
       // Refresh navbar wallet balances (USDC balance decreases, yield tokens received)
       refreshWalletBalances();
+
+      // Refetch minter data so NFT balances update (claim burns 1 NFT)
+      refetchMinterData();
     }
   }, [isClaimSuccess, claimHash]); // eslint-disable-line react-hooks/exhaustive-deps
 

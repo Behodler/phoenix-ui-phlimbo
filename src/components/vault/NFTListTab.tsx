@@ -33,6 +33,7 @@ export default function NFTListTab() {
         nftBalance: tokenData?.nftBalance ?? 0,
         allowanceRaw: tokenData?.allowanceRaw ?? 0n,
         priceRaw: tokenData?.priceRaw ?? 0n,
+        balanceRaw: tokenData?.balanceRaw ?? 0n,
         growthBasisPoints: tokenData?.growthBasisPoints ?? 0,
         dispatcherIndex: tokenData?.dispatcherIndex ?? 0,
         totalBurnt,
@@ -52,12 +53,12 @@ export default function NFTListTab() {
   }, [nftDataList, prices]);
 
   // Keep selectedNft in sync with fresh minterData after refetch.
-  // Without this, the modal holds a stale snapshot with old allowanceRaw,
-  // so the button never updates from "Approve" to "Mint" after approval.
+  // Without this, the modal holds a stale snapshot with old allowanceRaw/balanceRaw,
+  // so the button never updates from "Approve" to "Mint" or reflects balance changes.
   useEffect(() => {
     if (selectedNft) {
       const updated = nftDataList.find((n) => n.id === selectedNft.id);
-      if (updated && updated.allowanceRaw !== selectedNft.allowanceRaw) {
+      if (updated && (updated.allowanceRaw !== selectedNft.allowanceRaw || updated.balanceRaw !== selectedNft.balanceRaw)) {
         setSelectedNft(updated);
       }
     }
