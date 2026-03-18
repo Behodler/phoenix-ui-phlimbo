@@ -34,6 +34,7 @@ export default function NFTListTab() {
         allowanceRaw: tokenData?.allowanceRaw ?? 0n,
         priceRaw: tokenData?.priceRaw ?? 0n,
         growthBasisPoints: tokenData?.growthBasisPoints ?? 0,
+        dispatcherIndex: tokenData?.dispatcherIndex ?? 0,
         totalBurnt,
       };
     });
