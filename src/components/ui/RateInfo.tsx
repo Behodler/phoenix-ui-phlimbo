@@ -23,7 +23,7 @@ export default function RateInfo({
     displayPrice = isLoadingPrice ? "Loading..." : `≈ ${constants.dolaToPhUSDRate.toFixed(6)} DOLA`;
   } else {
     // Deposit: Show "1 DOLA = X phUSD"
-    displayLabel = "1 DOLA";
+    displayLabel = "1 phUSD";
     displayPrice = isLoadingPrice ? "Loading..." : `≈ ${constants.dolaToPhUSDRate.toFixed(6)} phUSD`;
   }
 
