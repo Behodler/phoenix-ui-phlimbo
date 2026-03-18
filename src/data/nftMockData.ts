@@ -115,7 +115,7 @@ export const tokenPrefixToAddressKey: Record<string, string> = {
   SCX: 'SCX',
   Flax: 'Flax',
   WBTC: 'WBTC',
-  // sUSDS is not in ContractAddresses - handled separately via MintPageView contract
+  sUSDS: 'SUSDS',
 };
 
 /**

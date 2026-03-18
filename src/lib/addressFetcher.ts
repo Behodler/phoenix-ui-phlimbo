@@ -66,7 +66,8 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       GatherWBTC: data.GatherWBTC || '0x0000000000000000000000000000000000000000',
       ViewRouter: data.ViewRouter || '0x0000000000000000000000000000000000000000',
       DepositPageView: data.DepositPageView || '0x0000000000000000000000000000000000000000',
-      MintPageView: data.MintPageView || '0x0000000000000000000000000000000000000000'
+      MintPageView: data.MintPageView || '0x0000000000000000000000000000000000000000',
+      SUSDS:data.SUSDS ||  '0x0000000000000000000000000000000000000000'
     }
     log.debug('📡 fetchLocalAddresses: Mapped addresses:', addresses)
 

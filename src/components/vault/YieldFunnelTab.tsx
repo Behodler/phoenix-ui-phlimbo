@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { maxUint256 } from 'viem';
-import { stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
+// import { stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
 import ActionButton from '../ui/ActionButton';
 import ConfirmationDialog from '../ui/ConfirmationDialog';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
@@ -124,6 +124,10 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
 
   // Claim transaction state
   const { data: claimHash, writeContractAsync: writeClaim, isPending: isClaimPending } = useWriteContract();
+ 
+ //Delete this if statement when yield funnel working
+  if(writeClaim.arguments)
+    console.log('write claim poked')
   const { isLoading: isClaimConfirming, isSuccess: isClaimSuccess } = useWaitForTransactionReceipt({
     hash: claimHash,
     query: {
@@ -217,11 +221,15 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       });
 
       // Call claim function
-      const hash = await writeClaim({
-        address: addresses.StableYieldAccumulator as `0x${string}`,
-        abi: stableYieldAccumulatorAbi,
-        functionName: 'claim',
-      });
+      const hash = '0xf3a480e0e3d223b4576c0b62b2d0411304fd5dc753da78a1587d3fd5f5a52c00' 
+   
+      //TODO: commented out until ready to fix. Must change!
+
+      // await writeClaim({
+      //   address: addresses.StableYieldAccumulator as `0x${string}`,
+      //   abi: stableYieldAccumulatorAbi,
+      //   functionName: 'claim',
+      // });
 
       // Show confirming toast
       addToast({
