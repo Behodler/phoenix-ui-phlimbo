@@ -1,17 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { maxUint256 } from 'viem';
-// import { stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
 import ActionButton from '../ui/ActionButton';
 import ConfirmationDialog from '../ui/ConfirmationDialog';
+import NFTSelectorGrid from './NFTSelectorGrid';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useWalletBalances } from '../../contexts/WalletBalancesContext';
 import { useYieldFunnelData, type PendingYieldItem } from '../../hooks/useYieldFunnelData';
+import { useMinterPageView } from '../../hooks/useMinterPageView';
 import { useTokenAllowance, useTokenApproval } from '../../hooks/useContractInteractions';
 import { useApprovalTransaction } from '../../hooks/useTransaction';
 import { useToast } from '../ui/ToastProvider';
 import { getErrorTitle, shouldOfferRetry } from '../../utils/transactionErrors';
 import { log } from '../../utils/logger';
+import { nftStaticConfig, type NFTData } from '../../data/nftMockData';
+
+// Inline ABI for claim(uint256 nftIndex, uint256 minRewardTokenSupplied)
+// The package ABI has the old claim() signature; this is the correct one.
+const claimAbi = [{
+  type: 'function',
+  inputs: [
+    { name: 'nftIndex', internalType: 'uint256', type: 'uint256' },
+    { name: 'minRewardTokenSupplied', internalType: 'uint256', type: 'uint256' },
+  ],
+  name: 'claim',
+  outputs: [],
+  stateMutability: 'nonpayable',
+}] as const;
 
 // Props interface for YieldFunnelTab
 interface YieldFunnelTabProps {
@@ -20,6 +35,7 @@ interface YieldFunnelTabProps {
 
 export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
 
   // Wagmi hooks for wallet connection
   const { isConnected, address: walletAddress } = useAccount();
@@ -46,6 +62,40 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
     error: dataError,
     refetch: refetchYieldData,
   } = useYieldFunnelData();
+
+  // NFT data from MinterPageView
+  const {
+    data: minterPageData,
+    isLoading: isMinterLoading,
+  } = useMinterPageView();
+
+  // Merge static NFT config with live MinterPageView data
+  const nftList: NFTData[] = minterPageData
+    ? nftStaticConfig.map((cfg) => {
+        const live = minterPageData[cfg.tokenPrefix];
+        const totalBurntMap: Record<string, string | undefined> = {
+          EYE: minterPageData.eyeTotalBurnt,
+          SCX: minterPageData.scxTotalBurnt,
+          Flax: minterPageData.flaxTotalBurnt,
+        };
+        return {
+          ...cfg,
+          price: live.price,
+          balance: live.balance,
+          nftBalance: live.nftBalance,
+          allowanceRaw: live.allowanceRaw,
+          priceRaw: live.priceRaw,
+          growthBasisPoints: live.growthBasisPoints,
+          dispatcherIndex: live.dispatcherIndex,
+          totalBurnt: totalBurntMap[cfg.tokenPrefix],
+        };
+      })
+    : [];
+
+  // Stable callback ref for NFT selection (avoids re-triggering auto-select effect)
+  const handleNftSelect = useCallback((nft: NFTData) => {
+    setSelectedNft(nft);
+  }, []);
 
   // Token approval hook for USDC
   const { approve } = useTokenApproval();
@@ -124,10 +174,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
 
   // Claim transaction state
   const { data: claimHash, writeContractAsync: writeClaim, isPending: isClaimPending } = useWriteContract();
- 
- //Delete this if statement when yield funnel working
-  if(writeClaim.arguments)
-    console.log('write claim poked')
+
   const { isLoading: isClaimConfirming, isSuccess: isClaimSuccess } = useWaitForTransactionReceipt({
     hash: claimHash,
     query: {
@@ -220,16 +267,22 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
         duration: 30000,
       });
 
-      // Call claim function
-      const hash = '0xf3a480e0e3d223b4576c0b62b2d0411304fd5dc753da78a1587d3fd5f5a52c00' 
-   
-      //TODO: commented out until ready to fix. Must change!
+      if (!selectedNft) {
+        addToast({
+          type: 'error',
+          title: 'No NFT Selected',
+          description: 'Please select an NFT to burn before claiming.',
+        });
+        return;
+      }
 
-      // await writeClaim({
-      //   address: addresses.StableYieldAccumulator as `0x${string}`,
-      //   abi: stableYieldAccumulatorAbi,
-      //   functionName: 'claim',
-      // });
+      // Call claim function with correct ABI: claim(dispatcherIndex, minRewardTokenSupplied)
+      const hash = await writeClaim({
+        address: addresses.StableYieldAccumulator as `0x${string}`,
+        abi: claimAbi,
+        functionName: 'claim',
+        args: [BigInt(selectedNft.dispatcherIndex), 0n],
+      });
 
       // Show confirming toast
       addToast({
@@ -325,7 +378,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   let buttonLoading = false;
 
   if (isConnected) {
-    if (isDataLoading || usdcAllowanceLoading || usdcLoading) {
+    if (isDataLoading || usdcAllowanceLoading || usdcLoading || isMinterLoading) {
       buttonLabel = 'Loading...';
       buttonLoading = true;
       buttonDisabled = true;
@@ -334,6 +387,9 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       buttonDisabled = true;
     } else if (pendingYield.length === 0 || claimAmount === 0n) {
       buttonLabel = 'No yield available';
+      buttonDisabled = true;
+    } else if (!selectedNft) {
+      buttonLabel = 'Select an NFT';
       buttonDisabled = true;
     } else if (needsApproval) {
       buttonLabel = 'Approve USDC';
@@ -476,6 +532,14 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
           </p>
         </div>
 
+        {/* NFT Selector Grid */}
+        <NFTSelectorGrid
+          nfts={nftList}
+          selectedNft={selectedNft}
+          onSelect={handleNftSelect}
+          isConnected={isConnected}
+        />
+
         {/* Pending Yield Breakdown Panel */}
         <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4 mb-6">
           <h3 className="text-lg font-semibold text-pxusd-orange-300 mb-3">Pending Yield</h3>
@@ -550,6 +614,16 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
               <span className="text-sm text-muted-foreground">${formatAmount(claimAmountFormatted)}</span>
             </div>
           </div>
+
+          {/* NFT to Burn */}
+          {selectedNft && (
+            <div className="bg-pxusd-teal-700 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">NFT to Burn:</span>
+                <span className="text-sm font-medium text-foreground">{selectedNft.name} (1 unit)</span>
+              </div>
+            </div>
+          )}
 
           {/* Arrow */}
           <div className="flex justify-center">
