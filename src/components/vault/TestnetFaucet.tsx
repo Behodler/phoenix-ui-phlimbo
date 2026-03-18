@@ -30,6 +30,7 @@ const mintableErc20Abi = [
 export default function TestnetFaucet() {
   const [isMinting, setIsMinting] = useState(false);
   const [isMintingEye, setIsMintingEye] = useState(false);
+  const [isMintingUsdc, setIsMintingUsdc] = useState(false);
   const { addToast, removeToast } = useToast();
   const { isConnected, address: walletAddress } = useAccount();
   const { addresses, networkType } = useContractAddresses();
@@ -52,6 +53,15 @@ export default function TestnetFaucet() {
     },
   });
 
+  // Wagmi hooks for contract interaction - USDC
+  const { data: hashUsdc, writeContractAsync: writeContractAsyncUsdc } = useWriteContract();
+  const { isLoading: isConfirmingUsdc, isSuccess: isSuccessUsdc } = useWaitForTransactionReceipt({
+    hash: hashUsdc,
+    query: {
+      enabled: !!hashUsdc,
+    },
+  });
+
   // Fetch DOLA balance to enable refetch after mint
   const { refetch: refetchDolaBalance } = useTokenBalance(
     walletAddress,
@@ -62,6 +72,12 @@ export default function TestnetFaucet() {
   const { refetch: refetchEyeBalance } = useTokenBalance(
     walletAddress,
     addresses?.EYE as `0x${string}` | undefined
+  );
+
+  // Fetch USDC balance to enable refetch after mint
+  const { refetch: refetchUsdcBalance } = useTokenBalance(
+    walletAddress,
+    addresses?.USDC as `0x${string}` | undefined
   );
 
   /**
@@ -204,6 +220,72 @@ export default function TestnetFaucet() {
     }
   };
 
+  /**
+   * Handle USDC mint button click
+   * Mints 10,000 USDC tokens to the connected wallet
+   */
+  const handleMintUsdc = async () => {
+    if (!isConnected || !walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet to use the faucet.',
+      });
+      return;
+    }
+
+    if (!addresses?.USDC) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Available',
+        description: 'USDC token contract address not loaded. Please try again.',
+      });
+      return;
+    }
+
+    setIsMintingUsdc(true);
+
+    try {
+      const pendingToastId = addToast({
+        type: 'info',
+        title: 'Confirm Transaction',
+        description: 'Please confirm the faucet transaction in your wallet.',
+        duration: 30000,
+      });
+
+      // Mint 10,000 USDC tokens (with 6 decimals)
+      const mintAmount = parseUnits('10000', 6);
+
+      await writeContractAsyncUsdc({
+        address: addresses.USDC as `0x${string}`,
+        abi: mintableErc20Abi,
+        functionName: 'mint',
+        args: [walletAddress, mintAmount],
+      });
+
+      removeToast(pendingToastId);
+
+      addToast({
+        type: 'info',
+        title: 'Transaction Submitted',
+        description: 'Waiting for blockchain confirmation...',
+        duration: 30000,
+      });
+
+    } catch (error) {
+      log.error('Mint USDC failed:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      addToast({
+        type: 'error',
+        title: 'Faucet Failed',
+        description: errorMessage,
+        duration: 16000,
+      });
+      setIsMintingUsdc(false);
+    }
+  };
+
   // Handle mint transaction success
   // Following the pattern from phoenix:031 for automatic balance refresh
   useEffect(() => {
@@ -270,6 +352,34 @@ export default function TestnetFaucet() {
     }
   }, [isSuccessEye, hashEye, networkType, addToast, refetchEyeBalance]);
 
+  // Handle USDC mint transaction success
+  useEffect(() => {
+    if (isSuccessUsdc && hashUsdc) {
+      addToast({
+        type: 'success',
+        title: 'Faucet Successful',
+        description: 'Successfully minted 10,000 USDC to your wallet!',
+        duration: 30000,
+        action: {
+          label: 'View Transaction',
+          onClick: () => {
+            const explorerUrl = networkType === 'mainnet'
+              ? `https://etherscan.io/tx/${hashUsdc}`
+              : `https://sepolia.etherscan.io/tx/${hashUsdc}`;
+            window.open(explorerUrl, '_blank');
+          }
+        }
+      });
+
+      const refetchData = async () => {
+        await refetchUsdcBalance();
+      };
+      refetchData();
+
+      setIsMintingUsdc(false);
+    }
+  }, [isSuccessUsdc, hashUsdc, networkType, addToast, refetchUsdcBalance]);
+
   return (
     <div className="p-6">
       {/* Faucet Header */}
@@ -318,6 +428,14 @@ export default function TestnetFaucet() {
           label={!isConnected ? "Connect Wallet" : "Mint 1000 EYE"}
           variant="primary"
           isLoading={isMintingEye || isConfirmingEye}
+        />
+
+        <ActionButton
+          disabled={!isConnected || isMintingUsdc || isConfirmingUsdc}
+          onAction={handleMintUsdc}
+          label={!isConnected ? "Connect Wallet" : "Mint 10000 USDC"}
+          variant="primary"
+          isLoading={isMintingUsdc || isConfirmingUsdc}
         />
       </div>
 
