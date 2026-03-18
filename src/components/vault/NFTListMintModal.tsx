@@ -66,6 +66,7 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
 
   // Determine if approved: allowance >= price (both as bigint)
   const isApproved = nft.allowanceRaw >= nft.priceRaw && nft.priceRaw > 0n;
+  const hasInsufficientBalance = nft.balanceRaw < nft.priceRaw;
   const isLoading = isApproving || isMinting;
 
   // Get the ERC20 token address for approve
@@ -180,6 +181,13 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
             >
               {isApproving && <LoadingSpinner />}
               Approve
+            </button>
+          ) : hasInsufficientBalance ? (
+            <button
+              disabled
+              className="flex-1 px-4 py-2 bg-pxusd-orange-900/40 border border-pxusd-orange-500/50 text-pxusd-orange-300 font-medium rounded-lg cursor-not-allowed opacity-70"
+            >
+              Insufficient {nft.tokenDisplayName} Balance
             </button>
           ) : (
             <button

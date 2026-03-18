@@ -48,6 +48,8 @@ export interface NFTData {
   allowanceRaw: bigint;
   /** Raw price as bigint (for approve/mint logic) */
   priceRaw: bigint;
+  /** Raw user token balance as bigint (for balance guard comparisons) */
+  balanceRaw: bigint;
   /** Growth rate in basis points (e.g., 250 = 2.5%) */
   growthBasisPoints: number;
   /** Dispatcher index used by NFTMinter.mint() to identify this token's dispatcher */
