@@ -36,7 +36,7 @@ export default function DepositToYieldConfirmationDialog({
         <div className="bg-pxusd-teal-700 rounded-lg p-4">
           <div className="text-sm text-muted-foreground mb-2">You're depositing</div>
           <div className="flex justify-between items-center">
-            <span className="text-lg font-medium">{formatNumber(depositAmount)} DOLA</span>
+            <span className="text-lg font-medium">{formatNumber(depositAmount)} phUSD</span>
             <span className="text-sm text-muted-foreground">${formatNumber(depositAmount)}</span>
           </div>
         </div>
@@ -48,7 +48,7 @@ export default function DepositToYieldConfirmationDialog({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
             <span className="text-foreground">
-              Your DOLA will earn yield in both <span className="font-semibold text-pxusd-teal-300">phUSD</span> and <span className="font-semibold text-pxusd-teal-300">USDC</span>
+              Your phUSD will earn yield in both <span className="font-semibold text-pxusd-teal-300">phUSD</span> and <span className="font-semibold text-pxusd-teal-300">USDC</span>
             </span>
           </div>
           <div className="flex items-start gap-2">
