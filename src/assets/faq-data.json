@@ -144,6 +144,18 @@
       {
         "title": "What is the Discount?",
         "body": "Swapping in USDC is a valuable service. To create an incentive for USDC holders to swap in their USDC for the reward tokens, a discount is applied to the USDC required. For instance, if the Total Yield Value is $100 and the discount is 2% then one only needs 98 USDC to claim the reward tokens, incurring a $2 profit."
+      },
+      {
+        "title": "Why do I need an NFT to claim?",
+        "body": "Each yield claim requires burning one NFT. This ensures every claim is paired with an action that strengthens the protocol — such as burning governance tokens, boosting liquidity, or building reserves. The NFT acts as your claim ticket."
+      },
+      {
+        "title": "Where do I get a claim NFT?",
+        "body": "Head over to the NFT tab to mint one. Each NFT type accepts a different token (EYE, SCX, Flax, sUSDS, or BTC). Pick whichever token is most accessible to you — all NFT types are equally valid for claiming yield."
+      },
+      {
+        "title": "What happens to my NFT after I claim?",
+        "body": "It is burned. One NFT is consumed per claim. If you plan to claim regularly, you can stock up on multiple NFTs from the NFT tab so you don't need to re-mint before every claim."
       }
     ]
   },
