@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { encodeAbiParameters } from 'viem';
 import { nftMinterAbi } from '@behodler/phase2-wagmi-hooks';
 import type { NFTData } from '../../data/nftMockData';
 import { tokenPrefixToAddressKey } from '../../data/nftMockData';
 import { LoadingSpinner } from '../ui/ActionButton';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useTokenApproval } from '../../hooks/useContractInteractions';
+import { useEstimateBPT } from '../../hooks/useEstimateBPT';
 import { useToast } from '../ui/ToastProvider';
 import NFTCard from './NFTCard';
 
@@ -24,11 +26,21 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   const [mintTxHash, setMintTxHash] = useState<`0x${string}` | undefined>(undefined);
   const [approvalTxHash, setApprovalTxHash] = useState<`0x${string}` | undefined>(undefined);
 
+  const [slippageBps, setSlippageBps] = useState(300); // 3% default
+  const [slippageInput, setSlippageInput] = useState('3.00');
+
   const { address: walletAddress } = useAccount();
   const { addresses } = useContractAddresses();
   const { approve } = useTokenApproval();
   const { addToast } = useToast();
   const { writeContractAsync } = useWriteContract();
+
+  const isSusdsNft = nft?.tokenPrefix === 'sUSDS';
+  const { minBPT, estimatedBPT, isLoading: isEstimatingBPT } = useEstimateBPT(
+    nft?.priceRaw ?? 0n,
+    slippageBps,
+    isSusdsNft,
+  );
 
   // Wait for approval transaction confirmation
   const { isSuccess: isApprovalSuccess } = useWaitForTransactionReceipt({
@@ -68,6 +80,17 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   const isApproved = nft.allowanceRaw >= nft.priceRaw && nft.priceRaw > 0n;
   const hasInsufficientBalance = nft.balanceRaw < nft.priceRaw;
   const isLoading = isApproving || isMinting;
+  // For sUSDS, disable mint until BPT estimate is ready
+  const isMintDisabled = isLoading || (isSusdsNft && (isEstimatingBPT || minBPT === undefined));
+
+  const handleSlippageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSlippageInput(val);
+    const parsed = parseFloat(val);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+      setSlippageBps(Math.round(parsed * 100));
+    }
+  };
 
   // Get the ERC20 token address for approve
   const getTokenAddress = (): `0x${string}` | null => {
@@ -126,14 +149,29 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
     try {
       addToast({ type: 'info', title: 'Confirm in Wallet', description: `Please confirm the mint transaction in your wallet.`, duration: 30000 });
 
-      // mint(address token, uint256 index, address recipient)
       // The index is the dispatcherIndex from MintPageView, NOT the static nft.id
-      const hash = await writeContractAsync({
-        address: addresses.NFTMinter as `0x${string}`,
-        abi: nftMinterAbi,
-        functionName: 'mint',
-        args: [tokenAddress, BigInt(nft.dispatcherIndex), walletAddress],
-      });
+      let hash: `0x${string}`;
+      if (isSusdsNft && minBPT !== undefined) {
+        // BalancerPooler: use 4-arg mint with extraData encoding minBPT for slippage protection
+        const extraData = encodeAbiParameters(
+          [{ type: 'uint256' }],
+          [minBPT],
+        );
+        hash = await writeContractAsync({
+          address: addresses.NFTMinter as `0x${string}`,
+          abi: nftMinterAbi,
+          functionName: 'mint',
+          args: [tokenAddress, BigInt(nft.dispatcherIndex), walletAddress, extraData],
+        });
+      } else {
+        // Standard 3-arg mint for all other NFTs
+        hash = await writeContractAsync({
+          address: addresses.NFTMinter as `0x${string}`,
+          abi: nftMinterAbi,
+          functionName: 'mint',
+          args: [tokenAddress, BigInt(nft.dispatcherIndex), walletAddress],
+        });
+      }
 
       setMintTxHash(hash);
       addToast({ type: 'info', title: 'Transaction Submitted', description: 'Waiting for blockchain confirmation...' });
@@ -164,6 +202,32 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
         {/* Full NFTCard at top (without its own mint button) */}
         <NFTCard nft={nft} price={price} showMintButton={false} />
 
+        {/* Slippage controls for BalancerPooler (sUSDS) NFT */}
+        {isSusdsNft && (
+          <div className="mt-3 border border-border rounded-lg p-3 bg-pxusd-teal-700/30">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Slippage Tolerance</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={slippageInput}
+                  onChange={handleSlippageChange}
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  className="w-16 px-2 py-1 text-right text-sm bg-pxusd-teal-700 border border-border rounded focus:outline-none focus:ring-1 focus:ring-accent text-foreground"
+                />
+                <span className="text-muted-foreground">%</span>
+              </div>
+            </div>
+            {estimatedBPT !== undefined && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Min BPT received: {(Number(minBPT) / 1e18).toFixed(6)}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="mt-4 flex gap-3">
           <button
@@ -192,11 +256,11 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
           ) : (
             <button
               onClick={handleMint}
-              disabled={isLoading}
+              disabled={isMintDisabled}
               className="flex-1 phoenix-btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isMinting && <LoadingSpinner />}
-              Mint
+              {isSusdsNft && isEstimatingBPT ? 'Estimating...' : 'Mint'}
             </button>
           )}
         </div>

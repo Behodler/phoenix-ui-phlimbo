@@ -1,10 +1,10 @@
 import { useReadContract } from 'wagmi';
 
 // Balancer e-CLP pool address for phUSD/sUSDS
-const BALANCER_POOL_ADDRESS = '0x5b26d938f0be6357c39e936cc9c2277b9334ea58' as const;
+export const BALANCER_POOL_ADDRESS = '0x5b26d938f0be6357c39e936cc9c2277b9334ea58' as const;
 
 // Balancer V3 Vault address
-const BALANCER_VAULT_ADDRESS = '0xbA1333333333a1BA1108E8412f11850A5C319bA9' as const;
+export const BALANCER_VAULT_ADDRESS = '0xbA1333333333a1BA1108E8412f11850A5C319bA9' as const;
 
 // sUSDS ERC4626 contract address
 const SUSDS_ADDRESS = '0xa3931d71877c0e7a3148cb7eb4463524fec27fbd' as const;
