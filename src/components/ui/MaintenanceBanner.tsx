@@ -52,8 +52,7 @@ export default function MaintenanceBanner() {
         <div className="mb-6">
           <div className="bg-pxusd-teal-900/50 border border-border rounded-lg p-4 sm:p-5">
             <p className="text-foreground text-sm sm:text-base leading-relaxed text-center">
-              We are currently performing scheduled maintenance to improve your
-              experience. The site will be back online shortly.
+              The site is currently unavailable as we prepare for the integration of new contracts. 
             </p>
           </div>
         </div>
