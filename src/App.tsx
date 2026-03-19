@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { ToastProvider } from './components/ui/ToastProvider'
 import { DisclaimerModal } from './components/ui/DisclaimerModal'
+import { MaintenanceBanner } from './components/ui/MaintenanceBanner'
 import VaultPage from './pages/VaultPage'
 
 export default function App() {
@@ -12,6 +13,7 @@ export default function App() {
 
   return (
     <ToastProvider>
+      <MaintenanceBanner />
       <DisclaimerModal />
       <VaultPage />
     </ToastProvider>
