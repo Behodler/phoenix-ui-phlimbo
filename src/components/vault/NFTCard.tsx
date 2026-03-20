@@ -15,9 +15,10 @@ export default function NFTCard({ nft, price, onMintClick, showMintButton = true
 
   const growthPercent = (nft.growthBasisPoints / 100).toFixed(2);
 
-  // Format balance for display
-  const balanceDisplay = parseFloat(nft.balance).toLocaleString(undefined, { maximumFractionDigits: 4 });
-  const priceDisplay = parseFloat(nft.price).toLocaleString(undefined, { maximumFractionDigits: 4 });
+  // Format balance for display — use full precision for low-decimal tokens like WBTC (8)
+  const maxFractionDigits = nft.decimals <= 8 ? nft.decimals : 4;
+  const balanceDisplay = parseFloat(nft.balance).toLocaleString(undefined, { maximumFractionDigits: maxFractionDigits });
+  const priceDisplay = parseFloat(nft.price).toLocaleString(undefined, { maximumFractionDigits: maxFractionDigits });
 
   return (
     <div className="w-full bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden hover:border-pxusd-orange-400/50 transition-colors">
