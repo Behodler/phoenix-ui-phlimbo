@@ -26,9 +26,6 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   const [mintTxHash, setMintTxHash] = useState<`0x${string}` | undefined>(undefined);
   const [approvalTxHash, setApprovalTxHash] = useState<`0x${string}` | undefined>(undefined);
 
-  const [slippageBps, setSlippageBps] = useState(300); // 3% default
-  const [slippageInput, setSlippageInput] = useState('3.00');
-
   const { address: walletAddress } = useAccount();
   const { addresses } = useContractAddresses();
   const { approve } = useTokenApproval();
@@ -36,9 +33,8 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   const { writeContractAsync } = useWriteContract();
 
   const isSusdsNft = nft?.tokenPrefix === 'sUSDS';
-  const { minBPT, estimatedBPT, isLoading: isEstimatingBPT } = useEstimateBPT(
+  const { minBPT, isLoading: isEstimatingBPT } = useEstimateBPT(
     nft?.priceRaw ?? 0n,
-    slippageBps,
     isSusdsNft,
   );
 
@@ -82,15 +78,6 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   const isLoading = isApproving || isMinting;
   // For sUSDS, disable mint until BPT estimate is ready
   const isMintDisabled = isLoading || (isSusdsNft && (isEstimatingBPT || minBPT === undefined));
-
-  const handleSlippageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setSlippageInput(val);
-    const parsed = parseFloat(val);
-    if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
-      setSlippageBps(Math.round(parsed * 100));
-    }
-  };
 
   // Get the ERC20 token address for approve
   const getTokenAddress = (): `0x${string}` | null => {
@@ -201,32 +188,6 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
       <div className="bg-background border border-border rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Full NFTCard at top (without its own mint button) */}
         <NFTCard nft={nft} price={price} showMintButton={false} />
-
-        {/* Slippage controls for BalancerPooler (sUSDS) NFT */}
-        {isSusdsNft && (
-          <div className="mt-3 border border-border rounded-lg p-3 bg-pxusd-teal-700/30">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Slippage Tolerance</span>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  value={slippageInput}
-                  onChange={handleSlippageChange}
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  className="w-16 px-2 py-1 text-right text-sm bg-pxusd-teal-700 border border-border rounded focus:outline-none focus:ring-1 focus:ring-accent text-foreground"
-                />
-                <span className="text-muted-foreground">%</span>
-              </div>
-            </div>
-            {estimatedBPT !== undefined && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Min BPT received: {(Number(minBPT) / 1e18).toFixed(6)}
-              </p>
-            )}
-          </div>
-        )}
 
         {/* Action buttons */}
         <div className="mt-4 flex gap-3">
