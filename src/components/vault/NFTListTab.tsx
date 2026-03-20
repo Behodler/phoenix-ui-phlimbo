@@ -34,6 +34,7 @@ export default function NFTListTab() {
         allowanceRaw: tokenData?.allowanceRaw ?? 0n,
         priceRaw: tokenData?.priceRaw ?? 0n,
         balanceRaw: tokenData?.balanceRaw ?? 0n,
+        decimals: config.decimals,
         growthBasisPoints: tokenData?.growthBasisPoints ?? 0,
         dispatcherIndex: tokenData?.dispatcherIndex ?? 0,
         totalBurnt,

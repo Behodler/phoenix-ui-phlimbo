@@ -3,6 +3,7 @@ import { useAccount } from 'wagmi';
 import { formatUnits } from 'viem';
 import { mintPageViewAbi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
+import { nftStaticConfig } from '../data/nftMockData';
 
 /**
  * Per-token data parsed from MinterPageView.getData()
@@ -68,7 +69,12 @@ const BURN_INDICES = {
   flaxTotalBurnt: 32,
 } as const;
 
-function parseTokenData(data: readonly bigint[], offset: number): TokenMintData {
+/** Decimals per token prefix, derived from static config */
+const TOKEN_DECIMALS: Record<string, number> = Object.fromEntries(
+  nftStaticConfig.map((c) => [c.tokenPrefix, c.decimals]),
+);
+
+function parseTokenData(data: readonly bigint[], offset: number, decimals: number): TokenMintData {
   const allowanceRaw = data[offset];
   const priceRaw = data[offset + 1];
   const growthBasisPointsRaw = data[offset + 2];
@@ -80,10 +86,10 @@ function parseTokenData(data: readonly bigint[], offset: number): TokenMintData 
     allowanceRaw,
     priceRaw,
     balanceRaw,
-    allowance: formatUnits(allowanceRaw, 18),
-    price: formatUnits(priceRaw, 18),
+    allowance: formatUnits(allowanceRaw, decimals),
+    price: formatUnits(priceRaw, decimals),
     growthBasisPoints: Number(growthBasisPointsRaw),
-    balance: formatUnits(balanceRaw, 18),
+    balance: formatUnits(balanceRaw, decimals),
     nftBalance: Number(nftBalanceRaw),
     dispatcherIndex: Number(dispatcherIndexRaw),
   };
@@ -121,11 +127,11 @@ export function useMinterPageView(): UseMinterPageViewReturn {
 
   if (rawData && Array.isArray(rawData) && rawData.length >= 33) {
     parsedData = {
-      EYE: parseTokenData(rawData, TOKEN_OFFSETS.EYE),
-      SCX: parseTokenData(rawData, TOKEN_OFFSETS.SCX),
-      Flax: parseTokenData(rawData, TOKEN_OFFSETS.Flax),
-      sUSDS: parseTokenData(rawData, TOKEN_OFFSETS.sUSDS),
-      WBTC: parseTokenData(rawData, TOKEN_OFFSETS.WBTC),
+      EYE: parseTokenData(rawData, TOKEN_OFFSETS.EYE, TOKEN_DECIMALS.EYE),
+      SCX: parseTokenData(rawData, TOKEN_OFFSETS.SCX, TOKEN_DECIMALS.SCX),
+      Flax: parseTokenData(rawData, TOKEN_OFFSETS.Flax, TOKEN_DECIMALS.Flax),
+      sUSDS: parseTokenData(rawData, TOKEN_OFFSETS.sUSDS, TOKEN_DECIMALS.sUSDS),
+      WBTC: parseTokenData(rawData, TOKEN_OFFSETS.WBTC, TOKEN_DECIMALS.WBTC),
       eyeTotalBurnt: formatUnits(rawData[BURN_INDICES.eyeTotalBurnt], 18),
       scxTotalBurnt: formatUnits(rawData[BURN_INDICES.scxTotalBurnt], 18),
       flaxTotalBurnt: formatUnits(rawData[BURN_INDICES.flaxTotalBurnt], 18),

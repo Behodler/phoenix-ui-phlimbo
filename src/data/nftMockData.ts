@@ -24,6 +24,8 @@ export interface NFTStaticConfig {
   tokenPrefix: 'EYE' | 'SCX' | 'Flax' | 'sUSDS' | 'WBTC';
   /** Display name of the input token */
   tokenDisplayName: string;
+  /** Number of decimals for the input token's ERC20 contract */
+  decimals: number;
 }
 
 /**
@@ -50,6 +52,8 @@ export interface NFTData {
   priceRaw: bigint;
   /** Raw user token balance as bigint (for balance guard comparisons) */
   balanceRaw: bigint;
+  /** Number of decimals for the input token's ERC20 contract */
+  decimals: number;
   /** Growth rate in basis points (e.g., 250 = 2.5%) */
   growthBasisPoints: number;
   /** Dispatcher index used by NFTMinter.mint() to identify this token's dispatcher */
@@ -71,6 +75,7 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     reason: "Returning value to the OG Behoblins. Patience has been rewarded!",
     tokenPrefix: "EYE",
     tokenDisplayName: "EYE",
+    decimals: 18,
   },
   {
     id: 2,
@@ -80,6 +85,7 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     reason: "More liquidity with price tilting means more minting which means more yield which means more liquidity which means... you get the idea.",
     tokenPrefix: "sUSDS",
     tokenDisplayName: "sUSDS",
+    decimals: 18,
   },
   {
     id: 3,
@@ -89,6 +95,7 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     reason: "All time low set by the Seychelles; all time high set by Phoenix",
     tokenPrefix: "SCX",
     tokenDisplayName: "SCX",
+    decimals: 18,
   },
   {
     id: 4,
@@ -98,6 +105,7 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     reason: "Antifragility reserve in case an external protocol fails.",
     tokenPrefix: "WBTC",
     tokenDisplayName: "WBTC",
+    decimals: 8,
   },
   {
     id: 5,
@@ -107,6 +115,7 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     reason: "Flax was a seed which grew into phUSD. DeFi will pay back that investment.",
     tokenPrefix: "Flax",
     tokenDisplayName: "FLAX",
+    decimals: 18,
   },
 ];
 

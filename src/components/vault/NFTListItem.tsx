@@ -12,7 +12,8 @@ export default function NFTListItem({ nft, price, onMintClick }: NFTListItemProp
     ? (tokenPrice * price).toLocaleString(undefined, { maximumFractionDigits: 2 })
     : null;
 
-  const priceDisplay = tokenPrice.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  const maxFractionDigits = nft.decimals <= 8 ? nft.decimals : 4;
+  const priceDisplay = tokenPrice.toLocaleString(undefined, { maximumFractionDigits: maxFractionDigits });
 
   return (
     <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg px-4 flex items-center hover:border-pxusd-orange-400/50 transition-colors text-xs min-h-[3.5rem]">
