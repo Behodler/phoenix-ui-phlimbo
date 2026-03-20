@@ -1,67 +1,64 @@
-import { useReadContract } from 'wagmi';
-import { erc20Abi } from 'viem';
-import { BALANCER_POOL_ADDRESS, BALANCER_VAULT_ADDRESS } from './useBalancerPrice';
+import { useReadContract, useAccount } from 'wagmi';
+import { BALANCER_POOL_ADDRESS } from './useBalancerPrice';
 
-const vaultAbi = [
+// Balancer V3 Router on Ethereum mainnet
+const BALANCER_ROUTER_ADDRESS = '0xae563e3f8219521950555f5962419c8919758ea2' as const;
+
+// Minimal ABI for Balancer V3 Router queryAddLiquidityUnbalanced.
+// Marked as 'view' so wagmi uses eth_call; the on-chain function uses transient
+// state simulation but works correctly via static call.
+const routerQueryAbi = [
   {
-    name: 'getCurrentLiveBalances',
+    name: 'queryAddLiquidityUnbalanced',
     type: 'function',
     stateMutability: 'view',
-    inputs: [{ name: 'pool', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256[]' }],
+    inputs: [
+      { name: 'pool', type: 'address' },
+      { name: 'exactAmountsIn', type: 'uint256[]' },
+      { name: 'sender', type: 'address' },
+      { name: 'userData', type: 'bytes' },
+    ],
+    outputs: [{ name: 'bptAmountOut', type: 'uint256' }],
   },
 ] as const;
 
 /**
- * Estimates minimum BPT output for a single-sided sUSDS add to the Balancer pool.
+ * Estimates BPT output for a single-sided sUSDS add to the Balancer E-CLP pool
+ * by querying the Balancer V3 Router's queryAddLiquidityUnbalanced.
  *
- * Uses proportional formula as upper bound: amount * totalSupply / sUsdsBalance,
- * then applies slippage tolerance. The proportional formula overestimates for
- * single-sided adds, so the slippage accounts for both approximation error and
- * on-chain price movement.
+ * This gives an accurate estimate that accounts for the E-CLP curve and
+ * unbalanced join pricing, unlike a proportional formula which assumes
+ * a balanced join.
  */
 export function useEstimateBPT(
   sUsdsAmount: bigint,
-  slippageBps: number,
   enabled: boolean,
 ): { minBPT: bigint | undefined; estimatedBPT: bigint | undefined; isLoading: boolean; isError: boolean } {
-  const {
-    data: totalSupply,
-    isLoading: isLoadingSupply,
-    isError: isErrorSupply,
-  } = useReadContract({
-    address: BALANCER_POOL_ADDRESS,
-    abi: erc20Abi,
-    functionName: 'totalSupply',
-    query: { enabled, refetchInterval: 30000 },
-  });
+  const { address: walletAddress } = useAccount();
 
-  const {
-    data: liveBalances,
-    isLoading: isLoadingBalances,
-    isError: isErrorBalances,
-  } = useReadContract({
-    address: BALANCER_VAULT_ADDRESS,
-    abi: vaultAbi,
-    functionName: 'getCurrentLiveBalances',
-    args: [BALANCER_POOL_ADDRESS],
-    query: { enabled, refetchInterval: 30000 },
-  });
+  // Use connected wallet as sender (can influence results via hooks), fallback to zero address
+  const sender = walletAddress ?? '0x0000000000000000000000000000000000000000';
 
-  const isLoading = isLoadingSupply || isLoadingBalances;
-  const isError = isErrorSupply || isErrorBalances;
+  // Pool token order: [sUSDS, phUSD] — single-sided sUSDS means [amount, 0]
+  const {
+    data: bptAmountOut,
+    isLoading,
+    isError,
+  } = useReadContract({
+    address: BALANCER_ROUTER_ADDRESS,
+    abi: routerQueryAbi,
+    functionName: 'queryAddLiquidityUnbalanced',
+    args: [BALANCER_POOL_ADDRESS, [sUsdsAmount, 0n], sender, '0x'],
+    query: { enabled: enabled && sUsdsAmount > 0n, refetchInterval: 30000 },
+  });
 
   let estimatedBPT: bigint | undefined;
   let minBPT: bigint | undefined;
 
-  if (totalSupply !== undefined && liveBalances !== undefined && sUsdsAmount > 0n) {
-    const sUsdsBalance = liveBalances[0]; // sUSDS is token index 0
-    if (sUsdsBalance > 0n) {
-      // Proportional upper bound for BPT output
-      estimatedBPT = (sUsdsAmount * totalSupply) / sUsdsBalance;
-      // Apply slippage: minBPT = estimatedBPT * (10000 - slippageBps) / 10000
-      minBPT = (estimatedBPT * BigInt(10000 - slippageBps)) / 10000n;
-    }
+  if (bptAmountOut !== undefined && sUsdsAmount > 0n) {
+    estimatedBPT = bptAmountOut;
+    // 5% slippage tolerance (500 bps)
+    minBPT = (estimatedBPT * 9500n) / 10000n;
   }
 
   return { minBPT, estimatedBPT, isLoading, isError };
