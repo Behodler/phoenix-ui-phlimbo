@@ -14,10 +14,10 @@ export default function Header() {
             className="rounded-xl object-cover"
             width={"90px"}
           />
-          <div>
+          <div className="hidden sm:block">
             <div className="text-xl leading-tight text-pxusd-white">Phoenix</div>
             <div className="text-sm font-semibold text-pxusd-white">phUSD minter</div>
-            <div className="text-sm text-muted-foreground font-semibold italic hidden sm:block">B3 Tech</div>
+            <div className="text-sm text-muted-foreground font-semibold italic">B3 Tech</div>
           </div>
         </div>
         <div className="flex items-center gap-4">
