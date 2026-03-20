@@ -5,9 +5,10 @@ interface NFTCardProps {
   price?: number | null;
   onMintClick?: (nft: NFTData) => void;
   showMintButton?: boolean;
+  tokenAddress?: string;
 }
 
-export default function NFTCard({ nft, price, onMintClick, showMintButton = true }: NFTCardProps) {
+export default function NFTCard({ nft, price, onMintClick, showMintButton = true, tokenAddress }: NFTCardProps) {
   const tokenPrice = parseFloat(nft.price);
   const dollarValue = price != null
     ? (tokenPrice * price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -42,7 +43,18 @@ export default function NFTCard({ nft, price, onMintClick, showMintButton = true
             {/* Stats */}
             <div className="bg-pxusd-teal-900/60 rounded-b-lg p-3 space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{nft.tokenDisplayName} balance:</span>
+                {tokenAddress ? (
+                  <a
+                    href={`https://app.uniswap.org/swap?outputCurrency=${tokenAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-pxusd-orange-300 hover:text-pxusd-orange-200 underline"
+                  >
+                    {nft.tokenDisplayName} balance:
+                  </a>
+                ) : (
+                  <span>{nft.tokenDisplayName} balance:</span>
+                )}
                 <span className="text-foreground">{balanceDisplay}</span>
               </div>
               <div className="flex justify-between text-xs text-muted-foreground">
