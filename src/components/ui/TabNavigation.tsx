@@ -17,7 +17,7 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
   };
 
   return (
-    <div className="flex items-end border-b border-border">
+    <div className="flex items-end border-b border-border overflow-x-auto scrollbar-hide">
       {tabs.map((tab) => {
         const faqType = getFAQComponentType(tab);
         const button = (
