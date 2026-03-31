@@ -5,7 +5,7 @@ import { wagmiConfig } from '../../wagmiConfig';
 import {
   phlimboEaAbi,
   phusdStableMinterAbi,
-  iYieldStrategyAbi,
+  erc4626YieldStrategyAbi,
   stableYieldAccumulatorAbi,
 } from '@behodler/phase2-wagmi-hooks';
 import { pauserAbi } from '../../lib/pauserAbi';
@@ -64,7 +64,7 @@ const getContractConfigs = (): ContractConfig[] => [
   {
     name: 'YieldStrategyDola',
     addressKey: 'YieldStrategyDola',
-    abi: iYieldStrategyAbi as Abi,
+    abi: erc4626YieldStrategyAbi as Abi,
   },
 
   {
@@ -183,7 +183,7 @@ export default function Admin() {
   // Fetch principal from YieldStrategyDola (principal deposited via PhusdStableMinter)
   const { data: phusdStableMinterPrincipal, refetch: refetchPrincipal, error: principalError } = useReadContract({
     address: addresses?.YieldStrategyDola as `0x${string}` | undefined,
-    abi: iYieldStrategyAbi,
+    abi: erc4626YieldStrategyAbi,
     functionName: 'principalOf',
     args: addresses?.Dola && addresses?.PhusdStableMinter
       ? [addresses.Dola as `0x${string}`, addresses.PhusdStableMinter as `0x${string}`]
@@ -198,7 +198,7 @@ export default function Admin() {
   // This is used for calculating yield display: yield = totalBalanceOf - principalOf
   const { data: phusdStableMinterTotalBalance, refetch: refetchTotalBalance, error: totalBalanceError } = useReadContract({
     address: addresses?.YieldStrategyDola as `0x${string}` | undefined,
-    abi: iYieldStrategyAbi,
+    abi: erc4626YieldStrategyAbi,
     functionName: 'totalBalanceOf',
     args: addresses?.Dola && addresses?.PhusdStableMinter
       ? [addresses.Dola as `0x${string}`, addresses.PhusdStableMinter as `0x${string}`]
@@ -211,7 +211,7 @@ export default function Admin() {
   // Fetch principal from YieldStrategyUSDC (autoUSD - principal deposited via PhusdStableMinter)
   const { data: autoUsdPrincipal, refetch: refetchAutoUsdPrincipal, error: autoUsdPrincipalError } = useReadContract({
     address: addresses?.YieldStrategyUSDC as `0x${string}` | undefined,
-    abi: iYieldStrategyAbi,
+    abi: erc4626YieldStrategyAbi,
     functionName: 'principalOf',
     args: addresses?.USDC && addresses?.PhusdStableMinter
       ? [addresses.USDC as `0x${string}`, addresses.PhusdStableMinter as `0x${string}`]
@@ -224,7 +224,7 @@ export default function Admin() {
   // Fetch total balance from YieldStrategyUSDC (autoUSD - principal + yield for PhusdStableMinter)
   const { data: autoUsdTotalBalance, refetch: refetchAutoUsdTotalBalance, error: autoUsdTotalBalanceError } = useReadContract({
     address: addresses?.YieldStrategyUSDC as `0x${string}` | undefined,
-    abi: iYieldStrategyAbi,
+    abi: erc4626YieldStrategyAbi,
     functionName: 'totalBalanceOf',
     args: addresses?.USDC && addresses?.PhusdStableMinter
       ? [addresses.USDC as `0x${string}`, addresses.PhusdStableMinter as `0x${string}`]
