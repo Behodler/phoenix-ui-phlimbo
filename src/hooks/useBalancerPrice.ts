@@ -1,16 +1,13 @@
 import { useReadContract } from 'wagmi';
 
-// Balancer e-CLP pool address for phUSD/sUSDS
-export const BALANCER_POOL_ADDRESS = '0x5b26d938f0be6357c39e936cc9c2277b9334ea58' as const;
+// Balancer 50/50 balanced pool address for phUSD/sUSDS
+export const BALANCER_POOL_ADDRESS = '0x642BB6860b4776CC10b26B8f361Fd139E7f0db04' as const;
 
 // Balancer V3 Vault address
 export const BALANCER_VAULT_ADDRESS = '0xbA1333333333a1BA1108E8412f11850A5C319bA9' as const;
 
 // sUSDS ERC4626 contract address
 const SUSDS_ADDRESS = '0xa3931d71877c0e7a3148cb7eb4463524fec27fbd' as const;
-
-// 0.1% invariant increase for marginal price computation
-const INVARIANT_RATIO = BigInt('1001000000000000000'); // 1.001e18
 
 // Minimal ABI for Balancer V3 Vault getCurrentLiveBalances
 const vaultAbi = [
@@ -20,21 +17,6 @@ const vaultAbi = [
     stateMutability: 'view',
     inputs: [{ name: 'pool', type: 'address' }],
     outputs: [{ name: '', type: 'uint256[]' }],
-  },
-] as const;
-
-// Minimal ABI for Balancer e-CLP pool computeBalance
-const poolAbi = [
-  {
-    name: 'computeBalance',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'balancesLiveScaled18', type: 'uint256[]' },
-      { name: 'tokenInIndex', type: 'uint256' },
-      { name: 'invariantRatio', type: 'uint256' },
-    ],
-    outputs: [{ name: 'newBalance', type: 'uint256' }],
   },
 ] as const;
 
@@ -57,13 +39,11 @@ export interface UseBalancerPriceResult {
 }
 
 /**
- * Hook to fetch phUSD price in USD from Balancer e-CLP pool
+ * Hook to fetch phUSD price in USD from Balancer 50/50 balanced pool
  *
  * Price calculation:
  * 1. Read live balances from Balancer Vault (pool tokens: [sUSDS, phUSD])
- * 2. Use pool's computeBalance to find how each token contributes to a
- *    small invariant increase — the ratio of deltas gives the marginal
- *    exchange rate (phUSD price in sUSDS terms)
+ * 2. Compute spot price: sUSDS_balance / phUSD_balance gives phUSD price in sUSDS terms
  * 3. Multiply by sUSDS/USD rate from ERC4626 convertToAssets
  */
 export function useBalancerPrice(): UseBalancerPriceResult {
@@ -100,62 +80,21 @@ export function useBalancerPrice(): UseBalancerPriceResult {
     },
   });
 
-  // Phase 2a: Compute new sUSDS balance needed for 0.1% invariant increase
-  const balancesArray = liveBalances ? [...liveBalances] : undefined;
-  const {
-    data: newSusdsBalance,
-    isLoading: isLoadingSusdsBal,
-    isError: isErrorSusdsBal,
-    error: errorSusdsBal,
-  } = useReadContract({
-    address: BALANCER_POOL_ADDRESS,
-    abi: poolAbi,
-    functionName: 'computeBalance',
-    args: balancesArray ? [balancesArray, BigInt(0), INVARIANT_RATIO] : undefined,
-    query: {
-      enabled: !!liveBalances,
-      refetchInterval: 30000,
-    },
-  });
-
-  // Phase 2b: Compute new phUSD balance needed for 0.1% invariant increase
-  const {
-    data: newPhUsdBalance,
-    isLoading: isLoadingPhUsdBal,
-    isError: isErrorPhUsdBal,
-    error: errorPhUsdBal,
-  } = useReadContract({
-    address: BALANCER_POOL_ADDRESS,
-    abi: poolAbi,
-    functionName: 'computeBalance',
-    args: balancesArray ? [balancesArray, BigInt(1), INVARIANT_RATIO] : undefined,
-    query: {
-      enabled: !!liveBalances,
-      refetchInterval: 30000,
-    },
-  });
-
-  const isLoading = isLoadingBalances || isLoadingSusdsConvert || isLoadingSusdsBal || isLoadingPhUsdBal;
-  const isError = isErrorBalances || isErrorSusdsConvert || isErrorSusdsBal || isErrorPhUsdBal;
-  const error = errorBalances || errorSusdsConvert || errorSusdsBal || errorPhUsdBal;
+  const isLoading = isLoadingBalances || isLoadingSusdsConvert;
+  const isError = isErrorBalances || isErrorSusdsConvert;
+  const error = errorBalances || errorSusdsConvert;
 
   let price: number | null = null;
 
-  if (
-    liveBalances !== undefined &&
-    sUsdsConvertResult !== undefined &&
-    newSusdsBalance !== undefined &&
-    newPhUsdBalance !== undefined
-  ) {
+  if (liveBalances !== undefined && sUsdsConvertResult !== undefined) {
     try {
-      // Delta sUSDS needed for 0.1% invariant increase
-      const deltaSusds = Number(newSusdsBalance - liveBalances[0]);
-      // Delta phUSD needed for 0.1% invariant increase
-      const deltaPhUsd = Number(newPhUsdBalance - liveBalances[1]);
+      // Spot price: sUSDS_balance / phUSD_balance gives phUSD price in sUSDS terms
+      // Token order verified: index 0 = sUSDS, index 1 = phUSD (matches pool.getTokens())
+      const sUsdsBalance = Number(liveBalances[0]);
+      const phUsdBalance = Number(liveBalances[1]);
 
-      if (deltaPhUsd > 0 && deltaSusds > 0) {
-        // Marginal exchange rate: phUSD price in sUSDS terms
-        const phUsdInSusds = deltaSusds / deltaPhUsd;
+      if (phUsdBalance > 0 && sUsdsBalance > 0) {
+        const phUsdInSusds = sUsdsBalance / phUsdBalance;
 
         // sUSDS to USD conversion
         const sUsdsToUsd = Number(sUsdsConvertResult) / 1e18;

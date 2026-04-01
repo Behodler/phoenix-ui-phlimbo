@@ -23,10 +23,10 @@ const routerQueryAbi = [
 ] as const;
 
 /**
- * Estimates BPT output for a single-sided sUSDS add to the Balancer E-CLP pool
+ * Estimates BPT output for a single-sided sUSDS add to the Balancer 50/50 balanced pool
  * by querying the Balancer V3 Router's queryAddLiquidityUnbalanced.
  *
- * This gives an accurate estimate that accounts for the E-CLP curve and
+ * This gives an accurate estimate that accounts for the balanced pool and
  * unbalanced join pricing, unlike a proportional formula which assumes
  * a balanced join.
  */

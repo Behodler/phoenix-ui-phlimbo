@@ -35,7 +35,7 @@ export const MAINNET_CONTRACT_ADDRESSES:ContractAddresses ={
   WBTC: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
 
   // Balancer V3 infrastructure
-  BalancerPool: "0x5b26d938f0be6357c39e936cc9c2277b9334ea58",
+  BalancerPool: "0x642BB6860b4776CC10b26B8f361Fd139E7f0db04",
   BalancerVault: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
 
   // NFT infrastructure (PLACEHOLDER: replace after broadcast)
