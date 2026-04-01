@@ -2,8 +2,8 @@ import ActionButton from '../ui/ActionButton';
 import balancerLogoSvg from '../../assets/balancer-logo.svg';
 
 // Balancer URLs
-const SWAP_URL = 'https://balancer.fi/pools/ethereum/v3/0x5b26d938f0be6357c39e936cc9c2277b9334ea58/swap';
-const ADD_LIQUIDITY_URL = 'https://balancer.fi/pools/ethereum/v3/0x5b26d938f0be6357c39e936cc9c2277b9334ea58/add-liquidity';
+const SWAP_URL = 'https://balancer.fi/pools/ethereum/v3/0x642BB6860b4776CC10b26B8f361Fd139E7f0db04/swap';
+const ADD_LIQUIDITY_URL = 'https://balancer.fi/pools/ethereum/v3/0x642BB6860b4776CC10b26B8f361Fd139E7f0db04/add-liquidity';
 
 // Balancer logo component
 const BalancerLogo = () => (

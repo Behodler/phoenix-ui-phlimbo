@@ -192,7 +192,7 @@ export default function VaultPage() {
     : 0;
 
   // ========== BALANCER PRICE FOR MARKET TAB ==========
-  // Fetch phUSD market price from Balancer e-CLP pool
+  // Fetch phUSD market price from Balancer 50/50 balanced pool
   // This hook is called here so price data can be used in USDC APY calculation on mainnet
   const {
     price: phUsdMarketPrice,
