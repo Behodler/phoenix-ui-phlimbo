@@ -14,17 +14,14 @@ export interface ContractAddresses {
   USDS: string;
   SUSDS: string;
   Dola: string;
-  Toke: string;
   EYE: string;
   SCX: string;
   Flax: string;
   WBTC: string;
   Pauser: string;
   AutoDOLA: string;
-  MainRewarder: string;
   YieldStrategyDola: string;
   AutoUSDC: string;
-  MainRewarderUSDC: string;
   YieldStrategyUSDC: string;
   PhusdStableMinter: string;
   PhlimboEA: string;

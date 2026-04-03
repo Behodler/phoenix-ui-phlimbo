@@ -36,7 +36,6 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
     // DOLA deposits. bondingToken is the ERC20 token it produces.
     const addresses: ContractAddresses = {
       Dola: data.Dola || '0x0000000000000000000000000000000000000000',
-      Toke: data.Toke || '0x0000000000000000000000000000000000000000',
       EYE: data.EYE || '0x0000000000000000000000000000000000000000',
       SCX: data.SCX || '0x0000000000000000000000000000000000000000',
       Flax: data.Flax || '0x0000000000000000000000000000000000000000',
@@ -51,8 +50,6 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       PhlimboEA: data.PhlimboEA || '0x0000000000000000000000000000000000000000',
       AutoDOLA: data.AutoDOLA || '0x0000000000000000000000000000000000000000',
       AutoUSDC: data.AutoUSDC || '0x0000000000000000000000000000000000000000',
-      MainRewarder: data.MainRewarder || '0x0000000000000000000000000000000000000000',
-      MainRewarderUSDC: data.MainRewarderUSDC || '0x0000000000000000000000000000000000000000',
       DepositView: data.DepositView || '0x0000000000000000000000000000000000000000',
       WBTC: data.WBTC || '0x0000000000000000000000000000000000000000',
       BalancerPool: data.BalancerPool || '0x0000000000000000000000000000000000000000',
