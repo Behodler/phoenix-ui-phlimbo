@@ -30,8 +30,20 @@ import phUSDIcon from "../assets/phUSD.png";
 import { isAllowlistedAdmin } from '../lib/adminAllowlist';
 import { log } from '../utils/logger';
 
-// Mint token type for switching between DOLA and USDC
-type MintTokenType = 'DOLA' | 'USDC';
+// Mint token symbol union — single source of truth used by VaultPage and MintForm
+export type MintTokenSymbol = 'DOLA' | 'USDC';
+
+// Configuration entry describing a single selectable mint token
+export interface MintTokenConfig {
+  symbol: MintTokenSymbol;
+  name: string;            // Human-readable name ("DOLA" / "USD Coin")
+  address: string | undefined; // Contract address — may be undefined before wallet connect
+  decimals: number;        // Token decimals (18 for DOLA, 6 for USDC)
+  icon: string;            // Imported asset icon
+  balance: number;         // Human-readable balance
+  balanceRaw: bigint;      // Raw on-chain balance
+  balanceUsd: number;      // Dollar value (1:1 assumption for stablecoins)
+}
 
 export default function VaultPage() {
   // Detect chain ID to determine if Testnet Faucet should be shown
@@ -321,12 +333,12 @@ export default function VaultPage() {
   const [depositToYieldAmount, setDepositToYieldAmount] = useState<string>("");
   const [withdrawFromYieldAmount, setWithdrawFromYieldAmount] = useState<string>("");
 
-  // Mint token type state - for switching between DOLA and USDC
-  const [mintTokenType, setMintTokenType] = useState<MintTokenType>('USDC');
+  // Mint token type state - default to USDC to preserve existing behavior
+  const [mintTokenType, setMintTokenType] = useState<MintTokenSymbol>('USDC');
 
-  // Toggle function for mint token switching
-  const toggleMintToken = () => {
-    setMintTokenType(prev => prev === 'DOLA' ? 'USDC' : 'DOLA');
+  // Select a specific mint token by symbol
+  const selectMintToken = (symbol: MintTokenSymbol) => {
+    setMintTokenType(symbol);
   };
 
   // State for transaction UI (all core transactions are now real: mint, deposit, withdraw, claim)
@@ -365,25 +377,47 @@ export default function VaultPage() {
   // Now using DepositView data (phUsdBalanceFromView)
   const phUsdBalance = phUsdBalanceFromView ? parseFloat((Number(phUsdBalanceFromView) / 1e18).toFixed(4)) : 0;
 
-  // Real token info for the Mint tab - conditional based on selected mint token type
-  const mintTokenInfo: TokenInfo = mintTokenType === 'DOLA'
-    ? {
-        name: "DOLA",
-        balance: dolaBalance,
-        balanceUsd: dolaBalance, // 1:1 USD value assumption for stablecoins
-        balanceRaw: dolaBalanceRaw ?? 0n,
-        icon: DOLA
-      }
-    : {
-        name: "USDC",
-        balance: usdcBalance,
-        balanceUsd: usdcBalance, // 1:1 USD value assumption for stablecoins
-        balanceRaw: usdcBalanceRaw ?? 0n,
-        icon: USDC
-      };
+  // Single source of truth for all selectable mint tokens.
+  // Adding a new token here drives every downstream lookup below (info, decimals, mint handler)
+  // without touching the UI branches.
+  const mintTokens: MintTokenConfig[] = [
+    {
+      symbol: 'DOLA',
+      name: 'DOLA',
+      address: addresses?.Dola,
+      decimals: 18,
+      icon: DOLA,
+      balance: dolaBalance,
+      balanceRaw: dolaBalanceRaw ?? 0n,
+      balanceUsd: dolaBalance, // 1:1 USD assumption
+    },
+    {
+      symbol: 'USDC',
+      name: 'USD Coin',
+      address: addresses?.USDC,
+      decimals: 6,
+      icon: USDC,
+      balance: usdcBalance,
+      balanceRaw: usdcBalanceRaw ?? 0n,
+      balanceUsd: usdcBalance, // 1:1 USD assumption
+    },
+  ];
+
+  // Look up the active mint token entry. Fall back to the first token if somehow not found.
+  const activeMintToken: MintTokenConfig =
+    mintTokens.find((t) => t.symbol === mintTokenType) ?? mintTokens[0];
+
+  // Real token info for the Mint tab sourced from the active mint token entry
+  const mintTokenInfo: TokenInfo = {
+    name: activeMintToken.name,
+    balance: activeMintToken.balance,
+    balanceUsd: activeMintToken.balanceUsd,
+    balanceRaw: activeMintToken.balanceRaw,
+    icon: activeMintToken.icon,
+  };
 
   // Get current token decimals for amount conversion
-  const mintTokenDecimals = mintTokenType === 'DOLA' ? 18 : 6;
+  const mintTokenDecimals = activeMintToken.decimals;
 
   // Real token info for the Deposit tab using DepositView phUSD balance
   // Use market price for USD value on mainnet, fallback to 1:1 for testnets
@@ -842,9 +876,9 @@ export default function VaultPage() {
       return;
     }
 
-    // Get the correct token address based on selected mint token type
-    const tokenAddress = mintTokenType === 'DOLA' ? addresses?.Dola : addresses?.USDC;
-    const currentBalance = mintTokenType === 'DOLA' ? dolaBalance : usdcBalance;
+    // Look up the correct token address and balance from the active mint token entry
+    const tokenAddress = activeMintToken.address;
+    const currentBalance = activeMintToken.balance;
 
     // Check contract addresses are loaded
     if (!addresses?.PhusdStableMinter || !tokenAddress) {
@@ -1322,8 +1356,9 @@ export default function VaultPage() {
                   needsApproval={needsMintTokenApproval && mintAmountWei > 0n}
                   isAllowanceLoading={mintAllowanceLoading}
                   isPaused={isPaused === true}
+                  mintTokens={mintTokens}
                   mintTokenType={mintTokenType}
-                  onToggleMintToken={toggleMintToken}
+                  onSelectMintToken={selectMintToken}
                   tokenDecimals={mintTokenDecimals}
                 />
               </ErrorBoundary>

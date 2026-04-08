@@ -1,15 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { parseUnits } from 'viem';
 import type { TokenInfo } from '../../types/vault';
+import type { MintTokenConfig, MintTokenSymbol } from '../../pages/VaultPage';
 import { safeMaxForDisplay } from '../../utils/bigIntDisplay';
 import AmountDisplay from '../ui/AmountDisplay';
 import AmountInput from '../ui/AmountInput';
 import ActionButton from '../ui/ActionButton';
+import TokenSelectorModal from '../ui/TokenSelectorModal';
 import MintConfirmationDialog from './MintConfirmationDialog';
 import { log } from '../../utils/logger';
-
-// Mint token type
-type MintTokenType = 'DOLA' | 'USDC';
 
 // Props interface for MintForm - simplified from DepositFormProps
 export interface MintFormProps {
@@ -22,9 +21,10 @@ export interface MintFormProps {
   onApprove?: () => void;
   isAllowanceLoading?: boolean;
   isPaused?: boolean;
-  // New props for token switching
-  mintTokenType?: MintTokenType;
-  onToggleMintToken?: () => void;
+  // Token selection props — driven by the token list on VaultPage
+  mintTokens?: MintTokenConfig[];
+  mintTokenType?: MintTokenSymbol;
+  onSelectMintToken?: (symbol: MintTokenSymbol) => void;
   tokenDecimals?: number;
 }
 
@@ -38,42 +38,18 @@ export default function MintForm({
   onApprove,
   isAllowanceLoading = false,
   isPaused = false,
-  mintTokenType = 'DOLA',
-  onToggleMintToken,
+  mintTokens,
+  mintTokenType = 'USDC',
+  onSelectMintToken,
   tokenDecimals = 18
 }: MintFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
-  const [isSwapping, setIsSwapping] = useState(false);
-  const swapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [selectorOpen, setSelectorOpen] = useState(false);
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (swapTimeoutRef.current) {
-        clearTimeout(swapTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Handle token logo click with animation
-  const handleTokenSwap = () => {
-    // Prevent rapid clicking during animation
-    if (isSwapping || !onToggleMintToken) return;
-
-    setIsSwapping(true);
-
-    // Swap the token at the midpoint of the animation (150ms = half of 300ms)
-    swapTimeoutRef.current = setTimeout(() => {
-      onToggleMintToken();
-    }, 150);
-
-    // Reset swapping state after animation completes
-    swapTimeoutRef.current = setTimeout(() => {
-      setIsSwapping(false);
-    }, 300);
-  };
+  // Whether the token selector pill is interactive — requires both a token list and a handler
+  const selectorEnabled = !!mintTokens && mintTokens.length > 0 && !!onSelectMintToken;
 
   // Validate input and parse to BigInt with error handling
   let inputAmountWei = 0n;
@@ -236,48 +212,41 @@ export default function MintForm({
 
         <div className="h-px w-full bg-border mb-6" />
 
-        {/* Custom token row with clickable logo */}
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            {/* Clickable token logo with animation */}
-            <button
-              onClick={handleTokenSwap}
-              disabled={!onToggleMintToken || isSwapping}
-              className="relative focus:outline-none focus:ring-2 focus:ring-primary rounded-full disabled:cursor-default"
-              title={onToggleMintToken ? `Click to switch to ${mintTokenType === 'DOLA' ? 'USDC' : 'DOLA'}` : undefined}
-            >
-              <img
-                src={tokenInfo.icon}
-                alt={`${tokenInfo.name} icon`}
-                className={`h-10 w-10 rounded-full flex-shrink-0 object-cover ${
-                  onToggleMintToken ? 'token-logo-clickable' : ''
-                } ${isSwapping ? 'animate-token-swap' : ''}`}
-              />
-              {/* Visual indicator that token is clickable */}
-              {onToggleMintToken && (
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-pxusd-teal-700 rounded-full flex items-center justify-center border border-border">
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="text-muted-foreground"
-                  >
-                    <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16" />
-                  </svg>
-                </div>
-              )}
-            </button>
-            <div className="min-w-0 flex-1">
-              <div className="text-base font-semibold text-foreground">{tokenInfo.name}</div>
-              <div className="text-xs sm:text-sm text-muted-foreground break-words">
-                Balance {formatBalance(tokenInfo.balance)} (${formatBalance(tokenInfo.balanceUsd)})
-              </div>
-            </div>
+        {/* Pill selector + balance line */}
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => selectorEnabled && setSelectorOpen(true)}
+            disabled={!selectorEnabled}
+            className="flex items-center gap-3 px-4 py-2 bg-card border border-border rounded-xl hover:bg-pxusd-teal-700 transition-colors focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-default disabled:hover:bg-card"
+          >
+            <img
+              src={tokenInfo.icon}
+              alt={`${tokenInfo.name} icon`}
+              className="h-8 w-8 rounded-full flex-shrink-0 object-cover"
+            />
+            <span className="text-base font-semibold text-foreground">
+              {tokenInfo.name}
+            </span>
+            {selectorEnabled && (
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 text-muted-foreground"
+                aria-hidden="true"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            )}
+          </button>
+          <div className="mt-2 text-xs sm:text-sm text-muted-foreground break-words">
+            Balance {formatBalance(tokenInfo.balance)} (${formatBalance(tokenInfo.balanceUsd)})
           </div>
         </div>
 
@@ -343,6 +312,16 @@ export default function MintForm({
           outputToken: 'phUSD',
         }}
       />
+
+      {selectorEnabled && (
+        <TokenSelectorModal
+          isOpen={selectorOpen}
+          onClose={() => setSelectorOpen(false)}
+          tokens={mintTokens!}
+          activeSymbol={mintTokenType}
+          onSelect={onSelectMintToken!}
+        />
+      )}
     </>
   );
 }
