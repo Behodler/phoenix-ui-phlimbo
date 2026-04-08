@@ -80,11 +80,10 @@ export default function TokenSelectorModal({
                 key={token.symbol}
                 type="button"
                 onClick={() => handleSelect(token.symbol)}
-                className={`w-full flex items-center justify-between gap-3 p-3 rounded-lg border transition-colors hover:bg-pxusd-teal-700 focus:outline-none focus:ring-2 focus:ring-primary ${
-                  isActive
-                    ? 'border-primary bg-pxusd-teal-900/40'
-                    : 'border-border bg-card'
-                }`}
+                className={`w-full flex items-center justify-between gap-3 p-3 rounded-lg border transition-colors hover:bg-pxusd-teal-700 focus:outline-none focus:ring-2 focus:ring-primary ${isActive
+                  ? 'border-primary bg-pxusd-teal-900/40'
+                  : 'border-border bg-card'
+                  }`}
               >
                 {/* Left section: icon + name/symbol-address */}
                 <div className="flex items-center gap-3 min-w-0">
@@ -95,10 +94,10 @@ export default function TokenSelectorModal({
                   />
                   <div className="flex flex-col items-start min-w-0">
                     <span className="text-base font-semibold text-foreground truncate">
-                      {token.name}
+                      {token.symbol || token.name}
                     </span>
                     <span className="text-xs text-muted-foreground truncate">
-                      {token.symbol}&nbsp;&nbsp;{truncateAddress(token.address)}
+                      {truncateAddress(token.address)}
                     </span>
                   </div>
                 </div>

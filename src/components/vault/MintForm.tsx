@@ -51,6 +51,11 @@ export default function MintForm({
   // Whether the token selector pill is interactive — requires both a token list and a handler
   const selectorEnabled = !!mintTokens && mintTokens.length > 0 && !!onSelectMintToken;
 
+  // Active mint token entry (if a token list is provided), used to source the ERC20 symbol
+  // for the pill label. Falls back to tokenInfo.name when no symbol is available.
+  const activeMintToken = mintTokens?.find((t) => t.symbol === mintTokenType);
+  const pillLabel = activeMintToken?.symbol || tokenInfo.name;
+
   // Validate input and parse to BigInt with error handling
   let inputAmountWei = 0n;
   let parseError = false;
@@ -226,7 +231,7 @@ export default function MintForm({
               className="h-8 w-8 rounded-full flex-shrink-0 object-cover"
             />
             <span className="text-base font-semibold text-foreground">
-              {tokenInfo.name}
+              {pillLabel}
             </span>
             {selectorEnabled && (
               <svg
