@@ -234,6 +234,32 @@ export default function Admin() {
     },
   });
 
+  // Fetch principal from YieldStrategyUSDe (principal deposited via PhusdStableMinter)
+  const { data: usdeYieldStrategyPrincipal, refetch: refetchUsdePrincipal, error: usdePrincipalError } = useReadContract({
+    address: addresses?.YieldStrategyUSDe as `0x${string}` | undefined,
+    abi: erc4626YieldStrategyAbi,
+    functionName: 'principalOf',
+    args: addresses?.USDe && addresses?.PhusdStableMinter
+      ? [addresses.USDe as `0x${string}`, addresses.PhusdStableMinter as `0x${string}`]
+      : undefined,
+    query: {
+      enabled: !!addresses?.YieldStrategyUSDe && !!addresses?.USDe && !!addresses?.PhusdStableMinter,
+    },
+  });
+
+  // Fetch total balance from YieldStrategyUSDe (principal + yield for PhusdStableMinter)
+  const { data: usdeYieldStrategyTotalBalance, refetch: refetchUsdeTotalBalance, error: usdeTotalBalanceError } = useReadContract({
+    address: addresses?.YieldStrategyUSDe as `0x${string}` | undefined,
+    abi: erc4626YieldStrategyAbi,
+    functionName: 'totalBalanceOf',
+    args: addresses?.USDe && addresses?.PhusdStableMinter
+      ? [addresses.USDe as `0x${string}`, addresses.PhusdStableMinter as `0x${string}`]
+      : undefined,
+    query: {
+      enabled: !!addresses?.YieldStrategyUSDe && !!addresses?.USDe && !!addresses?.PhusdStableMinter,
+    },
+  });
+
   // ========== PHLIMBO STATISTICS SECTION ==========
   // Fetch PhlimboEA pool info: (totalStaked, accPhUSDPerShare, accStablePerShare, phUSDPerSecond, lastRewardTime)
   const { data: poolInfo, refetch: refetchPoolInfo, isLoading: poolInfoLoading } = useReadContract({
@@ -282,6 +308,28 @@ export default function Admin() {
     },
   });
 
+  // Fetch YieldFunnel USDC pending yield from StableYieldAccumulator.getYield(usdcStrategy)
+  const { data: usdcFunnelYield, refetch: refetchUsdcFunnelYield, isLoading: usdcFunnelYieldLoading } = useReadContract({
+    address: addresses?.StableYieldAccumulator as `0x${string}` | undefined,
+    abi: stableYieldAccumulatorAbi,
+    functionName: 'getYield',
+    args: addresses?.YieldStrategyUSDC ? [addresses.YieldStrategyUSDC as `0x${string}`] : undefined,
+    query: {
+      enabled: !!addresses?.StableYieldAccumulator && !!addresses?.YieldStrategyUSDC,
+    },
+  });
+
+  // Fetch YieldFunnel USDe pending yield from StableYieldAccumulator.getYield(usdeStrategy)
+  const { data: usdeFunnelYield, refetch: refetchUsdeFunnelYield, isLoading: usdeFunnelYieldLoading } = useReadContract({
+    address: addresses?.StableYieldAccumulator as `0x${string}` | undefined,
+    abi: stableYieldAccumulatorAbi,
+    functionName: 'getYield',
+    args: addresses?.YieldStrategyUSDe ? [addresses.YieldStrategyUSDe as `0x${string}`] : undefined,
+    query: {
+      enabled: !!addresses?.StableYieldAccumulator && !!addresses?.YieldStrategyUSDe,
+    },
+  });
+
   // Extract values from poolInfo tuple
   const phlimboTotalStaked = poolInfo ? poolInfo[0] : 0n;
   const phlimboPhUSDPerSecond = poolInfo ? poolInfo[3] : 0n;
@@ -321,9 +369,15 @@ export default function Admin() {
   const dolaYieldDisplay = dolaYield
     ? (Number(dolaYield) / 1e18).toFixed(2)
     : '0.00';
+  const usdcFunnelYieldDisplay = usdcFunnelYield
+    ? (Number(usdcFunnelYield) / 1e6).toFixed(2)
+    : '0.00';
+  const usdeFunnelYieldDisplay = usdeFunnelYield
+    ? (Number(usdeFunnelYield) / 1e18).toFixed(2)
+    : '0.00';
 
   // Combined loading state for Phlimbo statistics
-  const phlimboStatsLoading = poolInfoLoading || rewardPerSecondLoading || depletionDurationLoading || phlimboUsdcLoading || dolaYieldLoading;
+  const phlimboStatsLoading = poolInfoLoading || rewardPerSecondLoading || depletionDurationLoading || phlimboUsdcLoading || dolaYieldLoading || usdcFunnelYieldLoading || usdeFunnelYieldLoading;
 
   // Refetch all Phlimbo statistics
   const refetchPhlimboStats = () => {
@@ -332,6 +386,8 @@ export default function Admin() {
     refetchDepletionDuration();
     refetchPhlimboUsdc();
     refetchDolaYield();
+    refetchUsdcFunnelYield();
+    refetchUsdeFunnelYield();
   };
   // ========== END PHLIMBO STATISTICS SECTION ==========
 
@@ -399,6 +455,16 @@ export default function Admin() {
   const usdcYieldDisplay = (Number(usdcYield) / 1e6).toFixed(2);
   const usdcTotalDisplay = (Number(usdcTotalBalance) / 1e6).toFixed(2);
 
+  // Calculate USDe yield vs principal breakdown (YieldStrategyUSDe)
+  // Uses same pattern as DOLA since USDe is also 18 decimals
+  const usdePrincipal = usdeYieldStrategyPrincipal !== undefined ? usdeYieldStrategyPrincipal : 0n;
+  const usdeTotalBalance = usdeYieldStrategyTotalBalance !== undefined ? usdeYieldStrategyTotalBalance : 0n;
+  const usdeYield = usdeTotalBalance > usdePrincipal ? usdeTotalBalance - usdePrincipal : 0n;
+
+  const usdePrincipalDisplay = (Number(usdePrincipal) / 1e18).toFixed(2);
+  const usdeYieldDisplay = (Number(usdeYield) / 1e18).toFixed(2);
+  const usdeTotalDisplay = (Number(usdeTotalBalance) / 1e18).toFixed(2);
+
   // Debug logging for balance queries
   useEffect(() => {
     console.log('[Admin] Balance Query Debug:', {
@@ -412,11 +478,18 @@ export default function Admin() {
         totalBalance: autoUsdTotalBalance?.toString(),
         yield_: usdcYield.toString(),
       },
+      usde: {
+        principal: usdeYieldStrategyPrincipal?.toString(),
+        totalBalance: usdeYieldStrategyTotalBalance?.toString(),
+        yield_: usdeYield.toString(),
+      },
       addresses: {
         YieldStrategyDola: addresses?.YieldStrategyDola,
         YieldStrategyUSDC: addresses?.YieldStrategyUSDC,
+        YieldStrategyUSDe: addresses?.YieldStrategyUSDe,
         Dola: addresses?.Dola,
         USDC: addresses?.USDC,
+        USDe: addresses?.USDe,
         PhusdStableMinter: addresses?.PhusdStableMinter,
       },
       errors: {
@@ -424,6 +497,8 @@ export default function Admin() {
         totalBalanceError: totalBalanceError?.message,
         autoUsdPrincipalError: autoUsdPrincipalError?.message,
         autoUsdTotalBalanceError: autoUsdTotalBalanceError?.message,
+        usdePrincipalError: usdePrincipalError?.message,
+        usdeTotalBalanceError: usdeTotalBalanceError?.message,
       }
     });
 
@@ -439,7 +514,13 @@ export default function Admin() {
     if (autoUsdTotalBalanceError) {
       console.error('[Admin] USDC Total Balance Query Error:', autoUsdTotalBalanceError);
     }
-  }, [phusdStableMinterPrincipal, phusdStableMinterTotalBalance, principal, totalVaultBalance, yield_, autoUsdPrincipal, autoUsdTotalBalance, usdcYield, addresses, principalError, totalBalanceError, autoUsdPrincipalError, autoUsdTotalBalanceError]);
+    if (usdePrincipalError) {
+      console.error('[Admin] USDe Principal Query Error:', usdePrincipalError);
+    }
+    if (usdeTotalBalanceError) {
+      console.error('[Admin] USDe Total Balance Query Error:', usdeTotalBalanceError);
+    }
+  }, [phusdStableMinterPrincipal, phusdStableMinterTotalBalance, principal, totalVaultBalance, yield_, autoUsdPrincipal, autoUsdTotalBalance, usdcYield, usdeYieldStrategyPrincipal, usdeYieldStrategyTotalBalance, usdePrincipal, usdeTotalBalance, usdeYield, addresses, principalError, totalBalanceError, autoUsdPrincipalError, autoUsdTotalBalanceError, usdePrincipalError, usdeTotalBalanceError]);
 
   /**
    * Discover owned contracts by checking ownership of each contract
@@ -1119,6 +1200,54 @@ export default function Admin() {
         </p>
       </div>
 
+      {/* YieldStrategyUSDe Balance Breakdown */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-semibold text-foreground mb-3">
+          YieldStrategyUSDe Balance Breakdown
+        </h3>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Principal (PhusdStableMinter):</span>
+            <span className="text-sm font-mono text-foreground">
+              {usdePrincipalDisplay} USDe
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Yield Generated:</span>
+            <span className="text-sm font-mono text-accent">
+              {usdeYieldDisplay} USDe
+            </span>
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-foreground">Total Vault Balance:</span>
+            <span className="text-sm font-mono font-semibold text-foreground">
+              {usdeTotalDisplay} USDe
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-border">
+          <button
+            onClick={() => {
+              refetchUsdePrincipal();
+              refetchUsdeTotalBalance();
+            }}
+            className="text-xs text-accent hover:text-accent/80 underline"
+          >
+            Refresh Balances
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+          <strong>Note:</strong> Principal represents USDe deposited through PhusdStableMinter.
+          Yield is vault balance growth beyond principal. PhUSD values are based on principal only,
+          while the protocol utilizes yield separately.
+          <span className="block mt-2">
+            Values are fetched directly from YieldStrategyUSDe using the IYieldStrategy interface:
+            principalOf() returns principal only, totalBalanceOf() returns principal + yield.
+            Yield is calculated as: totalBalanceOf - principalOf.
+          </span>
+        </p>
+      </div>
+
       {/* Phlimbo Statistics Section */}
       <div className="bg-card border border-border rounded-lg p-4 mb-6">
         <div className="flex justify-between items-center mb-3">
@@ -1166,6 +1295,18 @@ export default function Admin() {
               {dolaYieldDisplay} DOLA
             </span>
           </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">YieldFunnel USDC (Pending):</span>
+            <span className="text-sm font-mono text-accent">
+              {usdcFunnelYieldDisplay} USDC
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">YieldFunnel USDe (Pending):</span>
+            <span className="text-sm font-mono text-accent">
+              {usdeFunnelYieldDisplay} USDe
+            </span>
+          </div>
         </div>
         <div className="mt-3 pt-3 border-t border-border">
           <button
@@ -1179,7 +1320,7 @@ export default function Admin() {
           <strong>Note:</strong> phUSDPerSecond is the current phUSD emission rate.
           rewardPerSecond is the current USDC reward distribution rate (stored with 1e18 precision in contract), recalculated when users stake/unstake or USDC yield is injected.
           depletionDuration is the configurable duration over which rewards are linearly depleted.
-          YieldFunnel DOLA shows pending DOLA yield from the DOLA yield strategy.
+          YieldFunnel DOLA/USDC/USDe show pending yield from each stable yield strategy.
         </p>
       </div>
 
