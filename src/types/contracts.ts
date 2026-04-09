@@ -7,12 +7,14 @@
  * - surplusTracker: Tracks surplus yield accumulation from the yield strategy
  * - surplusWithdrawer: Handles withdrawal of accumulated surplus yield
  */
-
 export interface ContractAddresses {
   PhUSD: string;
   USDC: string;
   USDS: string;
   SUSDS: string;
+  USDe: string;
+  SUSDe: string;
+  YieldStrategyUSDe: string;
   Dola: string;
   EYE: string;
   SCX: string;
