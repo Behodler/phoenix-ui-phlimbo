@@ -26,12 +26,13 @@ import FAQ from '../components/vault/FAQ';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
 import DOLA from "../assets/sDOLA.png";
 import USDC from "../assets/usdc-logo.svg";
+import USDe from "../assets/USDe.png";
 import phUSDIcon from "../assets/phUSD.png";
 import { isAllowlistedAdmin } from '../lib/adminAllowlist';
 import { log } from '../utils/logger';
 
 // Mint token symbol union — single source of truth used by VaultPage and MintForm
-export type MintTokenSymbol = 'DOLA' | 'USDC';
+export type MintTokenSymbol = 'DOLA' | 'USDC' | 'USDe';
 
 // Configuration entry describing a single selectable mint token
 export interface MintTokenConfig {
@@ -117,6 +118,26 @@ export default function VaultPage() {
     walletAddress,
     addresses?.PhusdStableMinter as `0x${string}` | undefined,
     addresses?.USDC as `0x${string}` | undefined
+  );
+
+  // Fetch USDe balance for connected wallet (used by Mint tab when USDe is selected)
+  const {
+    balance: usdeBalanceRaw,
+    refetch: refetchUsdeBalance
+  } = useTokenBalance(
+    walletAddress,
+    addresses?.USDe as `0x${string}` | undefined
+  );
+
+  // Fetch USDe allowance for PhusdStableMinter contract (for Mint tab when USDe is selected)
+  const {
+    allowance: usdeAllowanceRaw,
+    isLoading: usdeAllowanceLoading,
+    refetch: refetchUsdeAllowance
+  } = useTokenAllowance(
+    walletAddress,
+    addresses?.PhusdStableMinter as `0x${string}` | undefined,
+    addresses?.USDe as `0x${string}` | undefined
   );
 
   // NOTE: phUSD allowance for PhlimboEA now comes from DepositView polling hook (phUsdAllowanceFromView)
@@ -373,6 +394,9 @@ export default function VaultPage() {
   // Convert USDC balance from raw bigint to display format (USDC has 6 decimals)
   const usdcBalance = usdcBalanceRaw ? parseFloat((Number(usdcBalanceRaw) / 1e6).toFixed(4)) : 0;
 
+  // Convert USDe balance from raw bigint to display format (USDe has 18 decimals)
+  const usdeBalance = usdeBalanceRaw ? parseFloat((Number(usdeBalanceRaw) / 1e18).toFixed(4)) : 0;
+
   // Convert phUSD balance from raw bigint to display format (for Deposit tab)
   // Now using DepositView data (phUsdBalanceFromView)
   const phUsdBalance = phUsdBalanceFromView ? parseFloat((Number(phUsdBalanceFromView) / 1e18).toFixed(4)) : 0;
@@ -400,6 +424,16 @@ export default function VaultPage() {
       balance: usdcBalance,
       balanceRaw: usdcBalanceRaw ?? 0n,
       balanceUsd: usdcBalance, // 1:1 USD assumption
+    },
+    {
+      symbol: 'USDe',
+      name: 'USDe',
+      address: addresses?.USDe,
+      decimals: 18,
+      icon: USDe,
+      balance: usdeBalance,
+      balanceRaw: usdeBalanceRaw ?? 0n,
+      balanceUsd: usdeBalance, // 1:1 USD assumption (consistent with DOLA/USDC)
     },
   ];
 
@@ -447,13 +481,20 @@ export default function VaultPage() {
   // Needs approval based on selected token type
   // For DOLA: check dolaAllowanceRaw
   // For USDC: check usdcAllowanceRaw
-  const currentAllowanceRaw = mintTokenType === 'DOLA' ? dolaAllowanceRaw : usdcAllowanceRaw;
+  // For USDe: check usdeAllowanceRaw
+  const currentAllowanceRaw =
+    mintTokenType === 'DOLA' ? dolaAllowanceRaw :
+    mintTokenType === 'USDC' ? usdcAllowanceRaw :
+    usdeAllowanceRaw;
   const needsMintTokenApproval = currentAllowanceRaw !== undefined
     ? currentAllowanceRaw < mintAmountWei
     : true; // Default to needing approval if allowance hasn't loaded yet
 
   // Current allowance loading state
-  const mintAllowanceLoading = mintTokenType === 'DOLA' ? dolaAllowanceLoading : usdcAllowanceLoading;
+  const mintAllowanceLoading =
+    mintTokenType === 'DOLA' ? dolaAllowanceLoading :
+    mintTokenType === 'USDC' ? usdcAllowanceLoading :
+    usdeAllowanceLoading;
 
   // Convert deposit amount to wei for comparison with allowance (for Deposit tab)
   const depositAmountWei = depositToYieldAmount && depositToYieldAmount !== '' && depositToYieldAmount !== '0'
@@ -572,6 +613,62 @@ export default function VaultPage() {
       },
       onError: (error) => {
         log.error('USDC approval failed:', error);
+      },
+      onStatusChange: (status) => {
+        if (status === 'PENDING_SIGNATURE') {
+          addToast({
+            type: 'info',
+            title: 'Confirm in Wallet',
+            description: 'Please confirm the approval transaction in your wallet.',
+            duration: 30000,
+          });
+        } else if (status === 'PENDING_CONFIRMATION') {
+          addToast({
+            type: 'info',
+            title: 'Transaction Submitted',
+            description: 'Waiting for blockchain confirmation...',
+            duration: 30000,
+          });
+        }
+      }
+    }
+  );
+
+  // USDe approval transaction state management (for Mint tab when USDe is selected)
+  const usdeApprovalTransaction = useApprovalTransaction(
+    async () => {
+      if (!addresses?.USDe || !addresses?.PhusdStableMinter) {
+        throw new Error('Contract addresses not loaded');
+      }
+      // Approve unlimited amount for better UX (single approval)
+      return approve(
+        addresses.USDe as `0x${string}`,
+        addresses.PhusdStableMinter as `0x${string}`,
+        maxUint256
+      );
+    },
+    {
+      onSuccess: async (hash) => {
+        await refetchUsdeAllowance();
+
+        addToast({
+          type: 'success',
+          title: 'Approval Successful',
+          description: 'USDe spending has been approved for minting phUSD.',
+          duration: 30000,
+          action: {
+            label: 'View Transaction',
+            onClick: () => {
+              const explorerUrl = networkType === 'mainnet'
+                ? `https://etherscan.io/tx/${hash}`
+                : `https://sepolia.etherscan.io/tx/${hash}`;
+              window.open(explorerUrl, '_blank');
+            }
+          }
+        });
+      },
+      onError: (error) => {
+        log.error('USDe approval failed:', error);
       },
       onStatusChange: (status) => {
         if (status === 'PENDING_SIGNATURE') {
@@ -820,7 +917,10 @@ export default function VaultPage() {
       return;
     }
 
-    const tokenAddress = mintTokenType === 'DOLA' ? addresses?.Dola : addresses?.USDC;
+    const tokenAddress =
+      mintTokenType === 'DOLA' ? addresses?.Dola :
+      mintTokenType === 'USDC' ? addresses?.USDC :
+      addresses?.USDe;
     if (!tokenAddress || !addresses?.PhusdStableMinter) {
       addToast({
         type: 'error',
@@ -831,9 +931,10 @@ export default function VaultPage() {
     }
 
     // Use the appropriate approval transaction based on token type
-    const currentApprovalTransaction = mintTokenType === 'DOLA'
-      ? approvalTransaction
-      : usdcApprovalTransaction;
+    const currentApprovalTransaction =
+      mintTokenType === 'DOLA' ? approvalTransaction :
+      mintTokenType === 'USDC' ? usdcApprovalTransaction :
+      usdeApprovalTransaction;
 
     try {
       await currentApprovalTransaction.execute();
@@ -990,9 +1091,11 @@ export default function VaultPage() {
       // Refetch balances (page-level for Mint tab functionality)
       refetchDolaBalance();
       refetchUsdcBalance();
+      refetchUsdeBalance();
       refetchPhUsdBalance();
       refetchDolaAllowance();
       refetchUsdcAllowance();
+      refetchUsdeAllowance();
 
       // Refresh navbar wallet balances
       refreshWalletBalances();
