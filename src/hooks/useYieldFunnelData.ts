@@ -64,6 +64,7 @@ function getTokenInfoMap(addresses: {
   USDC?: string;
   USDT?: string;
   USDS?: string;
+  USDe?: string;
 } | null): Map<string, TokenInfo> {
   const map = new Map<string, TokenInfo>();
 
@@ -97,6 +98,14 @@ function getTokenInfoMap(addresses: {
     map.set(addresses.USDS.toLowerCase(), {
       symbol: 'USDS',
       name: 'Sky Dollar',
+      decimals: 18,
+    });
+  }
+
+  if (addresses.USDe) {
+    map.set(addresses.USDe.toLowerCase(), {
+      symbol: 'USDe',
+      name: 'Ethena USDe',
       decimals: 18,
     });
   }
