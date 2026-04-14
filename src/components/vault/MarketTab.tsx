@@ -23,7 +23,7 @@ export default function MarketTab({ price, isLoading, isError }: MarketTabProps)
 
   // Format price for display
   const formatPrice = (p: number): string => {
-    return `$${p.toFixed(4)}`;
+    return `$${p.toFixed(10)}`;
   };
 
   // Handle swap button click
