@@ -20,6 +20,9 @@ export type { DepositViewData, UseDepositViewPollingReturn } from './useDepositV
 export { useBalancerPrice } from './useBalancerPrice';
 export type { UseBalancerPriceResult } from './useBalancerPrice';
 
+// Price interpolation hook
+export { usePriceInterpolation } from './usePriceInterpolation';
+
 // Solvency info hook
 export { useSolvencyInfo } from './useSolvencyInfo';
 export type { SolvencyInfo, RunwayHealth } from './useSolvencyInfo';
