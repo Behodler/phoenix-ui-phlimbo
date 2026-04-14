@@ -13,11 +13,12 @@ const BalancerLogo = () => (
 // Props interface for MarketTab
 interface MarketTabProps {
   price: number | null;
+  displayPrice: number | null;
   isLoading: boolean;
   isError: boolean;
 }
 
-export default function MarketTab({ price, isLoading, isError }: MarketTabProps) {
+export default function MarketTab({ price, displayPrice, isLoading, isError }: MarketTabProps) {
   // Determine action based on current price vs $1
   const isPriceAboveOrAtDollar = price !== null && price >= 1.0;
 
@@ -78,7 +79,7 @@ export default function MarketTab({ price, isLoading, isError }: MarketTabProps)
               <span className="text-red-400">Unable to fetch price</span>
             ) : (
               <span className={`text-2xl font-bold ${isPriceAboveOrAtDollar ? 'text-pxusd-green-400' : 'text-pxusd-pink-400'}`}>
-                {formatPrice(price)}
+                {formatPrice(displayPrice ?? price!)}
               </span>
             )}
           </div>
