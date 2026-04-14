@@ -60,7 +60,7 @@ export function useBalancerPrice(): UseBalancerPriceResult {
     functionName: 'getCurrentLiveBalances',
     args: [BALANCER_POOL_ADDRESS],
     query: {
-      refetchInterval: 30000,
+      refetchInterval: 12000,
     },
   });
 
@@ -76,7 +76,7 @@ export function useBalancerPrice(): UseBalancerPriceResult {
     functionName: 'convertToAssets',
     args: [BigInt('1000000000000000000')],
     query: {
-      refetchInterval: 30000,
+      refetchInterval: 12000,
     },
   });
 
