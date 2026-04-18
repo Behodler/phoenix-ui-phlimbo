@@ -223,12 +223,7 @@ export function useSolvencyInfo(): SolvencyInfo {
     if (runwayDays < 7) {
       return `${runwayDays.toFixed(1)} days`;
     }
-    if (runwayDays < 30) {
-      const weeks = runwayDays / 7;
-      return `${weeks.toFixed(1)} weeks`;
-    }
-    const months = runwayDays / 30;
-    return `${months.toFixed(1)} months`;
+    return `${Math.round(runwayDays)} days`;
   }, [runwayDays]);
 
   // Determine runway health status
