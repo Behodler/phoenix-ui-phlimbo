@@ -1,5 +1,5 @@
 import eyeImg from '../assets/EYE.png';
-import sUsdsImg from '../assets/sUSDS.png';
+import usdsImg from '../assets/USDS.png';
 import scxImg from '../assets/SCX.png';
 import bitcoinImg from '../assets/Bitcoin.png';
 import flaxImg from '../assets/Flax.png';
@@ -20,8 +20,8 @@ export interface NFTStaticConfig {
   action: string;
   /** Explanation of why this NFT is valuable */
   reason: string;
-  /** Token prefix matching MinterPageView data keys (EYE, SCX, Flax, sUSDS, WBTC) */
-  tokenPrefix: 'EYE' | 'SCX' | 'Flax' | 'sUSDS' | 'WBTC';
+  /** Token prefix matching MinterPageView data keys (EYE, SCX, Flax, USDS, WBTC) */
+  tokenPrefix: 'EYE' | 'SCX' | 'Flax' | 'USDS' | 'WBTC';
   /** Display name of the input token */
   tokenDisplayName: string;
   /** Number of decimals for the input token's ERC20 contract */
@@ -38,7 +38,7 @@ export interface NFTData {
   image: string;
   action: string;
   reason: string;
-  tokenPrefix: 'EYE' | 'SCX' | 'Flax' | 'sUSDS' | 'WBTC';
+  tokenPrefix: 'EYE' | 'SCX' | 'Flax' | 'USDS' | 'WBTC';
   tokenDisplayName: string;
   /** Formatted price in input token amount */
   price: string;
@@ -80,11 +80,11 @@ export const nftStaticConfig: NFTStaticConfig[] = [
   {
     id: 2,
     name: "Liquid Sky Phoenix",
-    image: sUsdsImg,
+    image: usdsImg,
     action: "Balancer liquidity boosted",
     reason: "More liquidity with price tilting means more minting which means more yield which means more liquidity which means... you get the idea.",
-    tokenPrefix: "sUSDS",
-    tokenDisplayName: "sUSDS",
+    tokenPrefix: "USDS",
+    tokenDisplayName: "USDS",
     decimals: 18,
   },
   {
@@ -128,7 +128,7 @@ export const tokenPrefixToAddressKey: Record<string, string> = {
   SCX: 'SCX',
   Flax: 'Flax',
   WBTC: 'WBTC',
-  sUSDS: 'SUSDS',
+  USDS: 'USDS',
 };
 
 /**
@@ -139,6 +139,6 @@ export const tokenPrefixToPriceKey: Record<string, string> = {
   EYE: 'EYE',
   SCX: 'SCX',
   Flax: 'FLAX',
-  sUSDS: 'sUSDS',
+  USDS: 'USDS',
   WBTC: 'BTC',
 };

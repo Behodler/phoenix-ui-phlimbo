@@ -127,7 +127,7 @@
       },
       {
         "title": "Where do I get a claim NFT?",
-        "body": "Head over to the NFT tab to mint one. Each NFT type accepts a different token (EYE, SCX, Flax, sUSDS, or BTC). Pick whichever token is most accessible to you — all NFT types are equally valid for claiming yield."
+        "body": "Head over to the NFT tab to mint one. Each NFT type accepts a different token (EYE, SCX, Flax, USDS, or BTC). Pick whichever token is most accessible to you — all NFT types are equally valid for claiming yield."
       },
       {
         "title": "What happens to my NFT after I claim?",
@@ -168,7 +168,7 @@
       },
       {
         "title": "What is the difference between 'burnt', 'stockpiled', and 'contributed'?",
-        "body": "These describe what happens to your tokens. 'Burnt' means permanently destroyed (EYE, SCX, Flax). 'Stockpiled' means sent to a reserve for protocol safety (BTC). 'Contributed' means donated as liquidity to the Balancer pool (sUSDS)."
+        "body": "These describe what happens to your tokens. 'Burnt' means permanently destroyed (EYE, SCX, Flax). 'Stockpiled' means sent to a reserve for protocol safety (BTC). 'Contributed' means donated as liquidity to the Balancer pool (USDS)."
       },
       {
         "title": "Why would I burn EYE or SCX instead of just adding liquidity?",
