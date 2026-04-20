@@ -7,6 +7,16 @@
  * - surplusTracker: Tracks surplus yield accumulation from the yield strategy
  * - surplusWithdrawer: Handles withdrawal of accumulated surplus yield
  */
+
+export interface YieldNFTAddresses {
+  NFTMinter: string;
+  BurnerEYE: string;
+  BurnerSCX: string;
+  BurnerFlax: string;
+  BalancerPooler: string;
+  GatherWBTC: string;
+}
+
 export interface ContractAddresses {
   PhUSD: string;
   USDC: string;
@@ -14,7 +24,6 @@ export interface ContractAddresses {
   SUSDS: string;
   USDe: string;
   SUSDe: string;
-  YieldStrategyUSDe: string;
   Dola: string;
   EYE: string;
   SCX: string;
@@ -25,24 +34,22 @@ export interface ContractAddresses {
   YieldStrategyDola: string;
   AutoUSDC: string;
   YieldStrategyUSDC: string;
+  YieldStrategyUSDe: string;
   PhusdStableMinter: string;
   PhlimboEA: string;
   StableYieldAccumulator: string;
   BalancerPool: string;
   BalancerVault: string;
-  NFTMinter: string;
   BurnRecorder: string;
-  BurnerEYE: string;
-  BurnerSCX: string;
-  BurnerFlax: string;
-  BalancerPooler: string;
-  GatherWBTC: string;
+  BalancerRouter: string;
+  NFTMigrator: string;
   DepositView: string;
   ViewRouter: string;
   DepositPageView: string;
   MintPageView: string;
+  nftsV1: YieldNFTAddresses;
+  nftsV2: YieldNFTAddresses;
 }
-
 
 /**
  * Response structure from local development address server
