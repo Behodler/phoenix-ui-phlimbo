@@ -1,5 +1,5 @@
 import eyeImg from '../assets/EYE.png';
-import usdsImg from '../assets/USDS.png';
+import sUsdsImg from '../assets/sUSDS.png';
 import scxImg from '../assets/SCX.png';
 import bitcoinImg from '../assets/Bitcoin.png';
 import flaxImg from '../assets/Flax.png';
@@ -80,7 +80,7 @@ export const nftStaticConfig: NFTStaticConfig[] = [
   {
     id: 2,
     name: "Liquid Sky Phoenix",
-    image: usdsImg,
+    image: sUsdsImg,
     action: "Balancer liquidity boosted",
     reason: "More liquidity with price tilting means more minting which means more yield which means more liquidity which means... you get the idea.",
     tokenPrefix: "USDS",
