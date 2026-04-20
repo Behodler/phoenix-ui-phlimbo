@@ -12,7 +12,6 @@ import usdcLogo from '../../assets/usdc-logo.svg';
  */
 export default function YieldRewardsInfo({
   totalApy,
-  phUsdApy,
   usdcApy,
   pendingPhUsd,
   pendingUsdc,
