@@ -1395,7 +1395,9 @@ export default function Admin() {
                 const selectedContract = ownedContracts.find(c => c.addressKey === selectedContractKey);
                 if (!selectedContract) return 'N/A';
                 const address = addresses[selectedContract.addressKey];
-                return address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'N/A';
+                return typeof address === 'string' && address
+                  ? `${address.slice(0, 6)}...${address.slice(-4)}`
+                  : 'N/A';
               })()}
             </span>
           </div>

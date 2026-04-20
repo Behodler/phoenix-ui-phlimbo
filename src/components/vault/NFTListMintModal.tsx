@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { encodeAbiParameters } from 'viem';
-import { nftMinterAbi } from '@behodler/phase2-wagmi-hooks';
+import { nftMinterV2Abi } from '@behodler/phase2-wagmi-hooks';
 import type { NFTData } from '../../data/nftMockData';
 import { tokenPrefixToAddressKey } from '../../data/nftMockData';
 import { LoadingSpinner } from '../ui/ActionButton';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useTokenApproval } from '../../hooks/useContractInteractions';
-import { useEstimateBPT } from '../../hooks/useEstimateBPT';
 import { useToast } from '../ui/ToastProvider';
 import NFTCard from './NFTCard';
 
@@ -27,16 +25,10 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   const [approvalTxHash, setApprovalTxHash] = useState<`0x${string}` | undefined>(undefined);
 
   const { address: walletAddress } = useAccount();
-  const { addresses } = useContractAddresses();
+  const { addresses, nftPrimary } = useContractAddresses();
   const { approve } = useTokenApproval();
   const { addToast } = useToast();
   const { writeContractAsync } = useWriteContract();
-
-  const isSusdsNft = nft?.tokenPrefix === 'sUSDS';
-  const { minBPT, isLoading: isEstimatingBPT } = useEstimateBPT(
-    nft?.priceRaw ?? 0n,
-    isSusdsNft,
-  );
 
   // Wait for approval transaction confirmation
   const { isSuccess: isApprovalSuccess } = useWaitForTransactionReceipt({
@@ -76,8 +68,7 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   const isApproved = nft.allowanceRaw >= nft.priceRaw && nft.priceRaw > 0n;
   const hasInsufficientBalance = nft.balanceRaw < nft.priceRaw;
   const isLoading = isApproving || isMinting;
-  // For sUSDS, disable mint until BPT estimate is ready
-  const isMintDisabled = isLoading || (isSusdsNft && (isEstimatingBPT || minBPT === undefined));
+  const isMintDisabled = isLoading;
 
   // Get the ERC20 token address for approve
   const getTokenAddress = (): `0x${string}` | null => {
@@ -86,13 +77,11 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
     if (addressKey && addresses[addressKey as keyof typeof addresses]) {
       return addresses[addressKey as keyof typeof addresses] as `0x${string}`;
     }
-    // sUSDS doesn't have a ContractAddresses entry - not supported for now
-    // In production, this would come from the MintPageView contract's susds() function
     return null;
   };
 
   const handleApprove = async () => {
-    if (!walletAddress || !addresses?.NFTMinter) {
+    if (!walletAddress || !nftPrimary?.NFTMinter) {
       addToast({ type: 'error', title: 'Error', description: 'Wallet not connected or contract addresses not loaded.' });
       return;
     }
@@ -106,7 +95,7 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
     setIsApproving(true);
     try {
       addToast({ type: 'info', title: 'Confirm in Wallet', description: `Please confirm the ${nft.tokenDisplayName} approval in your wallet.`, duration: 30000 });
-      const hash = await approve(tokenAddress, addresses.NFTMinter as `0x${string}`);
+      const hash = await approve(tokenAddress, nftPrimary.NFTMinter as `0x${string}`);
       setApprovalTxHash(hash);
       addToast({ type: 'info', title: 'Transaction Submitted', description: 'Waiting for approval confirmation...' });
     } catch (error) {
@@ -121,7 +110,7 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   };
 
   const handleMint = async () => {
-    if (!walletAddress || !addresses?.NFTMinter) {
+    if (!walletAddress || !nftPrimary?.NFTMinter) {
       addToast({ type: 'error', title: 'Error', description: 'Wallet not connected or contract addresses not loaded.' });
       return;
     }
@@ -136,29 +125,15 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
     try {
       addToast({ type: 'info', title: 'Confirm in Wallet', description: `Please confirm the mint transaction in your wallet.`, duration: 30000 });
 
-      // The index is the dispatcherIndex from MintPageView, NOT the static nft.id
-      let hash: `0x${string}`;
-      if (isSusdsNft && minBPT !== undefined) {
-        // BalancerPooler: use 4-arg mint with extraData encoding minBPT for slippage protection
-        const extraData = encodeAbiParameters(
-          [{ type: 'uint256' }],
-          [minBPT],
-        );
-        hash = await writeContractAsync({
-          address: addresses.NFTMinter as `0x${string}`,
-          abi: nftMinterAbi,
-          functionName: 'mint',
-          args: [tokenAddress, BigInt(nft.dispatcherIndex), walletAddress, extraData],
-        });
-      } else {
-        // Standard 3-arg mint for all other NFTs
-        hash = await writeContractAsync({
-          address: addresses.NFTMinter as `0x${string}`,
-          abi: nftMinterAbi,
-          functionName: 'mint',
-          args: [tokenAddress, BigInt(nft.dispatcherIndex), walletAddress],
-        });
-      }
+      // V2 NFTMinter: single 2-arg mint(index, recipient) path shared by every NFT.
+      // Dispatcher-specific behaviour (burn / gather / balancer pool) is handled
+      // server-side; no token-prefix branching, no extraData, no BPT preview.
+      const hash = await writeContractAsync({
+        address: nftPrimary.NFTMinter as `0x${string}`,
+        abi: nftMinterV2Abi,
+        functionName: 'mint',
+        args: [BigInt(nft.dispatcherIndex), walletAddress],
+      });
 
       setMintTxHash(hash);
       addToast({ type: 'info', title: 'Transaction Submitted', description: 'Waiting for blockchain confirmation...' });
@@ -221,7 +196,7 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
               className="flex-1 phoenix-btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isMinting && <LoadingSpinner />}
-              {isSusdsNft && isEstimatingBPT ? 'Estimating...' : 'Mint'}
+              Mint
             </button>
           )}
         </div>

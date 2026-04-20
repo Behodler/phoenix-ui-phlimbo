@@ -36,7 +36,7 @@ export interface MinterPageViewData {
   EYE: TokenMintData;
   SCX: TokenMintData;
   Flax: TokenMintData;
-  sUSDS: TokenMintData;
+  USDS: TokenMintData;
   WBTC: TokenMintData;
   eyeTotalBurnt: string;
   scxTotalBurnt: string;
@@ -59,7 +59,7 @@ const TOKEN_OFFSETS = {
   EYE: 0,
   SCX: 6,
   Flax: 12,
-  sUSDS: 18,
+  USDS: 18,
   WBTC: 24,
 } as const;
 
@@ -130,7 +130,7 @@ export function useMinterPageView(): UseMinterPageViewReturn {
       EYE: parseTokenData(rawData, TOKEN_OFFSETS.EYE, TOKEN_DECIMALS.EYE),
       SCX: parseTokenData(rawData, TOKEN_OFFSETS.SCX, TOKEN_DECIMALS.SCX),
       Flax: parseTokenData(rawData, TOKEN_OFFSETS.Flax, TOKEN_DECIMALS.Flax),
-      sUSDS: parseTokenData(rawData, TOKEN_OFFSETS.sUSDS, TOKEN_DECIMALS.sUSDS),
+      USDS: parseTokenData(rawData, TOKEN_OFFSETS.USDS, TOKEN_DECIMALS.USDS),
       WBTC: parseTokenData(rawData, TOKEN_OFFSETS.WBTC, TOKEN_DECIMALS.WBTC),
       eyeTotalBurnt: formatUnits(rawData[BURN_INDICES.eyeTotalBurnt], 18),
       scxTotalBurnt: formatUnits(rawData[BURN_INDICES.scxTotalBurnt], 18),

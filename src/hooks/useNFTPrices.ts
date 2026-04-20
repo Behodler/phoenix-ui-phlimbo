@@ -5,7 +5,6 @@ const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as const;
 const EYE = '0x155ff1A85F440EE0A382eA949f24CE4E0b751c65' as const;
 const SCX = '0x1B8568FbB47708E9E9D31Ff303254f748805bF21' as const;
 const FLAX = '0x0cf758D4303295C43CD95e1232f0101ADb3DA9E8' as const;
-const SUSDS = '0xa3931d71877c0e7a3148cb7eb4463524fec27fbd' as const;
 
 // Uniswap V2 Factory
 const UNISWAP_V2_FACTORY = '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f' as const;
@@ -65,16 +64,6 @@ const chainlinkAbi = [
   },
 ] as const;
 
-const erc4626Abi = [
-  {
-    name: 'convertToAssets',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'shares', type: 'uint256' }],
-    outputs: [{ name: 'assets', type: 'uint256' }],
-  },
-] as const;
-
 export interface UseNFTPricesResult {
   prices: Record<string, number | null>;
   isLoading: boolean;
@@ -85,7 +74,7 @@ export interface UseNFTPricesResult {
  * Hook to fetch USD prices for all NFT input tokens.
  *
  * - EYE, SCX, FLAX: Uniswap V2 WETH pair reserves -> ETH price -> multiply by Chainlink ETH/USD
- * - sUSDS: ERC4626 convertToAssets (1 sUSDS -> USDS, USDS ~ $1)
+ * - USDS: Pinned to $1 (Sky-issued stablecoin; acceptable for display-only pricing)
  * - BTC: Chainlink BTC/USD feed directly
  *
  * All queries use staleTime: Infinity (load once on page load, no refetching).
@@ -223,20 +212,6 @@ export function useNFTPrices(): UseNFTPricesResult {
     query: { ...queryOpts, enabled: !!flaxPair },
   });
 
-  // --- sUSDS ERC4626 convertToAssets ---
-
-  const {
-    data: susdsAssets,
-    isLoading: isLoadingSusds,
-    isError: isErrorSusds,
-  } = useReadContract({
-    address: SUSDS,
-    abi: erc4626Abi,
-    functionName: 'convertToAssets',
-    args: [BigInt('1000000000000000000')], // 1e18
-    query: queryOpts,
-  });
-
   // --- Aggregate loading / error ---
 
   const isLoading =
@@ -250,8 +225,7 @@ export function useNFTPrices(): UseNFTPricesResult {
     isLoadingScxReserves ||
     isLoadingScxToken0 ||
     isLoadingFlaxReserves ||
-    isLoadingFlaxToken0 ||
-    isLoadingSusds;
+    isLoadingFlaxToken0;
 
   const isError =
     isErrorEthUsd ||
@@ -264,8 +238,7 @@ export function useNFTPrices(): UseNFTPricesResult {
     isErrorScxReserves ||
     isErrorScxToken0 ||
     isErrorFlaxReserves ||
-    isErrorFlaxToken0 ||
-    isErrorSusds;
+    isErrorFlaxToken0;
 
   // --- Compute prices ---
 
@@ -273,7 +246,7 @@ export function useNFTPrices(): UseNFTPricesResult {
     EYE: null,
     SCX: null,
     FLAX: null,
-    sUSDS: null,
+    USDS: 1,
     BTC: null,
   };
 
@@ -284,11 +257,6 @@ export function useNFTPrices(): UseNFTPricesResult {
   // BTC/USD from Chainlink (8 decimals)
   if (btcUsdData !== undefined) {
     prices.BTC = Number(btcUsdData[1]) / 1e8;
-  }
-
-  // sUSDS price: convertToAssets returns USDS amount for 1e18 shares, USDS ~ $1
-  if (susdsAssets !== undefined) {
-    prices.sUSDS = Number(susdsAssets) / 1e18;
   }
 
   // Helper: compute token price in USD from Uniswap V2 reserves
