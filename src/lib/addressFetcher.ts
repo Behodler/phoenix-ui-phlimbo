@@ -34,6 +34,7 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
     // CRITICAL: Server sends "behodler3Tokenlaunch" (lowercase b, lowercase l) which we map to
     // "bondingCurve" for cleaner internal naming. This is the minter contract that accepts
     // DOLA deposits. bondingToken is the ERC20 token it produces.
+
     const addresses: ContractAddresses = {
       Dola: data.Dola || '0x0000000000000000000000000000000000000000',
       EYE: data.EYE || '0x0000000000000000000000000000000000000000',
@@ -54,13 +55,25 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       WBTC: data.WBTC || '0x0000000000000000000000000000000000000000',
       BalancerPool: data.BalancerPool || '0x0000000000000000000000000000000000000000',
       BalancerVault: data.BalancerVault || '0x0000000000000000000000000000000000000000',
-      NFTMinter: data.NFTMinter || '0x0000000000000000000000000000000000000000',
+      BalancerRouter: data.BalancerRouter || '0x0000000000000000000000000000000000000000',
       BurnRecorder: data.BurnRecorder || '0x0000000000000000000000000000000000000000',
-      BurnerEYE: data.BurnerEYE || '0x0000000000000000000000000000000000000000',
-      BurnerSCX: data.BurnerSCX || '0x0000000000000000000000000000000000000000',
-      BurnerFlax: data.BurnerFlax || '0x0000000000000000000000000000000000000000',
-      BalancerPooler: data.BalancerPooler || '0x0000000000000000000000000000000000000000',
-      GatherWBTC: data.GatherWBTC || '0x0000000000000000000000000000000000000000',
+      NFTMigrator: data.NFTMigrator || '0x0000000000000000000000000000000000000000',
+      nftsV1: {
+        NFTMinter: data.nftsV1?.NFTMinter || '0x0000000000000000000000000000000000000000',
+        BurnerEYE: data.nftsV1?.BurnerEYE || '0x0000000000000000000000000000000000000000',
+        BurnerSCX: data.nftsV1?.BurnerSCX || '0x0000000000000000000000000000000000000000',
+        BurnerFlax: data.nftsV1?.BurnerFlax || '0x0000000000000000000000000000000000000000',
+        BalancerPooler: data.nftsV1?.BalancerPooler || '0x0000000000000000000000000000000000000000',
+        GatherWBTC: data.nftsV1?.GatherWBTC || '0x0000000000000000000000000000000000000000',
+      },
+      nftsV2: {
+        NFTMinter: data.nftsV2?.NFTMinter || '0x0000000000000000000000000000000000000000',
+        BurnerEYE: data.nftsV2?.BurnerEYE || '0x0000000000000000000000000000000000000000',
+        BurnerSCX: data.nftsV2?.BurnerSCX || '0x0000000000000000000000000000000000000000',
+        BurnerFlax: data.nftsV2?.BurnerFlax || '0x0000000000000000000000000000000000000000',
+        BalancerPooler: data.nftsV2?.BalancerPooler || '0x0000000000000000000000000000000000000000',
+        GatherWBTC: data.nftsV2?.GatherWBTC || '0x0000000000000000000000000000000000000000',
+      },
       ViewRouter: data.ViewRouter || '0x0000000000000000000000000000000000000000',
       DepositPageView: data.DepositPageView || '0x0000000000000000000000000000000000000000',
       MintPageView: data.MintPageView || '0x0000000000000000000000000000000000000000',
