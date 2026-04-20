@@ -1527,7 +1527,6 @@ export default function VaultPage() {
             {(activeTab === "Deposit" || activeTab === "Withdraw") && (
               <YieldRewardsInfo
                 totalApy={totalApyCalculated}
-                phUsdApy={phUsdApyCalculated}
                 usdcApy={usdcApyCalculated}
                 pendingPhUsd={pendingPhUsdFromView}
                 pendingUsdc={pendingStableFromView}

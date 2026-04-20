@@ -107,8 +107,7 @@ export interface FAQWrapperProps {
 
 export interface YieldRewardsInfoProps {
   totalApy: number; // Combined yield percentage
-  phUsdApy: number; // PhUSD yield percentage (fixed)
-  usdcApy: number; // USDC yield percentage (variable)
+  usdcApy: number; // USDC yield percentage
   pendingPhUsd: bigint | string; // Pending PhUSD rewards (18 decimals)
   pendingUsdc: bigint | string; // Pending USDC rewards (6 decimals when isUsdcDecimals6=true)
   stakedBalance: bigint | string; // User's staked phUSD balance (18 decimals)
