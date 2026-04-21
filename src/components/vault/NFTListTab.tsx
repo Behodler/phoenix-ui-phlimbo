@@ -1,18 +1,29 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useToast } from '../ui/ToastProvider';
+import SegmentedControl from '../ui/SegmentedControl';
 import { nftStaticConfig, tokenPrefixToPriceKey } from '../../data/nftMockData';
 import type { NFTData } from '../../data/nftMockData';
 import { useNFTPrices } from '../../hooks/useNFTPrices';
 import { useMinterPageView } from '../../hooks/useMinterPageView';
+import { useStakingMockData } from '../../hooks/useStakingMockData';
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
+import StakingSurface from './StakingSurface';
+import ApyPill from './staking/ApyPill';
 
 export default function NFTListTab() {
   const { addToast } = useToast();
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [subTab, setSubTab] = useState<'mint' | 'stake'>('mint');
   const { prices } = useNFTPrices();
   const { data: minterData, isLoading, refetch: refetchMinterData } = useMinterPageView();
+
+  // Shared staking state — drives both the header (APY pill + staked badge)
+  // and the StakingSurface card actions so they stay in sync.
+  const staking = useStakingMockData((description) => {
+    addToast({ type: 'success', title: 'Staking', description });
+  });
 
   // Merge static config with live contract data
   const nftDataList: NFTData[] = useMemo(() => {
@@ -113,47 +124,76 @@ export default function NFTListTab() {
 
   return (
     <div className="p-6">
-      {/* Header */}
-      <div className="bg-pxusd-teal-700 border border-pxusd-teal-500 rounded-lg p-4 mb-6">
-        <h3 className="text-lg font-semibold text-pxusd-teal-300 mb-1">Mint an NFT to gain access to the yield funnel</h3>
-        <p className="text-sm text-muted-foreground">
-          Each NFT strengthens the ecosystem in a different way
-        </p>
+      {/* Sub-toggle header: Mint / Stake switch + min APY pill */}
+      <div className="max-w-4xl mx-auto mb-4 flex flex-wrap items-center justify-between gap-3">
+        <SegmentedControl
+          ariaLabel="NFT surface"
+          value={subTab}
+          onChange={setSubTab}
+          options={[
+            { value: 'mint', label: 'Mint' },
+            {
+              value: 'stake',
+              label: 'Stake',
+              badge: staking.stakedUnits,
+            },
+          ]}
+        />
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <ApyPill apy={staking.minApy} />
+          <span className="hidden sm:inline">on Liquid Sky Phoenix</span>
+        </div>
       </div>
 
-      {/* Column Headings */}
-      <div className="flex items-center px-4 py-2 text-[0.75rem] text-muted-foreground uppercase tracking-wider max-w-4xl mx-auto">
-        <span className="w-10 flex-shrink-0" /> {/* image spacer */}
-        <span className="flex-1 pl-3">Name</span>
-        <span className="hidden sm:inline flex-1 pl-3">Action</span>
-        <span className="w-[5rem] sm:w-[12rem] text-right pr-4">Price</span>
-        <span className="flex-shrink-0 w-[4.5rem] text-center">Mint</span>
-      </div>
+      {subTab === 'mint' ? (
+        <>
+          {/* Header */}
+          <div className="bg-pxusd-teal-700 border border-pxusd-teal-500 rounded-lg p-4 mb-6">
+            <h3 className="text-lg font-semibold text-pxusd-teal-300 mb-1">Mint an NFT to gain access to the yield funnel</h3>
+            <p className="text-sm text-muted-foreground">
+              Each NFT strengthens the ecosystem in a different way
+            </p>
+          </div>
 
-      {/* NFT List */}
-      <div className="flex flex-col gap-2 max-w-4xl mx-auto">
-        {sortedNfts.map((nft) => {
-          const priceKey = tokenPrefixToPriceKey[nft.tokenPrefix] ?? nft.tokenPrefix;
-          return (
-            <NFTListItem
-              key={nft.id}
-              nft={nft}
-              price={prices[priceKey] ?? null}
-              onMintClick={handleMintClick}
-            />
-          );
-        })}
-      </div>
+          {/* Column Headings */}
+          <div className="flex items-center px-4 py-2 text-[0.75rem] text-muted-foreground uppercase tracking-wider max-w-4xl mx-auto">
+            <span className="w-10 flex-shrink-0" /> {/* image spacer */}
+            <span className="flex-1 pl-3">Name</span>
+            <span className="hidden sm:inline flex-1 pl-3">Action</span>
+            <span className="w-[5rem] sm:w-[12rem] text-right pr-4">Price</span>
+            <span className="flex-shrink-0 w-[4.5rem] text-center">Mint</span>
+          </div>
 
-      {/* Mint Modal */}
-      <NFTListMintModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        nft={selectedNft}
-        price={selectedNft ? (prices[tokenPrefixToPriceKey[selectedNft.tokenPrefix] ?? selectedNft.tokenPrefix] ?? null) : null}
-        onMintSuccess={handleMintSuccess}
-        refetchMinterData={refetchMinterData}
-      />
+          {/* NFT List */}
+          <div className="flex flex-col gap-2 max-w-4xl mx-auto">
+            {sortedNfts.map((nft) => {
+              const priceKey = tokenPrefixToPriceKey[nft.tokenPrefix] ?? nft.tokenPrefix;
+              return (
+                <NFTListItem
+                  key={nft.id}
+                  nft={nft}
+                  price={prices[priceKey] ?? null}
+                  onMintClick={handleMintClick}
+                />
+              );
+            })}
+          </div>
+
+          {/* Mint Modal */}
+          <NFTListMintModal
+            isOpen={isModalOpen}
+            onClose={handleCloseModal}
+            nft={selectedNft}
+            price={selectedNft ? (prices[tokenPrefixToPriceKey[selectedNft.tokenPrefix] ?? selectedNft.tokenPrefix] ?? null) : null}
+            onMintSuccess={handleMintSuccess}
+            refetchMinterData={refetchMinterData}
+          />
+        </>
+      ) : (
+        <div className="max-w-4xl mx-auto">
+          <StakingSurface staking={staking} />
+        </div>
+      )}
     </div>
   );
 }
