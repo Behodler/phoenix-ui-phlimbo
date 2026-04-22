@@ -50,24 +50,7 @@ export default function StakedNftCard({
 }: StakedNftCardProps) {
   return (
     <div className="phoenix-card mb-[18px] overflow-hidden p-0">
-      {/* Sky accent banner */}
-      <div
-        className="relative h-20 border-b border-border"
-        style={{
-          background:
-            'linear-gradient(180deg, #0A1C28 0%, #163343 40%, #1f5a73 80%, rgba(255,140,66,.15) 100%)',
-        }}
-      >
-        <div
-          className="absolute inset-x-0 bottom-0 h-10"
-          style={{
-            background:
-              'radial-gradient(ellipse at center bottom, rgba(255,217,61,.28), transparent 65%)',
-          }}
-        />
-      </div>
-
-      <div className="-mt-11 px-[22px] pb-5 pt-0">
+      <div className="px-[22px] py-5">
         {/* Header */}
         <div className="mb-4 flex items-end gap-3.5">
           <div className="overflow-hidden rounded-[14px] shadow-[0_8px_24px_rgba(0,0,0,0.4)]">
