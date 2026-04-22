@@ -69,18 +69,29 @@ export default function StakedNftCard({
               <ApyPill apy={apy} />
             </div>
             <div className="max-w-[520px] text-xs leading-[1.5] text-muted-foreground">
-              {nft.action} · Staking rewards paid in{' '}
-              <b className="text-pxusd-orange-300">phUSD</b> from protocol fees.
+              {nft.action}
             </div>
           </div>
         </div>
 
         {/* Body grid */}
-        <div className="grid items-stretch gap-5 md:grid-cols-[1.15fr_1fr]">
-          {/* Left — live accrual */}
+        <div className="grid items-stretch gap-5 md:grid-cols-[1fr_1.15fr]">
+          {/* Left — unit management */}
+          <div className="flex flex-col gap-3.5">
+            <div className="rounded-[14px] border border-border bg-white/[0.02] p-3.5">
+              <div className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                Stake more units
+              </div>
+              <StakeMoreInline max={ownedUnits} onStake={onStake} />
+            </div>
+
+            <UnstakeInline max={stakedUnits} onUnstake={onUnstake} />
+          </div>
+
+          {/* Right — pending yield + claim */}
           <div className="rounded-[14px] border border-border bg-white/[0.02] p-[18px]">
             <div className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-              Pending yield · live
+              Pending yield
             </div>
             <div className="mb-3.5 flex items-baseline gap-2">
               <PhUsdCoin size={22} />
@@ -108,18 +119,6 @@ export default function StakedNftCard({
             >
               Claim phUSD
             </button>
-          </div>
-
-          {/* Right — unit management */}
-          <div className="flex flex-col gap-3.5">
-            <div className="rounded-[14px] border border-border bg-white/[0.02] p-3.5">
-              <div className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                Stake more units
-              </div>
-              <StakeMoreInline max={ownedUnits} onStake={onStake} />
-            </div>
-
-            <UnstakeInline max={stakedUnits} onUnstake={onUnstake} />
           </div>
         </div>
       </div>

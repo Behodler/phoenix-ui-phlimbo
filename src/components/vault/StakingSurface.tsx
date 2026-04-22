@@ -43,14 +43,9 @@ export default function StakingSurface({ staking }: StakingSurfaceProps) {
         lifetimeEarned={staking.lifetimeEarned}
       />
 
-      <div className="mb-3 mt-1 flex items-end justify-between">
-        <h2 className="m-0 text-[18px] font-bold tracking-[-0.01em] text-pxusd-white">
-          Your staked NFTs
-        </h2>
-        <span className="text-xs text-muted-foreground">
-          Earning phUSD from protocol fees · paid continuously
-        </span>
-      </div>
+      <h2 className="m-0 mb-3 mt-1 text-[18px] font-bold tracking-[-0.01em] text-pxusd-white">
+        Your staked NFTs
+      </h2>
 
       {liquidSky && (
         <StakedNftCard
