@@ -38,7 +38,6 @@ export default function StakingSurface({ staking }: StakingSurfaceProps) {
     <div>
       <EarningPanel
         totalUnits={staking.stakedUnits}
-        totalStaked={totalStakedValue}
         minApy={staking.minApy}
         ratePerSecond={staking.ratePerSec}
         lifetimeEarned={staking.lifetimeEarned}
