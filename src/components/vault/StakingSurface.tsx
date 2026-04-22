@@ -17,8 +17,8 @@ export interface StakingSurfaceProps {
 }
 
 /**
- * Composes the NFT-tab Stake view: global earning panel, the Liquid Sky
- * staking card, and a muted list of currently non-stakeable NFTs.
+ * Composes the NFT-tab Stake view: global earning panel and the Liquid Sky
+ * staking card.
  *
  * Data is entirely mocked via useStakingMockData (supplied by parent).
  */
@@ -26,11 +26,6 @@ export default function StakingSurface({ staking }: StakingSurfaceProps) {
 
   const liquidSky = useMemo(
     () => nftStaticConfig.find((n) => n.id === LIQUID_SKY_ID),
-    []
-  );
-
-  const otherNfts = useMemo(
-    () => nftStaticConfig.filter((n) => n.id !== LIQUID_SKY_ID),
     []
   );
 
@@ -72,36 +67,6 @@ export default function StakingSurface({ staking }: StakingSurfaceProps) {
           onClaim={staking.claim}
         />
       )}
-
-      {/* Non-stakeable NFT list */}
-      <div className="mb-3 mt-2 flex items-end justify-between">
-        <h3 className="m-0 text-[15px] font-semibold text-pxusd-white">Other NFTs</h3>
-        <span className="text-xs text-muted-foreground">
-          Non-yielding · staking coming later
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        {otherNfts.map((nft) => (
-          <div
-            key={nft.id}
-            className="flex items-center gap-3.5 rounded-[14px] border border-pxusd-teal-600 bg-pxusd-teal-700 px-4 py-3.5 opacity-55"
-          >
-            <img
-              src={nft.image}
-              alt={nft.name}
-              width={40}
-              height={40}
-              className="h-10 w-10 shrink-0 select-none rounded-[10px] object-cover"
-              draggable={false}
-            />
-            <div className="flex-1 min-w-0">
-              <div className="truncate text-sm font-semibold text-pxusd-white">{nft.name}</div>
-              <div className="text-xs text-muted-foreground">Non-yielding · staking coming later</div>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
