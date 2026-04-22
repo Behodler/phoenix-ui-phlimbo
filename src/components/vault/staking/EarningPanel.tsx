@@ -3,8 +3,6 @@ import PhUsdCoin from './PhUsdCoin';
 
 export interface EarningPanelProps {
   totalUnits: number;
-  /** Total staked dollar value (stakedUnits * priceProxy) */
-  totalStaked: number;
   minApy: number;
   ratePerSecond: number;
   /** Lifetime phUSD earned (counter baseline) */
@@ -14,13 +12,11 @@ export interface EarningPanelProps {
 /**
  * Global "Your phUSD earning · live" hero panel.
  *
- * Layout mirrors the mock's `EarningPanel`: big live counter on the left,
- * summary stats (units staked, staked value, min APY) on the right,
- * flavor stripe at the bottom.
+ * Layout: big live counter on the left, summary stats (units staked, min APY)
+ * on the right, flavor stripe at the bottom.
  */
 export default function EarningPanel({
   totalUnits,
-  totalStaked,
   minApy,
   ratePerSecond,
   lifetimeEarned,
@@ -56,14 +52,6 @@ export default function EarningPanel({
               Units staked
             </div>
             <div className="font-mono text-[22px] font-bold tabular-nums text-pxusd-white">{totalUnits}</div>
-          </div>
-          <div>
-            <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-              Staked value
-            </div>
-            <div className="font-mono text-[22px] font-bold tabular-nums text-pxusd-white">
-              ${totalStaked.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-            </div>
           </div>
           <div>
             <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
