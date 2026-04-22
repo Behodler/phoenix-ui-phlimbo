@@ -131,11 +131,7 @@ export default function NFTListTab() {
           onChange={setSubTab}
           options={[
             { value: 'mint', label: 'Mint' },
-            {
-              value: 'stake',
-              label: 'Stake',
-              badge: staking.stakedUnits,
-            },
+            { value: 'stake', label: 'Stake' },
           ]}
         />
       </div>
