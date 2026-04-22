@@ -9,7 +9,6 @@ import { useStakingMockData } from '../../hooks/useStakingMockData';
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurface from './StakingSurface';
-import ApyPill from './staking/ApyPill';
 
 export default function NFTListTab() {
   const { addToast } = useToast();
@@ -124,8 +123,8 @@ export default function NFTListTab() {
 
   return (
     <div className="p-6">
-      {/* Sub-toggle header: Mint / Stake switch + min APY pill */}
-      <div className="max-w-4xl mx-auto mb-4 flex flex-wrap items-center justify-between gap-3">
+      {/* Sub-toggle header: Mint / Stake switch */}
+      <div className="max-w-4xl mx-auto mb-4 flex flex-wrap items-center gap-3">
         <SegmentedControl
           ariaLabel="NFT surface"
           value={subTab}
@@ -139,10 +138,6 @@ export default function NFTListTab() {
             },
           ]}
         />
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <ApyPill apy={staking.minApy} />
-          <span className="hidden sm:inline">on Liquid Sky Phoenix</span>
-        </div>
       </div>
 
       {subTab === 'mint' ? (
