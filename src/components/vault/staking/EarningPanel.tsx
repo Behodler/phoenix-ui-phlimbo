@@ -32,7 +32,7 @@ export default function EarningPanel({
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div className="min-w-[280px] flex-[1_1_320px]">
           <div className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-            Your phUSD earning · live
+            Your phUSD earning
           </div>
           <div className="flex items-baseline gap-2.5">
             <PhUsdCoin size={28} />
