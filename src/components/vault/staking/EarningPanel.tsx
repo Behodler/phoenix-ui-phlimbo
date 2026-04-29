@@ -5,8 +5,15 @@ export interface EarningPanelProps {
   totalUnits: number;
   minApy: number;
   ratePerSecond: number;
-  /** Lifetime phUSD earned (counter baseline) */
-  lifetimeEarned: number;
+  /**
+   * User's currently-claimable phUSD (counter baseline).
+   *
+   * The LiveYieldCounter resets to this value whenever it changes —
+   * after each on-chain refetch and immediately after a Claim/Unstake
+   * confirmation — so the displayed number always tracks the user's
+   * live pending balance, not a session-lifetime accumulator.
+   */
+  pendingYield: number;
 }
 
 /**
@@ -19,7 +26,7 @@ export default function EarningPanel({
   totalUnits,
   minApy,
   ratePerSecond,
-  lifetimeEarned,
+  pendingYield,
 }: EarningPanelProps) {
   return (
     <div
@@ -38,7 +45,7 @@ export default function EarningPanel({
             <PhUsdCoin size={28} />
             <LiveYieldCounter
               ratePerSecond={ratePerSecond}
-              initial={lifetimeEarned}
+              initial={pendingYield}
               decimals={6}
               size={44}
             />

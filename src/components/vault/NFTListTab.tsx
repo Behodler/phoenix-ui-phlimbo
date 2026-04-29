@@ -5,7 +5,7 @@ import { nftStaticConfig, tokenPrefixToPriceKey } from '../../data/nftMockData';
 import type { NFTData } from '../../data/nftMockData';
 import { useNFTPrices } from '../../hooks/useNFTPrices';
 import { useMinterPageView } from '../../hooks/useMinterPageView';
-import { useStakingMockData } from '../../hooks/useStakingMockData';
+import { useStakingPageData } from '../../hooks/useStakingPageData';
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurface from './StakingSurface';
@@ -20,9 +20,9 @@ export default function NFTListTab() {
 
   // Shared staking state — drives both the header (APY pill + staked badge)
   // and the StakingSurface card actions so they stay in sync.
-  const staking = useStakingMockData((description) => {
-    addToast({ type: 'success', title: 'Staking', description });
-  });
+  // The hook owns its own toast lifecycle (confirm-in-wallet, submitted,
+  // confirmed) so we just pass through the addToast callback.
+  const staking = useStakingPageData(addToast);
 
   // Merge static config with live contract data
   const nftDataList: NFTData[] = useMemo(() => {

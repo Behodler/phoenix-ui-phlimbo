@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { NFTStaticConfig } from '../../../data/nftMockData';
+import { LoadingSpinner } from '../../ui/ActionButton';
 import ApyPill from './ApyPill';
 import LiveYieldCounter from './LiveYieldCounter';
 import PhUsdCoin from './PhUsdCoin';
@@ -15,6 +16,19 @@ export interface StakedNftCardProps {
   apy: number;
   /** Staked value in USD (stakedUnits * priceProxy) */
   unrealized: number;
+  /**
+   * Whether the NFTStaker contract has a non-zero address on the active
+   * network. When false, all action buttons are disabled and a "not yet
+   * deployed" badge is shown.
+   */
+  isStakerDeployed: boolean;
+  /** ERC1155 setApprovalForAll(staker, true) flag for the user. */
+  isApprovedForAll: boolean;
+  approveAll: () => Promise<void>;
+  isApproving: boolean;
+  isStaking: boolean;
+  isUnstaking: boolean;
+  isClaiming: boolean;
   onStake: (n: number) => void;
   onUnstake: (n: number) => void;
   onClaim: () => void;
@@ -44,10 +58,19 @@ export default function StakedNftCard({
   ratePerSec,
   apy,
   unrealized,
+  isStakerDeployed,
+  isApprovedForAll,
+  approveAll,
+  isApproving,
+  isStaking,
+  isUnstaking,
+  isClaiming,
   onStake,
   onUnstake,
   onClaim,
 }: StakedNftCardProps) {
+  const txInFlight = isApproving || isStaking || isUnstaking || isClaiming;
+
   return (
     <div className="phoenix-card mb-[18px] overflow-hidden p-0">
       <div className="px-[22px] py-5">
@@ -67,6 +90,11 @@ export default function StakedNftCard({
             <div className="mb-1 flex flex-wrap items-center gap-2.5">
               <h3 className="m-0 text-xl font-bold tracking-[-0.01em] text-pxusd-white">{nft.name}</h3>
               <ApyPill apy={apy} />
+              {!isStakerDeployed && (
+                <span className="rounded-full border border-pxusd-orange-500/40 bg-pxusd-orange-900/30 px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-pxusd-orange-300">
+                  Not yet deployed on this network
+                </span>
+              )}
             </div>
             <div className="max-w-[520px] text-xs leading-[1.5] text-muted-foreground">
               {nft.action}
@@ -82,10 +110,25 @@ export default function StakedNftCard({
               <div className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 Stake more units
               </div>
-              <StakeMoreInline max={ownedUnits} onStake={onStake} />
+              <StakeMoreInline
+                max={ownedUnits}
+                onStake={onStake}
+                isStakerDeployed={isStakerDeployed}
+                isApprovedForAll={isApprovedForAll}
+                onApprove={approveAll}
+                isApproving={isApproving}
+                isStaking={isStaking}
+                txInFlight={txInFlight}
+              />
             </div>
 
-            <UnstakeInline max={stakedUnits} onUnstake={onUnstake} />
+            <UnstakeInline
+              max={stakedUnits}
+              onUnstake={onUnstake}
+              isStakerDeployed={isStakerDeployed}
+              isUnstaking={isUnstaking}
+              txInFlight={txInFlight}
+            />
           </div>
 
           {/* Right — pending yield + claim */}
@@ -112,11 +155,16 @@ export default function StakedNftCard({
             />
 
             <button
-              className="phoenix-btn-primary mt-3.5 w-full px-3.5 py-2.5 text-sm"
+              className="phoenix-btn-primary mt-3.5 flex w-full items-center justify-center gap-2 px-3.5 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onClaim}
-              disabled={pendingYield <= 0 && ratePerSec <= 0}
+              disabled={
+                !isStakerDeployed ||
+                txInFlight ||
+                (pendingYield <= 0 && ratePerSec <= 0)
+              }
               type="button"
             >
+              {isClaiming && <LoadingSpinner />}
               Claim phUSD
             </button>
           </div>
@@ -150,7 +198,25 @@ function StatLine({
   );
 }
 
-function StakeMoreInline({ max, onStake }: { max: number; onStake: (n: number) => void }) {
+function StakeMoreInline({
+  max,
+  onStake,
+  isStakerDeployed,
+  isApprovedForAll,
+  onApprove,
+  isApproving,
+  isStaking,
+  txInFlight,
+}: {
+  max: number;
+  onStake: (n: number) => void;
+  isStakerDeployed: boolean;
+  isApprovedForAll: boolean;
+  onApprove: () => Promise<void>;
+  isApproving: boolean;
+  isStaking: boolean;
+  txInFlight: boolean;
+}) {
   const [n, setN] = useState<number>(Math.min(1, max));
 
   // Keep n in bounds if max drops.
@@ -158,31 +224,74 @@ function StakeMoreInline({ max, onStake }: { max: number; onStake: (n: number) =
     setN((prev) => Math.min(prev, max));
   }, [max]);
 
+  // Approval gate — when staker is deployed but not yet approved, the
+  // primary CTA flips to "Approve" until the on-chain flag confirms.
+  const showApprove = isStakerDeployed && !isApprovedForAll;
+
+  if (showApprove) {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <UnitSlider value={n} max={max} onChange={setN} />
+        <button
+          type="button"
+          className="phoenix-btn-primary flex items-center justify-center gap-2 px-3.5 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => {
+            void onApprove();
+          }}
+          disabled={txInFlight}
+        >
+          {isApproving && <LoadingSpinner />}
+          Approve for staking
+        </button>
+      </div>
+    );
+  }
+
+  const stakeDisabled = !isStakerDeployed || txInFlight || n <= 0 || max <= 0;
   return (
     <div className="flex flex-col gap-2.5">
       <UnitSlider value={n} max={max} onChange={setN} />
       <button
         type="button"
-        className="phoenix-btn-primary px-3.5 py-2.5 text-sm"
+        className="phoenix-btn-primary flex items-center justify-center gap-2 px-3.5 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
         onClick={() => {
           onStake(n);
           setN(0);
         }}
-        disabled={n <= 0 || max <= 0}
+        disabled={stakeDisabled}
       >
-        {max <= 0 ? 'No units in wallet' : `Stake ${n} unit${n === 1 ? '' : 's'}`}
+        {isStaking && <LoadingSpinner />}
+        {!isStakerDeployed
+          ? 'Staking unavailable'
+          : max <= 0
+            ? 'No units in wallet'
+            : `Stake ${n} unit${n === 1 ? '' : 's'}`}
       </button>
     </div>
   );
 }
 
-function UnstakeInline({ max, onUnstake }: { max: number; onUnstake: (n: number) => void }) {
+function UnstakeInline({
+  max,
+  onUnstake,
+  isStakerDeployed,
+  isUnstaking,
+  txInFlight,
+}: {
+  max: number;
+  onUnstake: (n: number) => void;
+  isStakerDeployed: boolean;
+  isUnstaking: boolean;
+  txInFlight: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [n, setN] = useState<number>(Math.min(1, max));
 
   useEffect(() => {
     setN((prev) => Math.min(prev, max));
   }, [max]);
+
+  const baseDisabled = !isStakerDeployed || txInFlight || max <= 0;
 
   if (!open) {
     return (
@@ -196,9 +305,9 @@ function UnstakeInline({ max, onUnstake }: { max: number; onUnstake: (n: number)
           </div>
           <button
             type="button"
-            className="phoenix-btn-ghost px-3.5 py-2 text-[13px]"
+            className="phoenix-btn-ghost px-3.5 py-2 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => setOpen(true)}
-            disabled={max <= 0}
+            disabled={baseDisabled}
           >
             Unstake…
           </button>
@@ -236,15 +345,16 @@ function UnstakeInline({ max, onUnstake }: { max: number; onUnstake: (n: number)
           </button>
           <button
             type="button"
-            className="phoenix-btn-primary flex-1 px-3.5 py-2.5 text-[13px]"
+            className="phoenix-btn-primary flex flex-1 items-center justify-center gap-2 px-3.5 py-2.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
             style={{ background: 'linear-gradient(135deg, #EF4444, #FF8C42)' }}
-            disabled={n <= 0}
+            disabled={baseDisabled || n <= 0}
             onClick={() => {
               onUnstake(n);
               setN(0);
               setOpen(false);
             }}
           >
+            {isUnstaking && <LoadingSpinner />}
             Unstake {n}
           </button>
         </div>
