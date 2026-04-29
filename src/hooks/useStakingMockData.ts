@@ -7,6 +7,10 @@ import { STAKING_MOCK, SECONDS_PER_YEAR } from '../data/stakeMockData';
  * Kept contract-agnostic so that swapping this mock for a real hook
  * (backed by the reward contract + useMinterPageView + useBalancerPrice)
  * is a one-file change.
+ *
+ * @deprecated Replaced by `useStakingPageData` (story 058) which reads
+ *             on-chain state from the deployed NFTStaker. Retained for
+ *             potential mock-mode debugging; not imported in shipping UI.
  */
 export interface StakingData {
   /** Units currently staked by the user */
