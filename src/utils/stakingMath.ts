@@ -77,6 +77,35 @@ export function computeMinApy(
 }
 
 /**
+ * phUSD/sec earned by a single staked unit, mirroring `computeMinApy`.
+ *
+ * When `totalStaked > 0` this is just the on-chain `rewardRate / totalStaked`
+ * (scaled out of 1e18). When nothing is staked the on-chain rate is 0, so we
+ * substitute the same hypothetical rate the starting-APY branch uses:
+ *   hypotheticalRate = highestPrice * targetAPY / (1e18 * SECONDS_PER_YEAR)
+ * with `totalStaked = 1`.
+ *
+ * The bigint product `highestPrice * targetAPY` can exceed JS's safe-integer
+ * range, so we divide in bigint space before crossing back to Number.
+ */
+export function computePhUsdPerSecPerUnit(
+  rewardRate: bigint,
+  totalStaked: bigint,
+  priceRaw: bigint,
+  growthBasisPoints: number,
+  targetAPY: bigint,
+): number {
+  if (totalStaked > 0n) {
+    if (rewardRate === 0n) return 0;
+    return Number(rewardRate) / Number(totalStaked) / 1e18;
+  }
+  const highestPriceRaw = backOutGrowthStep(priceRaw, growthBasisPoints);
+  if (highestPriceRaw === 0n || targetAPY === 0n) return 0;
+  const wei = (highestPriceRaw * targetAPY) / (BigInt(SECONDS_PER_YEAR) * 10n ** 18n);
+  return Number(wei) / 1e18;
+}
+
+/**
  * User's share of the global reward stream, in phUSD/sec.
  *
  * Returns 0 when the user has nothing staked or nobody is staking.

@@ -185,6 +185,18 @@
       {
         "title": "What if the system is paused?",
         "body": "Both minting and claiming respect the global pause mechanism. If the protocol is paused for safety, NFT minting and yield claiming will be temporarily unavailable until the pause is lifted."
+      },
+      {
+        "title": "Staking — which NFTs can I stake?",
+        "body": "Only the Liquid Sky Phoenix NFT can be staked. The other NFTs in the list are claim tickets for the yield funnel and are not accepted by the staking contract."
+      },
+      {
+        "title": "Staking — what is the 'min APY'?",
+        "body": "It is the floor APY a staker should expect. Because the mint price grows on every mint, anyone who minted a Liquid Sky earlier paid less per NFT, so they earn a higher effective APY than the headline figure. The displayed number assumes every staked NFT was bought at the most recent (highest) mint price — so your real APY is at least this much, and often more."
+      },
+      {
+        "title": "Staking — how is yield split between stakers?",
+        "body": "The phUSD reward stream is shared evenly across every staked NFT, regardless of when each NFT was minted. Two stakers holding the same number of staked NFTs earn the same per-second yield."
       }
     ]
   },

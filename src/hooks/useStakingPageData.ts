@@ -12,7 +12,12 @@ import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { useMinterPageView } from './useMinterPageView';
 import { useBalancerPrice } from './useBalancerPrice';
 import { useERC1155ApprovalForAll } from './useERC1155ApprovalForAll';
-import { computeMinApy, computeUserRatePerSec, backOutGrowthStep } from '../utils/stakingMath';
+import {
+  computeMinApy,
+  computePhUsdPerSecPerUnit,
+  computeUserRatePerSec,
+  backOutGrowthStep,
+} from '../utils/stakingMath';
 import type { Toast } from '../types/toast';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -47,6 +52,8 @@ export interface StakingPageData {
   // APY display
   /** Percentage, e.g. 12.5. */
   minApy: number;
+  /** phUSD/sec earned by a single staked unit (matches `minApy`'s data source). */
+  phUsdPerSecPerUnit: number;
   /** Highest USD price any staked unit could have been minted at. */
   highestPrice: number;
   /** Annual phUSD reward stream in USD (rate × seconds × phUSD/USD). */
@@ -214,6 +221,14 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
     priceRaw,
     growthBasisPoints,
     phUsdPriceSafe,
+    targetApyRaw,
+  );
+
+  const phUsdPerSecPerUnit = computePhUsdPerSecPerUnit(
+    currentRewardRate,
+    totalStakedRaw,
+    priceRaw,
+    growthBasisPoints,
     targetApyRaw,
   );
 
@@ -438,6 +453,7 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
     pendingYield,
     ratePerSec,
     minApy,
+    phUsdPerSecPerUnit,
     highestPrice,
     annualRewardDollars,
     isApprovedForAll,
