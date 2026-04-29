@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react';
-import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useState, useEffect, useMemo } from 'react';
+import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSimulateContract } from 'wagmi';
 import { readContract } from '@wagmi/core';
 import { wagmiConfig } from '../../wagmiConfig';
+import { erc20Abi, formatUnits, parseUnits } from 'viem';
 import {
   phlimboEaAbi,
   phusdStableMinterAbi,
   erc4626YieldStrategyAbi,
   stableYieldAccumulatorAbi,
+  nftStakerAbi,
+  balancerPoolerV2Abi,
 } from '@behodler/phase2-wagmi-hooks';
 import { pauserAbi } from '../../lib/pauserAbi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
@@ -16,6 +19,8 @@ import { useTokenBalance } from '../../hooks/useContractInteractions';
 import { useSolvencyInfo } from '../../hooks/useSolvencyInfo';
 import type { Abi, AbiFunction } from 'viem';
 import type { ContractAddresses } from '../../types/contracts';
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 // ABI for ERC20 tokens with mint function (used on testnets)
 const mintableErc20Abi = [
@@ -417,6 +422,277 @@ export default function Admin() {
     }
   };
   // ========== END SOLVENCY STATUS SECTION ==========
+
+  // ========== NFT STAKER RUNWAY SECTION ==========
+  const nftStakerAddress = addresses?.NFTStaker as `0x${string}` | undefined;
+  const phUsdAddress = addresses?.PhUSD as `0x${string}` | undefined;
+  const isNftStakerDeployed = !!nftStakerAddress &&
+    nftStakerAddress.toLowerCase() !== ZERO_ADDRESS;
+
+  const { data: nftStakerRunwaySeconds, refetch: refetchRunwaySeconds } = useReadContract({
+    address: nftStakerAddress,
+    abi: nftStakerAbi,
+    functionName: 'runwaySeconds',
+    query: { enabled: isNftStakerDeployed },
+  });
+
+  const { data: nftStakerRewardRate, refetch: refetchRewardRate } = useReadContract({
+    address: nftStakerAddress,
+    abi: nftStakerAbi,
+    functionName: 'currentRewardRate',
+    query: { enabled: isNftStakerDeployed },
+  });
+
+  const { data: nftStakerTotalBudget, refetch: refetchTotalBudget } = useReadContract({
+    address: nftStakerAddress,
+    abi: nftStakerAbi,
+    functionName: 'totalBudget',
+    query: { enabled: isNftStakerDeployed },
+  });
+
+  const { data: nftStakerTotalDebt, refetch: refetchTotalDebt } = useReadContract({
+    address: nftStakerAddress,
+    abi: nftStakerAbi,
+    functionName: 'totalDebt',
+    query: { enabled: isNftStakerDeployed },
+  });
+
+  const { data: nftStakerTargetApy, refetch: refetchTargetApy } = useReadContract({
+    address: nftStakerAddress,
+    abi: nftStakerAbi,
+    functionName: 'targetAPY',
+    query: { enabled: isNftStakerDeployed },
+  });
+
+  const { data: nftStakerTotalStaked, refetch: refetchTotalStakedRaw } = useReadContract({
+    address: nftStakerAddress,
+    abi: nftStakerAbi,
+    functionName: 'totalStaked',
+    query: { enabled: isNftStakerDeployed },
+  });
+
+  const { data: nftStakerOwner } = useReadContract({
+    address: nftStakerAddress,
+    abi: nftStakerAbi,
+    functionName: 'owner',
+    query: { enabled: isNftStakerDeployed },
+  });
+
+  const [topUpAmountInput, setTopUpAmountInput] = useState<string>('');
+  const [topUpInputError, setTopUpInputError] = useState<string | null>(null);
+
+  // Parse the user input into a bigint amount, surfacing parse errors inline.
+  const parsedTopUpAmount = useMemo<bigint | null>(() => {
+    const trimmed = topUpAmountInput.trim();
+    if (!trimmed) return null;
+    try {
+      const value = parseUnits(trimmed, 18);
+      return value > 0n ? value : null;
+    } catch {
+      return null;
+    }
+  }, [topUpAmountInput]);
+
+  const { data: nftStakerPhUsdAllowance, refetch: refetchNftStakerAllowance } = useReadContract({
+    address: phUsdAddress,
+    abi: erc20Abi,
+    functionName: 'allowance',
+    args: walletAddress && nftStakerAddress
+      ? [walletAddress as `0x${string}`, nftStakerAddress]
+      : undefined,
+    query: { enabled: isNftStakerDeployed && !!phUsdAddress && !!walletAddress },
+  });
+
+  const isNftStakerOwner = useMemo(() => {
+    if (!walletAddress || !nftStakerOwner) return false;
+    return (nftStakerOwner as string).toLowerCase() === walletAddress.toLowerCase();
+  }, [walletAddress, nftStakerOwner]);
+
+  const [topUpTxHash, setTopUpTxHash] = useState<`0x${string}` | undefined>();
+  const [topUpApproveTxHash, setTopUpApproveTxHash] = useState<`0x${string}` | undefined>();
+  const [isTopUpApproving, setIsTopUpApproving] = useState(false);
+  const [isTopUpExecuting, setIsTopUpExecuting] = useState(false);
+
+  const { isSuccess: topUpApproveConfirmed } = useWaitForTransactionReceipt({
+    hash: topUpApproveTxHash,
+    query: { enabled: !!topUpApproveTxHash },
+  });
+  const { isSuccess: topUpConfirmed } = useWaitForTransactionReceipt({
+    hash: topUpTxHash,
+    query: { enabled: !!topUpTxHash },
+  });
+
+  const refetchNftStakerStats = () => {
+    refetchRunwaySeconds();
+    refetchRewardRate();
+    refetchTotalBudget();
+    refetchTotalDebt();
+    refetchTargetApy();
+    refetchTotalStakedRaw();
+    refetchNftStakerAllowance();
+  };
+
+  useEffect(() => {
+    if (topUpApproveConfirmed && topUpApproveTxHash) {
+      setIsTopUpApproving(false);
+      setTopUpApproveTxHash(undefined);
+      refetchNftStakerAllowance();
+      addToast({
+        type: 'success',
+        title: 'Approval Confirmed',
+        description: 'phUSD allowance set for NFTStaker. You can now top up.',
+      });
+    }
+    // refetchNftStakerAllowance is stable from wagmi; addToast pulled from context
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topUpApproveConfirmed, topUpApproveTxHash]);
+
+  useEffect(() => {
+    if (topUpConfirmed && topUpTxHash) {
+      setIsTopUpExecuting(false);
+      setTopUpTxHash(undefined);
+      refetchNftStakerStats();
+      addToast({
+        type: 'success',
+        title: 'Top Up Confirmed',
+        description: 'phUSD has been transferred to NFTStaker. Runway updated.',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topUpConfirmed, topUpTxHash]);
+  // ========== END NFT STAKER RUNWAY SECTION ==========
+
+  // ========== BALANCER POOLER V2 DISPATCH SECTION ==========
+  const balancerPoolerV2Address = addresses?.nftsV2?.BalancerPooler as `0x${string}` | undefined;
+  const sUsdsAddress = addresses?.SUSDS as `0x${string}` | undefined;
+  const isBalancerPoolerV2Deployed = !!balancerPoolerV2Address &&
+    balancerPoolerV2Address.toLowerCase() !== ZERO_ADDRESS;
+
+  const { data: dispatcherSusdsBalance, refetch: refetchDispatcherSusdsBalance } = useReadContract({
+    address: sUsdsAddress,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: balancerPoolerV2Address ? [balancerPoolerV2Address] : undefined,
+    query: { enabled: isBalancerPoolerV2Deployed && !!sUsdsAddress },
+  });
+
+  const { data: dispatcherAuthVersion, refetch: refetchAuthVersion } = useReadContract({
+    address: balancerPoolerV2Address,
+    abi: balancerPoolerV2Abi,
+    functionName: 'authVersion',
+    query: { enabled: isBalancerPoolerV2Deployed },
+  });
+
+  const { data: dispatcherPoolerAuthVersion, refetch: refetchPoolerAuthVersion } = useReadContract({
+    address: balancerPoolerV2Address,
+    abi: balancerPoolerV2Abi,
+    functionName: 'poolerAuthVersion',
+    args: walletAddress ? [walletAddress as `0x${string}`] : undefined,
+    query: { enabled: isBalancerPoolerV2Deployed && !!walletAddress },
+  });
+
+  const { data: dispatcherPaused, refetch: refetchDispatcherPaused } = useReadContract({
+    address: balancerPoolerV2Address,
+    abi: balancerPoolerV2Abi,
+    functionName: 'paused',
+    query: { enabled: isBalancerPoolerV2Deployed },
+  });
+
+  // getIdealBPT is non-view (writes Balancer router transient state during the
+  // simulation), so eth_call still returns a clean value but useReadContract
+  // will reject the ABI annotation. Use useSimulateContract — same eth_call
+  // underneath. Only run the simulation when there is an sUSDS balance to pool;
+  // otherwise the call reverts and we'd surface a misleading error.
+  const idealBptSimEnabled = isBalancerPoolerV2Deployed &&
+    typeof dispatcherSusdsBalance === 'bigint' &&
+    dispatcherSusdsBalance > 0n;
+
+  const {
+    data: idealBptSim,
+    refetch: refetchIdealBpt,
+    error: idealBptError,
+  } = useSimulateContract({
+    address: balancerPoolerV2Address,
+    abi: balancerPoolerV2Abi,
+    functionName: 'getIdealBPT',
+    query: { enabled: idealBptSimEnabled },
+  });
+
+  const idealBpt = useMemo<bigint | null>(() => {
+    if (!idealBptSim) return null;
+    const result = idealBptSim.result;
+    return typeof result === 'bigint' ? result : null;
+  }, [idealBptSim]);
+
+  const isAuthorisedPooler = useMemo(() => {
+    if (typeof dispatcherAuthVersion !== 'bigint') return false;
+    if (typeof dispatcherPoolerAuthVersion !== 'bigint') return false;
+    return dispatcherPoolerAuthVersion === dispatcherAuthVersion;
+  }, [dispatcherAuthVersion, dispatcherPoolerAuthVersion]);
+
+  // Editable input for minBPT, displayed as decimal but stored raw.
+  const [minBptInput, setMinBptInput] = useState<string>('');
+  // Tracks whether the user has manually edited the minBPT input. Once true,
+  // we stop auto-overwriting from idealBpt updates so we don't clobber edits.
+  const [userEditedMinBpt, setUserEditedMinBpt] = useState(false);
+
+  // Auto-populate minBPT to idealBpt * 99 / 100 (1% slippage) whenever idealBpt
+  // changes, unless the user has manually edited the field. Never default to 0.
+  useEffect(() => {
+    if (userEditedMinBpt) return;
+    if (idealBpt === null || idealBpt === 0n) return;
+    const tolerated = (idealBpt * 99n) / 100n;
+    if (tolerated === 0n) return;
+    setMinBptInput(formatUnits(tolerated, 18));
+  }, [idealBpt, userEditedMinBpt]);
+
+  const parsedMinBpt = useMemo<bigint | null>(() => {
+    const trimmed = minBptInput.trim();
+    if (!trimmed) return null;
+    try {
+      const value = parseUnits(trimmed, 18);
+      return value;
+    } catch {
+      return null;
+    }
+  }, [minBptInput]);
+
+  const [poolTxHash, setPoolTxHash] = useState<`0x${string}` | undefined>();
+  const [isPoolExecuting, setIsPoolExecuting] = useState(false);
+  const { isSuccess: poolConfirmed } = useWaitForTransactionReceipt({
+    hash: poolTxHash,
+    query: { enabled: !!poolTxHash },
+  });
+
+  const refetchDispatcherStats = () => {
+    refetchDispatcherSusdsBalance();
+    refetchAuthVersion();
+    refetchPoolerAuthVersion();
+    refetchDispatcherPaused();
+    refetchIdealBpt();
+  };
+
+  useEffect(() => {
+    if (poolConfirmed && poolTxHash) {
+      setIsPoolExecuting(false);
+      setPoolTxHash(undefined);
+      // After a successful pool, sUSDS balance drops to 0 and the next
+      // getIdealBPT() simulation will revert (require sUSDSAmount > 0). The
+      // refetch call still triggers the read; the gating in `idealBptSimEnabled`
+      // suppresses it once balance hits 0.
+      refetchDispatcherStats();
+      // Clear the manual-edit flag so the next non-zero balance auto-populates.
+      setUserEditedMinBpt(false);
+      setMinBptInput('');
+      addToast({
+        type: 'success',
+        title: 'Pool Confirmed',
+        description: 'sUSDS has been pooled into the Balancer V3 pool.',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poolConfirmed, poolTxHash]);
+  // ========== END BALANCER POOLER V2 DISPATCH SECTION ==========
 
   // Wagmi hooks for contract write and transaction tracking
   const { data: txHash, writeContractAsync } = useWriteContract();
@@ -954,6 +1230,161 @@ export default function Admin() {
   };
 
   /**
+   * Handle phUSD approve for NFTStaker top-up
+   */
+  const handleNftStakerApprove = async () => {
+    if (!isConnected || !walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet to approve.',
+      });
+      return;
+    }
+    if (!phUsdAddress || !nftStakerAddress) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Available',
+        description: 'phUSD or NFTStaker address missing.',
+      });
+      return;
+    }
+    if (parsedTopUpAmount === null) {
+      setTopUpInputError('Enter a valid phUSD amount > 0.');
+      return;
+    }
+    setTopUpInputError(null);
+    setIsTopUpApproving(true);
+    try {
+      const hash = await writeContractAsync({
+        address: phUsdAddress,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [nftStakerAddress, parsedTopUpAmount],
+      });
+      setTopUpApproveTxHash(hash);
+      addToast({
+        type: 'info',
+        title: 'Approval Submitted',
+        description: 'Waiting for approval confirmation...',
+      });
+    } catch (err) {
+      setIsTopUpApproving(false);
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      addToast({
+        type: 'error',
+        title: 'Approval Failed',
+        description: msg,
+      });
+    }
+  };
+
+  /**
+   * Handle NFTStaker top up
+   */
+  const handleNftStakerTopUp = async () => {
+    if (!isConnected || !walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet to top up.',
+      });
+      return;
+    }
+    if (!nftStakerAddress) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Available',
+        description: 'NFTStaker address missing.',
+      });
+      return;
+    }
+    if (parsedTopUpAmount === null) {
+      setTopUpInputError('Enter a valid phUSD amount > 0.');
+      return;
+    }
+    setTopUpInputError(null);
+    setIsTopUpExecuting(true);
+    try {
+      const hash = await writeContractAsync({
+        address: nftStakerAddress,
+        abi: nftStakerAbi,
+        functionName: 'topUp',
+        args: [parsedTopUpAmount],
+      });
+      setTopUpTxHash(hash);
+      addToast({
+        type: 'info',
+        title: 'Top Up Submitted',
+        description: 'Waiting for top-up confirmation...',
+      });
+    } catch (err) {
+      setIsTopUpExecuting(false);
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      addToast({
+        type: 'error',
+        title: 'Top Up Failed',
+        description: msg,
+      });
+    }
+  };
+
+  /**
+   * Handle BalancerPoolerV2 pool dispatch
+   */
+  const handleDispatcherPool = async () => {
+    if (!isConnected || !walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet to pool.',
+      });
+      return;
+    }
+    if (!balancerPoolerV2Address) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Available',
+        description: 'BalancerPoolerV2 address missing.',
+      });
+      return;
+    }
+    // Hard-block submission of 0 — see story §4 MEV note. minBPT = 0 on a public
+    // mempool invites a sandwich that can drain the entire single-sided deposit.
+    if (parsedMinBpt === null || parsedMinBpt <= 0n) {
+      addToast({
+        type: 'error',
+        title: 'Invalid minBPT',
+        description: 'minBPT must be > 0 — submitting 0 invites MEV sandwich attacks that can drain the deposit.',
+      });
+      return;
+    }
+    setIsPoolExecuting(true);
+    try {
+      const hash = await writeContractAsync({
+        address: balancerPoolerV2Address,
+        abi: balancerPoolerV2Abi,
+        functionName: 'pool',
+        args: [parsedMinBpt],
+      });
+      setPoolTxHash(hash);
+      addToast({
+        type: 'info',
+        title: 'Pool Submitted',
+        description: 'Waiting for pool confirmation...',
+      });
+    } catch (err) {
+      setIsPoolExecuting(false);
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      addToast({
+        type: 'error',
+        title: 'Pool Failed',
+        description: msg,
+      });
+    }
+  };
+
+  /**
    * Handle mint yield button click
    * Mints DOLA to the AutoDOLA underlying vault for testing
    */
@@ -1383,6 +1814,298 @@ export default function Admin() {
             <span className="text-red-500">Red</span> = less than 3 days
           </span>
         </p>
+      </div>
+
+      {/* NFT Staker — Runway Panel */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            NFT Staker — Runway
+          </h3>
+          {isNftStakerDeployed && nftStakerOwner && (
+            <span className="text-xs font-mono text-muted-foreground">
+              owner: {(nftStakerOwner as string).slice(0, 6)}…{(nftStakerOwner as string).slice(-4)}
+            </span>
+          )}
+        </div>
+        {!isNftStakerDeployed ? (
+          <p className="text-sm text-muted-foreground">
+            NFTStaker not deployed on this chain.
+          </p>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Runway:</span>
+                <span className="text-sm font-mono text-foreground">
+                  {typeof nftStakerRunwaySeconds === 'bigint' && nftStakerRunwaySeconds > 0n
+                    ? `${(Number(nftStakerRunwaySeconds) / 86400).toFixed(2)} days`
+                    : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Reward Rate (per second):</span>
+                <span className="text-sm font-mono text-foreground">
+                  {typeof nftStakerRewardRate === 'bigint'
+                    ? `${(Number(nftStakerRewardRate) / 1e18).toFixed(8)} phUSD/sec`
+                    : '0.00000000 phUSD/sec'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Reward Rate (per day):</span>
+                <span className="text-sm font-mono text-foreground">
+                  {typeof nftStakerRewardRate === 'bigint'
+                    ? `${((Number(nftStakerRewardRate) * 86400) / 1e18).toFixed(2)} phUSD/day`
+                    : '0.00 phUSD/day'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Total Budget:</span>
+                <span className="text-sm font-mono text-foreground">
+                  {typeof nftStakerTotalBudget === 'bigint'
+                    ? `${(Number(nftStakerTotalBudget) / 1e18).toFixed(2)} phUSD`
+                    : '0.00 phUSD'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Total Debt:</span>
+                <span className="text-sm font-mono text-foreground">
+                  {typeof nftStakerTotalDebt === 'bigint'
+                    ? `${(Number(nftStakerTotalDebt) / 1e18).toFixed(2)} phUSD`
+                    : '0.00 phUSD'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Target APY:</span>
+                <span className="text-sm font-mono text-foreground">
+                  {typeof nftStakerTargetApy === 'bigint'
+                    ? `${(Number(nftStakerTargetApy) / 1e16).toFixed(2)} %`
+                    : '0.00 %'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Total Staked:</span>
+                <span className="text-sm font-mono text-foreground">
+                  {typeof nftStakerTotalStaked === 'bigint'
+                    ? nftStakerTotalStaked.toString()
+                    : '0'}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-border">
+              <label
+                htmlFor="nft-staker-topup-amount"
+                className="block text-sm font-medium text-foreground mb-2"
+              >
+                Top up phUSD
+              </label>
+              <input
+                id="nft-staker-topup-amount"
+                type="text"
+                inputMode="decimal"
+                value={topUpAmountInput}
+                onChange={(e) => {
+                  setTopUpAmountInput(e.target.value);
+                  setTopUpInputError(null);
+                }}
+                placeholder="e.g. 1000"
+                disabled={isTopUpApproving || isTopUpExecuting}
+                className={
+                  'w-full px-3 py-2 bg-background border rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ' +
+                  (topUpInputError ? 'border-red-500' : 'border-border')
+                }
+              />
+              {topUpInputError && (
+                <p className="text-xs text-red-500 mt-1">{topUpInputError}</p>
+              )}
+
+              <div className="flex gap-3 mt-3">
+                {(() => {
+                  const allowanceBigint = typeof nftStakerPhUsdAllowance === 'bigint'
+                    ? nftStakerPhUsdAllowance
+                    : 0n;
+                  const requiredAmount = parsedTopUpAmount ?? 0n;
+                  const needsApproval = requiredAmount > 0n && allowanceBigint < requiredAmount;
+                  const txInFlight = isTopUpApproving || isTopUpExecuting;
+
+                  if (needsApproval) {
+                    return (
+                      <ActionButton
+                        disabled={txInFlight || parsedTopUpAmount === null}
+                        onAction={handleNftStakerApprove}
+                        label={isTopUpApproving ? 'Approving…' : 'Approve phUSD'}
+                        variant="primary"
+                        isLoading={isTopUpApproving}
+                      />
+                    );
+                  }
+                  return (
+                    <div title={!isNftStakerOwner ? 'NFTStaker.owner only' : undefined}>
+                      <ActionButton
+                        disabled={txInFlight || parsedTopUpAmount === null || !isNftStakerOwner}
+                        onAction={handleNftStakerTopUp}
+                        label={isTopUpExecuting ? 'Topping Up…' : 'Top Up'}
+                        variant="primary"
+                        isLoading={isTopUpExecuting}
+                      />
+                    </div>
+                  );
+                })()}
+              </div>
+              {!isNftStakerOwner && walletAddress && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Connected wallet is not the NFTStaker owner — Top Up will revert on-chain.
+                </p>
+              )}
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-border">
+              <button
+                onClick={refetchNftStakerStats}
+                className="text-xs text-accent hover:text-accent/80 underline"
+              >
+                Refresh Runway Stats
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+              <strong>Note:</strong> Runway is derived: <code>(rewardToken.balanceOf(this) + dispatcherHook.mintDebt()) / rewardRate</code>.
+              Top Up requires phUSD approval for NFTStaker, then transfers phUSD from your wallet
+              and recomputes the emission schedule. Approve uses the exact entered amount.
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* BalancerPoolerV2 — Pending Dispatch Panel */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            BalancerPoolerV2 — Pending Dispatch
+          </h3>
+        </div>
+        {!isBalancerPoolerV2Deployed ? (
+          <p className="text-sm text-muted-foreground">
+            BalancerPoolerV2 not deployed on this chain.
+          </p>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">sUSDS Balance (dispatcher):</span>
+                <span className="text-sm font-mono text-foreground">
+                  {typeof dispatcherSusdsBalance === 'bigint'
+                    ? `${(Number(dispatcherSusdsBalance) / 1e18).toFixed(2)} sUSDS`
+                    : '0.00 sUSDS'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Estimated BPT out (idealBPT):</span>
+                <span className="text-sm font-mono text-foreground">
+                  {idealBpt !== null
+                    ? `${formatUnits(idealBpt, 18)} BPT`
+                    : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Authorised pooler:</span>
+                <span className={
+                  'text-sm font-mono ' + (isAuthorisedPooler ? 'text-green-500' : 'text-red-500')
+                }>
+                  {isAuthorisedPooler ? 'yes' : 'no'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Paused:</span>
+                <span className={
+                  'text-sm font-mono ' + (dispatcherPaused ? 'text-red-500' : 'text-foreground')
+                }>
+                  {dispatcherPaused ? 'yes' : 'no'}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-border">
+              <label
+                htmlFor="dispatcher-min-bpt"
+                className="block text-sm font-medium text-foreground mb-2"
+              >
+                minBPT (slippage floor — defaults to 1% below idealBPT)
+              </label>
+              <input
+                id="dispatcher-min-bpt"
+                type="text"
+                inputMode="decimal"
+                value={minBptInput}
+                onChange={(e) => {
+                  setMinBptInput(e.target.value);
+                  setUserEditedMinBpt(true);
+                }}
+                placeholder={idealBpt === null ? 'No idealBPT — enter manually' : 'BPT amount'}
+                disabled={isPoolExecuting}
+                className={
+                  'w-full px-3 py-2 bg-background border rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ' +
+                  ((parsedMinBpt === null || parsedMinBpt <= 0n) && minBptInput !== ''
+                    ? 'border-red-500'
+                    : 'border-border')
+                }
+              />
+              {idealBpt === null && idealBptError && (
+                <p className="text-xs text-red-500 mt-1">
+                  Could not estimate BPT — refresh, or enter a value manually.
+                </p>
+              )}
+              {minBptInput !== '' && (parsedMinBpt === null || parsedMinBpt <= 0n) && (
+                <p className="text-xs text-red-500 mt-1">
+                  minBPT must be &gt; 0 — submitting 0 invites MEV sandwich attacks that can drain the deposit.
+                </p>
+              )}
+
+              {(() => {
+                const susdsZero = typeof dispatcherSusdsBalance !== 'bigint' || dispatcherSusdsBalance === 0n;
+                const minBptInvalid = parsedMinBpt === null || parsedMinBpt <= 0n;
+                let tooltip: string | undefined;
+                if (susdsZero) tooltip = 'Nothing to pool';
+                else if (dispatcherPaused) tooltip = 'Dispatcher is paused';
+                else if (!isAuthorisedPooler) tooltip = 'Wallet not authorised. Contract owner must call setAuthorizedPooler(<your-address>, true).';
+                else if (minBptInvalid) tooltip = 'minBPT must be > 0 (MEV sandwich risk)';
+
+                const disabled = susdsZero
+                  || !!dispatcherPaused
+                  || !isAuthorisedPooler
+                  || minBptInvalid
+                  || isPoolExecuting;
+
+                return (
+                  <div className="mt-3" title={tooltip}>
+                    <ActionButton
+                      disabled={disabled}
+                      onAction={handleDispatcherPool}
+                      label={isPoolExecuting ? 'Pooling…' : 'Pool All sUSDS'}
+                      variant="primary"
+                      isLoading={isPoolExecuting}
+                    />
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-border">
+              <button
+                onClick={refetchDispatcherStats}
+                className="text-xs text-accent hover:text-accent/80 underline"
+              >
+                Refresh Dispatcher Stats
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+              <strong>Note:</strong> Pool All single-side-deposits the dispatcher's full sUSDS
+              balance into the sUSDS/phUSD Balancer V3 pool. minBPT auto-populates to 1% below
+              <code> getIdealBPT()</code> — never 0. The connected wallet must have been
+              authorised by the contract owner via <code>setAuthorizedPooler</code>.
+            </p>
+          </>
+        )}
       </div>
 
       {/* Selected Contract Address Display */}
