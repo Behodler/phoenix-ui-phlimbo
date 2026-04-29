@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { nftMinterV2Abi } from '@behodler/phase2-wagmi-hooks';
+import type { Address } from 'viem';
+import { nftMinterV2Abi, batchNftMinterAbi } from '@behodler/phase2-wagmi-hooks';
 import type { NFTData } from '../../data/nftMockData';
 import { tokenPrefixToAddressKey } from '../../data/nftMockData';
 import { LoadingSpinner } from '../ui/ActionButton';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
-import { useTokenApproval } from '../../hooks/useContractInteractions';
+import { useTokenAllowance, useTokenApproval } from '../../hooks/useContractInteractions';
 import { useToast } from '../ui/ToastProvider';
 import NFTCard from './NFTCard';
+import BatchMintControlsView from './BatchMintControls';
+import { useBatchMintControls } from '../../utils/useBatchMintControls';
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 interface NFTListMintModalProps {
   isOpen: boolean;
@@ -30,6 +35,34 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   const { addToast } = useToast();
   const { writeContractAsync } = useWriteContract();
 
+  // Runtime predicate: route through BatchNFTMinter when:
+  //   1. The NFT's static config has `batchEnabled: true` (Liquid Sky Phoenix only).
+  //   2. The resolved BatchNFTMinter address is non-zero (graceful mainnet fallback).
+  // Lower-cased compare guards against any future capitalisation drift in the
+  // address-server response.
+  const useBatchFlow =
+    !!nft?.batchEnabled &&
+    !!addresses?.BatchNFTMinter &&
+    addresses.BatchNFTMinter.toLowerCase() !== ZERO_ADDRESS;
+
+  // Allowance read against the batch helper. Always wired (hook order must be
+  // stable) but only consumed when `useBatchFlow` is true.
+  const usdsAddress = addresses?.USDS as Address | undefined;
+  const batchHelperAddress = useBatchFlow
+    ? (addresses?.BatchNFTMinter as Address)
+    : undefined;
+  const { allowance: batchAllowance, refetch: refetchBatchAllowance } = useTokenAllowance(
+    walletAddress,
+    batchHelperAddress,
+    usdsAddress,
+  );
+
+  // Batch-mint controls state. Always called for hook-order stability;
+  // only the rendered output is gated on `useBatchFlow`.
+  const batchControls = useBatchMintControls(
+    nft ?? ({ priceRaw: 0n, growthBasisPoints: 0, decimals: 18 } as NFTData),
+  );
+
   // Wait for approval transaction confirmation
   const { isSuccess: isApprovalSuccess } = useWaitForTransactionReceipt({
     hash: approvalTxHash,
@@ -42,9 +75,10 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
       setIsApproving(false);
       setApprovalTxHash(undefined);
       refetchMinterData();
+      refetchBatchAllowance();
       addToast({ type: 'success', title: 'Approval Confirmed', description: 'Token approval confirmed on-chain. You can now mint.' });
     }
-  }, [isApprovalSuccess, approvalTxHash, refetchMinterData, addToast]);
+  }, [isApprovalSuccess, approvalTxHash, refetchMinterData, refetchBatchAllowance, addToast]);
 
   // Wait for mint transaction confirmation
   const { isSuccess: isMintSuccess } = useWaitForTransactionReceipt({
@@ -58,15 +92,20 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
       setIsMinting(false);
       setMintTxHash(undefined);
       refetchMinterData();
+      refetchBatchAllowance();
       onMintSuccess(nft);
     }
-  }, [isMintSuccess, mintTxHash, nft, onMintSuccess, refetchMinterData]);
+  }, [isMintSuccess, mintTxHash, nft, onMintSuccess, refetchMinterData, refetchBatchAllowance]);
 
   if (!isOpen || !nft) return null;
 
   // Determine if approved: allowance >= price (both as bigint)
-  const isApproved = nft.allowanceRaw >= nft.priceRaw && nft.priceRaw > 0n;
-  const hasInsufficientBalance = nft.balanceRaw < nft.priceRaw;
+  const isApproved = useBatchFlow
+    ? batchAllowance !== undefined && batchAllowance >= batchControls.requiredRaw && batchControls.requiredRaw > 0n
+    : nft.allowanceRaw >= nft.priceRaw && nft.priceRaw > 0n;
+  const hasInsufficientBalance = useBatchFlow
+    ? nft.balanceRaw < batchControls.requiredRaw
+    : nft.balanceRaw < nft.priceRaw;
   const isLoading = isApproving || isMinting;
   const isMintDisabled = isLoading;
 
@@ -95,7 +134,12 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
     setIsApproving(true);
     try {
       addToast({ type: 'info', title: 'Confirm in Wallet', description: `Please confirm the ${nft.tokenDisplayName} approval in your wallet.`, duration: 30000 });
-      const hash = await approve(tokenAddress, nftPrimary.NFTMinter as `0x${string}`);
+      const spender = useBatchFlow
+        ? (addresses!.BatchNFTMinter as `0x${string}`)
+        : (nftPrimary.NFTMinter as `0x${string}`);
+      const hash = useBatchFlow
+        ? await approve(tokenAddress, spender, batchControls.requiredRaw)
+        : await approve(tokenAddress, spender);
       setApprovalTxHash(hash);
       addToast({ type: 'info', title: 'Transaction Submitted', description: 'Waiting for approval confirmation...' });
     } catch (error) {
@@ -125,15 +169,35 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
     try {
       addToast({ type: 'info', title: 'Confirm in Wallet', description: `Please confirm the mint transaction in your wallet.`, duration: 30000 });
 
-      // V2 NFTMinter: single 2-arg mint(index, recipient) path shared by every NFT.
-      // Dispatcher-specific behaviour (burn / gather / balancer pool) is handled
-      // server-side; no token-prefix branching, no extraData, no BPT preview.
-      const hash = await writeContractAsync({
-        address: nftPrimary.NFTMinter as `0x${string}`,
-        abi: nftMinterV2Abi,
-        functionName: 'mint',
-        args: [BigInt(nft.dispatcherIndex), walletAddress],
-      });
+      let hash: `0x${string}`;
+      if (useBatchFlow) {
+        // BatchNFTMinter.batchMint pulls the full paymentAmount upfront, mints
+        // `count` consecutive units (each step bumps the dispatcher price), and
+        // refunds dust below threshold. Args mirror the ABI exactly.
+        hash = await writeContractAsync({
+          address: addresses!.BatchNFTMinter as `0x${string}`,
+          abi: batchNftMinterAbi,
+          functionName: 'batchMint',
+          args: [
+            nftPrimary.NFTMinter as `0x${string}`,
+            tokenAddress,
+            BigInt(nft.dispatcherIndex),
+            BigInt(batchControls.count),
+            walletAddress,
+            batchControls.requiredRaw,
+          ],
+        });
+      } else {
+        // V2 NFTMinter: single 2-arg mint(index, recipient) path shared by every NFT.
+        // Dispatcher-specific behaviour (burn / gather / balancer pool) is handled
+        // server-side; no token-prefix branching, no extraData, no BPT preview.
+        hash = await writeContractAsync({
+          address: nftPrimary.NFTMinter as `0x${string}`,
+          abi: nftMinterV2Abi,
+          functionName: 'mint',
+          args: [BigInt(nft.dispatcherIndex), walletAddress],
+        });
+      }
 
       setMintTxHash(hash);
       addToast({ type: 'info', title: 'Transaction Submitted', description: 'Waiting for blockchain confirmation...' });
@@ -163,6 +227,20 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
       <div className="bg-background border border-border rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Full NFTCard at top (without its own mint button) */}
         <NFTCard nft={nft} price={price} showMintButton={false} tokenAddress={getTokenAddress() ?? undefined} />
+
+        {/* Batch controls (Liquid Sky Phoenix only, when helper is deployed) */}
+        {useBatchFlow ? (
+          <BatchMintControlsView
+            nft={nft}
+            count={batchControls.count}
+            displayValue={batchControls.displayValue}
+            isInvalid={batchControls.isInvalid}
+            isApproved={isApproved}
+            isLoading={isLoading}
+            onSliderChange={batchControls.onSliderChange}
+            onTextChange={batchControls.onTextChange}
+          />
+        ) : null}
 
         {/* Action buttons */}
         <div className="mt-4 flex gap-3">
