@@ -43,6 +43,9 @@ export interface ContractAddresses {
   BurnRecorder: string;
   BalancerRouter: string;
   NFTMigrator: string;
+  BalancerPoolerMintDebtHook: string;
+  NFTStaker: string;
+  BatchNFTMinter: string;
   DepositView: string;
   ViewRouter: string;
   DepositPageView: string;

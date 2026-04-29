@@ -81,7 +81,10 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
 
       SUSDe: data.SUSDe || '0x0000000000000000000000000000000000000000',
       USDe: data.USDe || '0x0000000000000000000000000000000000000000',
-      YieldStrategyUSDe: data.YieldStrategyUSDe || '0x0000000000000000000000000000000000000000'
+      YieldStrategyUSDe: data.YieldStrategyUSDe || '0x0000000000000000000000000000000000000000',
+      BalancerPoolerMintDebtHook: data.BalancerPoolerMintDebtHook || '0x0000000000000000000000000000000000000000',
+      NFTStaker: data.NFTStaker || '0x0000000000000000000000000000000000000000',
+      BatchNFTMinter: data.BatchNFTMinter || '0x0000000000000000000000000000000000000000'
     }
     log.debug('📡 fetchLocalAddresses: Mapped addresses:', addresses)
 

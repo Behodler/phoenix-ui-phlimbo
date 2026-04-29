@@ -8,7 +8,7 @@ import type { ContractAddresses } from '../types/contracts'
  *            bondingToken is the ERC20 token produced by the bonding curve
  */
 export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
-  // Deployed Phase 2 contracts
+  //Phase 1 protocol contracts
   PhUSD: "0xf3B5B661b92B75C71fA5Aba8Fd95D7514A9CD605",
 
   // Deployed Phase 2 contracts
@@ -66,12 +66,19 @@ export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
     GatherWBTC: "0xfd3775f2ccfb94b532b34b2b683e210ba4449880",
   },
 
-
   // View contracts
   ViewRouter: "0xC17Ce1cE5ebB43fc0cfda9Fe8BbC849c0894631a",
   DepositPageView: "0x50D4443782bB9A6e8D65dAcd593684EDd3FF03b8",
   MintPageView: "0x64FE63ca7BA456a9Bb190140e35DF2e437AbD119",
+
+  // NFT staking — not yet deployed
+  BalancerPoolerMintDebtHook: "0x0000000000000000000000000000000000000000",
+  NFTStaker: "0x0000000000000000000000000000000000000000",
+  BatchNFTMinter: "0x0000000000000000000000000000000000000000",
+
 };
+
+
 
 /**
  * Sepolia testnet contract addresses
@@ -139,4 +146,8 @@ export const SEPOLIA_CONTRACT_ADDRESSES: ContractAddresses = {
   DepositPageView: "0x50D4443782bB9A6e8D65dAcd593684EDd3FF03b8",
   MintPageView: "0x5122cb32aE42AcC2aD5C2071e977C95c08F70141",
 
+  // NFT staking — not yet deployed
+  BalancerPoolerMintDebtHook: "0x0000000000000000000000000000000000000000",
+  NFTStaker: "0x0000000000000000000000000000000000000000",
+  BatchNFTMinter: "0x0000000000000000000000000000000000000000",
 };
