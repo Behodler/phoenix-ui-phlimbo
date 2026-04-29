@@ -30,16 +30,25 @@ export function backOutGrowthStep(priceRaw: bigint, growthBasisPoints: number): 
 /**
  * Compute the displayed minimum APY (percentage, e.g. 12.5) from on-chain inputs.
  *
- * Formula:
+ * Formula (totalStaked > 0):
  *   annualRewardDollars = rewardRate / 1e18 * SECONDS_PER_YEAR * phUsdPrice
  *   highestPriceUsd     = backOutGrowthStep(priceRaw, growth) / 1e18  (USDS pinned to $1)
- *   denom               = max(totalStaked, 1) * highestPriceUsd
+ *   denom               = totalStaked * highestPriceUsd
  *   minApy              = annualRewardDollars / denom * 100
  *
  * "minimum" because it assumes the staked subset was bought at the
  * highest historical mint price; earlier (cheaper) mints would yield a
- * higher APY for those holders. The formula matches story 056's mock,
- * with on-chain values substituted.
+ * higher APY for those holders.
+ *
+ * Starting APY (totalStaked == 0):
+ *   On-chain `rewardRate` is sized against `totalStaked * latestPrice`,
+ *   so it is exactly 0 until someone stakes. Substituting totalStaked=1
+ *   into the contract's rate formula gives a hypothetical rate of
+ *   `latestPrice * targetAPY / (1e18 * SECONDS_PER_YEAR)`; plugging that
+ *   back into the APY formula above with denom=`1 * latestPrice` makes
+ *   the price cancel, leaving:
+ *     startingApy = (targetAPY / 1e18) * phUsdPrice * 100
+ *   This is the floor APY a sole first staker would receive.
  */
 export function computeMinApy(
   rewardRate: bigint,
@@ -47,17 +56,21 @@ export function computeMinApy(
   priceRaw: bigint,
   growthBasisPoints: number,
   phUsdPrice: number,
+  targetAPY: bigint,
 ): number {
-  const annualRewardDollars =
-    (Number(rewardRate) / 1e18) * SECONDS_PER_YEAR * phUsdPrice;
-
   const highestPriceRaw = backOutGrowthStep(priceRaw, growthBasisPoints);
   const highestPriceUsd = Number(highestPriceRaw) / 1e18;
 
   if (highestPriceUsd <= 0) return 0;
 
-  const stakedDenom = totalStaked > 0n ? Number(totalStaked) : 1;
-  const denom = stakedDenom * highestPriceUsd;
+  if (totalStaked === 0n) {
+    return (Number(targetAPY) / 1e18) * phUsdPrice * 100;
+  }
+
+  const annualRewardDollars =
+    (Number(rewardRate) / 1e18) * SECONDS_PER_YEAR * phUsdPrice;
+
+  const denom = Number(totalStaked) * highestPriceUsd;
   if (denom <= 0) return 0;
 
   return (annualRewardDollars / denom) * 100;

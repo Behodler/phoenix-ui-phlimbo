@@ -32,42 +32,54 @@ describe('backOutGrowthStep', () => {
 });
 
 describe('computeMinApy', () => {
-  it('returns 0 when rewardRate is 0', () => {
-    const apy = computeMinApy(0n, 10n, parseUnits('100', 18), 0, 1);
+  it('returns 0 when rewardRate is 0 and supply is staked', () => {
+    const apy = computeMinApy(0n, 10n, parseUnits('100', 18), 0, 1, 0n);
     expect(apy).toBe(0);
   });
 
   it('returns 0 when priceRaw is 0', () => {
-    const apy = computeMinApy(parseUnits('1', 18), 10n, 0n, 0, 1);
+    const apy = computeMinApy(parseUnits('1', 18), 10n, 0n, 0, 1, 0n);
     expect(apy).toBe(0);
   });
 
-  it('clamps totalStaked = 0 to a denominator of 1 (first-staker ceiling)', () => {
-    // rewardRate = 1e18 / SECONDS_PER_YEAR phUSD/sec → annual stream = $1
-    // priceRaw = 100e18, growth = 0 → highest = 100
-    // staked = 0 → denom = 1 * 100 = 100, APY = 1/100 * 100 = 1.0%
-    const rewardRate = parseUnits('1', 18) / BigInt(SECONDS_PER_YEAR);
-    const apy = computeMinApy(rewardRate, 0n, parseUnits('100', 18), 0, 1);
-    expect(apy).toBeCloseTo(1.0, 4);
+  it('returns the starting APY (targetAPY * phUsdPrice) when nothing is staked', () => {
+    // targetAPY = 0.10e18 → 10%; phUsdPrice = 1 → starting APY = 10%
+    const targetAPY = parseUnits('0.10', 18);
+    const apy = computeMinApy(0n, 0n, parseUnits('100', 18), 0, 1, targetAPY);
+    expect(apy).toBeCloseTo(10, 6);
+  });
+
+  it("starting APY does not depend on price when nothing is staked", () => {
+    const targetAPY = parseUnits('0.125', 18);
+    const a = computeMinApy(0n, 0n, parseUnits('100', 18), 0, 1, targetAPY);
+    const b = computeMinApy(0n, 0n, parseUnits('5000', 18), 250, 1, targetAPY);
+    expect(a).toBeCloseTo(b, 6);
+  });
+
+  it('starting APY scales linearly with phUsdPrice', () => {
+    const targetAPY = parseUnits('0.10', 18);
+    const at1 = computeMinApy(0n, 0n, parseUnits('100', 18), 0, 1, targetAPY);
+    const at2 = computeMinApy(0n, 0n, parseUnits('100', 18), 0, 2, targetAPY);
+    expect(at2).toBeCloseTo(at1 * 2, 6);
   });
 
   it('matches the spec example: rewardRate=1e18/yr, totalStaked=1, priceRaw=100e18, growth=0 → 1%', () => {
     const rewardRate = parseUnits('1', 18) / BigInt(SECONDS_PER_YEAR);
-    const apy = computeMinApy(rewardRate, 1n, parseUnits('100', 18), 0, 1);
+    const apy = computeMinApy(rewardRate, 1n, parseUnits('100', 18), 0, 1, 0n);
     expect(apy).toBeCloseTo(1.0, 4);
   });
 
   it('halves with double the staked supply', () => {
     const rewardRate = parseUnits('1', 18) / BigInt(SECONDS_PER_YEAR);
-    const single = computeMinApy(rewardRate, 1n, parseUnits('100', 18), 0, 1);
-    const dbl = computeMinApy(rewardRate, 2n, parseUnits('100', 18), 0, 1);
+    const single = computeMinApy(rewardRate, 1n, parseUnits('100', 18), 0, 1, 0n);
+    const dbl = computeMinApy(rewardRate, 2n, parseUnits('100', 18), 0, 1, 0n);
     expect(dbl).toBeCloseTo(single / 2, 4);
   });
 
-  it('scales linearly with phUsdPrice', () => {
+  it('scales linearly with phUsdPrice (staked > 0)', () => {
     const rewardRate = parseUnits('1', 18) / BigInt(SECONDS_PER_YEAR);
-    const at1 = computeMinApy(rewardRate, 1n, parseUnits('100', 18), 0, 1);
-    const at2 = computeMinApy(rewardRate, 1n, parseUnits('100', 18), 0, 2);
+    const at1 = computeMinApy(rewardRate, 1n, parseUnits('100', 18), 0, 1, 0n);
+    const at2 = computeMinApy(rewardRate, 1n, parseUnits('100', 18), 0, 2, 0n);
     expect(at2).toBeCloseTo(at1 * 2, 4);
   });
 
@@ -75,14 +87,14 @@ describe('computeMinApy', () => {
     // priceRaw = 101, growth = 100bp → highest = 100
     // rewardRate = 1e18/yr, staked = 1, phUsdPrice = 1 → APY = 1%
     const rewardRate = parseUnits('1', 18) / BigInt(SECONDS_PER_YEAR);
-    const apy = computeMinApy(rewardRate, 1n, parseUnits('101', 18), 100, 1);
+    const apy = computeMinApy(rewardRate, 1n, parseUnits('101', 18), 100, 1, 0n);
     expect(apy).toBeCloseTo(1.0, 4);
   });
 
   it('produces a positive realistic APY under typical inputs', () => {
     // 1 phUSD/sec at $1, 100 staked at $42.50 highest, growth 0 → ~7.4M% (toy)
     const rewardRate = parseUnits('1', 18);
-    const apy = computeMinApy(rewardRate, 100n, parseUnits('42.5', 18), 0, 1);
+    const apy = computeMinApy(rewardRate, 100n, parseUnits('42.5', 18), 0, 1, 0n);
     expect(apy).toBeGreaterThan(0);
     expect(Number.isFinite(apy)).toBe(true);
   });

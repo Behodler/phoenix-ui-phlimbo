@@ -90,7 +90,7 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
   const { price: phUsdPrice } = useBalancerPrice();
 
   const stakerAddress = addresses?.NFTStaker as Address | undefined;
-  const balancerPoolerAddress = addresses?.nftsV2?.BalancerPooler as Address | undefined;
+  const nftMinterAddress = addresses?.nftsV2?.NFTMinter as Address | undefined;
 
   const isStakerDeployed = useMemo(
     () =>
@@ -99,7 +99,10 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
     [stakerAddress],
   );
 
-  // ── ERC1155 approval state (BalancerPoolerV2 → NFTStaker) ───────────
+  // ── ERC1155 approval state (NFTMinterV2 → NFTStaker) ────────────────
+  // NFTStaker.stake() pulls the user's Liquid Sky units via
+  // safeTransferFrom on the staked ERC1155, which is NFTMinterV2 — not
+  // the BalancerPooler (a downstream dispatcher with no ERC1155 surface).
   const {
     isApprovedForAll,
     approveAll: approveAllRaw,
@@ -107,7 +110,7 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
   } = useERC1155ApprovalForAll(
     userAddress,
     isStakerDeployed ? stakerAddress : undefined,
-    balancerPoolerAddress,
+    nftMinterAddress,
   );
 
   // ── Batched NFTStaker reads ────────────────────────────────────────
@@ -139,6 +142,11 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
             abi: nftStakerAbi,
             functionName: 'users',
             args: [userAddress as Address],
+          },
+          {
+            address: stakerAddress as Address,
+            abi: nftStakerAbi,
+            functionName: 'targetAPY',
           },
         ]
       : [],
@@ -173,6 +181,11 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
     return tuple[0];
   }, [stakerReads]);
 
+  const targetApyRaw = useMemo<bigint>(() => {
+    const r = stakerReads?.[4];
+    return r?.status === 'success' ? (r.result as bigint) : 0n;
+  }, [stakerReads]);
+
   // ── USDS NFT data from useMinterPageView (Liquid Sky pays in USDS) ──
   const usdsRow = minterData?.USDS;
   const ownedUnits = usdsRow?.nftBalance ?? 0;
@@ -201,6 +214,7 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
     priceRaw,
     growthBasisPoints,
     phUsdPriceSafe,
+    targetApyRaw,
   );
 
   // ── Write-tx state ─────────────────────────────────────────────────
@@ -393,7 +407,7 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
 
   const approveAll = useCallback(
     async (): Promise<void> => {
-      if (!isStakerDeployed || !balancerPoolerAddress) return;
+      if (!isStakerDeployed || !nftMinterAddress) return;
       setIsApproving(true);
       try {
         addToast?.({
@@ -414,7 +428,7 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
         handleError(err, 'Approval Failed');
       }
     },
-    [isStakerDeployed, balancerPoolerAddress, approveAllRaw, addToast, handleError],
+    [isStakerDeployed, nftMinterAddress, approveAllRaw, addToast, handleError],
   );
 
   return {
