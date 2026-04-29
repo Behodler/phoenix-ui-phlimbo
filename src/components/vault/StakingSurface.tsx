@@ -53,7 +53,6 @@ export default function StakingSurface({ staking }: StakingSurfaceProps) {
           pendingYield={staking.pendingYield}
           ratePerSec={staking.ratePerSec}
           apy={staking.minApy}
-          phUsdPerSecPerUnit={staking.phUsdPerSecPerUnit}
           unrealized={totalStakedValue}
           isStakerDeployed={staking.isStakerDeployed}
           isApprovedForAll={staking.isApprovedForAll}

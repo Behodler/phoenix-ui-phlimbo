@@ -3,7 +3,6 @@ import { parseUnits } from 'viem';
 import {
   backOutGrowthStep,
   computeMinApy,
-  computePhUsdPerSecPerUnit,
   computeUserRatePerSec,
   SECONDS_PER_YEAR,
 } from '../stakingMath';
@@ -98,56 +97,6 @@ describe('computeMinApy', () => {
     const apy = computeMinApy(rewardRate, 100n, parseUnits('42.5', 18), 0, 1, 0n);
     expect(apy).toBeGreaterThan(0);
     expect(Number.isFinite(apy)).toBe(true);
-  });
-});
-
-describe('computePhUsdPerSecPerUnit', () => {
-  it('returns rewardRate / totalStaked / 1e18 when staked > 0', () => {
-    // rewardRate = 1e18 wei/sec → 1 phUSD/sec for the entire stream;
-    // totalStaked = 4 → per-unit = 0.25 phUSD/sec
-    const rate = computePhUsdPerSecPerUnit(
-      parseUnits('1', 18),
-      4n,
-      parseUnits('100', 18),
-      0,
-      0n,
-    );
-    expect(rate).toBeCloseTo(0.25, 9);
-  });
-
-  it('returns 0 when staked > 0 but rewardRate is 0', () => {
-    const rate = computePhUsdPerSecPerUnit(0n, 5n, parseUnits('100', 18), 0, parseUnits('0.1', 18));
-    expect(rate).toBe(0);
-  });
-
-  it('returns hypothetical rate at staked=1 when nothing is staked', () => {
-    // highestPrice = 100, targetAPY = 0.10 → annual phUSD per unit = 10
-    // per-sec = 10 / SECONDS_PER_YEAR
-    const rate = computePhUsdPerSecPerUnit(
-      0n,
-      0n,
-      parseUnits('100', 18),
-      0,
-      parseUnits('0.10', 18),
-    );
-    expect(rate).toBeCloseTo(10 / SECONDS_PER_YEAR, 6);
-  });
-
-  it('returns 0 when staked = 0 and targetAPY = 0', () => {
-    const rate = computePhUsdPerSecPerUnit(0n, 0n, parseUnits('100', 18), 0, 0n);
-    expect(rate).toBe(0);
-  });
-
-  it('returns 0 when staked = 0 and price = 0', () => {
-    const rate = computePhUsdPerSecPerUnit(0n, 0n, 0n, 0, parseUnits('0.10', 18));
-    expect(rate).toBe(0);
-  });
-
-  it('uses highestPrice (one growth step backed out) for the staked=0 fallback', () => {
-    // priceRaw = 101, growth = 100bp → highestPrice = 100
-    const a = computePhUsdPerSecPerUnit(0n, 0n, parseUnits('101', 18), 100, parseUnits('0.10', 18));
-    const b = computePhUsdPerSecPerUnit(0n, 0n, parseUnits('100', 18), 0, parseUnits('0.10', 18));
-    expect(a).toBeCloseTo(b, 6);
   });
 });
 
