@@ -3,19 +3,26 @@ export interface UnitSliderProps {
   max: number;
   onChange: (n: number) => void;
   disabled?: boolean;
+  /**
+   * Optional lower bound for the slider. Defaults to `0` so existing
+   * 0..max usage (StakedNftCard) is unaffected.
+   */
+  min?: number;
 }
 
 /**
- * 0..max unit selector (slider variant from the mock).
+ * min..max unit selector (slider variant from the mock).
  *
  * The visible track + thumb is a pure-CSS overlay; the real <input type="range">
  * is absolutely positioned on top with opacity:0 so it handles pointer/keyboard
  * interaction without visual duplication.
  */
-export default function UnitSlider({ value, max, onChange, disabled = false }: UnitSliderProps) {
-  const safeMax = Math.max(0, max);
-  const clamped = Math.min(Math.max(0, value), safeMax);
-  const pct = safeMax > 0 ? (clamped / safeMax) * 100 : 0;
+export default function UnitSlider({ value, max, onChange, disabled = false, min = 0 }: UnitSliderProps) {
+  const safeMin = min;
+  const safeMax = Math.max(safeMin, max);
+  const clamped = Math.min(Math.max(safeMin, value), safeMax);
+  const range = safeMax - safeMin;
+  const pct = range > 0 ? ((clamped - safeMin) / range) * 100 : 0;
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -35,10 +42,10 @@ export default function UnitSlider({ value, max, onChange, disabled = false }: U
         {/* Invisible range input for a11y / pointer */}
         <input
           type="range"
-          min={0}
+          min={safeMin}
           max={safeMax}
           value={clamped}
-          disabled={disabled || safeMax <= 0}
+          disabled={disabled || range <= 0}
           onChange={(e) => onChange(parseInt(e.target.value, 10))}
           className="absolute inset-x-0 m-0 h-7 w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
           aria-label="Units"
@@ -54,7 +61,7 @@ export default function UnitSlider({ value, max, onChange, disabled = false }: U
       </div>
 
       <div className="flex justify-between">
-        <span className="text-xs text-muted-foreground">0</span>
+        <span className="text-xs text-muted-foreground">{safeMin}</span>
         <span className="text-xs text-muted-foreground">{safeMax}</span>
       </div>
     </div>

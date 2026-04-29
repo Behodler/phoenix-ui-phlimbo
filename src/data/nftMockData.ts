@@ -26,6 +26,11 @@ export interface NFTStaticConfig {
   tokenDisplayName: string;
   /** Number of decimals for the input token's ERC20 contract */
   decimals: number;
+  /**
+   * When true, the mint flow routes through `BatchNFTMinter` (slider 1..20 + textbox).
+   * When false/undefined, uses the single-mint path. Currently only set on Liquid Sky Phoenix.
+   */
+  batchEnabled?: boolean;
 }
 
 /**
@@ -60,6 +65,11 @@ export interface NFTData {
   dispatcherIndex: number;
   /** Formatted total burnt (only for EYE, SCX, Flax) */
   totalBurnt?: string;
+  /**
+   * Mirrors `NFTStaticConfig.batchEnabled`. When true and the resolved
+   * `BatchNFTMinter` address is non-zero, the mint modal renders the batch UI.
+   */
+  batchEnabled?: boolean;
 }
 
 /**
@@ -86,6 +96,7 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     tokenPrefix: "USDS",
     tokenDisplayName: "USDS",
     decimals: 18,
+    batchEnabled: true,
   },
   {
     id: 3,
