@@ -131,7 +131,17 @@ export default function NFTListTab() {
           onChange={setSubTab}
           options={[
             { value: 'mint', label: 'Mint' },
-            { value: 'stake', label: 'Stake' },
+            {
+              value: 'stake',
+              label: (
+                <span className="inline-flex items-center gap-1.5">
+                  Stake
+                  <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-gradient-to-r from-pink-400 via-orange-400 to-yellow-400 text-white shadow-sm animate-pulse">
+                    NEW
+                  </span>
+                </span>
+              ),
+            },
           ]}
         />
       </div>
