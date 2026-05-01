@@ -26,12 +26,6 @@ export default function StakingSurface({ staking }: StakingSurfaceProps) {
     []
   );
 
-  // Value shown in "Staked value" and the card's "Unrealised value" rows.
-  // Uses the highest historical mint price (one growth-step backed out from
-  // the current `priceRaw`) as a per-unit proxy — see useStakingPageData /
-  // computeMinApy for the same convention.
-  const totalStakedValue = staking.stakedUnits * staking.highestPrice;
-
   return (
     <div>
       <EarningPanel
@@ -53,7 +47,6 @@ export default function StakingSurface({ staking }: StakingSurfaceProps) {
           pendingYield={staking.pendingYield}
           ratePerSec={staking.ratePerSec}
           apy={staking.minApy}
-          unrealized={totalStakedValue}
           isStakerDeployed={staking.isStakerDeployed}
           isApprovedForAll={staking.isApprovedForAll}
           approveAll={staking.approveAll}

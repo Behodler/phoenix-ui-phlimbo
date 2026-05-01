@@ -14,8 +14,6 @@ export interface StakedNftCardProps {
   ratePerSec: number;
   /** Current min APY to display in the header pill */
   apy: number;
-  /** Staked value in USD (stakedUnits * priceProxy) */
-  unrealized: number;
   /**
    * Whether the NFTStaker contract has a non-zero address on the active
    * network. When false, all action buttons are disabled and a "not yet
@@ -57,7 +55,6 @@ export default function StakedNftCard({
   pendingYield,
   ratePerSec,
   apy,
-  unrealized,
   isStakerDeployed,
   isApprovedForAll,
   approveAll,
@@ -148,11 +145,6 @@ export default function StakedNftCard({
             </div>
             <div className="mb-3 h-px w-full bg-border" />
             <StatLine label="Staked units" value={stakedUnits.toLocaleString()} />
-            <StatLine
-              label="Unrealised value"
-              mono
-              value={`$${unrealized.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-            />
 
             <button
               className="phoenix-btn-primary mt-3.5 flex w-full items-center justify-center gap-2 px-3.5 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
