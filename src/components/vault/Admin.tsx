@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSimulateContract } from 'wagmi';
 import { readContract } from '@wagmi/core';
 import { wagmiConfig } from '../../wagmiConfig';
-import { erc20Abi, formatUnits, parseUnits } from 'viem';
+import { erc20Abi, formatUnits, parseUnits, zeroAddress } from 'viem';
 import {
   phlimboEaAbi,
   phusdStableMinterAbi,
@@ -783,6 +783,12 @@ export default function Admin() {
   // will reject the ABI annotation. Use useSimulateContract — same eth_call
   // underneath. Only run the simulation when there is an sUSDS balance to pool;
   // otherwise the call reverts and we'd surface a misleading error.
+  //
+  // account: zeroAddress is required for the real Balancer V3 router. It detects
+  // static-call mode via `tx.origin == address(0)` (EVMCallModeHelpers) and
+  // reverts query paths with NotStaticCall() when called with a non-zero `from`.
+  // Wagmi defaults `from` to the connected wallet, which trips this check on
+  // mainnet/staging; the local mock router doesn't enforce it.
   const idealBptSimEnabled = isBalancerPoolerV2Deployed &&
     typeof dispatcherSusdsBalance === 'bigint' &&
     dispatcherSusdsBalance > 0n;
@@ -795,6 +801,7 @@ export default function Admin() {
     address: balancerPoolerV2Address,
     abi: balancerPoolerV2Abi,
     functionName: 'getIdealBPT',
+    account: zeroAddress,
     query: { enabled: idealBptSimEnabled },
   });
 
@@ -2246,9 +2253,22 @@ export default function Admin() {
                 }
               />
               {idealBpt === null && idealBptError && (
-                <p className="text-xs text-red-500 mt-1">
-                  Could not estimate BPT — refresh, or enter a value manually.
-                </p>
+                <div className="mt-1 space-y-1">
+                  <p className="text-xs text-red-500">
+                    Could not estimate BPT — refresh, or enter a value manually.
+                  </p>
+                  <pre className="text-[10px] text-red-400 whitespace-pre-wrap break-all bg-red-950/30 border border-red-900/50 rounded p-2 font-mono">
+                    {(idealBptError as { shortMessage?: string }).shortMessage ?? idealBptError.message}
+                    {(idealBptError as { metaMessages?: string[] }).metaMessages?.length
+                      ? '\n\n' + (idealBptError as { metaMessages?: string[] }).metaMessages!.join('\n')
+                      : ''}
+                    {(idealBptError as { cause?: { shortMessage?: string; message?: string } }).cause
+                      ? '\n\nCause: ' + ((idealBptError as { cause?: { shortMessage?: string; message?: string } }).cause!.shortMessage
+                          ?? (idealBptError as { cause?: { shortMessage?: string; message?: string } }).cause!.message
+                          ?? '')
+                      : ''}
+                  </pre>
+                </div>
               )}
               {minBptInput !== '' && (parsedMinBpt === null || parsedMinBpt <= 0n) && (
                 <p className="text-xs text-red-500 mt-1">
