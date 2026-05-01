@@ -284,7 +284,6 @@ function UnstakeInline({
   isUnstaking: boolean;
   txInFlight: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const [n, setN] = useState<number>(Math.min(1, max));
 
   useEffect(() => {
@@ -293,71 +292,33 @@ function UnstakeInline({
 
   const baseDisabled = !isStakerDeployed || txInFlight || max <= 0;
 
-  if (!open) {
-    return (
-      <div className="rounded-[14px] border border-border bg-white/[0.02] px-3.5 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="mb-0.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-              Unstake
-            </div>
-            <div className="text-xs text-muted-foreground">Instant · no cooldown</div>
-          </div>
-          <button
-            type="button"
-            className="phoenix-btn-ghost px-3.5 py-2 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={() => setOpen(true)}
-            disabled={baseDisabled}
-          >
-            Unstake…
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="rounded-[14px] border border-border bg-white/[0.02] p-3.5">
       <div className="flex flex-col gap-2.5">
-        <div className="flex items-baseline justify-between">
-          <span className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-            Unstake units
-          </span>
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="cursor-pointer border-none bg-transparent text-xs text-muted-foreground hover:text-pxusd-white"
-          >
-            cancel
-          </button>
+        <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+          Unstake units
         </div>
         <UnitSlider value={n} max={max} onChange={setN} />
         <div className="text-[12px] text-muted-foreground">
-          Pending yield is auto-claimed on unstake.
+          Pending yield is auto-claimed on unstake. Instant · no cooldown.
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="phoenix-btn-ghost flex-1 px-3.5 py-2.5 text-[13px]"
-            onClick={() => setOpen(false)}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="phoenix-btn-primary flex flex-1 items-center justify-center gap-2 px-3.5 py-2.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ background: 'linear-gradient(135deg, #EF4444, #FF8C42)' }}
-            disabled={baseDisabled || n <= 0}
-            onClick={() => {
-              onUnstake(n);
-              setN(0);
-              setOpen(false);
-            }}
-          >
-            {isUnstaking && <LoadingSpinner />}
-            Unstake {n}
-          </button>
-        </div>
+        <button
+          type="button"
+          className="phoenix-btn-primary flex items-center justify-center gap-2 px-3.5 py-2.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ background: 'linear-gradient(135deg, #EF4444, #FF8C42)' }}
+          disabled={baseDisabled || n <= 0}
+          onClick={() => {
+            onUnstake(n);
+            setN(0);
+          }}
+        >
+          {isUnstaking && <LoadingSpinner />}
+          {!isStakerDeployed
+            ? 'Unstaking unavailable'
+            : max <= 0
+              ? 'No staked units'
+              : `Unstake ${n} unit${n === 1 ? '' : 's'}`}
+        </button>
       </div>
     </div>
   );
