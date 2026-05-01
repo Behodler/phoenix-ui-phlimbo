@@ -10,6 +10,8 @@ import {
   stableYieldAccumulatorAbi,
   nftStakerAbi,
   balancerPoolerV2Abi,
+  nftMinterV2Abi,
+  balancerPoolerMintDebtHookAbi,
 } from '@behodler/phase2-wagmi-hooks';
 import { pauserAbi } from '../../lib/pauserAbi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
@@ -21,6 +23,12 @@ import type { Abi, AbiFunction } from 'viem';
 import type { ContractAddresses } from '../../types/contracts';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
+// Constants used to mirror NFTStaker._recomputeSchedule math client-side
+// when computing the Minimum Runway stat in the NFT Staker admin panel.
+const SECONDS_PER_YEAR = 365n * 86400n;
+const APY_PRECISION = 10n ** 18n;
+const GROWTH_PRECISION = 10n ** 14n;
 
 // ABI for ERC20 tokens with mint function (used on testnets)
 const mintableErc20Abi = [
@@ -478,6 +486,90 @@ export default function Admin() {
     query: { enabled: isNftStakerDeployed },
   });
 
+  // Reads for the Minimum Runway stat — the runway that would hold if the
+  // entire `totalSupply(stakedId)` of the NFT were staked under current
+  // conditions. We mirror NFTStaker._recomputeSchedule's `latestPrice`
+  // derivation client-side because the contract does not expose it as a view.
+  const { data: nftStakerStakedId } = useReadContract({
+    address: nftStakerAddress,
+    abi: nftStakerAbi,
+    functionName: 'stakedId',
+    query: { enabled: isNftStakerDeployed },
+  });
+
+  const { data: nftStakerNftMinter } = useReadContract({
+    address: nftStakerAddress,
+    abi: nftStakerAbi,
+    functionName: 'nftMinter',
+    query: { enabled: isNftStakerDeployed },
+  });
+
+  const { data: nftStakerDispatcherIndex } = useReadContract({
+    address: nftStakerAddress,
+    abi: nftStakerAbi,
+    functionName: 'dispatcherIndex',
+    query: { enabled: isNftStakerDeployed },
+  });
+
+  const { data: nftStakerDispatcherHook } = useReadContract({
+    address: nftStakerAddress,
+    abi: nftStakerAbi,
+    functionName: 'dispatcherHook',
+    query: { enabled: isNftStakerDeployed },
+  });
+
+  const isNftMinterValid = typeof nftStakerNftMinter === 'string'
+    && (nftStakerNftMinter as string).toLowerCase() !== ZERO_ADDRESS;
+
+  const { data: nftMinterConfig, refetch: refetchNftMinterConfig } = useReadContract({
+    address: nftStakerNftMinter as `0x${string}` | undefined,
+    abi: nftMinterV2Abi,
+    functionName: 'configs',
+    args: typeof nftStakerDispatcherIndex === 'bigint'
+      ? [nftStakerDispatcherIndex]
+      : undefined,
+    query: {
+      enabled: isNftStakerDeployed
+        && isNftMinterValid
+        && typeof nftStakerDispatcherIndex === 'bigint',
+    },
+  });
+
+  const { data: nftStakerMaxSupply, refetch: refetchMaxSupply } = useReadContract({
+    address: nftStakerNftMinter as `0x${string}` | undefined,
+    abi: nftMinterV2Abi,
+    functionName: 'totalSupply',
+    args: typeof nftStakerStakedId === 'bigint'
+      ? [nftStakerStakedId]
+      : undefined,
+    query: {
+      enabled: isNftStakerDeployed
+        && isNftMinterValid
+        && typeof nftStakerStakedId === 'bigint',
+    },
+  });
+
+  const { data: nftStakerPhUsdBalance, refetch: refetchNftStakerPhUsdBalance } = useReadContract({
+    address: phUsdAddress,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: nftStakerAddress ? [nftStakerAddress] : undefined,
+    query: { enabled: isNftStakerDeployed && !!phUsdAddress },
+  });
+
+  const isDispatcherHookValid = typeof nftStakerDispatcherHook === 'string'
+    && (nftStakerDispatcherHook as string).toLowerCase() !== ZERO_ADDRESS;
+
+  // Mirror NFTStaker's own `runwaySeconds()` behaviour: only add mint debt when
+  // dispatcherHook is non-zero. When zero, we treat mintDebt as 0n and skip the
+  // read entirely.
+  const { data: nftStakerMintDebt, refetch: refetchMintDebt } = useReadContract({
+    address: nftStakerDispatcherHook as `0x${string}` | undefined,
+    abi: balancerPoolerMintDebtHookAbi,
+    functionName: 'mintDebt',
+    query: { enabled: isNftStakerDeployed && isDispatcherHookValid },
+  });
+
   const [topUpAmountInput, setTopUpAmountInput] = useState<string>('');
   const [topUpInputError, setTopUpInputError] = useState<string | null>(null);
 
@@ -530,7 +622,70 @@ export default function Admin() {
     refetchTargetApy();
     refetchTotalStakedRaw();
     refetchNftStakerAllowance();
+    refetchMaxSupply();
+    refetchNftStakerPhUsdBalance();
+    refetchNftMinterConfig();
+    refetchMintDebt();
   };
+
+  // Compute Minimum Runway: what the runway would be if `totalSupply(stakedId)`
+  // were staked. Mirrors NFTStaker._recomputeSchedule math (NFTStaker.sol
+  // lines 385-425) plus runwaySeconds() (line ~616), with the two user-spec
+  // overrides applied before the formula path.
+  const minimumRunwayDisplay = useMemo<string>(() => {
+    // Edge case 1: NFT supply is zero (or unknown) → dash.
+    if (typeof nftStakerMaxSupply !== 'bigint') return '—';
+    if (nftStakerMaxSupply === 0n) return '—';
+
+    // Edge case 2 (user spec): no phUSD in the staking contract → display "0".
+    // Worst-case framing: the floor we can guarantee right now is zero.
+    if (typeof nftStakerPhUsdBalance !== 'bigint') return '—';
+    if (nftStakerPhUsdBalance === 0n) return '0';
+
+    if (!nftMinterConfig) return '—';
+    // wagmi decodes the configs() output as a positional tuple
+    // [dispatcher, price, growthBasisPoints, disabled].
+    const price = nftMinterConfig[1];
+    const growthBp = nftMinterConfig[2];
+
+    if (typeof price !== 'bigint' || price === 0n) return '0.00 days';
+    if (typeof growthBp !== 'bigint') return '—';
+
+    // Mirror NFTStaker._recomputeSchedule latestPrice derivation:
+    //   if (growthBp == 0) latestPrice = price;
+    //   else latestPrice = price.mulDiv(1e18, 1e18 + growthBp * 1e14);
+    let latestPrice: bigint;
+    if (growthBp === 0n) {
+      latestPrice = price;
+    } else {
+      const r = APY_PRECISION + growthBp * GROWTH_PRECISION;
+      latestPrice = (price * APY_PRECISION) / r;
+    }
+
+    if (latestPrice === 0n) return '0.00 days';
+
+    if (typeof nftStakerTargetApy !== 'bigint' || nftStakerTargetApy === 0n) {
+      return '0.00 days';
+    }
+
+    const sMax = nftStakerMaxSupply * latestPrice;
+    const fMax = (sMax * nftStakerTargetApy) / APY_PRECISION;
+    if (fMax === 0n) return '0.00 days';
+    const rMax = fMax / SECONDS_PER_YEAR;
+    if (rMax === 0n) return '0.00 days';
+
+    const mintDebt = typeof nftStakerMintDebt === 'bigint' ? nftStakerMintDebt : 0n;
+    const v = nftStakerPhUsdBalance + mintDebt;
+    const seconds = v / rMax;
+    const days = Number(seconds) / 86400;
+    return `${days.toFixed(2)} days`;
+  }, [
+    nftStakerMaxSupply,
+    nftStakerPhUsdBalance,
+    nftMinterConfig,
+    nftStakerTargetApy,
+    nftStakerMintDebt,
+  ]);
 
   useEffect(() => {
     if (topUpApproveConfirmed && topUpApproveTxHash) {
@@ -596,6 +751,31 @@ export default function Admin() {
     abi: balancerPoolerV2Abi,
     functionName: 'paused',
     query: { enabled: isBalancerPoolerV2Deployed },
+  });
+
+  // Resolve the Balancer V3 pool address from the dispatcher's `pool()` view.
+  // In Balancer V3 the pool contract IS the BPT ERC20 token, so we then read
+  // the dispatcher's ERC20 balance on that address to get its accumulated BPT.
+  const { data: balancerPoolAddress } = useReadContract({
+    address: balancerPoolerV2Address,
+    abi: balancerPoolerV2Abi,
+    functionName: 'pool',
+    query: { enabled: isBalancerPoolerV2Deployed },
+  });
+
+  const isPoolAddressValid = typeof balancerPoolAddress === 'string'
+    && (balancerPoolAddress as string).toLowerCase() !== ZERO_ADDRESS;
+
+  const { data: dispatcherBptBalance, refetch: refetchDispatcherBptBalance } = useReadContract({
+    address: balancerPoolAddress as `0x${string}` | undefined,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: balancerPoolerV2Address ? [balancerPoolerV2Address] : undefined,
+    query: {
+      enabled: isBalancerPoolerV2Deployed
+        && isPoolAddressValid
+        && !!balancerPoolerV2Address,
+    },
   });
 
   // getIdealBPT is non-view (writes Balancer router transient state during the
@@ -670,6 +850,7 @@ export default function Admin() {
     refetchPoolerAuthVersion();
     refetchDispatcherPaused();
     refetchIdealBpt();
+    refetchDispatcherBptBalance();
   };
 
   useEffect(() => {
@@ -1844,6 +2025,12 @@ export default function Admin() {
                 </span>
               </div>
               <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Minimum Runway:</span>
+                <span className="text-sm font-mono text-foreground">
+                  {minimumRunwayDisplay}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Reward Rate (per second):</span>
                 <span className="text-sm font-mono text-foreground">
                   {typeof nftStakerRewardRate === 'bigint'
@@ -1997,6 +2184,14 @@ export default function Admin() {
                   {typeof dispatcherSusdsBalance === 'bigint'
                     ? `${(Number(dispatcherSusdsBalance) / 1e18).toFixed(2)} sUSDS`
                     : '0.00 sUSDS'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">BPT held by dispatcher:</span>
+                <span className="text-sm font-mono text-foreground">
+                  {typeof dispatcherBptBalance === 'bigint'
+                    ? `${(Number(dispatcherBptBalance) / 1e18).toFixed(2)} BPT`
+                    : '0.00 BPT'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
