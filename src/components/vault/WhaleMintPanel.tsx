@@ -119,7 +119,7 @@ export default function WhaleMintPanel() {
               <button
                 type="button"
                 onClick={() => setIsModalOpen(true)}
-                className="phoenix-btn-primary whitespace-nowrap"
+                className="phoenix-btn-primary whitespace-nowrap !rounded-md !text-[13px]"
                 data-testid="whale-mint-cta"
               >
                 Mint {WHALE_MINT_MOCK.batchSize} — Claim Reward
