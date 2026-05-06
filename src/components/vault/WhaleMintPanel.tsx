@@ -24,7 +24,7 @@ export default function WhaleMintPanel() {
   const reward = WHALE_MINT_MOCK.potUsdc;
 
   return (
-    <div className="max-w-4xl mx-auto mt-6" data-testid="whale-mint-panel">
+    <div className="max-w-4xl mx-auto mt-6 lg:mt-14" data-testid="whale-mint-panel">
       <div className="bg-pxusd-teal-700 border border-pxusd-teal-500 rounded-lg overflow-hidden">
         <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr]">
           {/* Whale art */}
