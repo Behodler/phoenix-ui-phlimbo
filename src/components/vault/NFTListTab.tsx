@@ -9,6 +9,7 @@ import { useStakingPageData } from '../../hooks/useStakingPageData';
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurface from './StakingSurface';
+import WhaleMintPanel from './WhaleMintPanel';
 
 export default function NFTListTab() {
   const { addToast } = useToast();
@@ -179,6 +180,9 @@ export default function NFTListTab() {
               );
             })}
           </div>
+
+          {/* Whale Mint panel (mock-only; sits flush below the NFT list) */}
+          <WhaleMintPanel />
 
           {/* Mint Modal */}
           <NFTListMintModal
