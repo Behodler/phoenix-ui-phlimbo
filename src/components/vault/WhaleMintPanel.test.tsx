@@ -32,20 +32,21 @@ describe('WhaleMintPanel', () => {
       expect(screen.getByTestId('whale-mint-eyebrow')).toHaveTextContent(
         /Whale Mint · Phoenix ×40/i,
       );
-      expect(screen.getByText('Take the pot.')).toBeInTheDocument();
+      expect(screen.getByText('Claim the nudge reward')).toBeInTheDocument();
 
       // Pot displays the configured 10 USDC.
       expect(screen.getByTestId('whale-mint-pot')).toHaveTextContent(/10\.00/);
       expect(screen.getByTestId('whale-mint-pot')).toHaveTextContent(/USDC/);
 
-      // Cost hint reflects 40 × 12.0034 = 480.1360 USDS.
+      // Cost hint reflects 40 × 12.0034 = 480.1360 USDS, on three labelled lines.
       const hint = screen.getByTestId('whale-mint-cost-hint');
-      expect(hint).toHaveTextContent(/480\.1360 USDS/);
-      expect(hint).toHaveTextContent(/You keep 40 NFTs/);
+      expect(hint).toHaveTextContent(/Mint cost:\s*480\.1360 USDS/);
+      expect(hint).toHaveTextContent(/Receive:\s*40 NFTs/);
+      expect(hint).toHaveTextContent(/Whale mint reward:\s*10\.00 USDC/);
 
       // CTA label.
       expect(screen.getByTestId('whale-mint-cta')).toHaveTextContent(
-        /Mint 40 — Claim Pot/,
+        /Claim Reward/,
       );
     });
 
@@ -94,7 +95,7 @@ describe('WhaleMintPanel', () => {
       expect(modal).toHaveTextContent('Nudge reward');
       expect(modal).toHaveTextContent(/10\.00 USDC/);
       expect(modal).toHaveTextContent("You'll receive");
-      expect(modal).toHaveTextContent(/40 NFTs \+ pot/);
+      expect(modal).toHaveTextContent(/40 NFTs \+ 10\.00 USDC/);
     });
 
     it('transitions from Approve to Mint after the simulated approval delay', () => {

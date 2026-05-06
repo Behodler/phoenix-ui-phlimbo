@@ -78,7 +78,7 @@ export default function WhaleMintConfirmModal({
         description: (
           <>
             Whale Mint sent — {batchSize} NFTs minted and{' '}
-            <em>{formatUsdc(reward)} USDC</em> pot reserved for you.
+            <em>{formatUsdc(reward)} USDC</em> reward reserved for you.
           </>
         ),
       });
@@ -110,8 +110,8 @@ export default function WhaleMintConfirmModal({
             Confirm Whale Mint
           </h3>
           <p className="text-sm text-muted-foreground">
-            You'll mint {batchSize} Liquid Sky Phoenix and claim the pot in one
-            transaction.
+            You'll mint {batchSize} Liquid Sky Phoenix and claim the nudge
+            reward in one transaction.
           </p>
         </div>
 
@@ -137,7 +137,7 @@ export default function WhaleMintConfirmModal({
           <div className="flex justify-between items-center text-sm py-1">
             <span className="text-muted-foreground">You'll receive</span>
             <span className="font-mono text-foreground font-medium">
-              {batchSize} NFTs + pot
+              {batchSize} NFTs + {formatUsdc(reward)} USDC
             </span>
           </div>
         </div>

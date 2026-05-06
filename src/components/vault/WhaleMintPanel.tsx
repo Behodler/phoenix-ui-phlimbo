@@ -68,11 +68,10 @@ export default function WhaleMintPanel() {
                 Whale Mint · Phoenix ×40
               </div>
               <h2 className="m-0 mb-1 text-[22px] font-bold tracking-tight text-foreground">
-                Take the pot.
+                Claim the nudge reward
               </h2>
               <p className="m-0 text-sm text-muted-foreground max-w-[48ch]">
-                One transaction mints 40 Liquid Sky Phoenix and collects the
-                nudge reward. Pot resets after.
+                Mint 40 Liquid Sky Phoenix NFTs and receive 10 USDC back in the same transaction.
               </p>
             </div>
 
@@ -82,12 +81,12 @@ export default function WhaleMintPanel() {
                 Nudge reward
               </div>
               <div
-                className="font-mono text-3xl font-semibold tracking-tight text-foreground leading-none tabular-nums"
+                className="font-mono text-2xl font-semibold tracking-tight text-foreground leading-none tabular-nums"
                 data-testid="whale-mint-pot"
               >
                 {formatUsdc(reward)}
                 <span
-                  className="text-base font-medium ml-1.5"
+                  className="text-sm font-medium ml-1.5"
                   style={{ color: WHALE_MINT_CYAN }}
                 >
                   USDC
@@ -99,18 +98,22 @@ export default function WhaleMintPanel() {
             <div className="col-span-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-pxusd-teal-500">
               <div className="text-xs text-muted-foreground" data-testid="whale-mint-cost-hint">
                 <div>
-                  Mint cost{' '}
-                  <span className="font-mono text-foreground/80">
+                  Mint cost:{' '}
+                  <span className="font-mono text-sm text-foreground font-semibold tabular-nums">
                     {formatUsds(cost)} USDS
-                  </span>{' '}
-                  · You keep {WHALE_MINT_MOCK.batchSize} NFTs
+                  </span>
                 </div>
                 <div className="mt-1">
-                  Pot reward{' '}
-                  <span className="font-mono text-foreground/80">
+                  Receive:{' '}
+                  <span className="font-mono text-sm text-foreground font-semibold tabular-nums">
+                    {WHALE_MINT_MOCK.batchSize} NFTs
+                  </span>
+                </div>
+                <div className="mt-1">
+                  Whale mint reward:{' '}
+                  <span className="font-mono text-sm text-foreground font-semibold tabular-nums">
                     {formatUsdc(reward)} USDC
-                  </span>{' '}
-                  back to you
+                  </span>
                 </div>
               </div>
               <button
@@ -119,7 +122,7 @@ export default function WhaleMintPanel() {
                 className="phoenix-btn-primary whitespace-nowrap"
                 data-testid="whale-mint-cta"
               >
-                Mint {WHALE_MINT_MOCK.batchSize} — Claim Pot
+                Claim Reward
               </button>
             </div>
           </div>
