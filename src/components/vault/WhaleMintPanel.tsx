@@ -122,7 +122,7 @@ export default function WhaleMintPanel() {
                 className="phoenix-btn-primary whitespace-nowrap"
                 data-testid="whale-mint-cta"
               >
-                Claim Reward
+                Mint {WHALE_MINT_MOCK.batchSize} — Claim Reward
               </button>
             </div>
           </div>

@@ -46,7 +46,7 @@ describe('WhaleMintPanel', () => {
 
       // CTA label.
       expect(screen.getByTestId('whale-mint-cta')).toHaveTextContent(
-        /Claim Reward/,
+        /Mint 40 — Claim Reward/,
       );
     });
 
