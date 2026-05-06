@@ -13,8 +13,8 @@ function formatUsds(n: number): string {
 }
 
 /**
- * Mock-only "Whale Mint" panel rendered below the NFT list inside the Mint
- * sub-tab. Side-by-side variant only. All values are mock constants — no
+ * Mock-only "Whale Mint" panel rendered as its own section below the main
+ * NFT card on the Mint sub-tab. All values are mock constants — no
  * contract calls, no wallet writes, no live ticker.
  */
 export default function WhaleMintPanel() {
@@ -24,11 +24,7 @@ export default function WhaleMintPanel() {
   const reward = WHALE_MINT_MOCK.potUsdc;
 
   return (
-    <div className="max-w-4xl mx-auto mt-6 lg:mt-20" data-testid="whale-mint-panel">
-      <div
-        className="hidden lg:block mx-auto mb-10 h-px max-w-md"
-        style={{ background: 'rgba(255, 255, 255, 0.18)' }}
-      />
+    <div className="mt-6" data-testid="whale-mint-panel">
       <div className="bg-pxusd-teal-700 border border-pxusd-teal-500 rounded-lg overflow-hidden">
         <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr]">
           {/* Whale art */}

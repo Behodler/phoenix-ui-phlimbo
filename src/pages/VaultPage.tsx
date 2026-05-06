@@ -18,7 +18,8 @@ import TestnetFaucet from '../components/vault/TestnetFaucet';
 import EmergencyPauseFooter from '../components/vault/EmergencyPauseFooter';
 import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
-import NFTListTab from '../components/vault/NFTListTab';
+import NFTListTab, { type NFTSubTab } from '../components/vault/NFTListTab';
+import WhaleMintPanel from '../components/vault/WhaleMintPanel';
 import Admin from '../components/vault/Admin';
 import ContextBox from '../components/vault/ContextBox';
 import YieldRewardsInfo from '../components/vault/YieldRewardsInfo';
@@ -171,6 +172,11 @@ export default function VaultPage() {
 
   // Tab state needs to be declared early for DepositView polling
   const [activeTab, setActiveTab] = useState<Tab>("Mint");
+
+  // NFT sub-tab state lives here (rather than inside NFTListTab) so the
+  // WhaleMintPanel can be rendered as a sibling below the main phoenix-card,
+  // gated to the "mint" sub-tab.
+  const [nftSubTab, setNftSubTab] = useState<NFTSubTab>('mint');
 
   // ========== DEPOSITVIEW POLLING ==========
   // Use DepositView contract for consolidated Deposit tab data
@@ -1515,10 +1521,17 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "NFT" ? (
               <ErrorBoundary>
-                <NFTListTab />
+                <NFTListTab subTab={nftSubTab} onSubTabChange={setNftSubTab} />
               </ErrorBoundary>
             ) : null}
           </div>
+
+          {/* Whale Mint panel sits below the main card on the NFT mint sub-tab */}
+          {activeTab === "NFT" && nftSubTab === 'mint' && (
+            <ErrorBoundary>
+              <WhaleMintPanel />
+            </ErrorBoundary>
+          )}
         </section>
 
         {/* Right: ContextBox (tab-driven) and FAQ */}

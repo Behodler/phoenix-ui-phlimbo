@@ -9,13 +9,18 @@ import { useStakingPageData } from '../../hooks/useStakingPageData';
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurface from './StakingSurface';
-import WhaleMintPanel from './WhaleMintPanel';
 
-export default function NFTListTab() {
+export type NFTSubTab = 'mint' | 'stake';
+
+interface NFTListTabProps {
+  subTab: NFTSubTab;
+  onSubTabChange: (subTab: NFTSubTab) => void;
+}
+
+export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) {
   const { addToast } = useToast();
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [subTab, setSubTab] = useState<'mint' | 'stake'>('mint');
   const { prices } = useNFTPrices();
   const { data: minterData, isLoading, refetch: refetchMinterData } = useMinterPageView();
 
@@ -129,7 +134,7 @@ export default function NFTListTab() {
         <SegmentedControl
           ariaLabel="NFT surface"
           value={subTab}
-          onChange={setSubTab}
+          onChange={onSubTabChange}
           options={[
             { value: 'mint', label: 'Mint' },
             {
@@ -180,9 +185,6 @@ export default function NFTListTab() {
               );
             })}
           </div>
-
-          {/* Whale Mint panel (mock-only; sits flush below the NFT list) */}
-          <WhaleMintPanel />
 
           {/* Mint Modal */}
           <NFTListMintModal
