@@ -42,6 +42,7 @@ export interface ContractAddresses {
   BalancerVault: string;
   BurnRecorder: string;
   BalancerRouter: string;
+  WaUSDC: string;
   NFTMigrator: string;
   BalancerPoolerMintDebtHook: string;
   NFTStaker: string;
@@ -53,6 +54,7 @@ export interface ContractAddresses {
   nftsV1: YieldNFTAddresses;
   nftsV2: YieldNFTAddresses;
 }
+
 
 /**
  * Response structure from local development address server
