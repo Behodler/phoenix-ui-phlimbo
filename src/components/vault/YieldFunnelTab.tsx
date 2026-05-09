@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { maxUint256 } from 'viem';
+import { stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
 import ActionButton from '../ui/ActionButton';
 import ConfirmationDialog from '../ui/ConfirmationDialog';
 import NFTSelectorGrid from './NFTSelectorGrid';
@@ -15,19 +16,6 @@ import { getErrorTitle, shouldOfferRetry } from '../../utils/transactionErrors';
 import { log } from '../../utils/logger';
 import { nftStaticConfig, type NFTData } from '../../data/nftMockData';
 
-// Inline ABI for claim(uint256 nftIndex, uint256 minRewardTokenSupplied)
-// The package ABI has the old claim() signature; this is the correct one.
-const claimAbi = [{
-  type: 'function',
-  inputs: [
-    { name: 'nftIndex', internalType: 'uint256', type: 'uint256' },
-    { name: 'minRewardTokenSupplied', internalType: 'uint256', type: 'uint256' },
-  ],
-  name: 'claim',
-  outputs: [],
-  stateMutability: 'nonpayable',
-}] as const;
-
 // Props interface for YieldFunnelTab
 interface YieldFunnelTabProps {
   isPaused?: boolean;
@@ -36,6 +24,27 @@ interface YieldFunnelTabProps {
 export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
+
+  // Per-strategy exemption set for the claim call. A strategy address present
+  // in this set is "unchecked" in the UI and will be skipped when claim runs.
+  // Default empty = all checkboxes checked = claim every strategy (matches
+  // the prior 2-arg behavior). Resets on tab remount, satisfying the
+  // "always load with checkboxes checked" spec.
+  const [exemptSet, setExemptSet] = useState<Set<`0x${string}`>>(new Set());
+
+  const toggleExempt = useCallback((strategy: `0x${string}`) => {
+    setExemptSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(strategy)) next.delete(strategy);
+      else next.add(strategy);
+      return next;
+    });
+  }, []);
+
+  const exemptStrategies = useMemo<readonly `0x${string}`[]>(
+    () => Array.from(exemptSet),
+    [exemptSet]
+  );
 
   // Wagmi hooks for wallet connection
   const { isConnected, address: walletAddress } = useAccount();
@@ -290,12 +299,14 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
         return;
       }
 
-      // Call claim function with correct ABI: claim(dispatcherIndex, minRewardTokenSupplied)
+      // Call claim(nftIndex, minRewardTokenSupplied, exemptStrategies).
+      // exemptStrategies is the list of yield-strategy addresses to skip;
+      // an empty array means "claim every strategy" (the default).
       const hash = await writeClaim({
         address: addresses.StableYieldAccumulator as `0x${string}`,
-        abi: claimAbi,
+        abi: stableYieldAccumulatorAbi,
         functionName: 'claim',
-        args: [BigInt(selectedNft.dispatcherIndex), 0n],
+        args: [BigInt(selectedNft.dispatcherIndex), 0n, exemptStrategies],
       });
 
       // Show confirming toast
@@ -579,12 +590,34 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
           <h3 className="text-lg font-semibold text-pxusd-orange-300 mb-3">Pending Yield</h3>
 
           <div className="space-y-2">
-            {pendingYield.map((token: PendingYieldItem) => (
-              <div key={token.strategyAddress} className="flex justify-between items-center text-sm">
-                <span className="text-foreground">{token.symbol}</span>
-                <span className="font-medium text-pxusd-yellow-400">{formatAmount(token.amountFormatted)}</span>
-              </div>
-            ))}
+            {pendingYield.map((token: PendingYieldItem) => {
+              const strategy = token.strategyAddress as `0x${string}`;
+              const isIncluded = !exemptSet.has(strategy);
+              const checkboxId = `yield-funnel-include-${strategy}`;
+              return (
+                <div
+                  key={token.strategyAddress}
+                  className="flex justify-between items-center text-sm"
+                  data-testid={`yield-funnel-row-${strategy}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      id={checkboxId}
+                      type="checkbox"
+                      checked={isIncluded}
+                      onChange={() => toggleExempt(strategy)}
+                      className="h-4 w-4 accent-pxusd-orange-300 cursor-pointer"
+                      aria-label={`Include ${token.symbol} in claim`}
+                      data-testid={`yield-funnel-include-checkbox-${strategy}`}
+                    />
+                    <label htmlFor={checkboxId} className="text-foreground cursor-pointer">
+                      {token.symbol}
+                    </label>
+                  </div>
+                  <span className="font-medium text-pxusd-yellow-400">{formatAmount(token.amountFormatted)}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
