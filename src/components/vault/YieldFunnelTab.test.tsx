@@ -58,33 +58,60 @@ vi.mock('../../contexts/WalletBalancesContext', () => ({
 const STRATEGY_A = '0xStrategyAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const STRATEGY_B = '0xStrategyBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
+// Hoisted mutable fixture for the yield-funnel hook so individual tests can
+// override the pending-yield list (e.g., empty for the regression-guard test).
+// `vi.hoisted` runs before `vi.mock` factories, satisfying mock-hoisting rules.
+const yieldDataFixture = vi.hoisted(() => {
+  const defaultPending = [
+    {
+      strategyAddress: '0xStrategyAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      tokenAddress: '0xTokenA',
+      symbol: 'USDS',
+      name: 'Sky Dollar',
+      amount: 1n,
+      amountFormatted: '1.00',
+      decimals: 18,
+    },
+    {
+      strategyAddress: '0xStrategyBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      tokenAddress: '0xTokenB',
+      symbol: 'USDe',
+      name: 'Ethena USDe',
+      amount: 2n,
+      amountFormatted: '2.00',
+      decimals: 18,
+    },
+  ];
+  return {
+    // Cost-per-claim mock: 1.5 USDC for full set (1_500_000 in 6dp).
+    // Picked so proportional cost gives whole cents at every uncheck step
+    // (3.00 total / 1.50 cost → 1.00 / 0.50 after toggles).
+    state: {
+      pendingYield: defaultPending,
+      claimAmount: 1_500_000n,
+      claimAmountFormatted: '1.50',
+      totalYieldFormatted: '3.00',
+      profitFormatted: '1.50',
+    },
+    defaultPending,
+    reset() {
+      this.state.pendingYield = defaultPending;
+      this.state.claimAmount = 1_500_000n;
+      this.state.claimAmountFormatted = '1.50';
+      this.state.totalYieldFormatted = '3.00';
+      this.state.profitFormatted = '1.50';
+    },
+  };
+});
+
 vi.mock('../../hooks/useYieldFunnelData', () => ({
   useYieldFunnelData: () => ({
-    pendingYield: [
-      {
-        strategyAddress: STRATEGY_A,
-        tokenAddress: '0xTokenA',
-        symbol: 'USDS',
-        name: 'Sky Dollar',
-        amount: 1n,
-        amountFormatted: '1.00',
-        decimals: 18,
-      },
-      {
-        strategyAddress: STRATEGY_B,
-        tokenAddress: '0xTokenB',
-        symbol: 'USDe',
-        name: 'Ethena USDe',
-        amount: 2n,
-        amountFormatted: '2.00',
-        decimals: 18,
-      },
-    ],
+    pendingYield: yieldDataFixture.state.pendingYield,
     discountPercent: 5,
-    claimAmount: 100n,
-    claimAmountFormatted: '0.10',
-    totalYieldFormatted: '3.00',
-    profitFormatted: '2.90',
+    claimAmount: yieldDataFixture.state.claimAmount,
+    claimAmountFormatted: yieldDataFixture.state.claimAmountFormatted,
+    totalYieldFormatted: yieldDataFixture.state.totalYieldFormatted,
+    profitFormatted: yieldDataFixture.state.profitFormatted,
     isLoading: false,
     isError: false,
     error: null,
@@ -281,6 +308,7 @@ async function triggerClaim() {
 describe('YieldFunnelTab — exempt strategies checkboxes', () => {
   beforeEach(() => {
     writeContractMock.mockClear();
+    yieldDataFixture.reset();
   });
 
   it('renders one checkbox per pending-yield row, all checked by default', async () => {
@@ -349,7 +377,13 @@ describe('YieldFunnelTab — exempt strategies checkboxes', () => {
     expect(writeContractMock.mock.calls[0][0].args[2]).toEqual([]);
   });
 
-  it('passes both strategy addresses when both checkboxes are unchecked', async () => {
+  it('blocks claim submission when both checkboxes are unchecked (UI guard, story 063)', async () => {
+    // Story 062 wired exemptStrategies as the third claim arg; story 063
+    // adds a UI guard that disables the supply button when every checkbox
+    // is unchecked (so the claim with both exempted is unreachable through
+    // the UI). The underlying claim path still accepts a full exempt array
+    // if invoked programmatically — see the "Select a Yield Source"
+    // empty-state test below for the disabled-button assertion.
     await renderAndAutoSelectNft();
 
     await act(async () => {
@@ -363,13 +397,169 @@ describe('YieldFunnelTab — exempt strategies checkboxes', () => {
       );
     });
 
-    await triggerClaim();
+    const btn = screen.getByTestId('action-button') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    expect(btn.dataset.label).toBe('Select a Yield Source');
 
-    expect(writeContractMock).toHaveBeenCalledTimes(1);
-    // Order is insertion order — A clicked first, then B.
-    expect(writeContractMock.mock.calls[0][0].args[2]).toEqual([
-      STRATEGY_A,
-      STRATEGY_B,
-    ]);
+    // Clicking the disabled button must not fire the claim transaction.
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+    expect(writeContractMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Story 063: Selected totals + all-unchecked empty state
+// ---------------------------------------------------------------------------
+//
+// Fixture math (set in `yieldDataFixture`):
+//   - Strategy A: 1.00 USD
+//   - Strategy B: 2.00 USD
+//   - Full total: 3.00 USD
+//   - Full cost (claimAmount = 1_500_000 in 6dp): 1.50 USDC
+//   - Full profit: 1.50 USD
+//
+// Proportional reductions:
+//   - Uncheck A → selected = 2.00, cost = 1.50 * 2/3 = 1.00, profit = 1.00
+//   - Uncheck B → selected = 1.00, cost = 1.50 * 1/3 = 0.50, profit = 0.50
+
+describe('YieldFunnelTab — selected totals + empty selection', () => {
+  beforeEach(() => {
+    writeContractMock.mockClear();
+    yieldDataFixture.reset();
+  });
+
+  /**
+   * Find the results panel by locating the "Total Selected Yield Value:" label
+   * and walking up to the panel container. Returns null when the panel is
+   * absent from the DOM (all-unchecked case).
+   */
+  function findResultsPanel(): HTMLElement | null {
+    const label = screen.queryByText('Total Selected Yield Value:');
+    if (!label) return null;
+    return label.closest('.bg-pxusd-teal-700') as HTMLElement | null;
+  }
+
+  it('renders the panel with the renamed "Total Selected Yield Value:" label', async () => {
+    await renderAndAutoSelectNft();
+
+    expect(screen.getByText('Total Selected Yield Value:')).toBeInTheDocument();
+    expect(screen.queryByText('Total Yield Value:')).not.toBeInTheDocument();
+  });
+
+  it('shows the full total / cost / profit when every checkbox is checked', async () => {
+    await renderAndAutoSelectNft();
+
+    const panel = findResultsPanel();
+    expect(panel).not.toBeNull();
+    // All-checked totals come from summing amountFormatted (per-row stable=$1).
+    expect(panel!).toHaveTextContent('$3.00');
+    expect(panel!).toHaveTextContent('1.50 USDC');
+    // Profit row reads "$1.50" — the dollar sign disambiguates it from cost.
+    const profitRow = screen.getByText('Your Profit:').closest('div');
+    expect(profitRow).toHaveTextContent('$1.50');
+  });
+
+  it('unchecking one row reduces total, cost, and profit proportionally', async () => {
+    await renderAndAutoSelectNft();
+
+    // Uncheck Strategy A (1.00 USD) → selected total drops to 2.00, cost to 1.00.
+    await act(async () => {
+      fireEvent.click(
+        screen.getByTestId(`yield-funnel-include-checkbox-${STRATEGY_A}`),
+      );
+    });
+
+    const panel = findResultsPanel();
+    expect(panel).not.toBeNull();
+    expect(panel!).toHaveTextContent('$2.00');
+    expect(panel!).toHaveTextContent('1.00 USDC');
+    const profitRow = screen.getByText('Your Profit:').closest('div');
+    expect(profitRow).toHaveTextContent('$1.00');
+  });
+
+  it('unchecking every row hides the results panel and disables the button with "Select a Yield Source"', async () => {
+    await renderAndAutoSelectNft();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByTestId(`yield-funnel-include-checkbox-${STRATEGY_A}`),
+      );
+    });
+    await act(async () => {
+      fireEvent.click(
+        screen.getByTestId(`yield-funnel-include-checkbox-${STRATEGY_B}`),
+      );
+    });
+
+    // Panel is removed entirely from the DOM.
+    expect(screen.queryByText('Total Selected Yield Value:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Your Cost:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Your Profit:')).not.toBeInTheDocument();
+
+    const btn = screen.getByTestId('action-button') as HTMLButtonElement;
+    expect(btn.dataset.label).toBe('Select a Yield Source');
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('re-checking at least one row restores the panel and the supply button', async () => {
+    await renderAndAutoSelectNft();
+
+    // Uncheck both, then re-check B.
+    const checkboxA = screen.getByTestId(
+      `yield-funnel-include-checkbox-${STRATEGY_A}`,
+    ) as HTMLInputElement;
+    const checkboxB = screen.getByTestId(
+      `yield-funnel-include-checkbox-${STRATEGY_B}`,
+    ) as HTMLInputElement;
+
+    await act(async () => {
+      fireEvent.click(checkboxA);
+    });
+    await act(async () => {
+      fireEvent.click(checkboxB);
+    });
+    // Sanity: button reads "Select a Yield Source" right now.
+    expect(
+      (screen.getByTestId('action-button') as HTMLButtonElement).dataset.label,
+    ).toBe('Select a Yield Source');
+
+    await act(async () => {
+      fireEvent.click(checkboxB);
+    });
+
+    // Panel is back and reflects only Strategy B's 2.00 USD.
+    const panel = findResultsPanel();
+    expect(panel).not.toBeNull();
+    expect(panel!).toHaveTextContent('$2.00');
+    expect(panel!).toHaveTextContent('1.00 USDC');
+
+    // Button is back to the supply label (approval not needed in fixture).
+    const btn = screen.getByTestId('action-button') as HTMLButtonElement;
+    expect(btn.dataset.label).toMatch(/^Supply /);
+    expect(btn.disabled).toBe(false);
+  });
+
+  it('empty pendingYield still shows the existing "No yield available" button (regression guard)', async () => {
+    yieldDataFixture.state.pendingYield = [];
+    yieldDataFixture.state.claimAmount = 0n;
+    yieldDataFixture.state.claimAmountFormatted = '0.00';
+    yieldDataFixture.state.totalYieldFormatted = '0.00';
+    yieldDataFixture.state.profitFormatted = '0.00';
+
+    render(<YieldFunnelTab />);
+
+    // The empty-state path renders a static panel with the old "Total Yield Value:"
+    // label and disables the button with "No yield available" — that branch is
+    // out of scope for this story, so it stays untouched.
+    await waitFor(() => {
+      const btn = screen.getByTestId('action-button') as HTMLButtonElement;
+      expect(btn.dataset.label).toBe('No yield available');
+      expect(btn.disabled).toBe(true);
+    });
+    // The new "Select a Yield Source" override must NOT fire when there are no
+    // pending yield rows (allUnchecked is guarded by `pendingYield.length > 0`).
+    expect(screen.queryByText('Select a Yield Source')).not.toBeInTheDocument();
   });
 });

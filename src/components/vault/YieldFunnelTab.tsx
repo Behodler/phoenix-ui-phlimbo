@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { maxUint256 } from 'viem';
+import { maxUint256, formatUnits } from 'viem';
 import { stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
 import ActionButton from '../ui/ActionButton';
 import ConfirmationDialog from '../ui/ConfirmationDialog';
@@ -71,6 +71,36 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
     error: dataError,
     refetch: refetchYieldData,
   } = useYieldFunnelData();
+
+  // Selected-strategy totals derived from `exemptSet` + `pendingYield`.
+  // Stable tokens (USDC, USDT, DOLA, USDS, USDe) trade at 1:1 with USD for
+  // display purposes (see project CLAUDE.md), so summing `parseFloat(amountFormatted)`
+  // matches the existing per-row display. Avoids a new contract call per toggle.
+  const selectedCount = pendingYield.length - exemptSet.size;
+  const allUnchecked = pendingYield.length > 0 && selectedCount === 0;
+
+  const selectedTotalUsd = useMemo(() => {
+    return pendingYield
+      .filter((row) => !exemptSet.has(row.strategyAddress as `0x${string}`))
+      .reduce((sum, row) => sum + parseFloat(row.amountFormatted), 0);
+  }, [pendingYield, exemptSet]);
+
+  const fullTotalUsd = useMemo(() => {
+    return pendingYield.reduce((sum, row) => sum + parseFloat(row.amountFormatted), 0);
+  }, [pendingYield]);
+
+  // Proportional cost — `claimAmount` is the cost for the full set; scale by
+  // selected/full ratio. Linear discount semantics mean this matches the
+  // contract under typical conditions; small drift acceptable for display.
+  const claimAmountUsd = parseFloat(formatUnits(claimAmount, 6));
+  const selectedCostUsd = fullTotalUsd > 0
+    ? claimAmountUsd * (selectedTotalUsd / fullTotalUsd)
+    : 0;
+  const selectedProfitUsd = selectedTotalUsd - selectedCostUsd;
+
+  const selectedTotalFormatted = selectedTotalUsd.toFixed(2);
+  const selectedCostFormatted = selectedCostUsd.toFixed(2);
+  const selectedProfitFormatted = selectedProfitUsd.toFixed(2);
 
   // NFT data from MinterPageView
   const {
@@ -436,6 +466,19 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
     }
   }
 
+  // Override: when wallet is connected, data is loaded, and every Pending
+  // Yield checkbox is unchecked, the claim call would be a no-op. Surface a
+  // disabled "Select a Yield Source" prompt instead of the supply / approve
+  // label. Guarded by `allUnchecked` (which requires `pendingYield.length > 0`)
+  // so it does not collide with the "No yield available" branch.
+  if (isConnected && !isDataLoading && !isDataError && allUnchecked) {
+    buttonLabel = 'Select a Yield Source';
+    buttonDisabled = true;
+    buttonAction = () => {};
+    buttonLoading = false;
+    buttonVariant = 'primary';
+  }
+
   // Log rendering decision
   log.info('YieldFunnelTab: render decision', {
     isDataLoading,
@@ -621,30 +664,32 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
           </div>
         </div>
 
-        {/* Discount and Pricing Section */}
-        <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4 mb-6">
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between items-center">
-              <span className="text-foreground">Total Yield Value:</span>
-              <span className="font-medium text-pxusd-yellow-400">${formatAmount(totalYieldFormatted)}</span>
-            </div>
+        {/* Discount and Pricing Section — hidden when every strategy is unchecked */}
+        {!allUnchecked && (
+          <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4 mb-6">
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-foreground">Total Selected Yield Value:</span>
+                <span className="font-medium text-pxusd-yellow-400">${formatAmount(selectedTotalFormatted)}</span>
+              </div>
 
-            <div className="flex justify-between items-center">
-              <span className="text-foreground">Discount:</span>
-              <span className="font-medium text-pxusd-green-400">{discountPercent}%</span>
-            </div>
+              <div className="flex justify-between items-center">
+                <span className="text-foreground">Discount:</span>
+                <span className="font-medium text-pxusd-green-400">{discountPercent}%</span>
+              </div>
 
-            <div className="flex justify-between items-center">
-              <span className="text-foreground">Your Cost:</span>
-              <span className="font-medium text-pxusd-pink-400">{formatAmount(claimAmountFormatted)} USDC</span>
-            </div>
+              <div className="flex justify-between items-center">
+                <span className="text-foreground">Your Cost:</span>
+                <span className="font-medium text-pxusd-pink-400">{formatAmount(selectedCostFormatted)} USDC</span>
+              </div>
 
-            <div className="flex justify-between items-center pt-2 border-t border-pxusd-teal-600">
-              <span className="text-foreground font-semibold">Your Profit:</span>
-              <span className="font-bold text-pxusd-green-400">${formatAmount(profitFormatted)}</span>
+              <div className="flex justify-between items-center pt-2 border-t border-pxusd-teal-600">
+                <span className="text-foreground font-semibold">Your Profit:</span>
+                <span className="font-bold text-pxusd-green-400">${formatAmount(selectedProfitFormatted)}</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Conditionally render button or pause message based on pause state */}
         {isPaused === true ? (
