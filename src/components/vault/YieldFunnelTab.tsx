@@ -58,7 +58,10 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   // Toast notifications
   const { addToast } = useToast();
 
-  // Fetch yield funnel data from contract
+  // Fetch yield funnel data from contract. Pass `exemptStrategies` so
+  // `claimAmount` reflects the cost for the currently selected (non-exempt)
+  // strategies — the contract is the source of truth for cost, including any
+  // non-linear discount semantics.
   const {
     pendingYield,
     discountPercent,
@@ -70,12 +73,12 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
     isError: isDataError,
     error: dataError,
     refetch: refetchYieldData,
-  } = useYieldFunnelData();
+  } = useYieldFunnelData(exemptStrategies);
 
-  // Selected-strategy totals derived from `exemptSet` + `pendingYield`.
-  // Stable tokens (USDC, USDT, DOLA, USDS, USDe) trade at 1:1 with USD for
-  // display purposes (see project CLAUDE.md), so summing `parseFloat(amountFormatted)`
-  // matches the existing per-row display. Avoids a new contract call per toggle.
+  // Selected-strategy total derived from `exemptSet` + `pendingYield`. The
+  // contract has no `getTotalYield(exempt[])` so the displayed total is summed
+  // client-side. Stable tokens (USDC, USDT, DOLA, USDS, USDe) trade at 1:1
+  // with USD for display purposes (see project CLAUDE.md).
   const selectedCount = pendingYield.length - exemptSet.size;
   const allUnchecked = pendingYield.length > 0 && selectedCount === 0;
 
@@ -85,17 +88,9 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       .reduce((sum, row) => sum + parseFloat(row.amountFormatted), 0);
   }, [pendingYield, exemptSet]);
 
-  const fullTotalUsd = useMemo(() => {
-    return pendingYield.reduce((sum, row) => sum + parseFloat(row.amountFormatted), 0);
-  }, [pendingYield]);
-
-  // Proportional cost — `claimAmount` is the cost for the full set; scale by
-  // selected/full ratio. Linear discount semantics mean this matches the
-  // contract under typical conditions; small drift acceptable for display.
-  const claimAmountUsd = parseFloat(formatUnits(claimAmount, 6));
-  const selectedCostUsd = fullTotalUsd > 0
-    ? claimAmountUsd * (selectedTotalUsd / fullTotalUsd)
-    : 0;
+  // Selected cost comes straight from the contract via `claimAmount`, which
+  // already reflects the exempt set we passed to the hook.
+  const selectedCostUsd = parseFloat(formatUnits(claimAmount, 6));
   const selectedProfitUsd = selectedTotalUsd - selectedCostUsd;
 
   const selectedTotalFormatted = selectedTotalUsd.toFixed(2);

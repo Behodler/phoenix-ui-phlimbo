@@ -105,18 +105,36 @@ const yieldDataFixture = vi.hoisted(() => {
 });
 
 vi.mock('../../hooks/useYieldFunnelData', () => ({
-  useYieldFunnelData: () => ({
-    pendingYield: yieldDataFixture.state.pendingYield,
-    discountPercent: 5,
-    claimAmount: yieldDataFixture.state.claimAmount,
-    claimAmountFormatted: yieldDataFixture.state.claimAmountFormatted,
-    totalYieldFormatted: yieldDataFixture.state.totalYieldFormatted,
-    profitFormatted: yieldDataFixture.state.profitFormatted,
-    isLoading: false,
-    isError: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
+  // Mirrors the contract: claimAmount reflects the cost for the non-exempt
+  // strategies only. Uses linear scaling against the fixture's full cost so
+  // the same arithmetic in the test comments still holds (full $1.50,
+  // uncheck $1 row → cost $1.00, etc.).
+  useYieldFunnelData: (exemptStrategies: readonly `0x${string}`[] = []) => {
+    const pending = yieldDataFixture.state.pendingYield;
+    const fullTotalUsd = pending.reduce(
+      (sum, row) => sum + parseFloat(row.amountFormatted),
+      0,
+    );
+    const selectedTotalUsd = pending
+      .filter((row) => !exemptStrategies.includes(row.strategyAddress as `0x${string}`))
+      .reduce((sum, row) => sum + parseFloat(row.amountFormatted), 0);
+    const fullCost = Number(yieldDataFixture.state.claimAmount);
+    const scaledClaimAmount = fullTotalUsd > 0
+      ? BigInt(Math.round(fullCost * (selectedTotalUsd / fullTotalUsd)))
+      : 0n;
+    return {
+      pendingYield: pending,
+      discountPercent: 5,
+      claimAmount: scaledClaimAmount,
+      claimAmountFormatted: yieldDataFixture.state.claimAmountFormatted,
+      totalYieldFormatted: yieldDataFixture.state.totalYieldFormatted,
+      profitFormatted: yieldDataFixture.state.profitFormatted,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  },
 }));
 
 // One NFT with non-zero balance so the component can build a valid claim call.

@@ -124,7 +124,9 @@ function getTokenInfoMap(addresses: {
  * - calculateClaimAmount() - USDC amount user must pay
  * - getTotalYield() - total pending yield across all strategies
  */
-export function useYieldFunnelData(): YieldFunnelData {
+export function useYieldFunnelData(
+  exemptStrategies: readonly `0x${string}`[] = []
+): YieldFunnelData {
   const { addresses, loading: addressesLoading } = useContractAddresses();
 
   const accumulatorAddress = addresses?.StableYieldAccumulator as `0x${string}` | undefined;
@@ -180,6 +182,7 @@ export function useYieldFunnelData(): YieldFunnelData {
     address: accumulatorAddress,
     abi: stableYieldAccumulatorAbi,
     functionName: 'calculateClaimAmount',
+    args: [exemptStrategies],
     query: {
       enabled: !!accumulatorAddress,
     },
