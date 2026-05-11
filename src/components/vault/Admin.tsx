@@ -870,15 +870,28 @@ export default function Admin() {
   // we stop auto-overwriting from idealBpt updates so we don't clobber edits.
   const [userEditedMinBpt, setUserEditedMinBpt] = useState(false);
 
-  // Auto-populate minBPT to idealBpt * 99 / 100 (1% slippage) whenever idealBpt
-  // changes, unless the user has manually edited the field. Never default to 0.
+  // Auto-populate minBPT to (expected BPT) * 99 / 100 (1% slippage) whenever
+  // idealBpt changes, unless the user has manually edited the field. Never
+  // default to 0.
+  //
+  // getIdealBPT() takes no args and simulates against the dispatcher's full
+  // sUSDS balance, but the contract sets aside batchDonationSize% of that
+  // balance for the donation/nudge swap before pooling. So the BPT actually
+  // minted is roughly idealBpt * (balance - setAside) / balance. Scale before
+  // applying the 1% tolerance — otherwise pool() reverts on the slippage guard
+  // whenever donations are enabled.
   useEffect(() => {
     if (userEditedMinBpt) return;
     if (idealBpt === null || idealBpt === 0n) return;
-    const tolerated = (idealBpt * 99n) / 100n;
+    if (typeof dispatcherSusdsBalance !== 'bigint' || dispatcherSusdsBalance === 0n) return;
+    if (setAsideSusds === null) return;
+    const pooled = dispatcherSusdsBalance - setAsideSusds;
+    if (pooled <= 0n) return;
+    const expected = (idealBpt * pooled) / dispatcherSusdsBalance;
+    const tolerated = (expected * 99n) / 100n;
     if (tolerated === 0n) return;
     setMinBptInput(formatUnits(tolerated, 18));
-  }, [idealBpt, userEditedMinBpt]);
+  }, [idealBpt, userEditedMinBpt, dispatcherSusdsBalance, setAsideSusds]);
 
   const parsedMinBpt = useMemo<bigint | null>(() => {
     const trimmed = minBptInput.trim();
@@ -2466,7 +2479,10 @@ export default function Admin() {
               balance into the sUSDS/phUSD Balancer V3 pool, after first setting aside
               <code> batchDonationSize</code>% of the balance and swapping it to USDC for the
               BatchMinter / Nudge accumulator. <code>minBPT</code> auto-populates to 1% below
-              <code> getIdealBPT()</code> (Balancer slippage floor). <code>minUSDC</code> auto-populates
+              <code> getIdealBPT()</code> scaled by the pooled fraction
+              <code> (balance − setAside) / balance</code> — <code>getIdealBPT()</code> simulates
+              against the full balance, so the raw value overshoots actual minted BPT when
+              donations are enabled. <code>minUSDC</code> auto-populates
               to 1% below the USDS value of the set-aside (nudge-swap slippage floor) — parsed
               as 6-decimal USDC on submit. Both must be &gt; 0 when donations are enabled; when
               <code> batchDonationSize == 0</code> the donation phase is skipped and minUSDC is
