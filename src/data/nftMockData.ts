@@ -73,15 +73,6 @@ export interface NFTData {
 }
 
 /**
- * Mock unit price (USDS) for the Liquid Sky Phoenix NFT, used by mock-only
- * surfaces (e.g. WhaleMintPanel) where contract data isn't available. The
- * live mint list still reads its price from `useMinterPageView`; this
- * constant exists so that mock callers can derive costs (e.g. 40× this) from
- * a single source of truth instead of duplicating the literal.
- */
-export const LIQUID_SKY_PHOENIX_MOCK_PRICE_USDS = 12.0034;
-
-/**
  * Static config array with non-contract fields only.
  * The tokenPrefix maps to the MinterPageView data keys.
  */

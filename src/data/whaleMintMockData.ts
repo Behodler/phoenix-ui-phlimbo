@@ -1,14 +1,11 @@
 import whalePhoenixImg from '../assets/whale-phoenix.png';
 
 /**
- * Mock-only constants for the Whale Mint panel. When contracts are wired in
- * a later story, this file becomes the swap-out point — keep it small and
- * isolated.
+ * Presentational constants for the Whale Mint panel. All numeric values
+ * (batch size, reward pot, mint cost) now come from on-chain reads, so
+ * only the art import and the cyan accent live here.
  */
 export const WHALE_MINT_MOCK = {
-  batchSize: 40,
-  potUsdc: 10, // current pot total — static; updated manually for now
-  liquidSkyPhoenixId: 2, // matches nftMockData
   whaleArt: whalePhoenixImg,
 } as const;
 
