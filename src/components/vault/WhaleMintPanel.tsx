@@ -149,6 +149,11 @@ export default function WhaleMintPanel() {
     );
   }
 
+  // No nudge reward = no incentive to surface this CTA at all.
+  if (rewardPotRaw === 0n) {
+    return null;
+  }
+
   const rewardPotFormatted = formatUsdc(rewardPotRaw!);
   const mintCostFormatted = formatUsds(mintCostRaw);
 

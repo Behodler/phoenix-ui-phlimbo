@@ -230,6 +230,15 @@ describe('WhaleMintPanel', () => {
       expect(container.firstChild).toBeNull();
       expect(screen.queryByTestId('whale-mint-panel')).not.toBeInTheDocument();
     });
+
+    it('hides the panel entirely when the nudge reward pot is zero', () => {
+      panelFixture.state.rewardPotRaw = 0n;
+      const { container } = render(<WhaleMintPanel />);
+
+      expect(container.firstChild).toBeNull();
+      expect(screen.queryByTestId('whale-mint-panel')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('whale-mint-skeleton')).not.toBeInTheDocument();
+    });
   });
 
   describe('Modal interactions', () => {
