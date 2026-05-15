@@ -8,12 +8,19 @@ export default function Header() {
     <header className="phoenix-nav">
       <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img
-            src={phoenixLogo}
-            alt="Phoenix Logo"
-            className="rounded-xl object-cover"
-            width={"90px"}
-          />
+          <a
+            href="https://phoenix.behodler.io/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open Phoenix marketing site in a new tab"
+          >
+            <img
+              src={phoenixLogo}
+              alt="Phoenix Logo"
+              className="rounded-xl object-cover cursor-pointer"
+              width={"90px"}
+            />
+          </a>
           <div className="hidden sm:block">
             <div className="text-xl leading-tight text-pxusd-white">Phoenix</div>
             <div className="text-sm font-semibold text-pxusd-white">phUSD minter</div>
