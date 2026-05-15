@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import type { Tab, TokenInfo } from '../types/vault';
+import { PATH_TO_TAB, TAB_TO_PATH, DEFAULT_PATH } from '../lib/tabRoutes';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { parseUnits, maxUint256 } from 'viem';
@@ -170,8 +172,26 @@ export default function VaultPage() {
   // Check if wallet has admin access (owner OR allowlisted)
   const hasAdminAccess = isOwner || isAllowlistedAdmin(chainId, walletAddress);
 
-  // Tab state needs to be declared early for DepositView polling
-  const [activeTab, setActiveTab] = useState<Tab>("Mint");
+  // Tab state needs to be declared early for DepositView polling.
+  // Initial value is derived from the URL so a hard reload on /staking
+  // or /nft starts on the right tab without a mount-time effect.
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [activeTab, setActiveTab] = useState<Tab>(
+    () => PATH_TO_TAB[location.pathname] ?? "Mint"
+  );
+
+  // URL → tab sync. Handles browser back/forward navigation across the
+  // deep-linked routes. Intentionally does not depend on `activeTab` —
+  // including it would create an outbound→inbound loop with the tab-click
+  // handler below.
+  useEffect(() => {
+    const tabFromUrl = PATH_TO_TAB[location.pathname];
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // NFT sub-tab state lives here (rather than inside NFTListTab) so the
   // WhaleMintPanel can be rendered as a sibling below the main phoenix-card,
@@ -1448,6 +1468,14 @@ export default function VaultPage() {
                 // Clear FAQ when switching to a tab that has no FAQ data
                 if (!["Mint", "Deposit", "Withdraw", "Yield Funnel", "Market", "NFT"].includes(tab)) {
                   setFaqComponent(undefined);
+                }
+                // Sync URL with the active tab when it maps to a friendly
+                // path. Tabs without a friendly path fall back to "/".
+                // `replace: false` pushes a history entry so the browser
+                // back button walks through prior tab selections.
+                const targetPath = TAB_TO_PATH[tab] ?? DEFAULT_PATH;
+                if (targetPath !== location.pathname) {
+                  navigate(targetPath, { replace: false });
                 }
               }}
               onTriggerFAQ={setFaqComponent}
