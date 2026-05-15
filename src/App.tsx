@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ToastProvider } from './components/ui/ToastProvider'
 import { DisclaimerModal } from './components/ui/DisclaimerModal'
 import { MaintenanceBanner } from './components/ui/MaintenanceBanner'
@@ -13,11 +14,18 @@ export default function App() {
   }, [])
 
   return (
-    <ToastProvider>
-      <MaintenanceBanner />
-      <DisclaimerModal />
-      <NFTUpgradeModal />
-      <VaultPage />
-    </ToastProvider>
+    <BrowserRouter>
+      <ToastProvider>
+        <MaintenanceBanner />
+        <DisclaimerModal />
+        <NFTUpgradeModal />
+        <Routes>
+          <Route path="/" element={<VaultPage />} />
+          <Route path="/staking" element={<VaultPage />} />
+          <Route path="/nft" element={<VaultPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ToastProvider>
+    </BrowserRouter>
   )
 }
