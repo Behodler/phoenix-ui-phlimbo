@@ -4,7 +4,7 @@ import { readContract } from '@wagmi/core';
 import { wagmiConfig } from '../../wagmiConfig';
 import { erc20Abi, formatUnits, parseUnits, zeroAddress } from 'viem';
 import {
-  phlimboEaAbi,
+  phlimboV2Abi,
   phusdStableMinterAbi,
   erc4626YieldStrategyAbi,
   stableYieldAccumulatorAbi,
@@ -88,7 +88,7 @@ const getContractConfigs = (): ContractConfig[] => [
   {
     name: 'PhlimboEA',
     addressKey: 'PhlimboEA',
-    abi: phlimboEaAbi as Abi,
+    abi: phlimboV2Abi as Abi,
   },
 ];
 
@@ -186,7 +186,7 @@ export default function Admin() {
   // Fetch the owner address from the PhlimboEA contract (new Phase 2 architecture)
   const { data: ownerAddress } = useReadContract({
     address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboEaAbi,
+    abi: phlimboV2Abi,
     functionName: 'owner',
     query: {
       enabled: !!addresses?.PhlimboEA,
@@ -277,7 +277,7 @@ export default function Admin() {
   // Fetch PhlimboEA pool info: (totalStaked, accPhUSDPerShare, accStablePerShare, phUSDPerSecond, lastRewardTime)
   const { data: poolInfo, refetch: refetchPoolInfo, isLoading: poolInfoLoading } = useReadContract({
     address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboEaAbi,
+    abi: phlimboV2Abi,
     functionName: 'getPoolInfo',
     query: {
       enabled: !!addresses?.PhlimboEA,
@@ -287,7 +287,7 @@ export default function Admin() {
   // Fetch rewardPerSecond from PhlimboEA (linear depletion reward rate)
   const { data: rewardPerSecond, refetch: refetchRewardsPerSecond, isLoading: rewardPerSecondLoading } = useReadContract({
     address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboEaAbi,
+    abi: phlimboV2Abi,
     functionName: 'rewardPerSecond',
     query: {
       enabled: !!addresses?.PhlimboEA,
@@ -297,7 +297,7 @@ export default function Admin() {
   // Fetch depletionDuration from PhlimboEA (duration over which rewards are depleted, in seconds)
   const { data: depletionDuration, refetch: refetchDepletionDuration, isLoading: depletionDurationLoading } = useReadContract({
     address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboEaAbi,
+    abi: phlimboV2Abi,
     functionName: 'depletionDuration',
     query: {
       enabled: !!addresses?.PhlimboEA,

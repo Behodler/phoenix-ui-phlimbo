@@ -6,7 +6,7 @@ import { PATH_TO_TAB, TAB_TO_PATH, DEFAULT_PATH } from '../lib/tabRoutes';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { parseUnits, maxUint256 } from 'viem';
-import { phlimboEaAbi, phusdStableMinterAbi } from '@behodler/phase2-wagmi-hooks';
+import { phlimboV2Abi, phusdStableMinterAbi } from '@behodler/phase2-wagmi-hooks';
 import { useTokenBalance, useTokenAllowance, useTokenApproval, useDepositViewPolling, useBalancerPrice, usePriceInterpolation } from '../hooks';
 import { useWalletBalances } from '../contexts/WalletBalancesContext';
 import { useApprovalTransaction } from '../hooks/useTransaction';
@@ -21,7 +21,6 @@ import EmergencyPauseFooter from '../components/vault/EmergencyPauseFooter';
 import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
 import NFTListTab, { type NFTSubTab } from '../components/vault/NFTListTab';
-import WhaleMintPanel from '../components/vault/WhaleMintPanel';
 import Admin from '../components/vault/Admin';
 import ContextBox from '../components/vault/ContextBox';
 import YieldRewardsInfo from '../components/vault/YieldRewardsInfo';
@@ -157,7 +156,7 @@ export default function VaultPage() {
   // Fetch the owner address from the PhlimboEA contract (new architecture)
   const { data: ownerAddress } = useReadContract({
     address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboEaAbi,
+    abi: phlimboV2Abi,
     functionName: 'owner',
     query: {
       enabled: !!addresses?.PhlimboEA,
@@ -193,9 +192,6 @@ export default function VaultPage() {
     }
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // NFT sub-tab state lives here (rather than inside NFTListTab) so the
-  // WhaleMintPanel can be rendered as a sibling below the main phoenix-card,
-  // gated to the "mint" sub-tab.
   const [nftSubTab, setNftSubTab] = useState<NFTSubTab>('mint');
 
   // ========== DEPOSITVIEW POLLING ==========
@@ -225,7 +221,7 @@ export default function VaultPage() {
   // Fetch pool info to get totalStaked: getPoolInfo returns (totalStaked, accPhUSDPerShare, accStablePerShare, phUSDPerSecond, lastRewardTime)
   const { data: poolInfoData, isLoading: poolInfoLoading } = useReadContract({
     address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboEaAbi,
+    abi: phlimboV2Abi,
     functionName: 'getPoolInfo',
     query: {
       enabled: !!addresses?.PhlimboEA,
@@ -235,7 +231,7 @@ export default function VaultPage() {
   // Fetch desiredAPYBps for fixed phUSD APY (value in basis points, e.g., 1000 = 10%)
   const { data: desiredAPYBpsRaw, isLoading: desiredAPYBpsLoading } = useReadContract({
     address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboEaAbi,
+    abi: phlimboV2Abi,
     functionName: 'desiredAPYBps',
     query: {
       enabled: !!addresses?.PhlimboEA,
@@ -837,8 +833,9 @@ export default function VaultPage() {
       // Execute claim: PhlimboEA.claim()
       const hash = await writeClaim({
         address: addresses.PhlimboEA as `0x${string}`,
-        abi: phlimboEaAbi,
+        abi: phlimboV2Abi,
         functionName: 'claim',
+        args: [walletAddress],
       });
 
       // Show pending confirmation toast
@@ -1231,7 +1228,7 @@ export default function VaultPage() {
       // Execute stake: PhlimboEA.stake(amount, recipient)
       const hash = await writeStake({
         address: addresses.PhlimboEA as `0x${string}`,
-        abi: phlimboEaAbi,
+        abi: phlimboV2Abi,
         functionName: 'stake',
         args: [amountWei, walletAddress],
       });
@@ -1377,9 +1374,9 @@ export default function VaultPage() {
       // Execute withdraw: PhlimboEA.withdraw(amount)
       const hash = await writeWithdraw({
         address: addresses.PhlimboEA as `0x${string}`,
-        abi: phlimboEaAbi,
+        abi: phlimboV2Abi,
         functionName: 'withdraw',
-        args: [amountWei],
+        args: [amountWei, walletAddress],
       });
 
       // Show pending confirmation toast
@@ -1554,12 +1551,7 @@ export default function VaultPage() {
             ) : null}
           </div>
 
-          {/* Whale Mint panel sits below the main card on the NFT mint sub-tab */}
-          {activeTab === "NFT" && nftSubTab === 'mint' && (
-            <ErrorBoundary>
-              <WhaleMintPanel />
-            </ErrorBoundary>
-          )}
+          {/* Whale Mint (nudge) panel hidden alongside the Liquid Sky Phoenix row. */}
         </section>
 
         {/* Right: ContextBox (tab-driven) and FAQ */}

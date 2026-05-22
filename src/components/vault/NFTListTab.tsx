@@ -9,6 +9,7 @@ import { useStakingPageData } from '../../hooks/useStakingPageData';
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurface from './StakingSurface';
+import WhaleMintPanel from './WhaleMintPanel';
 
 export type NFTSubTab = 'mint' | 'stake';
 
@@ -185,6 +186,9 @@ export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) 
               );
             })}
           </div>
+
+          {/* Whale Mint panel — self-hides when nudge reward pot is zero */}
+          <WhaleMintPanel />
 
           {/* Mint Modal */}
           <NFTListMintModal

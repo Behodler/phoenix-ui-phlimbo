@@ -1,9 +1,14 @@
 import { useReadContract } from 'wagmi';
 import { useAccount } from 'wagmi';
-import { formatUnits } from 'viem';
-import { mintPageViewAbi } from '@behodler/phase2-wagmi-hooks';
+import { formatUnits, keccak256, toBytes } from 'viem';
+import { mintPageViewAbi, viewRouterAbi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { nftStaticConfig } from '../data/nftMockData';
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
+/** ViewRouter page key for the mint view — matches RegisterMintPageView.s.sol */
+const MINT_PAGE_KEY = keccak256(toBytes('mint'));
 
 /**
  * Per-token data parsed from MinterPageView.getData()
@@ -97,19 +102,45 @@ function parseTokenData(data: readonly bigint[], offset: number, decimals: numbe
 
 /**
  * Hook to fetch and parse MinterPageView contract data.
- * Calls getData(userAddress) and parses the uint256[] into structured token data.
+ * Resolves the MintPageView address via ViewRouter.pages(keccak256("mint")),
+ * then calls getData(userAddress) and parses the uint256[] into structured token data.
  */
 export function useMinterPageView(): UseMinterPageViewReturn {
   const { address: userAddress } = useAccount();
   const { addresses } = useContractAddresses();
 
-  const mintPageViewAddress = addresses?.MintPageView as `0x${string}` | undefined;
+  const viewRouterAddress = addresses?.ViewRouter as `0x${string}` | undefined;
+  const viewRouterAvailable =
+    !!viewRouterAddress && viewRouterAddress.toLowerCase() !== ZERO_ADDRESS;
+
+  // Resolve MintPageView via ViewRouter so the UI follows whichever view the
+  // router currently points at, instead of relying on the hardcoded address.
+  const {
+    data: resolvedAddressRaw,
+    isLoading: isResolveLoading,
+    isError: isResolveError,
+    error: resolveError,
+  } = useReadContract({
+    address: viewRouterAddress,
+    abi: viewRouterAbi,
+    functionName: 'pages',
+    args: [MINT_PAGE_KEY],
+    query: {
+      enabled: viewRouterAvailable,
+      refetchOnWindowFocus: false,
+      staleTime: 60_000,
+    },
+  });
+
+  const mintPageViewAddress = resolvedAddressRaw as `0x${string}` | undefined;
+  const mintPageViewAvailable =
+    !!mintPageViewAddress && mintPageViewAddress.toLowerCase() !== ZERO_ADDRESS;
 
   const {
     data: rawData,
-    isLoading,
-    isError,
-    error,
+    isLoading: isGetDataLoading,
+    isError: isGetDataError,
+    error: getDataError,
     refetch,
   } = useReadContract({
     address: mintPageViewAddress,
@@ -117,11 +148,15 @@ export function useMinterPageView(): UseMinterPageViewReturn {
     functionName: 'getData',
     args: userAddress ? [userAddress] : undefined,
     query: {
-      enabled: !!userAddress && !!mintPageViewAddress && mintPageViewAddress !== '0x0000000000000000000000000000000000000000',
+      enabled: !!userAddress && mintPageViewAvailable,
       refetchOnWindowFocus: false,
       staleTime: 15_000, // 15 seconds
     },
   });
+
+  const isLoading = isResolveLoading || isGetDataLoading;
+  const isError = isResolveError || isGetDataError;
+  const error = (resolveError ?? getDataError) as Error | null;
 
   let parsedData: MinterPageViewData | null = null;
 
@@ -142,7 +177,7 @@ export function useMinterPageView(): UseMinterPageViewReturn {
     data: parsedData,
     isLoading,
     isError,
-    error: error as Error | null,
+    error,
     refetch,
   };
 }

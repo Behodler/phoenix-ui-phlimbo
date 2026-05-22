@@ -23,43 +23,71 @@ export default function MaintenanceBanner() {
       role="alert"
       aria-live="assertive"
     >
-      <div className="bg-background border border-border rounded-xl max-w-lg w-full p-6 sm:p-8 shadow-2xl">
+      <div className="bg-background border border-border rounded-xl max-w-xl w-full p-6 sm:p-10 shadow-2xl">
+        {/* Construction Image */}
+        <div className="mb-6 flex justify-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 200 160"
+            className="w-40 h-32 sm:w-56 sm:h-44"
+            aria-hidden="true"
+          >
+            {/* Ground */}
+            <rect x="0" y="140" width="200" height="6" fill="currentColor" className="text-pxusd-teal-900/70" />
+
+            {/* Left traffic cone */}
+            <polygon points="30,140 42,100 54,140" fill="#f59e0b" />
+            <rect x="33" y="120" width="18" height="4" fill="#fff" />
+            <rect x="35" y="128" width="14" height="4" fill="#fff" />
+            <ellipse cx="42" cy="142" rx="16" ry="3" fill="#1f2937" />
+
+            {/* Right traffic cone */}
+            <polygon points="146,140 158,100 170,140" fill="#f59e0b" />
+            <rect x="149" y="120" width="18" height="4" fill="#fff" />
+            <rect x="151" y="128" width="14" height="4" fill="#fff" />
+            <ellipse cx="158" cy="142" rx="16" ry="3" fill="#1f2937" />
+
+            {/* Hard hat */}
+            <path
+              d="M70 90 Q70 50 100 50 Q130 50 130 90 Z"
+              fill="#fbbf24"
+            />
+            <rect x="62" y="88" width="76" height="8" rx="2" fill="#f59e0b" />
+            <rect x="96" y="55" width="8" height="35" fill="#f59e0b" />
+
+            {/* Wrench crossing hammer */}
+            <g transform="rotate(-25 100 115)">
+              <rect x="60" y="112" width="50" height="6" rx="2" fill="#9ca3af" />
+              <circle cx="58" cy="115" r="7" fill="#9ca3af" />
+              <circle cx="58" cy="115" r="3" fill="#1f2937" />
+            </g>
+            <g transform="rotate(25 100 115)">
+              <rect x="95" y="112" width="40" height="6" rx="2" fill="#92400e" />
+              <rect x="130" y="106" width="14" height="18" rx="2" fill="#9ca3af" />
+            </g>
+          </svg>
+        </div>
+
         {/* Header */}
         <div className="mb-6 text-center">
-          <div className="flex justify-center mb-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-12 w-12 sm:h-16 sm:w-16 text-pxusd-orange-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M11.42 15.17l-1.42-.88a1.14 1.14 0 01-.38-1.57l.32-.53a1.14 1.14 0 011.57-.38l.88.54M12 2v2m0 16v2m10-10h-2M4 12H2m15.07-5.07l-1.41 1.41M8.34 15.66l-1.41 1.41m0-10.14l1.41 1.41m7.32 7.32l1.41 1.41"
-              />
-            </svg>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-foreground">
-            Down for Routine Maintenance
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
+            Site Currently Paused for Maintenance
           </h2>
-          <div className="mt-2 w-16 h-1 bg-pxusd-orange-400 mx-auto rounded-full" />
+          <div className="mt-3 w-20 h-1 bg-pxusd-orange-400 mx-auto rounded-full" />
         </div>
 
         {/* Message */}
         <div className="mb-6">
-          <div className="bg-pxusd-teal-900/50 border border-border rounded-lg p-4 sm:p-5">
+          <div className="bg-pxusd-teal-900/50 border border-border rounded-lg p-5 sm:p-6">
             <p className="text-foreground text-sm sm:text-base leading-relaxed text-center">
-              The site is currently unavailable as we prepare for the integration of new contracts. 
+              We sincerely apologize for the inconvenience. The site is temporarily offline while we make some improvements behind the scenes. Please check back again shortly.
             </p>
           </div>
         </div>
 
         {/* Footer */}
-        <p className="text-center text-xs text-muted-foreground">
-          Thank you for your patience.
+        <p className="text-center text-xs sm:text-sm text-muted-foreground">
+          Thank you for your patience and understanding.
         </p>
       </div>
     </div>

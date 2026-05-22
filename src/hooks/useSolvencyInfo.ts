@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useReadContract } from 'wagmi';
 import { erc20Abi } from 'viem';
-import { phlimboEaAbi } from '@behodler/phase2-wagmi-hooks';
+import { phlimboV2Abi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 
 /**
@@ -84,7 +84,7 @@ export function useSolvencyInfo(): SolvencyInfo {
     refetch: refetchRewardBalance,
   } = useReadContract({
     address: phlimboAddress,
-    abi: phlimboEaAbi,
+    abi: phlimboV2Abi,
     functionName: 'rewardBalance',
     query: {
       enabled: !!phlimboAddress,
@@ -99,7 +99,7 @@ export function useSolvencyInfo(): SolvencyInfo {
     refetch: refetchRewardPerSecond,
   } = useReadContract({
     address: phlimboAddress,
-    abi: phlimboEaAbi,
+    abi: phlimboV2Abi,
     functionName: 'rewardPerSecond',
     query: {
       enabled: !!phlimboAddress,
@@ -114,7 +114,7 @@ export function useSolvencyInfo(): SolvencyInfo {
     refetch: refetchPoolInfo,
   } = useReadContract({
     address: phlimboAddress,
-    abi: phlimboEaAbi,
+    abi: phlimboV2Abi,
     functionName: 'getPoolInfo',
     query: {
       enabled: !!phlimboAddress,
