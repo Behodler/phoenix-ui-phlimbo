@@ -280,7 +280,6 @@ export default function WhaleMintPanel() {
         count={count}
         mintCostRaw={mintCostRaw}
         rewardPotRaw={rewardPotRaw!}
-        dispatcherIndex={lsp!.dispatcherIndex}
         nudgeSize={nudgeSizeRaw as bigint}
         refetchMinterData={refetchMinterData}
         refetchRewardPot={refetchRewardPot}

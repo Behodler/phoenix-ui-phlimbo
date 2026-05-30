@@ -173,18 +173,20 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
       if (useBatchFlow) {
         // BatchNFTMinter.batchMint pulls the full paymentAmount upfront, mints
         // `count` consecutive units (each step bumps the dispatcher price), and
-        // refunds dust below threshold. Args mirror the ABI exactly.
+        // refunds dust below threshold. The target NFT minter, payment token,
+        // and dispatcher index now live in BatchNFTMinter state (set on the
+        // contract), so only count/recipient/payment are passed here.
+        // `minReward` is the slippage floor on the nudge reward; 0n accepts any
+        // reward, matching the pre-nudge contract's behaviour.
         hash = await writeContractAsync({
           address: addresses!.BatchNFTMinter as `0x${string}`,
           abi: batchNftMinterAbi,
           functionName: 'batchMint',
           args: [
-            nftPrimary.NFTMinter as `0x${string}`,
-            tokenAddress,
-            BigInt(nft.dispatcherIndex),
             BigInt(batchControls.count),
             walletAddress,
             batchControls.requiredRaw,
+            0n,
           ],
         });
       } else {

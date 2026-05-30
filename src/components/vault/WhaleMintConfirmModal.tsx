@@ -27,8 +27,6 @@ interface WhaleMintConfirmModalProps {
   mintCostRaw: bigint;
   /** Current nudge reward pot (nudgePaymentToken balance held by BatchNFTMinter). */
   rewardPotRaw: bigint;
-  /** Liquid Sky Phoenix dispatcher index from MinterPageView. */
-  dispatcherIndex: number;
   /** Raw on-chain nudgeSize — passed verbatim as the `count` argument to batchMint. */
   nudgeSize: bigint;
   /** Refetcher for MinterPageView; fires after both approve and mint confirm. */
@@ -65,7 +63,6 @@ export default function WhaleMintConfirmModal({
   count,
   mintCostRaw,
   rewardPotRaw,
-  dispatcherIndex,
   nudgeSize,
   refetchMinterData,
   refetchRewardPot,
@@ -239,17 +236,21 @@ export default function WhaleMintConfirmModal({
         description: 'Please confirm the mint transaction in your wallet.',
         duration: 30000,
       });
+      // BatchNFTMinter holds the target NFT minter, payment token, and
+      // dispatcher index in state now, so batchMint only takes
+      // count/recipient/paymentAmount plus a `minReward` slippage floor.
+      // minReward is the nudge reward the UI promised the user — the current
+      // reward pot (rewardPotRaw, already in the payment token's 6-decimal raw
+      // units) — so the tx reverts rather than paying out less than shown.
       const hash = await writeContractAsync({
         address: batchMinter!,
         abi: batchNftMinterAbi,
         functionName: 'batchMint',
         args: [
-          nftMinter!,
-          usdsAddress!,
-          BigInt(dispatcherIndex),
           nudgeSize,
           walletAddress!,
           mintCostRaw,
+          rewardPotRaw,
         ],
       });
       setMintTxHash(hash);

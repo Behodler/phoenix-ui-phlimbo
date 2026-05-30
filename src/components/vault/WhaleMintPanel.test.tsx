@@ -322,13 +322,13 @@ describe('WhaleMintPanel', () => {
       const call = writeContractAsyncMock.mock.calls[0][0];
       expect(call.functionName).toBe('batchMint');
       expect(call.address).toBe(BATCH_MINTER);
-      // args = [NFTMinter, USDS, dispatcherIndex, nudgeSize, walletAddress, mintCostRaw]
-      expect(call.args[0]).toBe(NFT_MINTER);
-      expect(call.args[1]).toBe(USDS_ADDR);
-      expect(call.args[2]).toBe(BigInt(panelFixture.state.dispatcherIndex));
-      expect(call.args[3]).toBe(panelFixture.state.nudgeSize);
-      expect(typeof call.args[5]).toBe('bigint');
-      expect((call.args[5] as bigint) > 0n).toBe(true);
+      // NFTBatchMinter holds the NFT minter, payment token, and dispatcher
+      // index in state now. args = [nudgeSize, walletAddress, mintCostRaw, minReward]
+      // minReward is the displayed nudge reward pot.
+      expect(call.args[0]).toBe(panelFixture.state.nudgeSize);
+      expect(typeof call.args[2]).toBe('bigint');
+      expect((call.args[2] as bigint) > 0n).toBe(true);
+      expect(call.args[3]).toBe(panelFixture.state.rewardPotRaw);
     });
 
     it('toasts a cancellation when approve is rejected by the user', async () => {
