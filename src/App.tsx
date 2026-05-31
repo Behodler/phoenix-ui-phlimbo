@@ -21,6 +21,7 @@ export default function App() {
         <NFTUpgradeModal />
         <Routes>
           <Route path="/" element={<VaultPage />} />
+          <Route path="/stake" element={<VaultPage />} />
           <Route path="/staking" element={<VaultPage />} />
           <Route path="/nft" element={<VaultPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

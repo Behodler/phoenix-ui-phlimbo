@@ -4,12 +4,16 @@ import type { Tab } from '../types/vault';
 // Only listed paths are deep-linkable; all other tabs are reachable only
 // via the in-page TabNavigation and live at "/".
 export const PATH_TO_TAB: Record<string, Tab> = {
-  '/staking': 'Deposit',
+  '/stake': 'Stake',
+  // Repointed from 'Deposit' → 'Stake'. DeFi Llama deep-links to /staking, so
+  // that external link must land on the new consolidated Stake surface.
+  '/staking': 'Stake',
   '/nft': 'NFT',
 };
 
 export const TAB_TO_PATH: Partial<Record<Tab, string>> = {
-  Deposit: '/staking',
+  // Canonical path for the Stake tab; in-app Stake clicks navigate here.
+  Stake: '/stake',
   NFT: '/nft',
 };
 
