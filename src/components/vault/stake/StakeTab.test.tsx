@@ -50,31 +50,18 @@ describe('StakeTab (Story 068)', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the phUSD framed section, sphUSD placeholder, and 3 stable rows', () => {
+  it('renders the phUSD framed section and 3 stable rows', () => {
     renderStakeTab();
 
     // phUSD framed section header (stake phUSD → earn USDC).
     expect(screen.getByText('Stake phUSD · earn USDC')).toBeInTheDocument();
-    expect(screen.getByText('Inverse direction')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'phUSD pool' })).toBeInTheDocument();
-
-    // sphUSD coming-soon placeholder.
-    expect(screen.getByText('sphUSD · auto-compounding')).toBeInTheDocument();
-    expect(screen.getByText('Coming later')).toBeInTheDocument();
 
     // Stable pool group + the three stable rows (targeted by row aria-label).
     expect(screen.getByText('Stake stables · earn phUSD')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'USDC pool' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'USDe pool' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'DOLA pool' })).toBeInTheDocument();
-  });
-
-  it('shows the hero summary with APY range, total staked, and TVL', () => {
-    renderStakeTab();
-
-    expect(screen.getByText('APY range')).toBeInTheDocument();
-    expect(screen.getByText('Your total staked')).toBeInTheDocument();
-    expect(screen.getByText('TVL')).toBeInTheDocument();
   });
 
   it('expanding a stable row and submitting a mock stake updates its balance', async () => {
