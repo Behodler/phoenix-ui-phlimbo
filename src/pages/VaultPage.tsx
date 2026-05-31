@@ -21,6 +21,7 @@ import EmergencyPauseFooter from '../components/vault/EmergencyPauseFooter';
 import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
 import NFTListTab, { type NFTSubTab } from '../components/vault/NFTListTab';
+import StakeTab from '../components/vault/stake/StakeTab';
 import Admin from '../components/vault/Admin';
 import ContextBox from '../components/vault/ContextBox';
 import YieldRewardsInfo from '../components/vault/YieldRewardsInfo';
@@ -340,10 +341,10 @@ export default function VaultPage() {
   // - Safety/Emergency Pause is handled by the fixed footer, not a tab
   const tabs: readonly Tab[] = (() => {
     if (!isMounted) {
-      return ["Mint", "Deposit", "Withdraw", "Yield Funnel"];
+      return ["Mint", "Stake", "Deposit", "Withdraw", "Yield Funnel"];
     }
 
-    const tabList: Tab[] = ["Mint", "Deposit", "Withdraw", "Yield Funnel"];
+    const tabList: Tab[] = ["Mint", "Stake", "Deposit", "Withdraw", "Yield Funnel"];
 
     if (!isMainnet) {
       tabList.push("Testnet Faucet");
@@ -1496,6 +1497,10 @@ export default function VaultPage() {
                   onSelectMintToken={selectMintToken}
                   tokenDecimals={mintTokenDecimals}
                 />
+              </ErrorBoundary>
+            ) : activeTab === "Stake" ? (
+              <ErrorBoundary>
+                <StakeTab />
               </ErrorBoundary>
             ) : activeTab === "Testnet Faucet" ? (
               <TestnetFaucet />
