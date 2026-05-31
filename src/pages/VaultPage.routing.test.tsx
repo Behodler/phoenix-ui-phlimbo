@@ -26,6 +26,7 @@ const TAB_HEADING: Record<Tab, string> = {
   Deposit: 'Deposit Form',
   Withdraw: 'Withdraw Tab',
   'Yield Funnel': 'Yield Funnel Tab',
+  Stake: 'Stake Tab',
   'Testnet Faucet': 'Faucet Tab',
   Market: 'Market Tab',
   NFT: 'NFT Tab',
@@ -61,6 +62,7 @@ function VaultPageStub() {
       <div data-testid="current-pathname">{location.pathname}</div>
       <nav>
         <button onClick={() => handleTabClick('Mint')}>Mint Nav</button>
+        <button onClick={() => handleTabClick('Stake')}>Stake Nav</button>
         <button onClick={() => handleTabClick('Deposit')}>Deposit Nav</button>
         <button onClick={() => handleTabClick('NFT')}>NFT Nav</button>
         <button onClick={() => handleTabClick('Withdraw')}>Withdraw Nav</button>
@@ -81,6 +83,7 @@ function AppRoutesSubtree() {
   return (
     <Routes>
       <Route path="/" element={<VaultPageStub />} />
+      <Route path="/stake" element={<VaultPageStub />} />
       <Route path="/staking" element={<VaultPageStub />} />
       <Route path="/nft" element={<VaultPageStub />} />
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -100,15 +103,40 @@ describe('VaultPage routing (Story 066)', () => {
     expect(screen.getByTestId('current-pathname').textContent).toBe('/');
   });
 
-  it('renders Deposit form at /staking', () => {
+  it('renders Stake tab at /staking (repointed from Deposit, DeFi Llama link target)', () => {
     render(
       <MemoryRouter initialEntries={['/staking']}>
         <AppRoutesSubtree />
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('heading', { name: 'Deposit Form' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Stake Tab' })).toBeInTheDocument();
     expect(screen.getByTestId('current-pathname').textContent).toBe('/staking');
+  });
+
+  it('renders Stake tab at /stake (canonical path)', () => {
+    render(
+      <MemoryRouter initialEntries={['/stake']}>
+        <AppRoutesSubtree />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('heading', { name: 'Stake Tab' })).toBeInTheDocument();
+    expect(screen.getByTestId('current-pathname').textContent).toBe('/stake');
+  });
+
+  it('clicking the Stake tab navigates to the canonical /stake path', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutesSubtree />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Stake Nav' }));
+
+    expect(screen.getByRole('heading', { name: 'Stake Tab' })).toBeInTheDocument();
+    expect(screen.getByTestId('current-pathname').textContent).toBe('/stake');
   });
 
   it('renders NFT tab at /nft', () => {
@@ -141,8 +169,8 @@ describe('VaultPage routing (Story 066)', () => {
       </MemoryRouter>
     );
 
-    // Start on Deposit at /staking
-    expect(screen.getByRole('heading', { name: 'Deposit Form' })).toBeInTheDocument();
+    // Start on Stake at /staking (repointed)
+    expect(screen.getByRole('heading', { name: 'Stake Tab' })).toBeInTheDocument();
     expect(screen.getByTestId('current-pathname').textContent).toBe('/staking');
 
     await user.click(screen.getByRole('button', { name: 'NFT Nav' }));
