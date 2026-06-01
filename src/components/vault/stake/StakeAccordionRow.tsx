@@ -23,6 +23,12 @@ export interface StakeRowModel {
   pendingRewards: number;
   /** Earn-token per second for the live counter (human). */
   ratePerSecond: number;
+  /**
+   * Animate pending via client-side interpolation (mock pools). When false the
+   * pending figure is rendered as the raw on-chain value and only changes when
+   * fresh chain data arrives (real pool — block updates take precedence).
+   */
+  liveTicker: boolean;
   tagline: string;
   /** Decimal places for the live pending counter (USDC=6, phUSD=6 here). */
   pendingDecimals: number;
@@ -214,18 +220,25 @@ export default function StakeAccordionRow({
           )}
         </div>
 
-        {/* Pending (live counter) */}
+        {/* Pending. Mock pools interpolate; the real pool shows the raw
+            on-chain value so block refetches (not interpolation) drive it. */}
         <div className="flex flex-col gap-0.5">
           <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Pending</span>
-          {pool.pendingRewards > 0 || pool.ratePerSecond > 0 ? (
+          {pool.pendingRewards > 0 || (pool.liveTicker && pool.ratePerSecond > 0) ? (
             <div className="flex items-center gap-1.5">
-              <LiveYieldCounter
-                ratePerSecond={pool.ratePerSecond}
-                initial={pool.pendingRewards}
-                decimals={pool.pendingDecimals}
-                size={14}
-                weight={600}
-              />
+              {pool.liveTicker ? (
+                <LiveYieldCounter
+                  ratePerSecond={pool.ratePerSecond}
+                  initial={pool.pendingRewards}
+                  decimals={pool.pendingDecimals}
+                  size={14}
+                  weight={600}
+                />
+              ) : (
+                <span className="font-mono text-[14px] font-semibold text-pxusd-white">
+                  {fmtAmount(pool.pendingRewards, pool.pendingDecimals)}
+                </span>
+              )}
               <span className="text-[12px] text-muted-foreground">{pool.earnToken}</span>
             </div>
           ) : (
@@ -316,13 +329,19 @@ export default function StakeAccordionRow({
                 <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Claimable now</div>
                 <div className="flex items-baseline gap-2.5">
                   <img src={pool.earnIcon} alt={pool.earnToken} className="h-5 w-5 self-center rounded-full" />
-                  <LiveYieldCounter
-                    ratePerSecond={pool.ratePerSecond}
-                    initial={pool.pendingRewards}
-                    decimals={pool.pendingDecimals}
-                    size={18}
-                    weight={600}
-                  />
+                  {pool.liveTicker ? (
+                    <LiveYieldCounter
+                      ratePerSecond={pool.ratePerSecond}
+                      initial={pool.pendingRewards}
+                      decimals={pool.pendingDecimals}
+                      size={18}
+                      weight={600}
+                    />
+                  ) : (
+                    <span className="font-mono tabular-nums text-[18px] font-semibold text-pxusd-white">
+                      {fmtAmount(pool.pendingRewards, pool.pendingDecimals)}
+                    </span>
+                  )}
                   <span className="font-mono text-[13px] text-muted-foreground">{pool.earnToken}</span>
                 </div>
                 <div className="mt-1.5 text-[12px] text-muted-foreground">

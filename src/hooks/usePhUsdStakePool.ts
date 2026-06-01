@@ -11,12 +11,20 @@ import { phlimboV2Abi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { useToast } from '../components/ui/ToastProvider';
 import { useWalletBalances } from '../contexts/WalletBalancesContext';
+import { usePolling } from '../contexts/PollingContext';
 import { useApprovalTransaction } from './useTransaction';
 import { useTokenApproval } from './useContractInteractions';
 import { useDepositViewPolling } from './useDepositViewPolling';
 import { useBalancerPrice } from './useBalancerPrice';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
 import { log } from '../utils/logger';
+
+/**
+ * Heartbeat for re-reading on-chain stake data while real-time updates are on
+ * (roughly one mainnet block). Faster than the shared 60s DepositView poll so
+ * the Stake tab's pending figure stays close to chain state.
+ */
+const STAKE_REFRESH_INTERVAL_MS = 12_000;
 
 /**
  * Action currently awaiting wallet confirmation / chain confirmation.
@@ -77,6 +85,9 @@ export function usePhUsdStakePool(isActive: boolean): PhUsdStakePool {
   const { addToast } = useToast();
   const { refreshWalletBalances } = useWalletBalances();
   const { approve } = useTokenApproval();
+  // Global "Real-time Updates" (Live/Paused) toggle. When off, the page loads
+  // statically: no block refetches, and the live counter is frozen.
+  const { isPollingEnabled } = usePolling();
 
   // ---- Reads: DepositView polling (wallet/staked/pending/allowance) -------
   const {
@@ -84,6 +95,16 @@ export function usePhUsdStakePool(isActive: boolean): PhUsdStakePool {
     isLoading: depositViewLoading,
     refresh: refreshDepositView,
   } = useDepositViewPolling(isActive);
+
+  // Re-read the on-chain deposit data on a fixed 12s heartbeat (gated on the
+  // same Live toggle) so the pending figure + balances track chain state in
+  // near real-time, snapping up or down to each fresh value. A timer is used
+  // rather than block subscriptions, which are unreliable over HTTP RPCs.
+  useEffect(() => {
+    if (!isActive || !isPollingEnabled) return;
+    const id = setInterval(() => refreshDepositView(), STAKE_REFRESH_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [isActive, isPollingEnabled, refreshDepositView]);
 
   const userPhUSDBalance = depositViewData?.userPhUSDBalance ?? 0n;
   const pendingStableRewards = depositViewData?.pendingStableRewards ?? 0n;
@@ -156,9 +177,21 @@ export function usePhUsdStakePool(isActive: boolean): PhUsdStakePool {
   const stakedBalance = stakedBalanceRaw ? Number(stakedBalanceRaw) / 1e18 : 0;
   const pendingRewards = pendingStableRewards ? Number(pendingStableRewards) / 1e6 : 0;
   // USDC reward stream is scaled by 1e18 and denominated in USDC (6 decimals).
-  const ratePerSecond = stableRewardsPerSecond
+  // `stableRewardsPerSecond` is the pool-wide emission rate (R), so this wallet's
+  // accrual is R weighted by its share of the pool:
+  //   rate_user = R * (C / T)
+  // where C = this user's stake, T = total staked by all users. A zero stake
+  // (or unknown total) ⇒ 0, so the live counter stays put for non-stakers.
+  const globalRewardsPerSecond = stableRewardsPerSecond
     ? Number(stableRewardsPerSecond) / 1e18 / 1e6
     : 0;
+  const totalStaked = totalStakedRaw > 0n ? Number(totalStakedRaw) / 1e18 : 0;
+  // When real-time updates are paused, hold the counter still (rate 0) so it
+  // shows the last loaded on-chain value rather than extrapolating past it.
+  const ratePerSecond =
+    isPollingEnabled && totalStaked > 0 && stakedBalance > 0
+      ? globalRewardsPerSecond * (stakedBalance / totalStaked)
+      : 0;
 
   const needsApproval = (amount: string): boolean => {
     let amountWei = 0n;
