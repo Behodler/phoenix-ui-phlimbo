@@ -12,8 +12,10 @@ export const PATH_TO_TAB: Record<string, Tab> = {
 };
 
 export const TAB_TO_PATH: Partial<Record<Tab, string>> = {
-  // Canonical path for the Stake tab; in-app Stake clicks navigate here.
-  Stake: '/stake',
+  // Canonical path for the Stake tab (story 069); in-app Stake clicks navigate
+  // here. DeFi Llama deep-links to /staking, so the canonical outbound path is
+  // /staking. /stake remains a working alias in PATH_TO_TAB above.
+  Stake: '/staking',
   NFT: '/nft',
 };
 
