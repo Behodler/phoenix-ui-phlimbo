@@ -7,8 +7,6 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
   const getFAQComponentType = (tab: string): string | null => {
     switch (tab) {
       case "Mint": return "MintTab";
-      case "Deposit": return "DepositTab";
-      case "Withdraw": return "WithdrawTab";
       case "Yield Funnel": return "YieldFunnelTab";
       case "Market": return "MarketTab";
       case "NFT": return "NFTTab";

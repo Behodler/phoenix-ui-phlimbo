@@ -1,4 +1,4 @@
-export type Tab = "Mint" | "Deposit" | "Withdraw" | "Yield Funnel" | "Stake" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
+export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
 
 export interface VaultFormData {
   amount: string;
@@ -105,15 +105,3 @@ export interface FAQWrapperProps {
   onTriggerFAQ: (componentName: string) => void;
 }
 
-export interface YieldRewardsInfoProps {
-  totalApy: number; // Combined yield percentage
-  usdcApy: number; // USDC yield percentage
-  pendingPhUsd: bigint | string; // Pending PhUSD rewards (18 decimals)
-  pendingUsdc: bigint | string; // Pending USDC rewards (6 decimals when isUsdcDecimals6=true)
-  stakedBalance: bigint | string; // User's staked phUSD balance (18 decimals)
-  isLoading?: boolean; // Loading state
-  isConnected?: boolean; // Whether wallet is connected (for rewards display)
-  onClaim?: () => void; // Callback for claim button action
-  isClaiming?: boolean; // Loading state for claim button
-  isUsdcDecimals6?: boolean; // If true, pendingUsdc uses 6 decimals (USDC), otherwise 18 (default)
-}
