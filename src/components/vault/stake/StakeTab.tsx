@@ -2,7 +2,7 @@ import { useState } from 'react';
 import StakeAccordionRow from './StakeAccordionRow';
 import type { StakeRowModel } from './StakeAccordionRow';
 import { usePhUsdStakePool } from '../../../hooks/usePhUsdStakePool';
-import { useMockStablePools } from '../../../data/mockStablePools';
+import { useStableStakerPools } from '../../../hooks/useStableStakerPools';
 import phUSDIcon from '../../../assets/phUSD.png';
 import usdcIcon from '../../../assets/usdc-logo.svg';
 
@@ -22,7 +22,7 @@ const STABLE_USD = 1.0;
  */
 export default function StakeTab() {
   const phUsdPool = usePhUsdStakePool(true);
-  const stable = useMockStablePools();
+  const stable = useStableStakerPools(true);
 
   // Single open row keeps the surface calm. Default to the phUSD pool.
   const [expandedId, setExpandedId] = useState<string | null>('phusd');
@@ -110,15 +110,19 @@ export default function StakeTab() {
           stakedBalance: p.stakedBalance,
           pendingRewards: p.pendingRewards,
           ratePerSecond: p.ratePerSecond,
-          // Mock pools: simulated smooth ticker (no chain to sync against).
-          liveTicker: true,
+          // Real pools: interpolate the live counter between 12s reads.
+          liveTicker: p.liveTicker,
           tagline: p.tagline,
-          pendingDecimals: 6,
+          // Stable pools earn phUSD (18 decimals), not USDC.
+          pendingDecimals: p.pendingDecimals,
           isLegacy: false,
-          stakePriceUSD: STABLE_USD,
-          earnPriceUSD: phUsdPrice,
+          stakePriceUSD: p.stakePriceUSD,
+          earnPriceUSD: p.earnPriceUSD,
+          disabled: p.disabled,
+          withdrawDisabled: p.withdrawDisabled,
+          needsApproval: p.needsApproval,
         };
-        const pendingAction = stable.txPending?.poolId === p.id ? stable.txPending.action : null;
+        const pendingAction = stable.pendingAction?.id === p.id ? stable.pendingAction.action : null;
         return (
           <StakeAccordionRow
             key={p.id}
@@ -129,6 +133,7 @@ export default function StakeTab() {
             onStake={(amount) => stable.stake(p.id, amount)}
             onWithdraw={(amount) => stable.withdraw(p.id, amount)}
             onClaim={() => stable.claim(p.id)}
+            onApprove={() => stable.approve(p.id)}
           />
         );
       })}
