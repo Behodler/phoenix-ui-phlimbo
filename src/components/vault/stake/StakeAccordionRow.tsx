@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import LiveYieldCounter from '../staking/LiveYieldCounter';
 import SegmentedControl from '../../ui/SegmentedControl';
-import { fmtUSD, fmtAmount, fmtAPY } from '../../../data/mockStablePools';
+import { fmtUSD, fmtAmount, fmtAPY } from './formatStake';
 
 /**
  * Normalized, layout-agnostic view of a single stake pool row. Both the real
@@ -40,6 +40,14 @@ export interface StakeRowModel {
   earnPriceUSD: number;
   /** Disable stake/withdraw controls (e.g. when paused). */
   disabled?: boolean;
+  /**
+   * Per-pool underwater flag (real stable pools only). When true the pool's
+   * yield strategy is below par, so on-chain `withdraw` reverts. This gates
+   * ONLY the Withdraw control — Stake and Claim stay enabled. Distinct from
+   * the global `disabled` (paused) flag. Defaults to false so the phUSD panel
+   * and any caller not passing it are unaffected.
+   */
+  withdrawDisabled?: boolean;
   /** Whether phUSD approval is needed for the entered stake amount (real pool only). */
   needsApproval?: (amount: string) => boolean;
 }
@@ -148,8 +156,17 @@ export default function StakeAccordionRow({
   const withdrawParsed = parseFloat(withdrawAmount) || 0;
   const needsApprove = pool.needsApproval ? pool.needsApproval(stakeAmount) : false;
 
+  // Per-pool underwater status. Only meaningful when the global pause is NOT
+  // active (the global pause takes precedence in messaging).
+  const isUnderwater = !pool.disabled && pool.withdrawDisabled === true;
+
   const canStake = stakeParsed > 0 && stakeParsed <= pool.walletBalance && !isBusy && !pool.disabled;
-  const canWithdraw = withdrawParsed > 0 && withdrawParsed <= pool.stakedBalance && !isBusy && !pool.disabled;
+  const canWithdraw =
+    withdrawParsed > 0 &&
+    withdrawParsed <= pool.stakedBalance &&
+    !isBusy &&
+    !pool.disabled &&
+    !pool.withdrawDisabled;
   const canClaim = pool.pendingRewards > 0 && !isBusy;
 
   const handleStakeSubmit = async () => {
@@ -196,6 +213,11 @@ export default function StakeAccordionRow({
                 {pool.earnToken}
               </span>
             </span>
+            {isUnderwater && (
+              <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-pxusd-pink-400/40 bg-pxusd-pink-400/10 px-2 py-0.5 text-[10.5px] font-semibold text-pxusd-pink-400">
+                Withdrawals paused
+              </span>
+            )}
           </div>
         </div>
 
@@ -302,6 +324,14 @@ export default function StakeAccordionRow({
 
           {subTab === 'withdraw' && (
             <div>
+              {isUnderwater && (
+                <div className="mb-3.5 rounded-xl border border-pxusd-pink-400/40 bg-pxusd-pink-400/[0.06] p-3.5 text-[12.5px] text-muted-foreground">
+                  <span className="font-semibold text-pxusd-pink-400">Withdrawals temporarily paused.</span>{' '}
+                  This pool's yield strategy is below par (underwater), so withdrawals
+                  are blocked to avoid forcing a loss. Staking and claiming are
+                  unaffected — withdrawals re-enable once the strategy recovers.
+                </div>
+              )}
               <AmountField
                 label="Withdraw amount"
                 balanceLabel="Staked"
@@ -318,7 +348,11 @@ export default function StakeAccordionRow({
                 disabled={!canWithdraw}
                 onClick={handleWithdrawSubmit}
               >
-                {pendingAction === 'withdraw' ? 'Confirming…' : `Withdraw ${pool.stakeToken}`}
+                {isUnderwater
+                  ? 'Withdrawals paused'
+                  : pendingAction === 'withdraw'
+                    ? 'Confirming…'
+                    : `Withdraw ${pool.stakeToken}`}
               </button>
             </div>
           )}
