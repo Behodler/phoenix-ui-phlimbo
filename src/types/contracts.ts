@@ -47,6 +47,7 @@ export interface ContractAddresses {
   BalancerPoolerMintDebtHook: string;
   NFTStaker: string;
   BatchNFTMinter: string;
+  StableStaker: string;
   DepositView: string;
   ViewRouter: string;
   DepositPageView: string;
@@ -54,7 +55,6 @@ export interface ContractAddresses {
   nftsV1: YieldNFTAddresses;
   nftsV2: YieldNFTAddresses;
 }
-
 
 /**
  * Response structure from local development address server

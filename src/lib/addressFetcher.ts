@@ -85,7 +85,8 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       BalancerPoolerMintDebtHook: data.BalancerPoolerMintDebtHook || '0x0000000000000000000000000000000000000000',
       NFTStaker: data.NFTStaker || '0x0000000000000000000000000000000000000000',
       BatchNFTMinter: data.BatchNFTMinter || '0x0000000000000000000000000000000000000000',
-      WaUSDC: data.WaUSDC || '0x0000000000000000000000000000000000000000'
+      WaUSDC: data.WaUSDC || '0x0000000000000000000000000000000000000000',
+      StableStaker: data.StableStaker || '0x0000000000000000000000000000000000000000'
     }
     log.debug('📡 fetchLocalAddresses: Mapped addresses:', addresses)
 
