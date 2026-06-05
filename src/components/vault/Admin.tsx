@@ -756,16 +756,14 @@ export default function Admin() {
   // Donation percent (0–100). Contract computes setAside = balance * pct / 100
   // at execution time. Configured via setBatchDonationSize. A zero value is a
   // supported "donations off" state — the contract skips the donation phase
-  // entirely and ignores minUSDC.
+  // entirely. Still read here because the set-aside reduces the BPT actually
+  // minted, which feeds the minBPT slippage estimate below.
   const { data: batchDonationSize, refetch: refetchBatchDonationSize } = useReadContract({
     address: balancerPoolerV2Address,
     abi: balancerPoolerV2Abi,
     functionName: 'batchDonationSize',
     query: { enabled: isBalancerPoolerV2Deployed },
   });
-
-  const donationsEnabled =
-    typeof batchDonationSize === 'bigint' && batchDonationSize > 0n;
 
   // Mirror the contract's compute exactly: (balance * pct) / 100. Both inputs
   // are bigints, so the division floors — same as Solidity.
@@ -775,30 +773,6 @@ export default function Admin() {
     if (batchDonationSize === 0n || dispatcherSusdsBalance === 0n) return 0n;
     return (dispatcherSusdsBalance * batchDonationSize) / 100n;
   }, [dispatcherSusdsBalance, batchDonationSize]);
-
-  // Minimal ERC4626 fragment; matches the pattern in src/hooks/useBalancerPrice.ts.
-  const erc4626ConvertAbi = [
-    {
-      name: 'convertToAssets',
-      type: 'function',
-      stateMutability: 'view',
-      inputs: [{ name: 'shares', type: 'uint256' }],
-      outputs: [{ name: 'assets', type: 'uint256' }],
-    },
-  ] as const;
-
-  // USDS equivalent of the set-aside sUSDS. Both sides are 1e18. Gate the call
-  // on a non-zero set-aside so we don't fire a useless convertToAssets(0).
-  const isConvertEnabled =
-    setAsideSusds !== null && setAsideSusds > 0n && !!sUsdsAddress;
-
-  const { data: setAsideUsdsValue, refetch: refetchSetAsideUsdsValue } = useReadContract({
-    address: sUsdsAddress,
-    abi: erc4626ConvertAbi,
-    functionName: 'convertToAssets',
-    args: setAsideSusds !== null && setAsideSusds > 0n ? [setAsideSusds] : undefined,
-    query: { enabled: isConvertEnabled },
-  });
 
   // Resolve the Balancer V3 pool address from the dispatcher's `pool()` view.
   // In Balancer V3 the pool contract IS the BPT ERC20 token, so we then read
@@ -904,44 +878,6 @@ export default function Admin() {
     }
   }, [minBptInput]);
 
-  // Editable input for minUSDC, displayed as decimal (USDC, 6dp) but stored raw.
-  const [minUsdcInput, setMinUsdcInput] = useState<string>('');
-  const [userEditedMinUsdc, setUserEditedMinUsdc] = useState(false);
-
-  // Default minUSDC = USDS-equivalent of batchDonationSize set-aside, minus 1%
-  // slippage. USDS is 1e18; we display 6dp because the input is a USDC amount,
-  // parsed back with parseUnits(_, 6) on submit.
-  const defaultMinUsdcRaw18 = useMemo<bigint | null>(() => {
-    if (typeof setAsideUsdsValue !== 'bigint' || setAsideUsdsValue === 0n) return null;
-    const tolerated = (setAsideUsdsValue * 99n) / 100n;
-    return tolerated > 0n ? tolerated : null;
-  }, [setAsideUsdsValue]);
-
-  useEffect(() => {
-    if (userEditedMinUsdc) return;
-    if (defaultMinUsdcRaw18 === null) return;
-    // Display as 6dp string (USDC convention). formatUnits(_, 6) on a 1e18 value
-    // would over-scale; first scale 1e18 → 1e6 by dividing by 1e12, then format.
-    const raw6 = defaultMinUsdcRaw18 / 10n ** 12n;
-    if (raw6 === 0n) return;
-    setMinUsdcInput(formatUnits(raw6, 6));
-  }, [defaultMinUsdcRaw18, userEditedMinUsdc]);
-
-  // Parse the input field as a 6-decimal USDC amount. CRITICAL: parseUnits(_, 6),
-  // NOT parseEther / parseUnits(_, 18). USDC has 6 decimals; the other amounts
-  // in this panel (sUSDS / USDS / BPT) are all 18-decimal so the easy mistake
-  // would be to default to parseEther and silently send 1e12× too much.
-  const parsedMinUsdc = useMemo<bigint | null>(() => {
-    const trimmed = minUsdcInput.trim();
-    if (!trimmed) return null;
-    try {
-      const parsed = parseUnits(trimmed, 6);
-      return parsed >= 0n ? parsed : null;
-    } catch {
-      return null;
-    }
-  }, [minUsdcInput]);
-
   const [poolTxHash, setPoolTxHash] = useState<`0x${string}` | undefined>();
   const [isPoolExecuting, setIsPoolExecuting] = useState(false);
   const { isSuccess: poolConfirmed } = useWaitForTransactionReceipt({
@@ -957,7 +893,6 @@ export default function Admin() {
     refetchIdealBpt();
     refetchDispatcherBptBalance();
     refetchBatchDonationSize();
-    refetchSetAsideUsdsValue();
   };
 
   useEffect(() => {
@@ -972,8 +907,6 @@ export default function Admin() {
       // Clear the manual-edit flag so the next non-zero balance auto-populates.
       setUserEditedMinBpt(false);
       setMinBptInput('');
-      setUserEditedMinUsdc(false);
-      setMinUsdcInput('');
       addToast({
         type: 'success',
         title: 'Pool Confirmed',
@@ -1649,25 +1582,13 @@ export default function Admin() {
       });
       return;
     }
-    // Mirror the minBPT guard for minUSDC, but only when donations are active.
-    // When batchDonationSize === 0 the contract skips the donation phase and
-    // ignores minUSDC — we pass 0n on the user's behalf.
-    if (donationsEnabled && (parsedMinUsdc === null || parsedMinUsdc <= 0n)) {
-      addToast({
-        type: 'error',
-        title: 'Invalid minUSDC',
-        description: 'minUSDC must be > 0 — submitting 0 invites MEV sandwich attacks on the nudge-payment swap.',
-      });
-      return;
-    }
     setIsPoolExecuting(true);
     try {
-      const minUsdcArg: bigint = donationsEnabled ? (parsedMinUsdc as bigint) : 0n;
       const hash = await writeContractAsync({
         address: balancerPoolerV2Address,
         abi: balancerPoolerV2Abi,
         functionName: 'pool',
-        args: [parsedMinBpt, minUsdcArg],
+        args: [parsedMinBpt],
       });
       setPoolTxHash(hash);
       addToast({
@@ -2400,56 +2321,19 @@ export default function Admin() {
                 </p>
               )}
 
-              {donationsEnabled && (
-                <>
-                  <label
-                    htmlFor="dispatcher-min-usdc"
-                    className="block text-sm font-medium text-foreground mt-4 mb-2"
-                  >
-                    minUSDC (slippage floor on nudge sUSDS→USDC swap — defaults to 1% below USDS value of set-aside)
-                  </label>
-                  <input
-                    id="dispatcher-min-usdc"
-                    type="text"
-                    inputMode="decimal"
-                    value={minUsdcInput}
-                    onChange={(e) => {
-                      setMinUsdcInput(e.target.value);
-                      setUserEditedMinUsdc(true);
-                    }}
-                    placeholder={defaultMinUsdcRaw18 === null ? 'Enter USDC amount manually' : 'USDC amount'}
-                    disabled={isPoolExecuting}
-                    className={
-                      'w-full px-3 py-2 bg-background border rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ' +
-                      ((parsedMinUsdc === null || parsedMinUsdc <= 0n) && minUsdcInput !== ''
-                        ? 'border-red-500'
-                        : 'border-border')
-                    }
-                  />
-                  {minUsdcInput !== '' && (parsedMinUsdc === null || parsedMinUsdc <= 0n) && (
-                    <p className="text-xs text-red-500 mt-1">
-                      minUSDC must be &gt; 0 — submitting 0 invites MEV sandwich attacks on the nudge-payment swap.
-                    </p>
-                  )}
-                </>
-              )}
-
               {(() => {
                 const susdsZero = typeof dispatcherSusdsBalance !== 'bigint' || dispatcherSusdsBalance === 0n;
                 const minBptInvalid = parsedMinBpt === null || parsedMinBpt <= 0n;
-                const minUsdcInvalid = donationsEnabled && (parsedMinUsdc === null || parsedMinUsdc <= 0n);
                 let tooltip: string | undefined;
                 if (susdsZero) tooltip = 'Nothing to pool';
                 else if (dispatcherPaused) tooltip = 'Dispatcher is paused';
                 else if (!isAuthorisedPooler) tooltip = 'Wallet not authorised. Contract owner must call setAuthorizedPooler(<your-address>, true).';
                 else if (minBptInvalid) tooltip = 'minBPT must be > 0 (MEV sandwich risk)';
-                else if (minUsdcInvalid) tooltip = 'minUSDC must be > 0 (MEV sandwich risk on nudge swap)';
 
                 const disabled = susdsZero
                   || !!dispatcherPaused
                   || !isAuthorisedPooler
                   || minBptInvalid
-                  || minUsdcInvalid
                   || isPoolExecuting;
 
                 return (
@@ -2482,11 +2366,9 @@ export default function Admin() {
               <code> getIdealBPT()</code> scaled by the pooled fraction
               <code> (balance − setAside) / balance</code> — <code>getIdealBPT()</code> simulates
               against the full balance, so the raw value overshoots actual minted BPT when
-              donations are enabled. <code>minUSDC</code> auto-populates
-              to 1% below the USDS value of the set-aside (nudge-swap slippage floor) — parsed
-              as 6-decimal USDC on submit. Both must be &gt; 0 when donations are enabled; when
-              <code> batchDonationSize == 0</code> the donation phase is skipped and minUSDC is
-              ignored. The connected wallet must have been authorised by the contract owner via
+              donations are enabled. <code>minBPT</code> must be &gt; 0; when
+              <code> batchDonationSize == 0</code> the donation phase is skipped entirely. The
+              connected wallet must have been authorised by the contract owner via
               <code> setAuthorizedPooler</code>.
             </p>
           </>
