@@ -177,15 +177,31 @@ function useStablePoolReads(
       ? (Number(phusdPerSecond) / 1e18) * (Number(userAmount) / Number(totalStaked))
       : 0;
 
-  // APY = annualized phUSD emission (in USD) / staked USD * 100. Stables valued
-  // at $1.00, phUSD at phUsdPriceUSD. Guard totalStaked == 0.
+  // APY = annualized phUSD emission (in USD) / deposit USD * 100. Stables valued
+  // at $1.00, phUSD at phUsdPriceUSD.
+  //
+  // When the pool already has staked deposits (totalStaked > 0) we report the
+  // real, current APY off the actual total. When the pool is empty there is no
+  // real APY to show, so we infer a *starting* APY from a placeholder deposit:
+  // what the user would earn if they deposited their entire wallet balance and
+  // became the sole staker (owning 100% of emissions). For dust balances below
+  // 10 (or a disconnected wallet → 0), we assume a placeholder of 100 tokens so
+  // the figure stays representative instead of spiking arbitrarily high.
   const apy = (() => {
-    if (totalStaked === 0n) return 0;
     const annualPhUsd = (Number(phusdPerSecond) / 1e18) * SECONDS_PER_YEAR;
     const annualUsd = annualPhUsd * phUsdPriceUSD;
-    const stakedUsd = (Number(totalStaked) / 10 ** config.decimals) * 1.0;
-    if (stakedUsd === 0) return 0;
-    return (annualUsd / stakedUsd) * 100;
+
+    // Effective deposit (in tokens) that anchors the APY denominator.
+    const depositTokens =
+      totalStaked > 0n
+        ? Number(totalStaked) / 10 ** config.decimals
+        : walletBalance < 10
+          ? 100
+          : walletBalance;
+
+    const depositUsd = depositTokens * 1.0;
+    if (depositUsd === 0) return 0;
+    return (annualUsd / depositUsd) * 100;
   })();
 
   return {
