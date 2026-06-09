@@ -227,10 +227,10 @@
     viem "^2.31.7"
     zustand "5.0.3"
 
-"@behodler/phase2-wagmi-hooks@0.8.1":
-  version "0.8.1"
-  resolved "https://npm.pkg.github.com/download/@behodler/phase2-wagmi-hooks/0.8.1/cd0baf10ba123d395f4393ac97d2194035be05f6#cd0baf10ba123d395f4393ac97d2194035be05f6"
-  integrity sha512-CygzfjxyDuz3FFm/9dDb1Fn7MH9DrZMPJm2vdCk+DWVQNHfm8eFoyya63qGRaa1V7pQTqFvobx9Wx1KxnnKqwg==
+"@behodler/phase2-wagmi-hooks@0.8.2":
+  version "0.8.2"
+  resolved "https://npm.pkg.github.com/download/@behodler/phase2-wagmi-hooks/0.8.2/7587e1cc6e1b78a268e50c5b74587873288ce2ba#7587e1cc6e1b78a268e50c5b74587873288ce2ba"
+  integrity sha512-5YHlXv71c4cVy5S3QXC/J03cYKrHx5KwfRT8cxM3Er/REuwLezMv8AF6YNcIsg1/F6dAwkOikLWWrss+x4bhaQ==
 
 "@coinbase/cdp-sdk@^1.0.0":
   version "1.48.2"

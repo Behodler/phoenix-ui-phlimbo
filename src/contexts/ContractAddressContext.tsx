@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useChainId } from 'wagmi'
-import type { ContractAddresses, YieldNFTAddresses } from '../types/contracts'
+import type { ContractAddresses } from '../types/contracts'
 import { NetworkType } from '../types/contracts'
-import { getNetworkType, isMainnet, isSepolia, isLocalAnvil } from '../lib/networkDetection'
-import { MAINNET_CONTRACT_ADDRESSES, SEPOLIA_CONTRACT_ADDRESSES } from '../lib/contracts'
+import { getNetworkType, isMainnet, isLocalAnvil } from '../lib/networkDetection'
+import { mainnetAddresses } from '../lib/contracts'
 import { fetchLocalAddresses } from '../lib/addressFetcher'
 import { log } from '../utils/logger'
 
@@ -12,10 +12,8 @@ import { log } from '../utils/logger'
  * Primary-view mapping of NFT-related contract addresses.
  *
  * The UI consumes these opinionated names rather than reaching into
- * `addresses.nftsV2.NFTMinter` directly, so the consumer layer stays
- * stable when the upstream generated shape evolves. All fields point
- * at the V2 deploy; `nftMinter_old` carries the full V1 struct and
- * is reserved for a future migration UI (no consumer in this story).
+ * `addresses` directly, so the consumer layer stays stable when the
+ * upstream generated shape evolves.
  */
 export interface NFTPrimaryView {
   NFTMinter: string
@@ -25,8 +23,6 @@ export interface NFTPrimaryView {
   BurnerFlax: string
   GatherWBTC: string
   MintPageView: string
-  /** Full V1 NFT struct, reserved for a future migration story. */
-  nftMinter_old: YieldNFTAddresses
 }
 
 /**
@@ -35,8 +31,8 @@ export interface NFTPrimaryView {
 interface ContractAddressContextState {
   addresses: ContractAddresses | null
   /**
-   * Opinionated NFT primary view resolved from `addresses.nftsV2` plus
-   * the top-level `MintPageView`. Null when `addresses` is null.
+   * Opinionated NFT primary view resolved from the flat NFT contract
+   * addresses plus `MintPageView`. Null when `addresses` is null.
    */
   nftPrimary: NFTPrimaryView | null
   loading: boolean
@@ -93,11 +89,7 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
         if (isMainnet(chainId)) {
           // Use hardcoded mainnet addresses
           log.debug('📍 Using mainnet addresses')
-          setAddresses(MAINNET_CONTRACT_ADDRESSES)
-        } else if (isSepolia(chainId)) {
-          // Use hardcoded Sepolia testnet addresses
-          log.debug('📍 Using Sepolia testnet addresses')
-          setAddresses(SEPOLIA_CONTRACT_ADDRESSES)
+          setAddresses(mainnetAddresses)
         } else if (isLocalAnvil(chainId)) {
           // Fetch addresses from local development server
           log.debug('🔧 Detected Anvil (chainId 31337) - fetching addresses from http://localhost:3001/contracts')
@@ -106,7 +98,7 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
           setAddresses(localAddresses)
         } else {
           // Unsupported network
-          const errorMsg = `Unsupported network (Chain ID: ${chainId}). Please connect to Mainnet, Sepolia, or Local Anvil.`
+          const errorMsg = `Unsupported network (Chain ID: ${chainId}). Please connect to Mainnet or Local Anvil.`
           log.error('❌', errorMsg)
           setError(errorMsg)
           setAddresses(null)
@@ -127,14 +119,13 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
   const nftPrimary: NFTPrimaryView | null = useMemo(() => {
     if (!addresses) return null
     return {
-      NFTMinter: addresses.nftsV2.NFTMinter,
-      BalancerPooler: addresses.nftsV2.BalancerPooler,
-      BurnerEYE: addresses.nftsV2.BurnerEYE,
-      BurnerSCX: addresses.nftsV2.BurnerSCX,
-      BurnerFlax: addresses.nftsV2.BurnerFlax,
-      GatherWBTC: addresses.nftsV2.GatherWBTC,
+      NFTMinter: addresses.NFTMinter,
+      BalancerPooler: addresses.BalancerPooler,
+      BurnerEYE: addresses.BurnerEYE,
+      BurnerSCX: addresses.BurnerSCX,
+      BurnerFlax: addresses.BurnerFlax,
+      GatherWBTC: addresses.GatherWBTC,
       MintPageView: addresses.MintPageView,
-      nftMinter_old: addresses.nftsV1,
     }
   }, [addresses])
 

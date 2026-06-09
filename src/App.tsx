@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ToastProvider } from './components/ui/ToastProvider'
 import { DisclaimerModal } from './components/ui/DisclaimerModal'
 import { MaintenanceBanner } from './components/ui/MaintenanceBanner'
-import { NFTUpgradeModal } from './components/modals/NFTUpgradeModal'
 import VaultPage from './pages/VaultPage'
 
 export default function App() {
@@ -18,7 +17,6 @@ export default function App() {
       <ToastProvider>
         <MaintenanceBanner />
         <DisclaimerModal />
-        <NFTUpgradeModal />
         <Routes>
           <Route path="/" element={<VaultPage />} />
           <Route path="/stake" element={<VaultPage />} />

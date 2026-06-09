@@ -90,7 +90,7 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
   const { price: phUsdPrice } = useBalancerPrice();
 
   const stakerAddress = addresses?.NFTStaker as Address | undefined;
-  const nftMinterAddress = addresses?.nftsV2?.NFTMinter as Address | undefined;
+  const nftMinterAddress = addresses?.NFTMinter as Address | undefined;
 
   const isStakerDeployed = useMemo(
     () =>

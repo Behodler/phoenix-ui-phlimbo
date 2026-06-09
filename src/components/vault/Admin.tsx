@@ -718,7 +718,7 @@ export default function Admin() {
   // ========== END NFT STAKER RUNWAY SECTION ==========
 
   // ========== BALANCER POOLER V2 DISPATCH SECTION ==========
-  const balancerPoolerV2Address = addresses?.nftsV2?.BalancerPooler as `0x${string}` | undefined;
+  const balancerPoolerV2Address = addresses?.BalancerPooler as `0x${string}` | undefined;
   const sUsdsAddress = addresses?.SUSDS as `0x${string}` | undefined;
   const isBalancerPoolerV2Deployed = !!balancerPoolerV2Address &&
     balancerPoolerV2Address.toLowerCase() !== ZERO_ADDRESS;

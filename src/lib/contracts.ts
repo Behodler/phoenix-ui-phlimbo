@@ -7,7 +7,7 @@ import type { ContractAddresses } from '../types/contracts'
  * IMPORTANT: bondingCurve is the Behodler3Tokenlaunch contract (mints bonding tokens)
  *            bondingToken is the ERC20 token produced by the bonding curve
  */
-export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
+export const mainnetAddresses: ContractAddresses = {
   //Phase 1 protocol contracts
   PhUSD: "0xf3B5B661b92B75C71fA5Aba8Fd95D7514A9CD605",
 
@@ -21,8 +21,14 @@ export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
   YieldStrategyDola: "0xE7aEC21BF6420FF483107adCB9360C4b31d69D78",
   YieldStrategyUSDe: "0xFc629bC5F6339F77635f4F656FBb114A31F7bCB3",
   YieldStrategyUSDC: "0x8b4A75290A1C4935eC1dfd990374AC4BD4D33952",
+  // USDe<->sUSDe market AMM adapter — interface key (declared by ContractAddresses
+  // via the local MockMarketAMMAdapter). Not yet deployed to mainnet; placeholder
+  // so mainnet-addresses.ts satisfies the interface (mirrors StableStaker below).
+  USDeAMMAdapter: "0x0000000000000000000000000000000000000000",
 
   // External protocol contracts
+  // Sky USDS PSM wrapper (USDS<->USDC). Real mainnet address — NOT the local mock (0xc351…1181).
+  SkyPSM: "0xA188EEC8F81263234dA3622A406892F3D630f98c",
   USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
   Dola: "0x865377367054516e17014CcdED1e7d814EDC9ce4",
   AutoDOLA: "0x79eB84B5E30Ef2481c8f00fD0Aa7aAd6Ac0AA54d",
@@ -45,27 +51,14 @@ export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
 
   // NFT infrastructure — common
   BurnRecorder: "0x2A2c4186C906d3b347c86882ad4Bd1f2bE05579F",
-  NFTMigrator: "0x22c0fc1aae66873abd029448eaf15a2fd7eed140",
 
-  // NFT V1
-  nftsV1: {
-    NFTMinter: "0xd936461f1C15eA9f34Ca1F20ecD54A0819068811",
-    BurnerEYE: "0xA592e074f990c87E10b3Bba1DACFB9187899575b",
-    BurnerSCX: "0xbe2fbBb49b26C20E3aEE3b0608cB5116aeD5d297",
-    BurnerFlax: "0xD3B630cBA76AEA5Aadb4cB71732227E073C8338C",
-    BalancerPooler: "0xC2d1a82C66Fd535ae218b59F77a1B716919a46C3",
-    GatherWBTC: "0xb304e2E63820D4f7B41219D2C39123E20444D0C9",
-  },
-
-  // NFT V2 — not yet deployed
-  nftsV2: {
-    NFTMinter: "0x39af088408e815844c567037c157b31d48d2e10f",
-    BurnerEYE: "0x13fb51bcb3c5ae9e7115730bc1a58ec676ceeef2",
-    BurnerSCX: "0xa833603fd82674aec51f8a57c6a27b91bc1725b2",
-    BurnerFlax: "0xb63b57025e9bee5bbb66e4a5297ed0ca044d5ff7",
-    BalancerPooler: "0x26f89f4b46eb164303985795ee20b15bb1edb38a",
-    GatherWBTC: "0xfd3775f2ccfb94b532b34b2b683e210ba4449880",
-  },
+  // NFT V2 contracts (flattened)
+  NFTMinter: "0x39af088408e815844c567037c157b31d48d2e10f",
+  BurnerEYE: "0x13fb51bcb3c5ae9e7115730bc1a58ec676ceeef2",
+  BurnerSCX: "0xa833603fd82674aec51f8a57c6a27b91bc1725b2",
+  BurnerFlax: "0xb63b57025e9bee5bbb66e4a5297ed0ca044d5ff7",
+  BalancerPooler: "0x26f89f4b46eb164303985795ee20b15bb1edb38a",
+  GatherWBTC: "0xfd3775f2ccfb94b532b34b2b683e210ba4449880",
 
   // View contracts
   ViewRouter: "0xC17Ce1cE5ebB43fc0cfda9Fe8BbC849c0894631a",
@@ -75,84 +68,12 @@ export const MAINNET_CONTRACT_ADDRESSES: ContractAddresses = {
   // getData(0)[23] == 4 for the address below.
   MintPageView: "0x64FE63ca7BA456a9Bb190140e35DF2e437AbD119",
   // NFT staking
-  BalancerPoolerMintDebtHook: "0x14277a0bc38a6bb7eb732c3a49190030632f727e",
+  BalancerPoolerMintDebtHook: "0x4a26ad83306a2f17155799fdd9449f77eb3f8bd7",
   NFTStaker: "0xc8514f821a3d801fa8a8c435840a992a4365a13b",
   WaUSDC: "0xd4fa2d31b7968e448877f69a96de69f5de8cd23e",
   BatchNFTMinter: "0x6e9886AfDF07DD67dc70b8335E4e9DF14B445071",
-  StableStaker: "0x0"
+  // Stable Staking (story 051) — not yet deployed to mainnet; placeholder.
+  StableStaker: "0x0000000000000000000000000000000000000000",
+
 };
 
-
-/**
- * Sepolia testnet contract addresses
- */
-export const SEPOLIA_CONTRACT_ADDRESSES: ContractAddresses = {
-  PhUSD: "0xf3B5B661b92B75C71fA5Aba8Fd95D7514A9CD605",
-
-  // Deployed Phase 2 contracts
-  Pauser: "0x7c5A8EeF1d836450C019FB036453ac6eC97885a3",
-  PhusdStableMinter: "0x435B0A1884bd0fb5667677C9eb0e59425b1477E5",
-  PhlimboEA: "0x3984eBC84d45a889dDAc595d13dc0aC2E54819F4",
-  StableYieldAccumulator: "0xb9639e6Be92033F55E6D9E375Fd1C28ceEdbA50E",
-  DepositView: "0x2Fdf77d4Ea75eFd48922B8E521612197FFbB564c",
-  YieldStrategyDola: "0xE7aEC21BF6420FF483107adCB9360C4b31d69D78",
-  YieldStrategyUSDe: "0xFc629bC5F6339F77635f4F656FBb114A31F7bCB3",
-  YieldStrategyUSDC: "0x8b4A75290A1C4935eC1dfd990374AC4BD4D33952",
-
-  // External protocol contracts
-  USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-  Dola: "0x865377367054516e17014CcdED1e7d814EDC9ce4",
-  AutoDOLA: "0x79eB84B5E30Ef2481c8f00fD0Aa7aAd6Ac0AA54d",
-  AutoUSDC: "0xa7569A44f348d3D70d8ad5889e50F78E33d80D35",
-
-  // External tokens
-  USDS: "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
-  SCX: "0x1B8568FbB47708E9E9D31Ff303254f748805bF21",
-  Flax: "0x0cf758D4303295C43CD95e1232f0101ADb3DA9E8",
-  WBTC: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-  EYE: "0x155ff1A85F440EE0A382eA949f24CE4E0b751c65",
-  USDe: "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3",
-  SUSDe: "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497",
-  SUSDS: "0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD",
-
-  // Balancer V3 infrastructure
-  BalancerPool: "0x5b26d938f0be6357c39e936cc9c2277b9334ea58",
-  BalancerVault: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
-  BalancerRouter: "0x5C6fb490BDFD3246EB0bB062c168DeCAF4bD9FDd",
-
-  // NFT infrastructure — common
-  BurnRecorder: "0x2A2c4186C906d3b347c86882ad4Bd1f2bE05579F",
-  NFTMigrator: "0x0000000000000000000000000000000000000000",
-
-  // NFT V1
-  nftsV1: {
-    NFTMinter: "0xd936461f1C15eA9f34Ca1F20ecD54A0819068811",
-    BurnerEYE: "0xA592e074f990c87E10b3Bba1DACFB9187899575b",
-    BurnerSCX: "0xbe2fbBb49b26C20E3aEE3b0608cB5116aeD5d297",
-    BurnerFlax: "0xD3B630cBA76AEA5Aadb4cB71732227E073C8338C",
-    BalancerPooler: "0xC2d1a82C66Fd535ae218b59F77a1B716919a46C3",
-    GatherWBTC: "0xb304e2E63820D4f7B41219D2C39123E20444D0C9",
-  },
-
-  // NFT V2 — not yet deployed
-  nftsV2: {
-    NFTMinter: "0x0000000000000000000000000000000000000000",
-    BurnerEYE: "0x0000000000000000000000000000000000000000",
-    BurnerSCX: "0x0000000000000000000000000000000000000000",
-    BurnerFlax: "0x0000000000000000000000000000000000000000",
-    BalancerPooler: "0x0000000000000000000000000000000000000000",
-    GatherWBTC: "0x0000000000000000000000000000000000000000",
-  },
-
-  // View contracts
-  ViewRouter: "0xC17Ce1cE5ebB43fc0cfda9Fe8BbC849c0894631a",
-  DepositPageView: "0x50D4443782bB9A6e8D65dAcd593684EDd3FF03b8",
-  MintPageView: "0x5122cb32aE42AcC2aD5C2071e977C95c08F70141",
-
-  // NFT staking — not yet deployed
-  BalancerPoolerMintDebtHook: "0x0000000000000000000000000000000000000000",
-  NFTStaker: "0x0000000000000000000000000000000000000000",
-  BatchNFTMinter: "0x0000000000000000000000000000000000000000",
-  WaUSDC: '0x0',
-  StableStaker: "0x0"
-};
