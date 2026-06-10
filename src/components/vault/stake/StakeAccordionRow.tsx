@@ -148,6 +148,11 @@ function AmountField({
  * and never appear on touch devices, so this renders its own popover: hover
  * opens it on desktop, tap toggles it on touch, and tapping/clicking anywhere
  * else dismisses it.
+ *
+ * The trigger is a span[role=button], not a real <button>: the tip also
+ * renders inside the accordion header (itself a <button>), where a nested
+ * button would be invalid HTML. Clicks are stopped at the root so opening the
+ * tip never toggles the surrounding accordion.
  */
 function InfoTip({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
@@ -170,9 +175,11 @@ function InfoTip({ text }: { text: string }) {
       className="relative inline-flex"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
+      onClick={(e) => e.stopPropagation()}
     >
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         aria-label="More info"
         aria-expanded={open}
         // Open-only: touch browsers fire a simulated mouseenter before click,
@@ -183,11 +190,15 @@ function InfoTip({ text }: { text: string }) {
         onBlur={() => setOpen(false)}
         onKeyDown={(e) => {
           if (e.key === 'Escape') setOpen(false);
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setOpen(true);
+          }
         }}
-        className="-m-1 cursor-help p-1 text-[11px] leading-none text-muted-foreground/70 hover:text-foreground focus:outline-none focus-visible:text-foreground"
+        className="-m-1 cursor-help p-1 text-[11px] leading-none text-current opacity-70 hover:opacity-100 focus:outline-none focus-visible:opacity-100"
       >
         ⓘ
-      </button>
+      </span>
       {open && (
         <span
           role="tooltip"
@@ -351,6 +362,7 @@ export default function StakeAccordionRow({
             {isUnderwater && (
               <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-pxusd-pink-400/40 bg-pxusd-pink-400/10 px-2 py-0.5 text-[10.5px] font-semibold text-pxusd-pink-400">
                 Withdrawals paused
+                <InfoTip text="This pool's yield strategy is below par (underwater), so withdrawals are blocked to avoid forcing a loss. Staking and claiming are unaffected — withdrawals re-enable once the strategy recovers." />
               </span>
             )}
           </div>
@@ -473,22 +485,31 @@ export default function StakeAccordionRow({
                   unaffected — withdrawals re-enable once the strategy recovers.
                 </div>
               )}
-              <AmountField
-                label="Withdraw amount"
-                balanceLabel="Staked"
-                balance={pool.stakedBalance}
-                value={withdrawAmount}
-                onChange={setWithdrawAmount}
-                tokenSymbol={pool.stakeToken}
-                tokenIcon={pool.stakeIcon}
-                tokenPriceUSD={pool.stakePriceUSD}
-              />
-              <OutcomeSummary
-                kind="withdraw"
-                amount={withdrawParsed}
-                tokenSymbol={pool.stakeToken}
-                conversionBps={pool.conversionBps}
-              />
+              {/* While underwater the form stays interactive as a what-if
+                  preview, but is dimmed so it reads as inert. */}
+              <div className={isUnderwater ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+                <AmountField
+                  label="Withdraw amount"
+                  balanceLabel="Staked"
+                  balance={pool.stakedBalance}
+                  value={withdrawAmount}
+                  onChange={setWithdrawAmount}
+                  tokenSymbol={pool.stakeToken}
+                  tokenIcon={pool.stakeIcon}
+                  tokenPriceUSD={pool.stakePriceUSD}
+                />
+                <OutcomeSummary
+                  kind="withdraw"
+                  amount={withdrawParsed}
+                  tokenSymbol={pool.stakeToken}
+                  conversionBps={pool.conversionBps}
+                />
+              </div>
+              {isUnderwater && withdrawParsed > 0 && (
+                <div className="mb-3.5 text-[12px] italic text-muted-foreground">
+                  Preview only — this is what you'd receive once withdrawals re-enable.
+                </div>
+              )}
               <button
                 type="button"
                 className={`phoenix-btn-ghost w-full ${!canWithdraw ? 'opacity-50 cursor-not-allowed' : ''}`}

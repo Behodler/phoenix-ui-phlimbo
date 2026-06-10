@@ -12,6 +12,7 @@ import {
   balancerPoolerV2Abi,
   nftMinterV2Abi,
   balancerPoolerMintDebtHookAbi,
+  stableStakerAbi,
 } from '@behodler/phase2-wagmi-hooks';
 import { pauserAbi } from '../../lib/pauserAbi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
@@ -151,6 +152,112 @@ const extractFunctionsFromAbi = (abi: Abi): string[] => {
 
   return functions.map((func) => func.name);
 };
+
+/**
+ * Reads StableStaker admin stats for one stake-token pool:
+ * - buffer: token.balanceOf(StableStaker) — the set-aside balance held directly on the
+ *   contract, used to pay withdrawals while the pool's yield strategy is underwater
+ * - totalStaked: poolInfo(token).totalStaked
+ * - underwater: withdrawDisabled(token) — true when the strategy is below par
+ *   (totalBalanceOf < principalOf), i.e. a withdraw would evaluate the pool as underwater
+ */
+function useStableStakerPoolStats(
+  stableStaker: `0x${string}` | undefined,
+  tokenAddress: `0x${string}` | undefined,
+) {
+  const enabled =
+    !!stableStaker && stableStaker !== ZERO_ADDRESS &&
+    !!tokenAddress && tokenAddress !== ZERO_ADDRESS;
+
+  const { data: buffer, refetch: refetchBuffer, isLoading: bufferLoading } = useReadContract({
+    address: tokenAddress,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: stableStaker ? [stableStaker] : undefined,
+    query: { enabled },
+  });
+
+  const { data: poolInfo, refetch: refetchPoolInfo, isLoading: poolInfoLoading } = useReadContract({
+    address: stableStaker,
+    abi: stableStakerAbi,
+    functionName: 'poolInfo',
+    args: tokenAddress ? [tokenAddress] : undefined,
+    query: { enabled },
+  });
+
+  const { data: withdrawDisabled, refetch: refetchWithdrawDisabled, isLoading: withdrawDisabledLoading } = useReadContract({
+    address: stableStaker,
+    abi: stableStakerAbi,
+    functionName: 'withdrawDisabled',
+    args: tokenAddress ? [tokenAddress] : undefined,
+    query: { enabled },
+  });
+
+  return {
+    buffer: typeof buffer === 'bigint' ? buffer : undefined,
+    // poolInfo tuple: (phusdPerSecond, accPhusdPerShare, lastRewardTime, totalStaked)
+    totalStaked: poolInfo ? poolInfo[3] : undefined,
+    underwater: withdrawDisabled === true,
+    isLoading: bufferLoading || poolInfoLoading || withdrawDisabledLoading,
+    refetch: () => {
+      refetchBuffer();
+      refetchPoolInfo();
+      refetchWithdrawDisabled();
+    },
+  };
+}
+
+/**
+ * Reads one yield-strategy client's principal/yield/total for a single token.
+ *
+ * A yield strategy tracks deposits per (token, client) pair, where `client` is
+ * the contract that deposited into the strategy (e.g. PhusdStableMinter or
+ * StableStaker). principalOf returns the deposited principal, totalBalanceOf
+ * returns principal + accrued yield, and yield is the difference.
+ *
+ * Returns 0n for any pair that has never deposited (the strategy reverts/returns
+ * zero), so callers can safely sum across clients.
+ */
+function useYieldStrategyClientStats(
+  strategy: `0x${string}` | undefined,
+  token: `0x${string}` | undefined,
+  client: `0x${string}` | undefined,
+) {
+  const enabled =
+    !!strategy && strategy !== ZERO_ADDRESS &&
+    !!token && token !== ZERO_ADDRESS &&
+    !!client && client !== ZERO_ADDRESS;
+
+  const { data: principalData, refetch: refetchPrincipal } = useReadContract({
+    address: strategy,
+    abi: erc4626YieldStrategyAbi,
+    functionName: 'principalOf',
+    args: token && client ? [token, client] : undefined,
+    query: { enabled },
+  });
+
+  const { data: totalData, refetch: refetchTotal } = useReadContract({
+    address: strategy,
+    abi: erc4626YieldStrategyAbi,
+    functionName: 'totalBalanceOf',
+    args: token && client ? [token, client] : undefined,
+    query: { enabled },
+  });
+
+  const principal = typeof principalData === 'bigint' ? principalData : 0n;
+  const total = typeof totalData === 'bigint' ? totalData : 0n;
+  const yieldAmount = total > principal ? total - principal : 0n;
+
+  return {
+    principal,
+    total,
+    yield: yieldAmount,
+    refetch: () => {
+      refetchPrincipal();
+      refetchTotal();
+    },
+  };
+}
 
 /**
  * Admin Component
@@ -342,6 +449,38 @@ export default function Admin() {
       enabled: !!addresses?.StableYieldAccumulator && !!addresses?.YieldStrategyUSDe,
     },
   });
+
+  // ========== STABLE STAKER SECTION ==========
+  const stableStakerAddress = addresses?.StableStaker as `0x${string}` | undefined;
+  const isStableStakerDeployed = !!stableStakerAddress && stableStakerAddress !== ZERO_ADDRESS;
+  const stableStakerUsdc = useStableStakerPoolStats(stableStakerAddress, addresses?.USDC as `0x${string}` | undefined);
+  const stableStakerUsde = useStableStakerPoolStats(stableStakerAddress, addresses?.USDe as `0x${string}` | undefined);
+  const stableStakerDola = useStableStakerPoolStats(stableStakerAddress, addresses?.Dola as `0x${string}` | undefined);
+  const stableStakerPools = [
+    { label: 'USDC', decimals: 6, stats: stableStakerUsdc },
+    { label: 'USDe', decimals: 18, stats: stableStakerUsde },
+    { label: 'DOLA', decimals: 18, stats: stableStakerDola },
+  ];
+  const stableStakerLoading = stableStakerPools.some((p) => p.stats.isLoading);
+
+  // Yield-strategy balances attributable to the StableStaker client, mirroring
+  // the PhusdStableMinter reads above. The strategy panels show line items for
+  // both clients (StableMinter + StableStaker) with per-strategy totals.
+  const dolaStakerStrategyStats = useYieldStrategyClientStats(
+    addresses?.YieldStrategyDola as `0x${string}` | undefined,
+    addresses?.Dola as `0x${string}` | undefined,
+    stableStakerAddress,
+  );
+  const usdcStakerStrategyStats = useYieldStrategyClientStats(
+    addresses?.YieldStrategyUSDC as `0x${string}` | undefined,
+    addresses?.USDC as `0x${string}` | undefined,
+    stableStakerAddress,
+  );
+  const usdeStakerStrategyStats = useYieldStrategyClientStats(
+    addresses?.YieldStrategyUSDe as `0x${string}` | undefined,
+    addresses?.USDe as `0x${string}` | undefined,
+    stableStakerAddress,
+  );
 
   // Extract values from poolInfo tuple
   const phlimboTotalStaked = poolInfo ? poolInfo[0] : 0n;
@@ -938,21 +1077,11 @@ export default function Admin() {
   const totalVaultBalance = phusdStableMinterTotalBalance !== undefined ? phusdStableMinterTotalBalance : 0n;
   const yield_ = totalVaultBalance > principal ? totalVaultBalance - principal : 0n;
 
-  // Format for display (convert from wei to DOLA)
-  const principalDisplay = (Number(principal) / 1e18).toFixed(2);
-  const yieldDisplay = (Number(yield_) / 1e18).toFixed(2);
-  const totalDisplay = (Number(totalVaultBalance) / 1e18).toFixed(2);
-
   // Calculate USDC yield vs principal breakdown (YieldStrategyUSDC / autoUSD)
   // Uses same pattern as DOLA but with USDC 6 decimals
   const usdcPrincipal = autoUsdPrincipal !== undefined ? autoUsdPrincipal : 0n;
   const usdcTotalBalance = autoUsdTotalBalance !== undefined ? autoUsdTotalBalance : 0n;
   const usdcYield = usdcTotalBalance > usdcPrincipal ? usdcTotalBalance - usdcPrincipal : 0n;
-
-  // Format for display (convert from 6 decimals to USDC)
-  const usdcPrincipalDisplay = (Number(usdcPrincipal) / 1e6).toFixed(2);
-  const usdcYieldDisplay = (Number(usdcYield) / 1e6).toFixed(2);
-  const usdcTotalDisplay = (Number(usdcTotalBalance) / 1e6).toFixed(2);
 
   // Calculate USDe yield vs principal breakdown (YieldStrategyUSDe)
   // Uses same pattern as DOLA since USDe is also 18 decimals
@@ -960,9 +1089,73 @@ export default function Admin() {
   const usdeTotalBalance = usdeYieldStrategyTotalBalance !== undefined ? usdeYieldStrategyTotalBalance : 0n;
   const usdeYield = usdeTotalBalance > usdePrincipal ? usdeTotalBalance - usdePrincipal : 0n;
 
-  const usdePrincipalDisplay = (Number(usdePrincipal) / 1e18).toFixed(2);
-  const usdeYieldDisplay = (Number(usdeYield) / 1e18).toFixed(2);
-  const usdeTotalDisplay = (Number(usdeTotalBalance) / 1e18).toFixed(2);
+  // Format a raw token amount for display, scaling by the token's decimals.
+  const fmtAmount = (value: bigint, decimals: number): string =>
+    Number(formatUnits(value, decimals)).toFixed(2);
+
+  // Per-strategy panel config. Each strategy shows line items split by client
+  // (StableMinter + StableStaker) with a per-strategy total row. The StableMinter
+  // figures reuse the existing reads above; the StableStaker figures come from
+  // useYieldStrategyClientStats.
+  const yieldStrategyPanels = [
+    {
+      name: 'YieldStrategyDola',
+      token: 'DOLA',
+      decimals: 18,
+      clients: [
+        { label: 'StableMinter', principal, yield: yield_, total: totalVaultBalance },
+        {
+          label: 'StableStaker',
+          principal: dolaStakerStrategyStats.principal,
+          yield: dolaStakerStrategyStats.yield,
+          total: dolaStakerStrategyStats.total,
+        },
+      ],
+      refetch: () => {
+        refetchPrincipal();
+        refetchTotalBalance();
+        dolaStakerStrategyStats.refetch();
+      },
+    },
+    {
+      name: 'YieldStrategyUSDC',
+      token: 'USDC',
+      decimals: 6,
+      clients: [
+        { label: 'StableMinter', principal: usdcPrincipal, yield: usdcYield, total: usdcTotalBalance },
+        {
+          label: 'StableStaker',
+          principal: usdcStakerStrategyStats.principal,
+          yield: usdcStakerStrategyStats.yield,
+          total: usdcStakerStrategyStats.total,
+        },
+      ],
+      refetch: () => {
+        refetchAutoUsdPrincipal();
+        refetchAutoUsdTotalBalance();
+        usdcStakerStrategyStats.refetch();
+      },
+    },
+    {
+      name: 'YieldStrategyUSDe',
+      token: 'USDe',
+      decimals: 18,
+      clients: [
+        { label: 'StableMinter', principal: usdePrincipal, yield: usdeYield, total: usdeTotalBalance },
+        {
+          label: 'StableStaker',
+          principal: usdeStakerStrategyStats.principal,
+          yield: usdeStakerStrategyStats.yield,
+          total: usdeStakerStrategyStats.total,
+        },
+      ],
+      refetch: () => {
+        refetchUsdePrincipal();
+        refetchUsdeTotalBalance();
+        usdeStakerStrategyStats.refetch();
+      },
+    },
+  ];
 
   // Debug logging for balance queries
   useEffect(() => {
@@ -1758,149 +1951,85 @@ export default function Admin() {
         </div>
       )}
 
-      {/* YieldStrategyDola Balance Breakdown */}
-      <div className="bg-card border border-border rounded-lg p-4 mb-6">
-        <h3 className="text-sm font-semibold text-foreground mb-3">
-          YieldStrategyDola Balance Breakdown
-        </h3>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Principal (PhusdStableMinter):</span>
-            <span className="text-sm font-mono text-foreground">
-              {principalDisplay} DOLA
-            </span>
+      {/* Yield Strategy Balance Breakdowns — split by client (StableMinter + StableStaker) with totals */}
+      {yieldStrategyPanels.map((strategy) => {
+        const totalPrincipal = strategy.clients.reduce((sum, c) => sum + c.principal, 0n);
+        const totalYield = strategy.clients.reduce((sum, c) => sum + c.yield, 0n);
+        const totalBalance = strategy.clients.reduce((sum, c) => sum + c.total, 0n);
+        return (
+          <div key={strategy.name} className="bg-card border border-border rounded-lg p-4 mb-6">
+            <h3 className="text-sm font-semibold text-foreground mb-3">
+              {strategy.name} Balance Breakdown
+            </h3>
+            <div className="space-y-3">
+              {strategy.clients.map((client, idx) => (
+                <div
+                  key={client.label}
+                  className={idx > 0 ? 'space-y-2 pt-3 border-t border-border' : 'space-y-2'}
+                >
+                  <div className="text-sm font-medium text-foreground">{client.label}</div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Principal:</span>
+                    <span className="text-sm font-mono text-foreground">
+                      {fmtAmount(client.principal, strategy.decimals)} {strategy.token}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Yield Generated:</span>
+                    <span className="text-sm font-mono text-accent">
+                      {fmtAmount(client.yield, strategy.decimals)} {strategy.token}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Subtotal:</span>
+                    <span className="text-sm font-mono text-foreground">
+                      {fmtAmount(client.total, strategy.decimals)} {strategy.token}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              <div className="space-y-1 pt-3 border-t-2 border-border">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-foreground">Total Principal:</span>
+                  <span className="text-sm font-mono text-foreground">
+                    {fmtAmount(totalPrincipal, strategy.decimals)} {strategy.token}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-foreground">Total Yield:</span>
+                  <span className="text-sm font-mono text-accent">
+                    {fmtAmount(totalYield, strategy.decimals)} {strategy.token}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-foreground">Total Vault Balance:</span>
+                  <span className="text-sm font-mono font-semibold text-foreground">
+                    {fmtAmount(totalBalance, strategy.decimals)} {strategy.token}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-border">
+              <button
+                onClick={strategy.refetch}
+                className="text-xs text-accent hover:text-accent/80 underline"
+              >
+                Refresh Balances
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+              <strong>Note:</strong> Line items split {strategy.token} principal and yield by depositing
+              client (StableMinter and StableStaker). Yield is vault balance growth beyond principal.
+              PhUSD values are based on principal only, while the protocol utilizes yield separately.
+              <span className="block mt-2">
+                Values are fetched directly from {strategy.name} using the IYieldStrategy interface:
+                principalOf(token, client) returns principal only, totalBalanceOf(token, client) returns
+                principal + yield. Yield is calculated as: totalBalanceOf - principalOf.
+              </span>
+            </p>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Yield Generated:</span>
-            <span className="text-sm font-mono text-accent">
-              {yieldDisplay} DOLA
-            </span>
-          </div>
-          <div className="flex justify-between items-center pt-2 border-t border-border">
-            <span className="text-sm font-medium text-foreground">Total Vault Balance:</span>
-            <span className="text-sm font-mono font-semibold text-foreground">
-              {totalDisplay} DOLA
-            </span>
-          </div>
-        </div>
-        <div className="mt-3 pt-3 border-t border-border">
-          <button
-            onClick={() => {
-              refetchPrincipal();
-              refetchTotalBalance();
-            }}
-            className="text-xs text-accent hover:text-accent/80 underline"
-          >
-            Refresh Balances
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-          <strong>Note:</strong> Principal represents DOLA deposited through PhusdStableMinter.
-          Yield is vault balance growth beyond principal. PhUSD values are based on principal only,
-          while the protocol utilizes yield separately.
-          <span className="block mt-2">
-            Values are fetched directly from YieldStrategyDola using the IYieldStrategy interface:
-            principalOf() returns principal only, totalBalanceOf() returns principal + yield.
-            Yield is calculated as: totalBalanceOf - principalOf.
-          </span>
-        </p>
-      </div>
-
-      {/* YieldStrategyUSDC Balance Breakdown (autoUSD) */}
-      <div className="bg-card border border-border rounded-lg p-4 mb-6">
-        <h3 className="text-sm font-semibold text-foreground mb-3">
-          YieldStrategyUSDC Balance Breakdown
-        </h3>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Principal (PhusdStableMinter):</span>
-            <span className="text-sm font-mono text-foreground">
-              {usdcPrincipalDisplay} USDC
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Yield Generated:</span>
-            <span className="text-sm font-mono text-accent">
-              {usdcYieldDisplay} USDC
-            </span>
-          </div>
-          <div className="flex justify-between items-center pt-2 border-t border-border">
-            <span className="text-sm font-medium text-foreground">Total Vault Balance:</span>
-            <span className="text-sm font-mono font-semibold text-foreground">
-              {usdcTotalDisplay} USDC
-            </span>
-          </div>
-        </div>
-        <div className="mt-3 pt-3 border-t border-border">
-          <button
-            onClick={() => {
-              refetchAutoUsdPrincipal();
-              refetchAutoUsdTotalBalance();
-            }}
-            className="text-xs text-accent hover:text-accent/80 underline"
-          >
-            Refresh Balances
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-          <strong>Note:</strong> Principal represents USDC deposited through PhusdStableMinter via autoUSD pool.
-          Yield is vault balance growth beyond principal. PhUSD values are based on principal only,
-          while the protocol utilizes yield separately.
-          <span className="block mt-2">
-            Values are fetched directly from YieldStrategyUSDC using the IYieldStrategy interface:
-            principalOf() returns principal only, totalBalanceOf() returns principal + yield.
-            Yield is calculated as: totalBalanceOf - principalOf.
-          </span>
-        </p>
-      </div>
-
-      {/* YieldStrategyUSDe Balance Breakdown */}
-      <div className="bg-card border border-border rounded-lg p-4 mb-6">
-        <h3 className="text-sm font-semibold text-foreground mb-3">
-          YieldStrategyUSDe Balance Breakdown
-        </h3>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Principal (PhusdStableMinter):</span>
-            <span className="text-sm font-mono text-foreground">
-              {usdePrincipalDisplay} USDe
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Yield Generated:</span>
-            <span className="text-sm font-mono text-accent">
-              {usdeYieldDisplay} USDe
-            </span>
-          </div>
-          <div className="flex justify-between items-center pt-2 border-t border-border">
-            <span className="text-sm font-medium text-foreground">Total Vault Balance:</span>
-            <span className="text-sm font-mono font-semibold text-foreground">
-              {usdeTotalDisplay} USDe
-            </span>
-          </div>
-        </div>
-        <div className="mt-3 pt-3 border-t border-border">
-          <button
-            onClick={() => {
-              refetchUsdePrincipal();
-              refetchUsdeTotalBalance();
-            }}
-            className="text-xs text-accent hover:text-accent/80 underline"
-          >
-            Refresh Balances
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-          <strong>Note:</strong> Principal represents USDe deposited through PhusdStableMinter.
-          Yield is vault balance growth beyond principal. PhUSD values are based on principal only,
-          while the protocol utilizes yield separately.
-          <span className="block mt-2">
-            Values are fetched directly from YieldStrategyUSDe using the IYieldStrategy interface:
-            principalOf() returns principal only, totalBalanceOf() returns principal + yield.
-            Yield is calculated as: totalBalanceOf - principalOf.
-          </span>
-        </p>
-      </div>
+        );
+      })}
 
       {/* Phlimbo Statistics Section */}
       <div className="bg-card border border-border rounded-lg p-4 mb-6">
@@ -2037,6 +2166,86 @@ export default function Admin() {
             <span className="text-red-500">Red</span> = less than 3 days
           </span>
         </p>
+      </div>
+
+      {/* Stable Staker Section */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            Stable Staker
+          </h3>
+          {stableStakerLoading && (
+            <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
+          )}
+        </div>
+        {!isStableStakerDeployed ? (
+          <p className="text-sm text-muted-foreground">
+            StableStaker not deployed on this chain.
+          </p>
+        ) : (
+          <>
+            <div className="space-y-3">
+              {stableStakerPools.map(({ label, decimals, stats }, idx) => (
+                <div
+                  key={label}
+                  className={idx > 0 ? 'space-y-2 pt-3 border-t border-border' : 'space-y-2'}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-foreground">{label}</span>
+                    <span
+                      className={`text-xs font-mono font-semibold ${
+                        stats.underwater ? 'text-red-500' : 'text-green-500'
+                      }`}
+                    >
+                      {stats.underwater ? 'UNDERWATER' : 'Solvent'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Set-Aside Buffer:</span>
+                    <span className="text-sm font-mono text-foreground">
+                      {typeof stats.buffer === 'bigint'
+                        ? `${Number(formatUnits(stats.buffer, decimals)).toFixed(2)} ${label}`
+                        : '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total Staked:</span>
+                    <span className="text-sm font-mono text-foreground">
+                      {typeof stats.totalStaked === 'bigint'
+                        ? `${Number(formatUnits(stats.totalStaked, decimals)).toFixed(2)} ${label}`
+                        : '—'}
+                    </span>
+                  </div>
+                  {stats.underwater && (
+                    <p className="text-xs text-red-500">
+                      Yield strategy is below par — withdrawals revert unless fully covered by
+                      the set-aside buffer
+                      {typeof stats.buffer === 'bigint'
+                        ? ` (up to ${Number(formatUnits(stats.buffer, decimals)).toFixed(2)} ${label})`
+                        : ''}.
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 pt-3 border-t border-border">
+              <button
+                onClick={() => stableStakerPools.forEach((p) => p.stats.refetch())}
+                className="text-xs text-accent hover:text-accent/80 underline"
+              >
+                Refresh Stable Staker Stats
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+              <strong>Note:</strong> Set-Aside Buffer is the token balance held directly on the
+              StableStaker contract (token.balanceOf), kept outside the yield strategy so
+              withdrawals can still be paid while the strategy is underwater. Total Staked is
+              poolInfo.totalStaked. Status reflects withdrawDisabled(token): a pool evaluates as
+              underwater when its strategy's totalBalanceOf is less than its principalOf, in
+              which case a normal withdraw reverts unless the full amount fits in the buffer.
+            </p>
+          </>
+        )}
       </div>
 
       {/* NFT Staker — Runway Panel */}

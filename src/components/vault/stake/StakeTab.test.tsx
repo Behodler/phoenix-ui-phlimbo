@@ -142,8 +142,12 @@ describe('StakeTab (Story 069 — real stable pools)', () => {
     const user = userEvent.setup();
     renderStakeTab();
 
-    // The header pill renders for the underwater USDe pool.
+    // The header pill renders for the underwater USDe pool, and its info tip
+    // explains why on tap — without toggling the accordion (USDe must still
+    // be collapsed for the expand click below to work).
     expect(screen.getByText('Withdrawals paused')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'More info' }));
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/below par/i);
 
     // Collapse phUSD, expand USDe.
     await user.click(screen.getByRole('button', { name: 'phUSD pool' }));
@@ -154,6 +158,13 @@ describe('StakeTab (Story 069 — real stable pools)', () => {
     await user.click(screen.getByRole('tab', { name: 'Withdraw' }));
     expect(screen.getByText(/Withdrawals temporarily paused/i)).toBeInTheDocument();
     const withdrawBtn = screen.getByRole('button', { name: /Withdrawals paused/ });
+    expect(withdrawBtn).toBeDisabled();
+
+    // The form stays interactive as a what-if preview: typing an amount shows
+    // the outcome plus a preview-only note, while the button stays disabled.
+    const withdrawInput = await screen.findByPlaceholderText('0.00');
+    await user.type(withdrawInput, '10');
+    expect(screen.getByText(/Preview only/i)).toBeInTheDocument();
     expect(withdrawBtn).toBeDisabled();
 
     // Stake sub-tab control stays enabled (USDe has a wallet balance, no approval).
@@ -198,8 +209,11 @@ describe('StakeTab (Story 069 — real stable pools)', () => {
     expect(screen.getByText('−0.5 USDe (0.50%)')).toBeInTheDocument();
 
     // The themed tooltip opens on tap/click (native title is unusable on touch).
+    // USDe is underwater, so its header pill carries an info tip too — the
+    // conversion-cost tip is the last one in DOM order (inside the panel).
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'More info' }));
+    const infoTips = screen.getAllByRole('button', { name: 'More info' });
+    await user.click(infoTips[infoTips.length - 1]);
     expect(screen.getByRole('tooltip')).toHaveTextContent(/fixed 0\.50% conversion cost/i);
 
     // Withdraw: 100 USDe → between 99.5 (max slippage) and 100 (buffer hit).
