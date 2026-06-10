@@ -6,8 +6,8 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from 'wagmi';
-import { parseUnits, maxUint256, erc20Abi } from 'viem';
-import { stableStakerAbi } from '@behodler/phase2-wagmi-hooks';
+import { parseUnits, maxUint256, erc20Abi, zeroAddress } from 'viem';
+import { stableStakerAbi, erc4626MarketYieldStrategyAbi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { useToast } from '../components/ui/ToastProvider';
 import { useWalletBalances } from '../contexts/WalletBalancesContext';
@@ -53,6 +53,13 @@ export interface StableStakeRow {
   withdrawDisabled: boolean;
   needsApproval: (amount: string) => boolean;
   tagline: string;
+  /**
+   * Max slippage (bps) of the pool's ERC4626Market yield strategy, when it has
+   * one (USDe). Deposits pay exactly this haircut; withdrawals pay between
+   * zero and this depending on the strategy's buffer. Undefined for pools
+   * without an AMM-routed strategy (and while the value is loading).
+   */
+  conversionBps?: number;
 }
 
 export interface UseStableStakerPools {
@@ -77,6 +84,7 @@ interface PoolReads {
   apy: number;
   withdrawDisabled: boolean;
   allowanceRaw: bigint;
+  conversionBps: number | undefined;
   isLoading: boolean;
   refresh: () => void;
 }
@@ -85,6 +93,7 @@ function useStablePoolReads(
   config: StablePoolConfig,
   stableStaker: `0x${string}` | undefined,
   tokenAddress: `0x${string}` | undefined,
+  strategyAddress: `0x${string}` | undefined,
   walletAddress: `0x${string}` | undefined,
   phUsdPriceUSD: number,
   isActive: boolean,
@@ -139,6 +148,16 @@ function useStablePoolReads(
     functionName: 'allowance',
     args: walletAddress && stableStaker ? [walletAddress, stableStaker] : undefined,
     query: { enabled: !!tokenAddress && !!walletAddress && !!stableStaker },
+  });
+
+  // Max slippage of the pool's ERC4626Market yield strategy, when it has one.
+  // Admin-set and effectively static, so it's read once and deliberately left
+  // out of the 12s heartbeat refresh.
+  const { data: slippageBpsRaw } = useReadContract({
+    address: strategyAddress,
+    abi: erc4626MarketYieldStrategyAbi,
+    functionName: 'slippageToleranceBps',
+    query: { enabled: !!strategyAddress },
   });
 
   const refresh = () => {
@@ -212,6 +231,8 @@ function useStablePoolReads(
     apy,
     withdrawDisabled: withdrawDisabledRaw === true,
     allowanceRaw: (allowanceRaw as bigint | undefined) ?? 0n,
+    conversionBps:
+      strategyAddress && slippageBpsRaw !== undefined ? Number(slippageBpsRaw as bigint) : undefined,
     isLoading: poolInfoLoading || userInfoLoading || pendingLoading || balanceLoading,
     refresh,
   };
@@ -248,6 +269,15 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
   const tokenAddressFor = (cfg: StablePoolConfig): `0x${string}` | undefined =>
     addresses ? (addresses[cfg.addressKey] as `0x${string}`) : undefined;
 
+  // ERC4626Market yield strategy address for pools that route deposits through
+  // an AMM (USDe). Undefined (read disabled) for the others, and when the
+  // address server reports the zero-address placeholder.
+  const strategyAddressFor = (cfg: StablePoolConfig): `0x${string}` | undefined => {
+    if (!addresses || !cfg.marketStrategyKey) return undefined;
+    const addr = addresses[cfg.marketStrategyKey] as `0x${string}`;
+    return addr && addr !== zeroAddress ? addr : undefined;
+  };
+
   // ---- Global pause (gates all actions for all pools) ---------------------
   const { data: isPausedRaw } = useReadContract({
     address: stableStaker,
@@ -258,9 +288,9 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
   const isPaused = isPausedRaw === true;
 
   // ---- Per-token reads (fixed 3-entry static config) ----------------------
-  const usdcReads = useStablePoolReads(STABLE_POOLS[0], stableStaker, tokenAddressFor(STABLE_POOLS[0]), walletAddress, phUsdPriceUSD, isActive, isPollingEnabled);
-  const usdeReads = useStablePoolReads(STABLE_POOLS[1], stableStaker, tokenAddressFor(STABLE_POOLS[1]), walletAddress, phUsdPriceUSD, isActive, isPollingEnabled);
-  const dolaReads = useStablePoolReads(STABLE_POOLS[2], stableStaker, tokenAddressFor(STABLE_POOLS[2]), walletAddress, phUsdPriceUSD, isActive, isPollingEnabled);
+  const usdcReads = useStablePoolReads(STABLE_POOLS[0], stableStaker, tokenAddressFor(STABLE_POOLS[0]), strategyAddressFor(STABLE_POOLS[0]), walletAddress, phUsdPriceUSD, isActive, isPollingEnabled);
+  const usdeReads = useStablePoolReads(STABLE_POOLS[1], stableStaker, tokenAddressFor(STABLE_POOLS[1]), strategyAddressFor(STABLE_POOLS[1]), walletAddress, phUsdPriceUSD, isActive, isPollingEnabled);
+  const dolaReads = useStablePoolReads(STABLE_POOLS[2], stableStaker, tokenAddressFor(STABLE_POOLS[2]), strategyAddressFor(STABLE_POOLS[2]), walletAddress, phUsdPriceUSD, isActive, isPollingEnabled);
   const readsById: Record<StablePoolId, PoolReads> = {
     usdc: usdcReads,
     usde: usdeReads,
@@ -303,6 +333,7 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
       withdrawDisabled: r.withdrawDisabled,
       needsApproval: needsApprovalFor(cfg, r.allowanceRaw),
       tagline: cfg.tagline,
+      conversionBps: r.conversionBps,
     };
   });
 

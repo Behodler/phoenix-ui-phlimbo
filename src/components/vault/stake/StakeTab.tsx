@@ -121,6 +121,9 @@ export default function StakeTab() {
           disabled: p.disabled,
           withdrawDisabled: p.withdrawDisabled,
           needsApproval: p.needsApproval,
+          // AMM-routed pools (USDe) surface their fixed entry haircut /
+          // bounded exit cost in the action panels.
+          conversionBps: p.conversionBps,
         };
         const pendingAction = stable.pendingAction?.id === p.id ? stable.pendingAction.action : null;
         return (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import LiveYieldCounter from '../staking/LiveYieldCounter';
 import SegmentedControl from '../../ui/SegmentedControl';
 import { fmtUSD, fmtAmount, fmtAPY } from './formatStake';
@@ -50,6 +50,12 @@ export interface StakeRowModel {
   withdrawDisabled?: boolean;
   /** Whether phUSD approval is needed for the entered stake amount (real pool only). */
   needsApproval?: (amount: string) => boolean;
+  /**
+   * Max slippage (bps) of the pool's AMM-routed yield strategy (USDe). When
+   * set (> 0), deposits pay exactly this haircut and withdrawals pay between
+   * zero and this. Undefined / 0 → the pool stakes and withdraws 1:1.
+   */
+  conversionBps?: number;
 }
 
 type SubAction = 'stake' | 'withdraw' | 'claim';
@@ -132,6 +138,135 @@ function AmountField({
           ≈ <span className={`font-mono ${parsed > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{fmtUSD(usdValue)}</span>
         </span>
         {overBalance && <span className="text-pxusd-pink-400">Insufficient balance</span>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Themed info tooltip. Native `title` bubbles are OS-rendered (unstyleable)
+ * and never appear on touch devices, so this renders its own popover: hover
+ * opens it on desktop, tap toggles it on touch, and tapping/clicking anywhere
+ * else dismisses it.
+ */
+function InfoTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLSpanElement>(null);
+
+  // Tap-away dismissal for touch (where the trigger may never receive focus,
+  // so onBlur alone isn't enough).
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [open]);
+
+  return (
+    <span
+      ref={rootRef}
+      className="relative inline-flex"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        aria-label="More info"
+        aria-expanded={open}
+        // Open-only: touch browsers fire a simulated mouseenter before click,
+        // so a toggle would open-then-close on the same tap. Dismissal is
+        // handled by tap-away / mouse-leave / blur / Escape instead.
+        onClick={() => setOpen(true)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setOpen(false);
+        }}
+        className="-m-1 cursor-help p-1 text-[11px] leading-none text-muted-foreground/70 hover:text-foreground focus:outline-none focus-visible:text-foreground"
+      >
+        ⓘ
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className="absolute bottom-full left-0 z-20 mb-2 w-64 rounded-lg border border-border bg-pxusd-teal-700 px-3 py-2.5 text-left text-[12px] font-normal normal-case leading-relaxed tracking-normal text-pxusd-white/90 shadow-xl"
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Outcome summary rendered under the amount field once the user types an
+ * amount (hidden while empty so the default surface stays minimal). Pools
+ * with an AMM-routed strategy (conversionBps > 0, e.g. USDe) show the
+ * guaranteed entry haircut on stake and the zero-to-max range on withdraw;
+ * every other pool shows the exact 1:1 outcome so the row reads consistently
+ * across pools.
+ */
+function OutcomeSummary({
+  kind,
+  amount,
+  tokenSymbol,
+  conversionBps,
+}: {
+  kind: 'stake' | 'withdraw';
+  amount: number;
+  tokenSymbol: string;
+  conversionBps?: number;
+}) {
+  if (amount <= 0) return null;
+
+  const bps = conversionBps ?? 0;
+  const hasCost = bps > 0;
+  const pctLabel = `${(bps / 100).toFixed(2)}%`;
+  const minAmount = amount * (1 - bps / 10000);
+
+  const headline = kind === 'stake' ? "You'll stake" : "You'll receive";
+  const row = 'flex items-center justify-between';
+  const label = 'text-muted-foreground';
+  const value = 'font-mono font-medium text-foreground';
+
+  if (!hasCost) {
+    return (
+      <div className={`mb-3.5 text-[12.5px] ${row}`}>
+        <span className={label}>{headline}</span>
+        <span className={value}>
+          {fmtAmount(amount, 4)} {tokenSymbol}
+        </span>
+      </div>
+    );
+  }
+
+  const tooltip =
+    kind === 'stake'
+      ? `A fixed ${pctLabel} conversion cost applies when entering this pool: deposits are routed through an AMM into the pool's yield strategy. The "You'll stake" amount is exactly what gets staked — guaranteed.`
+      : `Withdrawals convert back from the pool's yield strategy. If the pool holds an idle buffer you pay nothing; otherwise live AMM pricing applies, capped at ${pctLabel}. You'll never receive less than the minimum shown.`;
+
+  return (
+    <div className="mb-3.5 space-y-1 text-[12.5px]">
+      <div className={row}>
+        <span className={label}>{headline}</span>
+        <span className={value}>
+          {kind === 'stake'
+            ? `${fmtAmount(minAmount, 4)} ${tokenSymbol}`
+            : `${fmtAmount(minAmount, 4)} – ${fmtAmount(amount, 4)} ${tokenSymbol}`}
+        </span>
+      </div>
+      <div className={row}>
+        <span className={`${label} flex items-center gap-1.5`}>
+          {kind === 'stake' ? 'Conversion cost' : 'Exit cost'}
+          <InfoTip text={tooltip} />
+        </span>
+        <span className="font-mono text-muted-foreground">
+          {kind === 'stake'
+            ? `−${fmtAmount(amount - minAmount, 4)} ${tokenSymbol} (${pctLabel})`
+            : `0% – ${pctLabel}`}
+        </span>
       </div>
     </div>
   );
@@ -305,6 +440,12 @@ export default function StakeAccordionRow({
                 tokenIcon={pool.stakeIcon}
                 tokenPriceUSD={pool.stakePriceUSD}
               />
+              <OutcomeSummary
+                kind="stake"
+                amount={stakeParsed}
+                tokenSymbol={pool.stakeToken}
+                conversionBps={pool.conversionBps}
+              />
               <button
                 type="button"
                 className={`w-full ${pool.isLegacy ? 'phoenix-btn-secondary' : 'phoenix-btn-primary'} ${(!canStake && !needsApprove) || isBusy ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -341,6 +482,12 @@ export default function StakeAccordionRow({
                 tokenSymbol={pool.stakeToken}
                 tokenIcon={pool.stakeIcon}
                 tokenPriceUSD={pool.stakePriceUSD}
+              />
+              <OutcomeSummary
+                kind="withdraw"
+                amount={withdrawParsed}
+                tokenSymbol={pool.stakeToken}
+                conversionBps={pool.conversionBps}
               />
               <button
                 type="button"

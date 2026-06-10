@@ -93,8 +93,9 @@ describe('StakeTab (Story 069 — real stable pools)', () => {
       pools: [
         // USDC needs approval (so the approve→stake gating test works).
         makeRow({ id: 'usdc', stakeToken: 'USDC', stakeIcon: usdcIcon, needsApproval: (amt) => parseFloat(amt) > 0 }),
-        // USDe is underwater — withdrawals paused.
-        makeRow({ id: 'usde', stakeToken: 'USDe', stakeIcon: usdeIcon, withdrawDisabled: true, stakedBalance: 300 }),
+        // USDe is underwater — withdrawals paused. Its ERC4626Market strategy
+        // has a 0.50% max slippage (50 bps) → conversion-cost UI.
+        makeRow({ id: 'usde', stakeToken: 'USDe', stakeIcon: usdeIcon, withdrawDisabled: true, stakedBalance: 300, conversionBps: 50 }),
         makeRow({ id: 'dola', stakeToken: 'DOLA', stakeIcon: dolaIcon }),
       ],
       pendingAction: null,
@@ -161,5 +162,53 @@ describe('StakeTab (Story 069 — real stable pools)', () => {
     await user.type(stakeInput, '50');
     const stakeBtn = screen.getByRole('button', { name: /Stake USDe → Earn phUSD/ });
     expect(stakeBtn).not.toBeDisabled();
+  });
+
+  it('1:1 pool (USDC): typing an amount reveals an exact outcome line, no cost rows', async () => {
+    const user = userEvent.setup();
+    renderStakeTab();
+
+    await user.click(screen.getByRole('button', { name: 'phUSD pool' }));
+    await user.click(screen.getByRole('button', { name: 'USDC pool' }));
+
+    // Hidden until an amount is typed.
+    expect(screen.queryByText("You'll stake")).not.toBeInTheDocument();
+
+    const stakeInput = await screen.findByPlaceholderText('0.00');
+    await user.type(stakeInput, '100');
+
+    expect(screen.getByText("You'll stake")).toBeInTheDocument();
+    expect(screen.getByText('100 USDC')).toBeInTheDocument();
+    expect(screen.queryByText('Conversion cost')).not.toBeInTheDocument();
+  });
+
+  it('AMM-routed pool (USDe): stake shows the guaranteed haircut, withdraw shows the zero-to-max range', async () => {
+    const user = userEvent.setup();
+    renderStakeTab();
+
+    await user.click(screen.getByRole('button', { name: 'phUSD pool' }));
+    await user.click(screen.getByRole('button', { name: 'USDe pool' }));
+
+    // Stake: 100 USDe at 50 bps → 99.5 staked, −0.5 fixed conversion cost.
+    const stakeInput = await screen.findByPlaceholderText('0.00');
+    await user.type(stakeInput, '100');
+    expect(screen.getByText("You'll stake")).toBeInTheDocument();
+    expect(screen.getByText('99.5 USDe')).toBeInTheDocument();
+    expect(screen.getByText('Conversion cost')).toBeInTheDocument();
+    expect(screen.getByText('−0.5 USDe (0.50%)')).toBeInTheDocument();
+
+    // The themed tooltip opens on tap/click (native title is unusable on touch).
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'More info' }));
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/fixed 0\.50% conversion cost/i);
+
+    // Withdraw: 100 USDe → between 99.5 (max slippage) and 100 (buffer hit).
+    await user.click(screen.getByRole('tab', { name: 'Withdraw' }));
+    const withdrawInput = await screen.findByPlaceholderText('0.00');
+    await user.type(withdrawInput, '100');
+    expect(screen.getByText("You'll receive")).toBeInTheDocument();
+    expect(screen.getByText('99.5 – 100 USDe')).toBeInTheDocument();
+    expect(screen.getByText('Exit cost')).toBeInTheDocument();
+    expect(screen.getByText('0% – 0.50%')).toBeInTheDocument();
   });
 });

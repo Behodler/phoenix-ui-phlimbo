@@ -25,6 +25,14 @@ export interface StablePoolConfig {
   stakeIcon: string;
   /** Short tagline shown in the expanded row. */
   tagline: string;
+  /**
+   * Key into ContractAddresses for the pool's ERC4626Market yield strategy,
+   * when deposits route through an AMM (USDe). Such pools charge the
+   * strategy's max slippage as a fixed haircut on every deposit, and between
+   * zero and that max on withdrawals. Presence of this key enables the
+   * conversion-cost UI in the stake/withdraw panels.
+   */
+  marketStrategyKey?: keyof ContractAddresses;
 }
 
 export const STABLE_POOLS: StablePoolConfig[] = [
@@ -43,6 +51,7 @@ export const STABLE_POOLS: StablePoolConfig[] = [
     decimals: 18,
     stakeIcon: USDe,
     tagline: 'Stake USDe, earn a phUSD stream.',
+    marketStrategyKey: 'YieldStrategyUSDe',
   },
   {
     id: 'dola',
