@@ -120,6 +120,7 @@ export default function StakeTab() {
           earnPriceUSD: p.earnPriceUSD,
           disabled: p.disabled,
           withdrawDisabled: p.withdrawDisabled,
+          withdrawBuffer: p.withdrawBuffer,
           needsApproval: p.needsApproval,
           // AMM-routed pools (USDe) surface their fixed entry haircut /
           // bounded exit cost in the action panels.

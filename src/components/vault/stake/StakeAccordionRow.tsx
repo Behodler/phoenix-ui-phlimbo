@@ -48,6 +48,13 @@ export interface StakeRowModel {
    * and any caller not passing it are unaffected.
    */
   withdrawDisabled?: boolean;
+  /**
+   * Set-aside buffer (human units) backing withdrawals while underwater.
+   * While underwater, withdraw amounts that fit entirely within this buffer
+   * still succeed on-chain, so only larger amounts are paused. Undefined → 0
+   * (underwater fully pauses withdrawals).
+   */
+  withdrawBuffer?: number;
   /** Whether phUSD approval is needed for the entered stake amount (real pool only). */
   needsApproval?: (amount: string) => boolean;
   /**
@@ -94,7 +101,12 @@ function AmountField({
   const parsed = parseFloat(value) || 0;
   const usdValue = parsed * tokenPriceUSD;
   const overBalance = parsed > balance + 0.0000001;
-  const handleMax = () => onChange(String(balance));
+  // Truncate (round DOWN) to 4 dp rather than passing the full-precision float.
+  // The label only displays `fmtAmount(balance, 4)`, which rounds — so a raw
+  // `String(balance)` could submit more precision (or a rounded-up value) than
+  // the wallet actually holds, which `parseUnits` turns into an amount that
+  // exceeds the on-chain balance and reverts the tx.
+  const handleMax = () => onChange(String(Math.floor(balance * 1e4) / 1e4));
 
   return (
     <div className="mb-3.5">
@@ -305,6 +317,14 @@ export default function StakeAccordionRow({
   // Per-pool underwater status. Only meaningful when the global pause is NOT
   // active (the global pause takes precedence in messaging).
   const isUnderwater = !pool.disabled && pool.withdrawDisabled === true;
+  // While underwater the contract still pays withdrawals that fit entirely
+  // within the set-aside buffer, so only amounts above it are paused. The
+  // epsilon mirrors AmountField's over-balance tolerance.
+  const withdrawBuffer = pool.withdrawBuffer ?? 0;
+  const overBuffer = isUnderwater && withdrawParsed > withdrawBuffer + 0.0000001;
+  // With no buffer at all, every positive amount would exceed it — surface the
+  // paused state up front instead of waiting for the user to type.
+  const withdrawPaused = isUnderwater && (withdrawBuffer <= 0 || overBuffer);
 
   const canStake = stakeParsed > 0 && stakeParsed <= pool.walletBalance && !isBusy && !pool.disabled;
   const canWithdraw =
@@ -312,7 +332,7 @@ export default function StakeAccordionRow({
     withdrawParsed <= pool.stakedBalance &&
     !isBusy &&
     !pool.disabled &&
-    !pool.withdrawDisabled;
+    !overBuffer;
   const canClaim = pool.pendingRewards > 0 && !isBusy;
 
   const handleStakeSubmit = async () => {
@@ -373,9 +393,15 @@ export default function StakeAccordionRow({
               </span>
             </span>
             {isUnderwater && (
-              <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-pxusd-pink-400/40 bg-pxusd-pink-400/10 px-2 py-0.5 text-[10.5px] font-semibold text-pxusd-pink-400">
-                Withdrawals paused
-                <InfoTip text="This pool's yield strategy is below par (underwater), so withdrawals are blocked to avoid forcing a loss. Staking and claiming are unaffected — withdrawals re-enable once the strategy recovers." />
+              <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-pxusd-yellow-400/35 bg-pxusd-yellow-400/10 px-2 py-0.5 text-[10.5px] font-semibold text-pxusd-yellow-400">
+                {withdrawBuffer > 0 ? 'Withdrawals limited' : 'Withdrawals paused'}
+                <InfoTip
+                  text={
+                    withdrawBuffer > 0
+                      ? `This pool's yield strategy is rebalancing. Withdrawals up to the set-aside buffer of ${fmtAmount(withdrawBuffer, 2)} ${pool.stakeToken} still go through; larger amounts pause until it settles. Staking and claiming are unaffected.`
+                      : "This pool's yield strategy is rebalancing, so withdrawals pause for now. Staking and claiming are unaffected — withdrawals re-enable once it settles."
+                  }
+                />
               </span>
             )}
           </div>
@@ -491,16 +517,32 @@ export default function StakeAccordionRow({
           {subTab === 'withdraw' && (
             <div>
               {isUnderwater && (
-                <div className="mb-3.5 rounded-xl border border-pxusd-pink-400/40 bg-pxusd-pink-400/[0.06] p-3.5 text-[12.5px] text-muted-foreground">
-                  <span className="font-semibold text-pxusd-pink-400">Withdrawals temporarily paused.</span>{' '}
-                  This pool's yield strategy is below par (underwater), so withdrawals
-                  are blocked to avoid forcing a loss. Staking and claiming are
-                  unaffected — withdrawals re-enable once the strategy recovers.
+                <div className="mb-3.5 rounded-xl border border-pxusd-yellow-400/30 bg-pxusd-yellow-400/[0.06] p-3.5 text-[12.5px] text-muted-foreground">
+                  {withdrawBuffer > 0 ? (
+                    <>
+                      <span className="font-semibold text-pxusd-yellow-400">Withdrawals limited.</span>{' '}
+                      This pool's yield strategy is rebalancing. Withdrawals up
+                      to the set-aside buffer of{' '}
+                      <span className="font-mono text-pxusd-white">
+                        {fmtAmount(withdrawBuffer, 2)} {pool.stakeToken}
+                      </span>{' '}
+                      still go through; larger amounts pause until it settles.
+                      Staking and claiming are unaffected.
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-pxusd-yellow-400">Withdrawals temporarily paused.</span>{' '}
+                      This pool's yield strategy is rebalancing, so withdrawals
+                      pause for now. Staking and claiming are
+                      unaffected — withdrawals re-enable once it settles.
+                    </>
+                  )}
                 </div>
               )}
-              {/* While underwater the form stays interactive as a what-if
-                  preview, but is dimmed so it reads as inert. */}
-              <div className={isUnderwater ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+              {/* Over the buffer (or underwater with no buffer at all) the
+                  form stays interactive as a what-if preview, but is dimmed so
+                  it reads as inert. */}
+              <div className={withdrawPaused ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
                 <AmountField
                   label="Withdraw amount"
                   balanceLabel="Staked"
@@ -518,9 +560,10 @@ export default function StakeAccordionRow({
                   conversionBps={pool.conversionBps}
                 />
               </div>
-              {isUnderwater && withdrawParsed > 0 && (
+              {overBuffer && (
                 <div className="mb-3.5 text-[12px] italic text-muted-foreground">
-                  Preview only — this is what you'd receive once withdrawals re-enable.
+                  Preview only — this amount exceeds the buffer, so it can only be
+                  withdrawn once the strategy recovers.
                 </div>
               )}
               <button
@@ -529,8 +572,10 @@ export default function StakeAccordionRow({
                 disabled={!canWithdraw}
                 onClick={handleWithdrawSubmit}
               >
-                {isUnderwater
-                  ? 'Withdrawals paused'
+                {withdrawPaused
+                  ? withdrawBuffer > 0
+                    ? 'Amount exceeds buffer'
+                    : 'Withdrawals paused'
                   : pendingAction === 'withdraw'
                     ? 'Confirming…'
                     : `Withdraw ${pool.stakeToken}`}

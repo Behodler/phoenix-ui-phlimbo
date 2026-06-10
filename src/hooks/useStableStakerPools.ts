@@ -51,6 +51,12 @@ export interface StableStakeRow {
   disabled: boolean;
   /** Per-pool underwater flag — gates ONLY this pool's withdraw. */
   withdrawDisabled: boolean;
+  /**
+   * Set-aside buffer (human units): stake tokens held directly on the
+   * StableStaker. While underwater the contract still pays withdrawals that
+   * fit entirely within this buffer, so only larger amounts are paused.
+   */
+  withdrawBuffer: number;
   needsApproval: (amount: string) => boolean;
   tagline: string;
   /**
@@ -83,6 +89,8 @@ interface PoolReads {
   ratePerSecond: number;
   apy: number;
   withdrawDisabled: boolean;
+  bufferRaw: bigint;
+  withdrawBuffer: number;
   allowanceRaw: bigint;
   conversionBps: number | undefined;
   isLoading: boolean;
@@ -134,6 +142,17 @@ function useStablePoolReads(
     query: { enabled },
   });
 
+  // Set-aside buffer: stake tokens held directly on the StableStaker, used to
+  // pay withdrawals while the pool's yield strategy is underwater. A withdraw
+  // that fits entirely within this buffer succeeds even when withdrawDisabled.
+  const { data: bufferRaw, refetch: refetchBuffer } = useReadContract({
+    address: tokenAddress,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: stableStaker ? [stableStaker] : undefined,
+    query: { enabled },
+  });
+
   const { data: walletBalanceRaw, isLoading: balanceLoading, refetch: refetchBalance } = useReadContract({
     address: tokenAddress,
     abi: erc20Abi,
@@ -165,6 +184,7 @@ function useStablePoolReads(
     refetchUserInfo();
     refetchPending();
     refetchWithdrawDisabled();
+    refetchBuffer();
     refetchBalance();
     refetchAllowance();
   };
@@ -230,6 +250,8 @@ function useStablePoolReads(
     ratePerSecond,
     apy,
     withdrawDisabled: withdrawDisabledRaw === true,
+    bufferRaw: (bufferRaw as bigint | undefined) ?? 0n,
+    withdrawBuffer: bufferRaw ? Number(bufferRaw) / 10 ** config.decimals : 0,
     allowanceRaw: (allowanceRaw as bigint | undefined) ?? 0n,
     conversionBps:
       strategyAddress && slippageBpsRaw !== undefined ? Number(slippageBpsRaw as bigint) : undefined,
@@ -324,13 +346,14 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
       pendingRewards: r.pendingRewards,
       ratePerSecond: r.ratePerSecond,
       apy: r.apy,
-      pendingDecimals: 18,
+      pendingDecimals: 8,
       stakePriceUSD: 1.0,
       earnPriceUSD: phUsdPriceUSD,
       liveTicker: true,
       isLegacy: false as const,
       disabled: isPaused,
       withdrawDisabled: r.withdrawDisabled,
+      withdrawBuffer: r.withdrawBuffer,
       needsApproval: needsApprovalFor(cfg, r.allowanceRaw),
       tagline: cfg.tagline,
       conversionBps: r.conversionBps,
@@ -443,13 +466,24 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
       return;
     }
     if (readsById[id].withdrawDisabled) {
-      addToast({
-        type: 'info',
-        title: 'Withdrawals Paused',
-        description: "Withdrawals for this pool are temporarily paused — the pool's yield strategy is below par. Staking and claiming are unaffected.",
-        duration: 12000,
-      });
-      return;
+      // While underwater the contract still pays withdrawals that fit entirely
+      // within the set-aside buffer held on the StableStaker, so only block
+      // amounts exceeding it. Raw-unit comparison mirrors the contract check.
+      let amountWei = 0n;
+      try {
+        amountWei = parseUnits(amount || '0', cfg.decimals);
+      } catch {
+        amountWei = 0n;
+      }
+      if (amountWei > readsById[id].bufferRaw) {
+        addToast({
+          type: 'info',
+          title: 'Amount Exceeds Buffer',
+          description: `This pool's yield strategy is rebalancing, so withdrawals are limited to the set-aside buffer of ${readsById[id].withdrawBuffer.toFixed(2)} ${cfg.symbol}. Enter a smaller amount, or wait for it to settle.`,
+          duration: 12000,
+        });
+        return;
+      }
     }
     if (!amount || amount === '0' || amount === '') {
       addToast({ type: 'error', title: 'Invalid Amount', description: 'Please enter a valid amount greater than 0.' });

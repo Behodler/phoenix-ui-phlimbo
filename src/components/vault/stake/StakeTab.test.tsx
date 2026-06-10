@@ -66,6 +66,7 @@ function makeRow(over: Partial<StableStakeRow> & Pick<StableStakeRow, 'id' | 'st
     isLegacy: false,
     disabled: false,
     withdrawDisabled: false,
+    withdrawBuffer: 0,
     needsApproval: () => false,
     tagline: 'test pool',
     ...over,
@@ -147,7 +148,7 @@ describe('StakeTab (Story 069 — real stable pools)', () => {
     // be collapsed for the expand click below to work).
     expect(screen.getByText('Withdrawals paused')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'More info' }));
-    expect(screen.getByRole('tooltip')).toHaveTextContent(/below par/i);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/rebalancing/i);
 
     // Collapse phUSD, expand USDe.
     await user.click(screen.getByRole('button', { name: 'phUSD pool' }));
@@ -173,6 +174,39 @@ describe('StakeTab (Story 069 — real stable pools)', () => {
     await user.type(stakeInput, '50');
     const stakeBtn = screen.getByRole('button', { name: /Stake USDe → Earn phUSD/ });
     expect(stakeBtn).not.toBeDisabled();
+  });
+
+  it('underwater pool with a buffer: withdrawals within the buffer stay enabled, larger amounts pause', async () => {
+    // Underwater but with a 26.68-token set-aside buffer — the contract still
+    // pays withdrawals that fit entirely within it.
+    stableReturn.pools = [
+      makeRow({ id: 'usdc', stakeToken: 'USDC', stakeIcon: usdcIcon, withdrawDisabled: true, withdrawBuffer: 26.68, stakedBalance: 500 }),
+    ];
+    const user = userEvent.setup();
+    renderStakeTab();
+
+    // Header pill reads "limited", not "paused".
+    expect(screen.getByText('Withdrawals limited')).toBeInTheDocument();
+
+    // Collapse phUSD, expand USDC.
+    await user.click(screen.getByRole('button', { name: 'phUSD pool' }));
+    await user.click(screen.getByRole('button', { name: 'USDC pool' }));
+    await user.click(screen.getByRole('tab', { name: 'Withdraw' }));
+    expect(screen.getByText(/set-aside buffer of/i)).toBeInTheDocument();
+
+    // Within the buffer: the normal withdraw CTA, enabled.
+    const withdrawInput = await screen.findByPlaceholderText('0.00');
+    await user.type(withdrawInput, '20');
+    const withdrawBtn = screen.getByRole('button', { name: /Withdraw USDC/ });
+    expect(withdrawBtn).not.toBeDisabled();
+    await user.click(withdrawBtn);
+    expect(stableFixture.withdraw).toHaveBeenCalledWith('usdc', '20');
+
+    // Beyond the buffer: paused with an explicit over-buffer label.
+    await user.type(withdrawInput, '30');
+    const pausedBtn = screen.getByRole('button', { name: /Amount exceeds buffer/ });
+    expect(pausedBtn).toBeDisabled();
+    expect(screen.getByText(/Preview only/i)).toBeInTheDocument();
   });
 
   it('1:1 pool (USDC): typing an amount reveals an exact outcome line, no cost rows', async () => {
