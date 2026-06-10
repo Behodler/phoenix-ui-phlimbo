@@ -347,16 +347,29 @@ export default function StakeAccordionRow({
         aria-label={`${pool.stakeToken} pool`}
         className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-4 px-4 py-4 text-left sm:grid-cols-[auto_1.1fr_0.9fr_1fr_auto]"
       >
-        {/* Token + name */}
-        <div className="flex items-center gap-3.5">
+        {/* Token + name. min-w-0 lets this cell shrink instead of forcing the
+            grid wider than the viewport, so the subtitle wraps rather than
+            colliding with the Pending column on narrow screens. */}
+        <div className="flex min-w-0 items-center gap-3.5">
           <img src={pool.stakeIcon} alt={pool.stakeToken} className="h-9 w-9 rounded-full" />
-          <div className="flex flex-col gap-0.5">
+          <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-[16px] font-bold text-pxusd-white">{pool.stakeToken}</span>
-            <span className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-              Earn
-              <img src={pool.earnIcon} alt={pool.earnToken} className="h-3.5 w-3.5 rounded-full" />
-              <span className={`font-semibold ${pool.isLegacy ? 'text-pxusd-teal-400' : 'text-pxusd-orange-300'}`}>
-                {pool.earnToken}
+            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11.5px] text-muted-foreground">
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                Earn
+                <img src={pool.earnIcon} alt={pool.earnToken} className="h-3.5 w-3.5 rounded-full" />
+                <span className={`font-semibold ${pool.isLegacy ? 'text-pxusd-teal-400' : 'text-pxusd-orange-300'}`}>
+                  {pool.earnToken}
+                </span>
+              </span>
+              {/* APY lives in its own header column from sm up; below that the
+                  column is hidden, so surface it inline here instead. Grouped
+                  so the dot and value wrap to a new line as one unit. */}
+              <span className="flex items-center gap-1.5 whitespace-nowrap sm:hidden">
+                ·
+                <span className={`font-mono font-semibold ${pool.isLegacy ? 'text-pxusd-teal-400' : 'text-pxusd-orange-300'}`}>
+                  {fmtAPY(pool.apy)} APY
+                </span>
               </span>
             </span>
             {isUnderwater && (
@@ -391,10 +404,10 @@ export default function StakeAccordionRow({
 
         {/* Pending. Mock pools interpolate; the real pool shows the raw
             on-chain value so block refetches (not interpolation) drive it. */}
-        <div className="flex flex-col gap-0.5">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Pending</span>
           {pool.pendingRewards > 0 || (pool.liveTicker && pool.ratePerSecond > 0) ? (
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-x-1.5">
               {pool.liveTicker ? (
                 <LiveYieldCounter
                   ratePerSecond={pool.ratePerSecond}
