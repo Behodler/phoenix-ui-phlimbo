@@ -16,7 +16,6 @@ import TabNavigation from '../components/ui/TabNavigation';
 import MintForm from '../components/vault/MintForm';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
 import EmergencyPauseFooter from '../components/vault/EmergencyPauseFooter';
-import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
 import NFTListTab, { type NFTSubTab } from '../components/vault/NFTListTab';
 import StakeTab from '../components/vault/stake/StakeTab';
@@ -806,9 +805,18 @@ export default function VaultPage() {
             ) : activeTab === "Admin" ? (
               <Admin />
             ) : activeTab === "Yield Funnel" ? (
-              <ErrorBoundary>
-                <YieldFunnelTab isPaused={isPaused === true} />
-              </ErrorBoundary>
+              <div className="p-6">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Yield Funnel</h2>
+                </div>
+                <div className="bg-pxusd-orange-900/20 border border-pxusd-orange-500 rounded-lg p-6 text-center">
+                  <p className="text-pxusd-orange-300 font-semibold mb-2">🚧 Under Construction</p>
+                  <p className="text-sm text-foreground">
+                    The Yield Funnel is temporarily unavailable while we make improvements.
+                    Check back soon — everything else is working as usual.
+                  </p>
+                </div>
+              </div>
             ) : activeTab === "Market" ? (
               <ErrorBoundary>
                 <MarketTab
