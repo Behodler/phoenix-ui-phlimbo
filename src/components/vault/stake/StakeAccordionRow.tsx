@@ -79,6 +79,17 @@ export interface StakeAccordionRowProps {
   onApprove?: () => void | Promise<void>;
 }
 
+/**
+ * Reassuring note for pools with no fixed conversion cost (USDC, Dola): their
+ * deposits/withdrawals route through an underlying yield vault whose share
+ * rounding leaves a tiny, expected variance, so the displayed figure is an
+ * estimate rather than a guarantee. Worded as normal mechanics, not a fee.
+ */
+const vaultSlippageTip = (kind: 'stake' | 'withdraw') =>
+  kind === 'stake'
+    ? `Estimated. Your deposit is routed into an underlying yield vault, and the vault's share-price rounding can leave the amount actually staked a touch different from the figure shown. This is a normal part of the vault mechanics, not a fee.`
+    : `Estimated. Your withdrawal is redeemed from an underlying yield vault, and the vault's share-price rounding can leave the amount you receive a touch different from the figure shown. This is a normal part of the vault mechanics, not a fee.`;
+
 function AmountField({
   label,
   balanceLabel,
@@ -88,6 +99,7 @@ function AmountField({
   tokenSymbol,
   tokenIcon,
   tokenPriceUSD,
+  estimateTip,
 }: {
   label: string;
   balanceLabel: string;
@@ -97,6 +109,8 @@ function AmountField({
   tokenSymbol: string;
   tokenIcon: string;
   tokenPriceUSD: number;
+  /** Optional note shown beside the ≈ USD line (e.g. vault-rounding slippage). */
+  estimateTip?: string;
 }) {
   const parsed = parseFloat(value) || 0;
   const usdValue = parsed * tokenPriceUSD;
@@ -146,8 +160,9 @@ function AmountField({
         </div>
       </div>
       <div className="mt-1.5 flex items-center justify-between text-[12px] text-muted-foreground">
-        <span>
+        <span className="flex items-center gap-1.5">
           ≈ <span className={`font-mono ${parsed > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{fmtUSD(usdValue)}</span>
+          {estimateTip && <InfoTip text={estimateTip} />}
         </span>
         {overBalance && <span className="text-pxusd-pink-400">Insufficient balance</span>}
       </div>
@@ -312,6 +327,12 @@ export default function StakeAccordionRow({
   const isBusy = pendingAction !== null;
   const stakeParsed = parseFloat(stakeAmount) || 0;
   const withdrawParsed = parseFloat(withdrawAmount) || 0;
+  // The estimate note (vault-rounding slippage) applies only to the stable
+  // pools. USDe already explains its slippage via OutcomeSummary's conversion-
+  // cost tooltip, so it's excluded; USDC/Dola leak a hair to underlying-vault
+  // share rounding and get the note instead. The flagship phUSD pool
+  // (isLegacy) is fully controlled with no loss, so it never shows the note.
+  const showEstimateTip = !pool.isLegacy && (pool.conversionBps ?? 0) === 0;
   const needsApprove = pool.needsApproval ? pool.needsApproval(stakeAmount) : false;
 
   // Per-pool underwater status. Only meaningful when the global pause is NOT
@@ -490,6 +511,7 @@ export default function StakeAccordionRow({
                 tokenSymbol={pool.stakeToken}
                 tokenIcon={pool.stakeIcon}
                 tokenPriceUSD={pool.stakePriceUSD}
+                estimateTip={showEstimateTip ? vaultSlippageTip('stake') : undefined}
               />
               <OutcomeSummary
                 kind="stake"
@@ -552,6 +574,7 @@ export default function StakeAccordionRow({
                   tokenSymbol={pool.stakeToken}
                   tokenIcon={pool.stakeIcon}
                   tokenPriceUSD={pool.stakePriceUSD}
+                  estimateTip={showEstimateTip ? vaultSlippageTip('withdraw') : undefined}
                 />
                 <OutcomeSummary
                   kind="withdraw"

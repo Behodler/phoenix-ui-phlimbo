@@ -45,8 +45,8 @@ export default function StakeTab() {
     stakedBalance: phUsdPool.stakedBalance,
     pendingRewards: phUsdPool.pendingRewards,
     ratePerSecond: phUsdPool.ratePerSecond,
-    // Real pool: show the block-refreshed on-chain value, no interpolation.
-    liveTicker: false,
+    // Interpolate the live counter between block reads, same as the stables.
+    liveTicker: true,
     tagline: 'Flagship pool — stake phUSD, earn USDC streamed from the yield funnel.',
     pendingDecimals: 6,
     isLegacy: true,

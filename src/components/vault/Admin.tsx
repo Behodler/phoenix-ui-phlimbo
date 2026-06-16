@@ -25,6 +25,12 @@ import type { ContractAddresses } from '../../types/contracts';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
+// PhusdStableMinter V1 (retired). DOLA/USDC migrated their positions to the V2
+// minter (now in addresses.PhusdStableMinter), but USDe retained its position in
+// V1. Minting going forward only uses V2; V1 is hardcoded here because it is no
+// longer referenced anywhere else once the contract address change is committed.
+const PHUSD_STABLE_MINTER_V1 = '0x435B0A1884bd0fb5667677C9eb0e59425b1477E5' as const;
+
 // Constants used to mirror NFTStaker._recomputeSchedule math client-side
 // when computing the Minimum Runway stat in the NFT Staker admin panel.
 const SECONDS_PER_YEAR = 365n * 86400n;
@@ -480,6 +486,15 @@ export default function Admin() {
     addresses?.YieldStrategyUSDe as `0x${string}` | undefined,
     addresses?.USDe as `0x${string}` | undefined,
     stableStakerAddress,
+  );
+
+  // USDe's position under the retired V1 StableMinter. USDe never migrated to V2,
+  // so this read (against the hardcoded V1 minter) holds its real balance, while
+  // the V2 read above reflects the current minter. Shown as a separate line item.
+  const usdeStableMinterV1Stats = useYieldStrategyClientStats(
+    addresses?.YieldStrategyUSDe as `0x${string}` | undefined,
+    addresses?.USDe as `0x${string}` | undefined,
+    PHUSD_STABLE_MINTER_V1,
   );
 
   // Extract values from poolInfo tuple
@@ -1141,7 +1156,13 @@ export default function Admin() {
       token: 'USDe',
       decimals: 18,
       clients: [
-        { label: 'StableMinter', principal: usdePrincipal, yield: usdeYield, total: usdeTotalBalance },
+        {
+          label: 'StableMinter V1',
+          principal: usdeStableMinterV1Stats.principal,
+          yield: usdeStableMinterV1Stats.yield,
+          total: usdeStableMinterV1Stats.total,
+        },
+        { label: 'StableMinter V2 (current)', principal: usdePrincipal, yield: usdeYield, total: usdeTotalBalance },
         {
           label: 'StableStaker',
           principal: usdeStakerStrategyStats.principal,
@@ -1152,6 +1173,7 @@ export default function Admin() {
       refetch: () => {
         refetchUsdePrincipal();
         refetchUsdeTotalBalance();
+        usdeStableMinterV1Stats.refetch();
         usdeStakerStrategyStats.refetch();
       },
     },
