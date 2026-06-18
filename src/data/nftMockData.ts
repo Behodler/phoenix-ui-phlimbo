@@ -131,6 +131,59 @@ export const nftStaticConfig: NFTStaticConfig[] = [
 ];
 
 /**
+ * Registry of NFTs that can be staked in the NFT → Stake sub-tab.
+ *
+ * Each entry binds a static NFT config to its staking-surface metadata.
+ * `isLive` distinguishes NFTs whose NFTStaker contract is deployed (wired
+ * to the real `useStakingPageData` hook) from those that are still
+ * mock-backed (no deployed staker yet).
+ *
+ * IMPORTANT: each NFT has its own unique NFTStaker contract — stakers are
+ * NOT shared (`nftStakerAbi.stake(amount)` takes only a `uint256` amount,
+ * with no token-id parameter, so one staker is intrinsically bound to one
+ * NFT). The set is static and small, so the surface calls each NFT's source
+ * hook explicitly (never inside a `.map`, per the Rules of Hooks).
+ */
+export interface StakeableNft {
+  /** Static NFT config (name, image, id, tokenPrefix, ...). */
+  config: NFTStaticConfig;
+  /**
+   * Display APY used by the thumbnail rail / aggregation. For live NFTs the
+   * real hook's computed `minApy` overrides this; for mock NFTs this is the
+   * source of truth.
+   */
+  apy: number;
+  /** Short flavor tagline shown on the card, e.g. "SCX is burnt". */
+  tagline: string;
+  /** False => mock-backed (staker contract not deployed yet). */
+  isLive: boolean;
+}
+
+const liquidSkyConfig = nftStaticConfig.find((n) => n.id === 2)!;
+const smoulderingConfig = nftStaticConfig.find((n) => n.id === 3)!;
+
+/**
+ * The ordered set of stakeable NFTs rendered in the rail.
+ *
+ * To add another NFT: append an entry here AND add one explicit source-hook
+ * call in `StakingSurface` (hooks cannot be called in a `.map`).
+ */
+export const STAKEABLE_NFTS: StakeableNft[] = [
+  {
+    config: liquidSkyConfig,
+    apy: 4.2, // overridden by the live hook's computed minApy
+    tagline: liquidSkyConfig.action,
+    isLive: true,
+  },
+  {
+    config: smoulderingConfig,
+    apy: 6.8,
+    tagline: 'SCX is burnt',
+    isLive: false,
+  },
+];
+
+/**
  * Mapping from tokenPrefix to the ContractAddresses key for the ERC20 token.
  * Used for approve() calls.
  */
