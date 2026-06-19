@@ -10,8 +10,9 @@ interface NFTSelectorGridProps {
 
 /**
  * NFT selector grid for the Yield Funnel tab.
- * Shows 5 NFT cards in a horizontal row (>=640px) or compact list (<640px).
- * Owned NFTs are selectable; unowned NFTs are dimmed and not clickable.
+ * Shows NFT cards in a 3-column grid (3×2 for six NFTs) at >=640px, or a compact
+ * list (<640px). Owned NFTs are selectable; unowned NFTs are dimmed and not
+ * clickable. Cards flagged `isNew` render a small "NEW" badge.
  * Auto-selects the first owned NFT on data load.
  */
 export default function NFTSelectorGrid({
@@ -38,8 +39,8 @@ export default function NFTSelectorGrid({
         Select NFT to Burn
       </h3>
 
-      {/* Card row (>=640px) */}
-      <div className="hidden sm:flex flex-wrap gap-3">
+      {/* Card grid (>=640px): 3 columns → 3×2 for six NFTs */}
+      <div className="hidden sm:grid grid-cols-3 gap-3">
         {nfts.map((nft) => {
           const isOwned = nft.nftBalance > 0;
           const isSelected = selectedNft?.id === nft.id;
@@ -52,7 +53,7 @@ export default function NFTSelectorGrid({
               disabled={!canSelect}
               onClick={() => canSelect && onSelect(nft)}
               className={`
-                flex flex-col items-center p-2 rounded-lg border transition-all min-w-[100px] flex-1
+                relative flex flex-col items-center p-2 rounded-lg border transition-all
                 ${isSelected
                   ? 'border-pxusd-orange-400 bg-pxusd-teal-700 shadow-[0_0_8px_rgba(251,146,60,0.3)]'
                   : isOwned
@@ -61,6 +62,11 @@ export default function NFTSelectorGrid({
                 }
               `}
             >
+              {nft.isNew && (
+                <span className="absolute top-1.5 right-1.5 px-1 py-px rounded text-[8px] font-semibold tracking-wide text-pxusd-teal-950 bg-pxusd-yellow-400">
+                  NEW
+                </span>
+              )}
               <img
                 src={nft.image}
                 alt={nft.name}
@@ -108,6 +114,11 @@ export default function NFTSelectorGrid({
               <span className="text-sm font-medium text-foreground flex-1 text-left truncate">
                 {nft.name}
               </span>
+              {nft.isNew && (
+                <span className="px-1 py-px rounded text-[8px] font-semibold tracking-wide text-pxusd-teal-950 bg-pxusd-yellow-400">
+                  NEW
+                </span>
+              )}
               <span className={`text-xs ${isOwned ? 'text-pxusd-green-400' : 'text-muted-foreground'}`}>
                 x{nft.nftBalance}
               </span>
