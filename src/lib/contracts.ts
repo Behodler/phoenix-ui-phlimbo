@@ -1,4 +1,3 @@
-import { data } from 'react-router-dom';
 import type { ContractAddresses } from '../types/contracts'
 
 /**
