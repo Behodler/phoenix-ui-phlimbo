@@ -7,6 +7,7 @@
  * - surplusTracker: Tracks surplus yield accumulation from the yield strategy
  * - surplusWithdrawer: Handles withdrawal of accumulated surplus yield
  */
+
 export interface ContractAddresses {
   PhUSD: string;
   USDC: string;
@@ -46,12 +47,14 @@ export interface ContractAddresses {
   BatchNFTMinter: string;
   NudgeRatchet: string;
   NudgeRatchetMintDebtHook: string;
+  RatchetNFTStaker: string;
   StableStaker: string;
   DepositView: string;
   ViewRouter: string;
   DepositPageView: string;
   MintPageView: string;
 }
+
 
 
 /**

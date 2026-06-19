@@ -1,3 +1,4 @@
+import { data } from 'react-router-dom';
 import type { ContractAddresses } from '../types/contracts'
 
 /**
@@ -85,4 +86,5 @@ export const mainnetAddresses: ContractAddresses = {
   // local deploy added these fields. Patch by hand when they ship to mainnet.
   NudgeRatchet: "0x0000000000000000000000000000000000000000",
   NudgeRatchetMintDebtHook: "0x0000000000000000000000000000000000000000",
+  RatchetNFTStaker: "0x0000000000000000000000000000000000000000"
 };
