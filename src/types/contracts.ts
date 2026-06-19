@@ -33,22 +33,24 @@ export interface ContractAddresses {
   BalancerVault: string;
   BurnRecorder: string;
   BalancerRouter: string;
-  WaUSDC: string;
-  SkyPSM: string;
-  BalancerPoolerMintDebtHook: string;
-  NFTStaker: string;
-  BatchNFTMinter: string;
-  StableStaker: string;
-  DepositView: string;
-  ViewRouter: string;
-  DepositPageView: string;
-  MintPageView: string;
   NFTMinter: string;
   BurnerEYE: string;
   BurnerSCX: string;
   BurnerFlax: string;
   BalancerPooler: string;
   GatherWBTC: string;
+  WaUSDC: string;
+  SkyPSM: string;
+  BalancerPoolerMintDebtHook: string;
+  NFTStaker: string;
+  BatchNFTMinter: string;
+  NudgeRatchet: string;
+  NudgeRatchetMintDebtHook: string;
+  StableStaker: string;
+  DepositView: string;
+  ViewRouter: string;
+  DepositPageView: string;
+  MintPageView: string;
 }
 
 

@@ -78,7 +78,9 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       WaUSDC: data.WaUSDC || '0x0000000000000000000000000000000000000000',
       StableStaker: data.StableStaker || '0x0000000000000000000000000000000000000000',
       SkyPSM: data.SkyPSM || '0x0000000000000000000000000000000000000000',
-      USDeAMMAdapter: data.USDeAMMAdapter || '0x0000000000000000000000000000000000000000'
+      USDeAMMAdapter: data.USDeAMMAdapter || '0x0000000000000000000000000000000000000000',
+      NudgeRatchet: data.NudgeRatchet || '0x0000000000000000000000000000000000000000',
+      NudgeRatchetMintDebtHook: data.NudgeRatchetMintDebtHook || '0x0000000000000000000000000000000000000000'
     }
     log.debug('📡 fetchLocalAddresses: Mapped addresses:', addresses)
 

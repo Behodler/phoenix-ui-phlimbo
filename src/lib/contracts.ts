@@ -80,5 +80,9 @@ export const mainnetAddresses: ContractAddresses = {
   // Stable Staking — deployed 2026-06-10 by ResumeStableStakerMigration (story 055).
   // Pools: DOLA 5 / USDC 7 / USDe 10 phUSD per day, 10% set-aside buffer.
   StableStaker: "0xbce8ABC09BaEDCabE93419bF875f6186e182079A",
-
+  // NudgeRatchet dispatcher + its mint-debt hook — not yet deployed on mainnet (story 068).
+  // Zero placeholders so this file still satisfies the ContractAddresses interface once the
+  // local deploy added these fields. Patch by hand when they ship to mainnet.
+  NudgeRatchet: "0x0000000000000000000000000000000000000000",
+  NudgeRatchetMintDebtHook: "0x0000000000000000000000000000000000000000",
 };
