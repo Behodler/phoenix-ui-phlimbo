@@ -105,7 +105,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   } = useMinterPageView();
 
   // Merge static NFT config with live MinterPageView data
-  const nftList: NFTData[] = minterPageData
+  const liveMappedNfts: NFTData[] = minterPageData
     ? nftStaticConfig
         // Exclude mock-only NFTs (e.g. Reservoir Ratchet) — they have no
         // on-chain MinterPageView data and cannot be burned in the yield funnel.
@@ -132,6 +132,29 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
           totalBurnt: totalBurntMap[cfg.tokenPrefix],
         };
       })
+    : [];
+
+  const RATCHET_NFT_ID = 6;
+
+  // Inert mock placeholder for Reservoir Ratchet: appears in the 3×2 grid with a
+  // "NEW" badge but is non-selectable (nftBalance 0 → dimmed) until its contract is
+  // wired. nftBalance 0 means the grid never makes it clickable, so dispatcherIndex
+  // is never used in a claim() call.
+  const ratchetCfg = nftStaticConfig.find((c) => c.id === RATCHET_NFT_ID)!;
+  const ratchetMock: NFTData = {
+    ...ratchetCfg,
+    price: '0',
+    balance: '0',
+    nftBalance: 0,
+    allowanceRaw: 0n,
+    priceRaw: 0n,
+    balanceRaw: 0n,
+    growthBasisPoints: 0,
+    dispatcherIndex: -1, // never read: card is non-selectable
+  };
+
+  const nftList: NFTData[] = minterPageData
+    ? [...liveMappedNfts, ratchetMock]
     : [];
 
   // Stable callback ref for NFT selection (avoids re-triggering auto-select effect)

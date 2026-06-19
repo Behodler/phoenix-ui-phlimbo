@@ -42,6 +42,8 @@ export interface NFTStaticConfig {
    * is excluded from the live yield-funnel surface (it has no MinterPageView data).
    */
   comingSoon?: boolean;
+  /** Purely cosmetic. When true, the selector renders a small "NEW" badge. Never reaches a contract call. */
+  isNew?: boolean;
 }
 
 /**
@@ -83,6 +85,8 @@ export interface NFTData {
   batchEnabled?: boolean;
   /** Mirrors `NFTStaticConfig.comingSoon`. When true, mint shows a "coming soon" toast. */
   comingSoon?: boolean;
+  /** Purely cosmetic. When true, the selector renders a small "NEW" badge. Never reaches a contract call. */
+  isNew?: boolean;
 }
 
 /**
@@ -151,6 +155,7 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     tokenDisplayName: "USDC",
     decimals: 6,
     comingSoon: true,
+    isNew: true,
   },
 ];
 
