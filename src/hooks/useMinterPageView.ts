@@ -43,6 +43,7 @@ export interface MinterPageViewData {
   Flax: TokenMintData;
   USDS: TokenMintData;
   WBTC: TokenMintData;
+  USDC: TokenMintData;
   eyeTotalBurnt: string;
   scxTotalBurnt: string;
   flaxTotalBurnt: string;
@@ -66,12 +67,17 @@ const TOKEN_OFFSETS = {
   Flax: 12,
   USDS: 18,
   WBTC: 24,
+  // Reservoir Ratchet (USDC) row. Its on-chain dispatcher index parses to 7
+  // from offset+5 — never hardcoded here (see story 072).
+  USDC: 30,
 } as const;
 
+// Burn totals follow the 6 token rows (6 × 6 = 36 fields), so they sit at
+// 36/37/38 now that the USDC row occupies 30–35.
 const BURN_INDICES = {
-  eyeTotalBurnt: 30,
-  scxTotalBurnt: 31,
-  flaxTotalBurnt: 32,
+  eyeTotalBurnt: 36,
+  scxTotalBurnt: 37,
+  flaxTotalBurnt: 38,
 } as const;
 
 /** Decimals per token prefix, derived from static config */
@@ -160,13 +166,14 @@ export function useMinterPageView(): UseMinterPageViewReturn {
 
   let parsedData: MinterPageViewData | null = null;
 
-  if (rawData && Array.isArray(rawData) && rawData.length >= 33) {
+  if (rawData && Array.isArray(rawData) && rawData.length >= 39) {
     parsedData = {
       EYE: parseTokenData(rawData, TOKEN_OFFSETS.EYE, TOKEN_DECIMALS.EYE),
       SCX: parseTokenData(rawData, TOKEN_OFFSETS.SCX, TOKEN_DECIMALS.SCX),
       Flax: parseTokenData(rawData, TOKEN_OFFSETS.Flax, TOKEN_DECIMALS.Flax),
       USDS: parseTokenData(rawData, TOKEN_OFFSETS.USDS, TOKEN_DECIMALS.USDS),
       WBTC: parseTokenData(rawData, TOKEN_OFFSETS.WBTC, TOKEN_DECIMALS.WBTC),
+      USDC: parseTokenData(rawData, TOKEN_OFFSETS.USDC, TOKEN_DECIMALS.USDC),
       eyeTotalBurnt: formatUnits(rawData[BURN_INDICES.eyeTotalBurnt], 18),
       scxTotalBurnt: formatUnits(rawData[BURN_INDICES.scxTotalBurnt], 18),
       flaxTotalBurnt: formatUnits(rawData[BURN_INDICES.flaxTotalBurnt], 18),

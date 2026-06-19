@@ -104,16 +104,14 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
     refetch: refetchMinterData,
   } = useMinterPageView();
 
-  // Merge static NFT config with live MinterPageView data
+  // Merge static NFT config with live MinterPageView data. Every NFT — now
+  // including Reservoir Ratchet (USDC row, dispatcher index 7) — has on-chain
+  // MinterPageView data, so the whole static config maps directly.
   const liveMappedNfts: NFTData[] = minterPageData
-    ? nftStaticConfig
-        // Exclude mock-only NFTs (e.g. Reservoir Ratchet) — they have no
-        // on-chain MinterPageView data and cannot be burned in the yield funnel.
-        .filter((cfg) => !cfg.comingSoon)
-        .map((cfg) => {
-        // Safe to index: `comingSoon` (mock-only) prefixes are filtered out
-        // above, so every remaining prefix has on-chain MinterPageView data.
+    ? nftStaticConfig.map((cfg) => {
         const live = (minterPageData as unknown as Record<string, TokenMintData>)[cfg.tokenPrefix];
+        // Only EYE/SCX/Flax have burn totals; nudge dispatchers (e.g. USDC /
+        // Reservoir Ratchet) have none, so this resolves to undefined.
         const totalBurntMap: Record<string, string | undefined> = {
           EYE: minterPageData.eyeTotalBurnt,
           SCX: minterPageData.scxTotalBurnt,
@@ -134,28 +132,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       })
     : [];
 
-  const RATCHET_NFT_ID = 6;
-
-  // Inert mock placeholder for Reservoir Ratchet: appears in the 3×2 grid with a
-  // "NEW" badge but is non-selectable (nftBalance 0 → dimmed) until its contract is
-  // wired. nftBalance 0 means the grid never makes it clickable, so dispatcherIndex
-  // is never used in a claim() call.
-  const ratchetCfg = nftStaticConfig.find((c) => c.id === RATCHET_NFT_ID)!;
-  const ratchetMock: NFTData = {
-    ...ratchetCfg,
-    price: '0',
-    balance: '0',
-    nftBalance: 0,
-    allowanceRaw: 0n,
-    priceRaw: 0n,
-    balanceRaw: 0n,
-    growthBasisPoints: 0,
-    dispatcherIndex: -1, // never read: card is non-selectable
-  };
-
-  const nftList: NFTData[] = minterPageData
-    ? [...liveMappedNfts, ratchetMock]
-    : [];
+  const nftList: NFTData[] = liveMappedNfts;
 
   // Stable callback ref for NFT selection (avoids re-triggering auto-select effect)
   const handleNftSelect = useCallback((nft: NFTData) => {

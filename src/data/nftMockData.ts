@@ -22,9 +22,9 @@ export interface NFTStaticConfig {
   /** Explanation of why this NFT is valuable */
   reason: string;
   /**
-   * Token prefix matching MinterPageView data keys (EYE, SCX, Flax, USDS, WBTC).
-   * `USDC` is a mock-only prefix (Reservoir Ratchet) with no on-chain MinterPageView
-   * field — it is filtered out of the live yield-funnel surface via `comingSoon`.
+   * Token prefix matching MinterPageView data keys (EYE, SCX, Flax, USDS, WBTC, USDC).
+   * `USDC` is the Reservoir Ratchet row (id 6), backed by the on-chain
+   * MinterPageView USDC fields (offsets 30–35, dispatcher index 7).
    */
   tokenPrefix: 'EYE' | 'SCX' | 'Flax' | 'USDS' | 'WBTC' | 'USDC';
   /** Display name of the input token */
@@ -154,7 +154,6 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     tokenPrefix: "USDC",
     tokenDisplayName: "USDC",
     decimals: 6,
-    comingSoon: true,
     isNew: true,
   },
 ];
@@ -206,9 +205,9 @@ export const STAKEABLE_NFTS: StakeableNft[] = [
   },
   {
     config: ratchetConfig,
-    apy: 6.8,
+    apy: 6.8, // overridden by the live hook's computed minApy
     tagline: ratchetConfig.action,
-    isLive: false,
+    isLive: true,
   },
 ];
 

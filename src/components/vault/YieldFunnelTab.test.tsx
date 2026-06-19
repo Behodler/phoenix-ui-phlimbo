@@ -196,6 +196,20 @@ vi.mock('../../hooks/useMinterPageView', () => ({
         nftBalance: 0,
         dispatcherIndex: 4,
       },
+      // Reservoir Ratchet (USDC, 6-decimal). dispatcherIndex 7 mirrors the
+      // on-chain MintPageView USDC row — never hardcoded as 6. Owned
+      // (nftBalance 1) so the ratchet-claim test can select and keep it.
+      USDC: {
+        allowanceRaw: 0n,
+        priceRaw: 0n,
+        balanceRaw: 0n,
+        allowance: '0',
+        price: '0',
+        growthBasisPoints: 0,
+        balance: '0',
+        nftBalance: 1,
+        dispatcherIndex: 7,
+      },
       eyeTotalBurnt: '0',
       scxTotalBurnt: '0',
       flaxTotalBurnt: '0',
@@ -250,7 +264,7 @@ vi.mock('../ui/ConfirmationDialog', () => ({
 
 // Stub the NFT selector grid: auto-select the first owned NFT on mount so
 // the supply button is enabled without user interaction.
-type NftStub = { nftBalance: number };
+type NftStub = { nftBalance: number; tokenPrefix?: string };
 type SelectorStubProps = {
   nfts: NftStub[];
   onSelect: (n: NftStub) => void;
@@ -266,7 +280,19 @@ vi.mock('./NFTSelectorGrid', () => ({
         queueMicrotask(() => onSelect(owned));
       }
     }
-    return <div data-testid="nft-selector-stub" />;
+    // Expose an explicit per-NFT select button so tests can pick a specific
+    // NFT (e.g. Reservoir Ratchet / USDC) regardless of auto-select order.
+    return (
+      <div data-testid="nft-selector-stub">
+        {nfts.map((n) => (
+          <button
+            key={n.tokenPrefix}
+            data-testid={`nft-select-${n.tokenPrefix}`}
+            onClick={() => onSelect(n)}
+          />
+        ))}
+      </div>
+    );
   },
 }));
 
@@ -354,6 +380,24 @@ describe('YieldFunnelTab — exempt strategies checkboxes', () => {
     expect(callArgs.functionName).toBe('claim');
     expect(callArgs.args).toEqual([0n, 0n, []]);
     expect(callArgs.address).toBe(ACCUMULATOR_ADDRESS);
+  });
+
+  it('claims with the live Reservoir Ratchet dispatcher index (7) when ratchet is selected', async () => {
+    // Reservoir Ratchet is UI config id 6 but its on-chain dispatcher index is
+    // 7 (read from the MintPageView USDC row, never hardcoded). Selecting it
+    // must forward 7n as the first claim arg.
+    await renderAndAutoSelectNft();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('nft-select-USDC'));
+    });
+
+    await triggerClaim();
+
+    expect(writeContractMock).toHaveBeenCalledTimes(1);
+    const callArgs = writeContractMock.mock.calls[0][0];
+    expect(callArgs.functionName).toBe('claim');
+    expect(callArgs.args[0]).toBe(7n);
   });
 
   it("unchecking a row puts that row's strategyAddress into the exempt array passed to claim", async () => {

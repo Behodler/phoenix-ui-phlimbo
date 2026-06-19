@@ -68,28 +68,59 @@ export interface StakingPageData {
 
 type AddToast = (toast: Omit<Toast, 'id'>) => string;
 
+/** MinterPageView per-token row key used for the owned-units balance. */
+type OwnedRowKey = 'EYE' | 'SCX' | 'Flax' | 'USDS' | 'WBTC' | 'USDC';
+
+/**
+ * Per-NFT bindings for {@link useStakingPageData}. Omit for Liquid Sky
+ * Phoenix (id 2) — the defaults below reproduce its original behaviour
+ * byte-for-byte. Reservoir Ratchet (id 6) passes its own staker address,
+ * the USDC owned-row key, and its display name.
+ */
+export interface StakingPageDataOptions {
+  /** Resolved NFTStaker address. Defaults to `addresses.NFTStaker` (Liquid Sky). */
+  stakerAddress?: Address;
+  /** MinterPageView row supplying owned units / price. Defaults to `'USDS'`. */
+  ownedRowKey?: OwnedRowKey;
+  /** NFT display name woven into action toasts. Defaults to `'Liquid Sky Phoenix'`. */
+  nftName?: string;
+}
+
 /**
  * Hook returning everything the staking surface needs.
  *
  * Reads the NFTStaker contract for global / per-user state, derives
  * the displayed APY via `computeMinApy`, exposes the user's wallet
- * balance via `useMinterPageView` (USDS row — Liquid Sky pays in USDS,
- * id=2), and wires `stake / unstake / claim` writes through wagmi's
- * `useWriteContract` + `useWaitForTransactionReceipt` lifecycle with
- * toast feedback mirroring `NFTListMintModal`.
+ * balance via `useMinterPageView` (the `ownedRowKey` row — Liquid Sky
+ * pays in USDS, id=2; Reservoir Ratchet pays in USDC, id=6), and wires
+ * `stake / unstake / claim` writes through wagmi's `useWriteContract` +
+ * `useWaitForTransactionReceipt` lifecycle with toast feedback mirroring
+ * `NFTListMintModal`.
  *
- * Gracefully no-ops when NFTStaker is not deployed on the active
+ * The staker address, owned-units row, and toast NFT name are
+ * parameterized via {@link StakingPageDataOptions} so the same hook drives
+ * every NFT's dedicated staker. Omitting the options reproduces Liquid
+ * Sky Phoenix's original behaviour exactly.
+ *
+ * Gracefully no-ops when the staker is not deployed on the active
  * network: returns zeroed numeric fields, `isStakerDeployed = false`,
  * and action callbacks that throw so accidental calls surface in
  * dev-tools instead of silently swallowing.
  */
-export function useStakingPageData(addToast?: AddToast): StakingPageData {
+export function useStakingPageData(
+  addToast?: AddToast,
+  options?: StakingPageDataOptions,
+): StakingPageData {
   const { address: userAddress } = useAccount();
   const { addresses } = useContractAddresses();
   const { data: minterData, refetch: refetchMinterData } = useMinterPageView();
   const { price: phUsdPrice } = useBalancerPrice();
 
-  const stakerAddress = addresses?.NFTStaker as Address | undefined;
+  const ownedRowKey: OwnedRowKey = options?.ownedRowKey ?? 'USDS';
+  const nftName = options?.nftName ?? 'Liquid Sky Phoenix';
+
+  const stakerAddress = (options?.stakerAddress ??
+    (addresses?.NFTStaker as Address | undefined)) as Address | undefined;
   const nftMinterAddress = addresses?.NFTMinter as Address | undefined;
 
   const isStakerDeployed = useMemo(
@@ -186,11 +217,11 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
     return r?.status === 'success' ? (r.result as bigint) : 0n;
   }, [stakerReads]);
 
-  // ── USDS NFT data from useMinterPageView (Liquid Sky pays in USDS) ──
-  const usdsRow = minterData?.USDS;
-  const ownedUnits = usdsRow?.nftBalance ?? 0;
-  const priceRaw = usdsRow?.priceRaw ?? 0n;
-  const growthBasisPoints = usdsRow?.growthBasisPoints ?? 0;
+  // ── NFT data from useMinterPageView (Liquid Sky → USDS, Ratchet → USDC) ──
+  const ownedRow = minterData?.[ownedRowKey];
+  const ownedUnits = ownedRow?.nftBalance ?? 0;
+  const priceRaw = ownedRow?.priceRaw ?? 0n;
+  const growthBasisPoints = ownedRow?.growthBasisPoints ?? 0;
 
   // ── Derived numbers ────────────────────────────────────────────────
   const phUsdPriceSafe = phUsdPrice ?? 1; // USDS pinned to $1; phUSD ≈ $1
@@ -287,10 +318,10 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
       addToast?.({
         type: 'success',
         title: 'Approval Confirmed',
-        description: 'Liquid Sky Phoenix is now approved for staking.',
+        description: `${nftName} is now approved for staking.`,
       });
     }
-  }, [approveConfirmed, approveHash, refetchApproval, addToast]);
+  }, [approveConfirmed, approveHash, refetchApproval, addToast, nftName]);
 
   // ── Action callbacks ───────────────────────────────────────────────
   const handleError = useCallback(
@@ -318,7 +349,7 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
         addToast?.({
           type: 'info',
           title: 'Confirm in Wallet',
-          description: `Staking ${n} unit${n === 1 ? '' : 's'} of Liquid Sky Phoenix...`,
+          description: `Staking ${n} unit${n === 1 ? '' : 's'} of ${nftName}...`,
           duration: 30_000,
         });
         const hash = await writeContractAsync({
@@ -338,7 +369,7 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
         handleError(err, 'Stake Failed');
       }
     },
-    [isStakerDeployed, stakerAddress, writeContractAsync, addToast, handleError],
+    [isStakerDeployed, stakerAddress, writeContractAsync, addToast, handleError, nftName],
   );
 
   const unstake = useCallback(
@@ -413,7 +444,7 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
         addToast?.({
           type: 'info',
           title: 'Confirm in Wallet',
-          description: 'Approving Liquid Sky Phoenix for staking...',
+          description: `Approving ${nftName} for staking...`,
           duration: 30_000,
         });
         const hash = await approveAllRaw();
@@ -428,7 +459,7 @@ export function useStakingPageData(addToast?: AddToast): StakingPageData {
         handleError(err, 'Approval Failed');
       }
     },
-    [isStakerDeployed, nftMinterAddress, approveAllRaw, addToast, handleError],
+    [isStakerDeployed, nftMinterAddress, approveAllRaw, addToast, handleError, nftName],
   );
 
   return {

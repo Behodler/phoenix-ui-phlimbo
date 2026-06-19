@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
+import type { Address } from 'viem';
 import { STAKEABLE_NFTS } from '../../data/nftMockData';
 import type { StakeableNft } from '../../data/nftMockData';
 import { useStakingPageData } from '../../hooks/useStakingPageData';
-import { useReservoirRatchetStake } from '../../hooks/useReservoirRatchetStake';
 import type { StakingPageData } from '../../hooks/useStakingPageData';
+import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import type { Toast } from '../../types/toast';
 import EarningPanel from './staking/EarningPanel';
 import StakedNftCard from './staking/StakedNftCard';
@@ -36,25 +37,29 @@ interface StakingSource {
  * registry entry.
  */
 export default function StakingSurface({ addToast }: StakingSurfaceProps) {
+  const { addresses } = useContractAddresses();
+
   // ── Per-NFT staking sources (one explicit hook call each) ───────────────
-  // Liquid Sky Phoenix (id 2) — LIVE on-chain wiring, unchanged.
+  // Liquid Sky Phoenix (id 2) — LIVE on-chain wiring (defaults: NFTStaker
+  // address, USDS owned-row, "Liquid Sky Phoenix" toast name).
   const liquidSky = useStakingPageData(addToast);
 
-  // Reservoir Ratchet (id 6) — MOCK source (staker not deployed yet).
-  //
-  // ░░░ PLUG-AND-PLAY SWAP POINT ░░░
-  // When the Reservoir Ratchet NFTStaker deploys, replace the line below with a
-  // real `useStakingPageData(...)` instance pointed at the Ratchet staker
-  // address, and flip `isLive: true` in the STAKEABLE_NFTS registry. The rail,
-  // detail card, and aggregation are source-agnostic — nothing else changes.
-  const ratchet = useReservoirRatchetStake(addToast);
+  // Reservoir Ratchet (id 6) — LIVE on-chain wiring against its dedicated
+  // RatchetNFTStaker, paying in USDC. Same generic staker shape as Liquid Sky,
+  // parameterized via useStakingPageData's options. Gracefully no-ops while
+  // RatchetNFTStaker is zero-address (e.g. on mainnet before deploy).
+  const ratchet = useStakingPageData(addToast, {
+    stakerAddress: addresses?.RatchetNFTStaker as Address | undefined,
+    ownedRowKey: 'USDC',
+    nftName: 'Reservoir Ratchet',
+  });
 
   // ── Assemble sources, binding each registry entry to its hook state ─────
+  // Bind by config id (both NFTs are now live, so `isLive` no longer
+  // distinguishes them): Liquid Sky Phoenix is id 2, Reservoir Ratchet is id 6.
   const sources = useMemo<StakingSource[]>(() => {
-    const byLive = (isLive: boolean) =>
-      STAKEABLE_NFTS.find((n) => n.isLive === isLive);
-    const liquidMeta = byLive(true);
-    const ratchetMeta = STAKEABLE_NFTS.find((n) => !n.isLive);
+    const liquidMeta = STAKEABLE_NFTS.find((n) => n.config.id === 2);
+    const ratchetMeta = STAKEABLE_NFTS.find((n) => n.config.id === 6);
 
     const list: StakingSource[] = [];
     if (liquidMeta) list.push({ meta: liquidMeta, state: liquidSky });
