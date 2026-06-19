@@ -32,9 +32,14 @@ export function backOutGrowthStep(priceRaw: bigint, growthBasisPoints: number): 
  *
  * Formula (totalStaked > 0):
  *   annualRewardDollars = rewardRate / 1e18 * SECONDS_PER_YEAR * phUsdPrice
- *   highestPriceUsd     = backOutGrowthStep(priceRaw, growth) / 1e18  (USDS pinned to $1)
+ *   highestPriceUsd     = backOutGrowthStep(priceRaw, growth) / 10**priceDecimals
  *   denom               = totalStaked * highestPriceUsd
  *   minApy              = annualRewardDollars / denom * 100
+ *
+ * `rewardRate` is always denominated in phUSD (18 decimals), so it divides
+ * by 1e18 unconditionally. `priceRaw` is denominated in the NFT's payment
+ * token, whose scale varies (USDS = 18, USDC = 6), so it divides by
+ * 10**priceDecimals — defaulting to 18 to preserve the original USDS path.
  *
  * "minimum" because it assumes the staked subset was bought at the
  * highest historical mint price; earlier (cheaper) mints would yield a
@@ -57,9 +62,10 @@ export function computeMinApy(
   growthBasisPoints: number,
   phUsdPrice: number,
   targetAPY: bigint,
+  priceDecimals = 18,
 ): number {
   const highestPriceRaw = backOutGrowthStep(priceRaw, growthBasisPoints);
-  const highestPriceUsd = Number(highestPriceRaw) / 1e18;
+  const highestPriceUsd = Number(highestPriceRaw) / 10 ** priceDecimals;
 
   if (highestPriceUsd <= 0) return 0;
 

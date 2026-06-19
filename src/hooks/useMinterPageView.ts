@@ -32,6 +32,8 @@ export interface TokenMintData {
   nftBalance: number;
   /** Dispatcher index used by NFTMinter.mint() to identify this token's dispatcher */
   dispatcherIndex: number;
+  /** Decimals of the payment token (e.g. 18 for USDS, 6 for USDC) — the scale of the raw fields above. */
+  decimals: number;
 }
 
 /**
@@ -103,6 +105,7 @@ function parseTokenData(data: readonly bigint[], offset: number, decimals: numbe
     balance: formatUnits(balanceRaw, decimals),
     nftBalance: Number(nftBalanceRaw),
     dispatcherIndex: Number(dispatcherIndexRaw),
+    decimals,
   };
 }
 

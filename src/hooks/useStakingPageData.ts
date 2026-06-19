@@ -222,6 +222,10 @@ export function useStakingPageData(
   const ownedUnits = ownedRow?.nftBalance ?? 0;
   const priceRaw = ownedRow?.priceRaw ?? 0n;
   const growthBasisPoints = ownedRow?.growthBasisPoints ?? 0;
+  // `priceRaw` is denominated in the NFT's payment token, whose scale varies
+  // (Liquid Sky pays USDS = 18 decimals; Reservoir Ratchet pays USDC = 6).
+  // Convert the price to USD with the row's own decimals, not a hardcoded 1e18.
+  const priceDecimals = ownedRow?.decimals ?? 18;
 
   // ── Derived numbers ────────────────────────────────────────────────
   const phUsdPriceSafe = phUsdPrice ?? 1; // USDS pinned to $1; phUSD ≈ $1
@@ -237,7 +241,8 @@ export function useStakingPageData(
   const annualRewardDollars =
     (Number(currentRewardRate) / 1e18) * 86_400 * 365 * phUsdPriceSafe;
 
-  const highestPrice = Number(backOutGrowthStep(priceRaw, growthBasisPoints)) / 1e18;
+  const highestPrice =
+    Number(backOutGrowthStep(priceRaw, growthBasisPoints)) / 10 ** priceDecimals;
 
   const minApy = computeMinApy(
     currentRewardRate,
@@ -246,6 +251,7 @@ export function useStakingPageData(
     growthBasisPoints,
     phUsdPriceSafe,
     targetApyRaw,
+    priceDecimals,
   );
 
   // ── Write-tx state ─────────────────────────────────────────────────

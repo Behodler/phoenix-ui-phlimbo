@@ -98,6 +98,25 @@ describe('computeMinApy', () => {
     expect(apy).toBeGreaterThan(0);
     expect(Number.isFinite(apy)).toBe(true);
   });
+
+  it('defaults priceDecimals to 18 when the arg is omitted', () => {
+    const rewardRate = parseUnits('1', 18) / BigInt(SECONDS_PER_YEAR);
+    const omitted = computeMinApy(rewardRate, 1n, parseUnits('100', 18), 0, 1, 0n);
+    const explicit = computeMinApy(rewardRate, 1n, parseUnits('100', 18), 0, 1, 0n, 18);
+    expect(omitted).toBeCloseTo(explicit, 9);
+  });
+
+  it('is decimal-invariant: a 6-decimal (USDC) price yields the same APY as the equivalent 18-decimal (USDS) price', () => {
+    // Same $100 NFT price, expressed in USDS (18 dp) vs USDC (6 dp).
+    const rewardRate = parseUnits('1', 18) / BigInt(SECONDS_PER_YEAR);
+    const usds = computeMinApy(rewardRate, 1n, parseUnits('100', 18), 0, 1, 0n, 18);
+    const usdc = computeMinApy(rewardRate, 1n, parseUnits('100', 6), 0, 1, 0n, 6);
+    expect(usdc).toBeCloseTo(usds, 4);
+    // ... and a USDC price read with the wrong (18) scale wildly inflates APY,
+    // which is exactly the bug priceDecimals fixes.
+    const usdcMisread = computeMinApy(rewardRate, 1n, parseUnits('100', 6), 0, 1, 0n, 18);
+    expect(usdcMisread).toBeGreaterThan(usdc * 1e6);
+  });
 });
 
 describe('computeUserRatePerSec', () => {
