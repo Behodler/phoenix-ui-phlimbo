@@ -247,6 +247,7 @@ export function useNFTPrices(): UseNFTPricesResult {
     SCX: null,
     FLAX: null,
     USDS: 1,
+    USDC: 1,
     BTC: null,
   };
 

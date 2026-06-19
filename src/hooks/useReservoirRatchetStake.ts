@@ -4,34 +4,33 @@ import type { Toast } from '../types/toast';
 
 type AddToast = (toast: Omit<Toast, 'id'>) => string;
 
-/** Display APY for Smouldering Scarcity (mock — staker not deployed). */
-const SMOULDERING_APY = 6.8;
+/** Display APY for Reservoir Ratchet (mock — staker not deployed). */
+const RATCHET_APY = 6.8;
 /** Mock owned units (in wallet, not staked). */
-const SMOULDERING_OWNED = 5;
+const RATCHET_OWNED = 5;
 /** Mock staked units. */
-const SMOULDERING_STAKED = 0;
+const RATCHET_STAKED = 0;
 
 /**
  * phUSD/sec drip used when units are staked, so the LiveYieldCounter ticks
  * for the mock card. Chosen to read as a plausible small live yield without
  * implying real on-chain rewards. Only applied when `stakedUnits > 0`.
  */
-const SMOULDERING_RATE_PER_SEC = 0.0000025;
+const RATCHET_RATE_PER_SEC = 0.0000025;
 
 /**
- * Mock staking source for **Smouldering Scarcity** (id 3).
+ * Mock staking source for **Reservoir Ratchet** (id 6).
  *
- * Smouldering's NFTStaker contract is **not deployed yet**, so this hook
+ * Reservoir Ratchet's NFTStaker contract is **not deployed yet**, so this hook
  * returns the same `StakingPageData` shape as the live `useStakingPageData`
  * but with fixed mock numbers and no-op actions that fire an info toast.
- * Modeled on the deprecated `useStakingMockData`.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * PLUG-AND-PLAY SWAP POINT
  * ───────────────────────────────────────────────────────────────────────────
- * When the Smouldering Scarcity NFTStaker is deployed, replace the call to
- * this hook in `StakingSurface` with a real `useStakingPageData(...)` instance
- * pointed at the Smouldering staker address (parameterize that hook's
+ * When the Reservoir Ratchet NFTStaker is deployed, replace the call to this
+ * hook in `StakingSurface` with a real `useStakingPageData(...)` instance
+ * pointed at the Ratchet staker address (parameterize that hook's
  * staker-address / owned-units token-prefix / NFT name), and flip
  * `STAKEABLE_NFTS[...].isLive` to `true`. The rail, detail card, and
  * EarningPanel aggregation are source-agnostic and need NO changes. This file
@@ -43,18 +42,18 @@ const SMOULDERING_RATE_PER_SEC = 0.0000025;
  * owned/staked counts; the underlying actions are no-ops that surface a
  * "coming soon" info toast.
  */
-export function useSmoulderingScarcityStake(addToast?: AddToast): StakingPageData {
+export function useReservoirRatchetStake(addToast?: AddToast): StakingPageData {
   // Mock balances held in local state so the slider has something to bound
   // against. Stake/unstake are no-ops (mock — no real contract), so these do
   // not change; kept as state to mirror the real hook's reactive shape.
-  const [ownedUnits] = useState<number>(SMOULDERING_OWNED);
-  const [stakedUnits] = useState<number>(SMOULDERING_STAKED);
+  const [ownedUnits] = useState<number>(RATCHET_OWNED);
+  const [stakedUnits] = useState<number>(RATCHET_STAKED);
 
   // Pending yield baseline is 0; the LiveYieldCounter ticks from here using
   // ratePerSec. Only drip when something is staked (mirrors the mock).
   const pendingYield = 0;
   const ratePerSec = useMemo(
-    () => (stakedUnits > 0 ? SMOULDERING_RATE_PER_SEC : 0),
+    () => (stakedUnits > 0 ? RATCHET_RATE_PER_SEC : 0),
     [stakedUnits],
   );
 
@@ -62,7 +61,7 @@ export function useSmoulderingScarcityStake(addToast?: AddToast): StakingPageDat
     addToast?.({
       type: 'info',
       title: 'Coming soon',
-      description: 'Smouldering Scarcity staking goes live soon.',
+      description: 'Reservoir Ratchet staking goes live soon.',
     });
   }, [addToast]);
 
@@ -104,7 +103,7 @@ export function useSmoulderingScarcityStake(addToast?: AddToast): StakingPageDat
     ownedUnits,
     pendingYield,
     ratePerSec,
-    minApy: SMOULDERING_APY,
+    minApy: RATCHET_APY,
     highestPrice: 0,
     annualRewardDollars: 0,
     // Treat as approved so the primary CTA shows "Stake" (the no-op path)

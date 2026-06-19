@@ -4,7 +4,7 @@ import SegmentedControl from '../ui/SegmentedControl';
 import { nftStaticConfig, tokenPrefixToPriceKey } from '../../data/nftMockData';
 import type { NFTData } from '../../data/nftMockData';
 import { useNFTPrices } from '../../hooks/useNFTPrices';
-import { useMinterPageView } from '../../hooks/useMinterPageView';
+import { useMinterPageView, type TokenMintData } from '../../hooks/useMinterPageView';
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurface from './StakingSurface';
@@ -27,7 +27,11 @@ export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) 
   // Merge static config with live contract data
   const nftDataList: NFTData[] = useMemo(() => {
     return nftStaticConfig.map((config) => {
-      const tokenData = minterData?.[config.tokenPrefix];
+      // Index by prefix tolerantly: mock-only NFTs (e.g. USDC / Reservoir
+      // Ratchet) have no on-chain MinterPageView field, so this resolves to
+      // undefined and the defaults below apply.
+      const tokenData = (minterData as unknown as Record<string, TokenMintData | undefined> | null | undefined)
+        ?.[config.tokenPrefix];
       // Determine totalBurnt for EYE, SCX, Flax
       let totalBurnt: string | undefined;
       if (minterData) {
@@ -76,6 +80,16 @@ export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) 
   }, [nftDataList, selectedNft]);
 
   const handleMintClick = (nft: NFTData) => {
+    // Mock-only NFTs (e.g. Reservoir Ratchet) are not deployed on-chain yet —
+    // surface a "coming soon" toast rather than opening the mint modal.
+    if (nft.comingSoon) {
+      addToast({
+        type: 'info',
+        title: 'Coming soon',
+        description: <><em>{nft.name}</em> minting goes live soon.</>,
+      });
+      return;
+    }
     setSelectedNft(nft);
     setIsModalOpen(true);
   };

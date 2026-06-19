@@ -8,7 +8,7 @@ import NFTSelectorGrid from './NFTSelectorGrid';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useWalletBalances } from '../../contexts/WalletBalancesContext';
 import { useYieldFunnelData, type PendingYieldItem } from '../../hooks/useYieldFunnelData';
-import { useMinterPageView } from '../../hooks/useMinterPageView';
+import { useMinterPageView, type TokenMintData } from '../../hooks/useMinterPageView';
 import { useTokenAllowance, useTokenApproval } from '../../hooks/useContractInteractions';
 import { useApprovalTransaction } from '../../hooks/useTransaction';
 import { useToast } from '../ui/ToastProvider';
@@ -106,8 +106,14 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
 
   // Merge static NFT config with live MinterPageView data
   const nftList: NFTData[] = minterPageData
-    ? nftStaticConfig.map((cfg) => {
-        const live = minterPageData[cfg.tokenPrefix];
+    ? nftStaticConfig
+        // Exclude mock-only NFTs (e.g. Reservoir Ratchet) — they have no
+        // on-chain MinterPageView data and cannot be burned in the yield funnel.
+        .filter((cfg) => !cfg.comingSoon)
+        .map((cfg) => {
+        // Safe to index: `comingSoon` (mock-only) prefixes are filtered out
+        // above, so every remaining prefix has on-chain MinterPageView data.
+        const live = (minterPageData as unknown as Record<string, TokenMintData>)[cfg.tokenPrefix];
         const totalBurntMap: Record<string, string | undefined> = {
           EYE: minterPageData.eyeTotalBurnt,
           SCX: minterPageData.scxTotalBurnt,

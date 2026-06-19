@@ -3,6 +3,7 @@ import sUsdsImg from '../assets/sUSDS.png';
 import scxImg from '../assets/SCX.png';
 import bitcoinImg from '../assets/Bitcoin.png';
 import flaxImg from '../assets/Flax.png';
+import ratchetImg from '../assets/Ratchet.png';
 
 /**
  * Static configuration for each NFT (non-contract fields).
@@ -20,8 +21,12 @@ export interface NFTStaticConfig {
   action: string;
   /** Explanation of why this NFT is valuable */
   reason: string;
-  /** Token prefix matching MinterPageView data keys (EYE, SCX, Flax, USDS, WBTC) */
-  tokenPrefix: 'EYE' | 'SCX' | 'Flax' | 'USDS' | 'WBTC';
+  /**
+   * Token prefix matching MinterPageView data keys (EYE, SCX, Flax, USDS, WBTC).
+   * `USDC` is a mock-only prefix (Reservoir Ratchet) with no on-chain MinterPageView
+   * field — it is filtered out of the live yield-funnel surface via `comingSoon`.
+   */
+  tokenPrefix: 'EYE' | 'SCX' | 'Flax' | 'USDS' | 'WBTC' | 'USDC';
   /** Display name of the input token */
   tokenDisplayName: string;
   /** Number of decimals for the input token's ERC20 contract */
@@ -31,6 +36,12 @@ export interface NFTStaticConfig {
    * When false/undefined, uses the single-mint path. Currently only set on Liquid Sky Phoenix.
    */
   batchEnabled?: boolean;
+  /**
+   * When true, this NFT is not yet deployed on-chain (mock-only). Clicking "Mint"
+   * surfaces a "coming soon" toast instead of opening the mint modal, and the NFT
+   * is excluded from the live yield-funnel surface (it has no MinterPageView data).
+   */
+  comingSoon?: boolean;
 }
 
 /**
@@ -43,7 +54,7 @@ export interface NFTData {
   image: string;
   action: string;
   reason: string;
-  tokenPrefix: 'EYE' | 'SCX' | 'Flax' | 'USDS' | 'WBTC';
+  tokenPrefix: 'EYE' | 'SCX' | 'Flax' | 'USDS' | 'WBTC' | 'USDC';
   tokenDisplayName: string;
   /** Formatted price in input token amount */
   price: string;
@@ -70,6 +81,8 @@ export interface NFTData {
    * `BatchNFTMinter` address is non-zero, the mint modal renders the batch UI.
    */
   batchEnabled?: boolean;
+  /** Mirrors `NFTStaticConfig.comingSoon`. When true, mint shows a "coming soon" toast. */
+  comingSoon?: boolean;
 }
 
 /**
@@ -128,6 +141,17 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     tokenDisplayName: "FLAX",
     decimals: 18,
   },
+  {
+    id: 6,
+    name: "Reservoir Ratchet",
+    image: ratchetImg,
+    action: "USDC increases whale nudge reward.",
+    reason: "NFT staking for fish that encourages whales",
+    tokenPrefix: "USDC",
+    tokenDisplayName: "USDC",
+    decimals: 6,
+    comingSoon: true,
+  },
 ];
 
 /**
@@ -160,7 +184,7 @@ export interface StakeableNft {
 }
 
 const liquidSkyConfig = nftStaticConfig.find((n) => n.id === 2)!;
-const smoulderingConfig = nftStaticConfig.find((n) => n.id === 3)!;
+const ratchetConfig = nftStaticConfig.find((n) => n.id === 6)!;
 
 /**
  * The ordered set of stakeable NFTs rendered in the rail.
@@ -176,9 +200,9 @@ export const STAKEABLE_NFTS: StakeableNft[] = [
     isLive: true,
   },
   {
-    config: smoulderingConfig,
+    config: ratchetConfig,
     apy: 6.8,
-    tagline: 'SCX is burnt',
+    tagline: ratchetConfig.action,
     isLive: false,
   },
 ];
@@ -193,6 +217,7 @@ export const tokenPrefixToAddressKey: Record<string, string> = {
   Flax: 'Flax',
   WBTC: 'WBTC',
   USDS: 'USDS',
+  USDC: 'USDC',
 };
 
 /**
@@ -205,4 +230,5 @@ export const tokenPrefixToPriceKey: Record<string, string> = {
   Flax: 'FLAX',
   USDS: 'USDS',
   WBTC: 'BTC',
+  USDC: 'USDC',
 };

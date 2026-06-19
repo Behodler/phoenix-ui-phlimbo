@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { STAKEABLE_NFTS } from '../../data/nftMockData';
 import type { StakeableNft } from '../../data/nftMockData';
 import { useStakingPageData } from '../../hooks/useStakingPageData';
-import { useSmoulderingScarcityStake } from '../../hooks/useSmoulderingScarcityStake';
+import { useReservoirRatchetStake } from '../../hooks/useReservoirRatchetStake';
 import type { StakingPageData } from '../../hooks/useStakingPageData';
 import type { Toast } from '../../types/toast';
 import EarningPanel from './staking/EarningPanel';
@@ -40,27 +40,27 @@ export default function StakingSurface({ addToast }: StakingSurfaceProps) {
   // Liquid Sky Phoenix (id 2) — LIVE on-chain wiring, unchanged.
   const liquidSky = useStakingPageData(addToast);
 
-  // Smouldering Scarcity (id 3) — MOCK source (staker not deployed yet).
+  // Reservoir Ratchet (id 6) — MOCK source (staker not deployed yet).
   //
   // ░░░ PLUG-AND-PLAY SWAP POINT ░░░
-  // When the Smouldering NFTStaker deploys, replace the line below with a real
-  // `useStakingPageData(...)` instance pointed at the Smouldering staker
+  // When the Reservoir Ratchet NFTStaker deploys, replace the line below with a
+  // real `useStakingPageData(...)` instance pointed at the Ratchet staker
   // address, and flip `isLive: true` in the STAKEABLE_NFTS registry. The rail,
   // detail card, and aggregation are source-agnostic — nothing else changes.
-  const smouldering = useSmoulderingScarcityStake(addToast);
+  const ratchet = useReservoirRatchetStake(addToast);
 
   // ── Assemble sources, binding each registry entry to its hook state ─────
   const sources = useMemo<StakingSource[]>(() => {
     const byLive = (isLive: boolean) =>
       STAKEABLE_NFTS.find((n) => n.isLive === isLive);
     const liquidMeta = byLive(true);
-    const smoulderingMeta = STAKEABLE_NFTS.find((n) => !n.isLive);
+    const ratchetMeta = STAKEABLE_NFTS.find((n) => !n.isLive);
 
     const list: StakingSource[] = [];
     if (liquidMeta) list.push({ meta: liquidMeta, state: liquidSky });
-    if (smoulderingMeta) list.push({ meta: smoulderingMeta, state: smouldering });
+    if (ratchetMeta) list.push({ meta: ratchetMeta, state: ratchet });
     return list;
-  }, [liquidSky, smouldering]);
+  }, [liquidSky, ratchet]);
 
   const [selectedId, setSelectedId] = useState<number>(
     () => sources[0]?.meta.config.id ?? STAKEABLE_NFTS[0]?.config.id ?? 0,
