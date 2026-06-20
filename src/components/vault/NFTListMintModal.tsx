@@ -35,26 +35,40 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   const { addToast } = useToast();
   const { writeContractAsync } = useWriteContract();
 
-  // Runtime predicate: route through BatchNFTMinter when:
-  //   1. The NFT's static config has `batchEnabled: true` (Liquid Sky Phoenix only).
-  //   2. The resolved BatchNFTMinter address is non-zero (graceful mainnet fallback).
+  // The batch minter this NFT routes through, named by its static config:
+  //   - Liquid Sky Phoenix → BatchNFTMinter (USDS)
+  //   - Reservoir Ratchet   → RatchetBatchNFTMinter (USDC)
+  // Each helper holds its own target NFT minter, payment token, and dispatcher
+  // index in contract state, so the UI just resolves the right address.
+  const batchMinterAddress = nft?.batchMinterKey
+    ? (addresses?.[nft.batchMinterKey] as Address | undefined)
+    : undefined;
+
+  // Runtime predicate: route through the batch minter when:
+  //   1. The NFT's static config has `batchEnabled: true`.
+  //   2. Its resolved batch-minter address is non-zero (graceful mainnet
+  //      fallback — RatchetBatchNFTMinter is still undeployed on mainnet).
   // Lower-cased compare guards against any future capitalisation drift in the
   // address-server response.
   const useBatchFlow =
     !!nft?.batchEnabled &&
-    !!addresses?.BatchNFTMinter &&
-    addresses.BatchNFTMinter.toLowerCase() !== ZERO_ADDRESS;
+    !!batchMinterAddress &&
+    batchMinterAddress.toLowerCase() !== ZERO_ADDRESS;
+
+  // Payment token for the batch flow is the NFT's own input token (USDS for
+  // Liquid Sky, USDC for Reservoir Ratchet), resolved from its tokenPrefix.
+  const batchPaymentTokenKey = nft ? tokenPrefixToAddressKey[nft.tokenPrefix] : undefined;
+  const batchPaymentToken = batchPaymentTokenKey
+    ? (addresses?.[batchPaymentTokenKey as keyof typeof addresses] as Address | undefined)
+    : undefined;
 
   // Allowance read against the batch helper. Always wired (hook order must be
   // stable) but only consumed when `useBatchFlow` is true.
-  const usdsAddress = addresses?.USDS as Address | undefined;
-  const batchHelperAddress = useBatchFlow
-    ? (addresses?.BatchNFTMinter as Address)
-    : undefined;
+  const batchHelperAddress = useBatchFlow ? batchMinterAddress : undefined;
   const { allowance: batchAllowance, refetch: refetchBatchAllowance } = useTokenAllowance(
     walletAddress,
     batchHelperAddress,
-    usdsAddress,
+    batchPaymentToken,
   );
 
   // Batch-mint controls state. Always called for hook-order stability;
@@ -135,7 +149,7 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
     try {
       addToast({ type: 'info', title: 'Confirm in Wallet', description: `Please confirm the ${nft.tokenDisplayName} approval in your wallet.`, duration: 30000 });
       const spender = useBatchFlow
-        ? (addresses!.BatchNFTMinter as `0x${string}`)
+        ? (batchHelperAddress as `0x${string}`)
         : (nftPrimary.NFTMinter as `0x${string}`);
       const hash = useBatchFlow
         ? await approve(tokenAddress, spender, batchControls.requiredRaw)
@@ -171,15 +185,17 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
 
       let hash: `0x${string}`;
       if (useBatchFlow) {
-        // BatchNFTMinter.batchMint pulls the full paymentAmount upfront, mints
-        // `count` consecutive units (each step bumps the dispatcher price), and
-        // refunds dust below threshold. The target NFT minter, payment token,
-        // and dispatcher index now live in BatchNFTMinter state (set on the
-        // contract), so only count/recipient/payment are passed here.
+        // batchMint pulls the full paymentAmount upfront, mints `count`
+        // consecutive units (each step bumps the dispatcher price), and refunds
+        // dust below threshold. The target NFT minter, payment token, and
+        // dispatcher index live in the batch minter's contract state (set on the
+        // contract), so only count/recipient/payment are passed here. The helper
+        // address itself is resolved per-NFT (BatchNFTMinter vs
+        // RatchetBatchNFTMinter) via `batchMinterKey`.
         // `minReward` is the slippage floor on the nudge reward; 0n accepts any
         // reward, matching the pre-nudge contract's behaviour.
         hash = await writeContractAsync({
-          address: addresses!.BatchNFTMinter as `0x${string}`,
+          address: batchHelperAddress as `0x${string}`,
           abi: batchNftMinterAbi,
           functionName: 'batchMint',
           args: [

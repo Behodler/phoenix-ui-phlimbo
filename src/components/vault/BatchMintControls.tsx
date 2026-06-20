@@ -32,7 +32,6 @@ export default function BatchMintControlsView({
   onSliderChange,
   onTextChange,
 }: BatchMintControlsViewProps) {
-  void nft; // reserved for future per-NFT styling; retained for interface symmetry.
   return (
     <div className="mt-4 flex flex-col gap-4">
       <div>
@@ -54,7 +53,7 @@ export default function BatchMintControlsView({
             htmlFor="batch-mint-approve-amount"
             className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block"
           >
-            Amount to approve (USDS)
+            Amount to approve ({nft.tokenDisplayName})
           </label>
           <input
             id="batch-mint-approve-amount"
