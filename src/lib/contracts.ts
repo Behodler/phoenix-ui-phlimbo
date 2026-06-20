@@ -71,7 +71,7 @@ export const mainnetAddresses: ContractAddresses = {
   // Story 048: reverted from 0xeBEc50cD19310e6ed59D8153313Ec7C888152c1A (index-6 view)
   // to the prior index-4 view ahead of the dispatcher cutover. Verified on-chain:
   // getData(0)[23] == 4 for the address below.
-  MintPageView: "0x64FE63ca7BA456a9Bb190140e35DF2e437AbD119",
+  MintPageView: "0x7e329338d319882ba1809b648eba584b3a4630cb",
   // NFT staking
   BalancerPoolerMintDebtHook: "0x4a26ad83306a2f17155799fdd9449f77eb3f8bd7",
   NFTStaker: "0xc8514f821a3d801fa8a8c435840a992a4365a13b",
@@ -83,11 +83,12 @@ export const mainnetAddresses: ContractAddresses = {
   // NudgeRatchet dispatcher + its mint-debt hook — not yet deployed on mainnet (story 068).
   // Zero placeholders so this file still satisfies the ContractAddresses interface once the
   // local deploy added these fields. Patch by hand when they ship to mainnet.
-  NudgeRatchet: "0x0000000000000000000000000000000000000000",
-  NudgeRatchetMintDebtHook: "0x0000000000000000000000000000000000000000",
+  NudgeRatchet: "0x7a4ed11160a06bb1c5b59091575d59707be97a72",
+  NudgeRatchetMintDebtHook: "0xdcddb2f6548d5f1bac812110679e4c87e4ba9958",
   // Dedicated NFTStaker for the NudgeRatchet NFT — not yet deployed on mainnet (story 068).
-  RatchetNFTStaker: "0x0000000000000000000000000000000000000000",
+  RatchetNFTStaker: "0x299b0071def42d35eaf5ea24cc0a71cf10655a64",
   // Dedicated BatchNFTMinter for the NudgeRatchet NFT (UI batch-mint entrypoint; pays USDC,
   // rewards USDS) — not yet deployed on mainnet (story 068). Patch by hand when it ships.
-  RatchetBatchNFTMinter: "0x0000000000000000000000000000000000000000",
+  RatchetBatchNFTMinter: "0x81896f48a95abea255cd38a3010e985b6051a1c7",
 };
+
