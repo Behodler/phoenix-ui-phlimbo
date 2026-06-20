@@ -3,7 +3,6 @@ import PhUsdCoin from './PhUsdCoin';
 
 export interface EarningPanelProps {
   totalUnits: number;
-  minApy: number;
   ratePerSecond: number;
   /**
    * User's currently-claimable phUSD (counter baseline).
@@ -19,12 +18,11 @@ export interface EarningPanelProps {
 /**
  * Global "Your phUSD earning · live" hero panel.
  *
- * Layout: big live counter on the left, summary stats (units staked, min APY)
+ * Layout: big live counter on the left, summary stats (units staked)
  * on the right, flavor stripe at the bottom.
  */
 export default function EarningPanel({
   totalUnits,
-  minApy,
   ratePerSecond,
   pendingYield,
 }: EarningPanelProps) {
@@ -59,14 +57,6 @@ export default function EarningPanel({
               Units staked
             </div>
             <div className="font-mono text-[22px] font-bold tabular-nums text-pxusd-white">{totalUnits}</div>
-          </div>
-          <div>
-            <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-              Min APY
-            </div>
-            <div className="font-mono text-[22px] font-bold tabular-nums text-pxusd-orange-300">
-              {minApy.toFixed(2)}%
-            </div>
           </div>
         </div>
       </div>

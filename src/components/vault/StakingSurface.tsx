@@ -94,20 +94,10 @@ export default function StakingSurface({ addToast }: StakingSurfaceProps) {
     () => sources.reduce((sum, s) => sum + s.state.ratePerSec, 0),
     [sources],
   );
-  const minApy = useMemo(() => {
-    const staked = sources.filter((s) => s.state.stakedUnits > 0);
-    // Graceful fallback: when nothing is staked, show the min over all
-    // sources rather than Infinity.
-    const pool = staked.length > 0 ? staked : sources;
-    if (pool.length === 0) return 0;
-    return Math.min(...pool.map(apyFor));
-  }, [sources]);
-
   return (
     <div>
       <EarningPanel
         totalUnits={totalUnits}
-        minApy={minApy}
         ratePerSecond={ratePerSecond}
         pendingYield={pendingYield}
       />
