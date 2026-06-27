@@ -35,6 +35,11 @@ export interface YieldFunnelData {
   strategies: string[];
   pendingYield: PendingYieldItem[];
 
+  // Strategies to skip on claim: the user's explicit unchecks plus any
+  // strategy hidden from the checklist (no claimable yield). Pass this to
+  // claim() so an "underwater" source is skipped instead of reverting the tx.
+  effectiveExemptStrategies: readonly `0x${string}`[];
+
   // Discount and pricing
   discountRate: bigint;
   discountPercent: number;
@@ -172,37 +177,6 @@ export function useYieldFunnelData(
     },
   });
 
-  // Query 3: Get claim amount (USDC cost)
-  const {
-    data: claimAmount,
-    isLoading: claimAmountLoading,
-    isError: claimAmountError,
-    refetch: refetchClaimAmount,
-  } = useReadContract({
-    address: accumulatorAddress,
-    abi: stableYieldAccumulatorAbi,
-    functionName: 'calculateClaimAmount',
-    args: [exemptStrategies],
-    query: {
-      enabled: !!accumulatorAddress,
-    },
-  });
-
-  // Query 4: Get total yield
-  const {
-    data: totalYield,
-    isLoading: totalYieldLoading,
-    isError: totalYieldError,
-    refetch: refetchTotalYield,
-  } = useReadContract({
-    address: accumulatorAddress,
-    abi: stableYieldAccumulatorAbi,
-    functionName: 'getTotalYield',
-    query: {
-      enabled: !!accumulatorAddress,
-    },
-  });
-
   // Build multicall contracts array for strategy tokens and yields
   const strategyContracts = useMemo(() => {
     if (!strategies || strategies.length === 0 || !accumulatorAddress) {
@@ -238,7 +212,9 @@ export function useYieldFunnelData(
     return contracts;
   }, [strategies, accumulatorAddress]);
 
-  // Query 5: Multicall for strategy tokens and yields
+  // Query: Multicall for strategy tokens and yields. Declared before the
+  // claim-amount query because the effective exempt list (below) depends on
+  // each strategy's yield.
   const {
     data: strategyData,
     isLoading: strategyDataLoading,
@@ -248,6 +224,72 @@ export function useYieldFunnelData(
     contracts: strategyContracts,
     query: {
       enabled: strategyContracts.length > 0,
+    },
+  });
+
+  // Effective exempt list driving both the cost calc and the claim tx. The
+  // checklist hides any strategy with no claimable yield (see the zero-yield
+  // skip in the pendingYield memo below), so a hidden / "underwater" strategy
+  // is never rendered as a checkbox and can never enter the user's exempt set.
+  // Fold every such strategy into the exempt list alongside the user's
+  // explicit unchecks. Without this, claim() would be asked to claim a
+  // zero-yield strategy and revert, making the claim appear to silently fail.
+  const effectiveExemptStrategies = useMemo<readonly `0x${string}`[]>(() => {
+    if (!strategies || strategies.length === 0) {
+      return exemptStrategies;
+    }
+    // Yield data not loaded yet: fall back to the user's explicit exemptions.
+    if (!strategyData) {
+      return exemptStrategies;
+    }
+
+    const userExempt = new Set(exemptStrategies.map((s) => s.toLowerCase()));
+    const result: `0x${string}`[] = [];
+
+    for (let i = 0; i < strategies.length; i++) {
+      const strategy = strategies[i] as `0x${string}`;
+      const yieldResult = strategyData[i * 2 + 1]; // getYield result
+      const hasYield =
+        yieldResult?.status === 'success' && (yieldResult.result as bigint) > 0n;
+
+      // Exempt when the user unchecked it, or when it's hidden from the
+      // checklist (no successful, positive yield).
+      if (userExempt.has(strategy.toLowerCase()) || !hasYield) {
+        result.push(strategy);
+      }
+    }
+
+    return result;
+  }, [strategies, strategyData, exemptStrategies]);
+
+  // Query 3: Get claim amount (USDC cost)
+  const {
+    data: claimAmount,
+    isLoading: claimAmountLoading,
+    isError: claimAmountError,
+    refetch: refetchClaimAmount,
+  } = useReadContract({
+    address: accumulatorAddress,
+    abi: stableYieldAccumulatorAbi,
+    functionName: 'calculateClaimAmount',
+    args: [effectiveExemptStrategies],
+    query: {
+      enabled: !!accumulatorAddress,
+    },
+  });
+
+  // Query 4: Get total yield
+  const {
+    data: totalYield,
+    isLoading: totalYieldLoading,
+    isError: totalYieldError,
+    refetch: refetchTotalYield,
+  } = useReadContract({
+    address: accumulatorAddress,
+    abi: stableYieldAccumulatorAbi,
+    functionName: 'getTotalYield',
+    query: {
+      enabled: !!accumulatorAddress,
     },
   });
 
@@ -375,6 +417,7 @@ export function useYieldFunnelData(
   return {
     strategies: (strategies as string[]) ?? [],
     pendingYield,
+    effectiveExemptStrategies,
     discountRate: discountRate ?? 0n,
     discountPercent,
     claimAmount: claimAmount ?? 0n,

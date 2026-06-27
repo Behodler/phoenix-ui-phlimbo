@@ -64,6 +64,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   // non-linear discount semantics.
   const {
     pendingYield,
+    effectiveExemptStrategies,
     discountPercent,
     claimAmount,
     claimAmountFormatted,
@@ -331,13 +332,16 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       }
 
       // Call claim(nftIndex, minRewardTokenSupplied, exemptStrategies).
-      // exemptStrategies is the list of yield-strategy addresses to skip;
-      // an empty array means "claim every strategy" (the default).
+      // exemptStrategies is the list of yield-strategy addresses to skip. Use
+      // `effectiveExemptStrategies`, which folds the user's unchecks together
+      // with any source hidden from the checklist for having no claimable
+      // yield — otherwise the contract would try to claim a zero-yield
+      // ("underwater") source and revert, silently failing the claim.
       const hash = await writeClaim({
         address: addresses.StableYieldAccumulator as `0x${string}`,
         abi: stableYieldAccumulatorAbi,
         functionName: 'claim',
-        args: [BigInt(selectedNft.dispatcherIndex), 0n, exemptStrategies],
+        args: [BigInt(selectedNft.dispatcherIndex), 0n, effectiveExemptStrategies],
       });
 
       // Show confirming toast

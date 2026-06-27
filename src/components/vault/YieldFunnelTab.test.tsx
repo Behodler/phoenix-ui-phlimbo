@@ -124,6 +124,10 @@ vi.mock('../../hooks/useYieldFunnelData', () => ({
       : 0n;
     return {
       pendingYield: pending,
+      // The fixture's pending rows are all visible (non-zero yield), so there
+      // are no hidden "underwater" strategies to fold in — the effective
+      // exempt list is exactly the user's unchecks.
+      effectiveExemptStrategies: exemptStrategies,
       discountPercent: 5,
       claimAmount: scaledClaimAmount,
       claimAmountFormatted: yieldDataFixture.state.claimAmountFormatted,
