@@ -85,16 +85,21 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
 
       {/* Fixed rate — Original stakers (teal) */}
       <section
-        className="mb-4 rounded-[18px] border border-pxusd-teal-400/[0.42] p-3.5"
+        className="mb-4 rounded-[18px] border p-3.5"
         style={{
           background:
             'linear-gradient(180deg, rgba(31,90,115,.16), rgba(10,28,40,0) 78%)',
+          borderColor: 'rgba(31,90,115,0.42)',
         }}
       >
         <div className="mb-[3px] flex items-center gap-2.5">
           <span
-            className="whitespace-nowrap rounded-md border border-pxusd-teal-400/[0.55] bg-pxusd-teal-400/[0.34] px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em]"
-            style={{ color: '#8fd0e8' }}
+            className="whitespace-nowrap rounded-md border px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em]"
+            style={{
+              color: '#8fd0e8',
+              background: 'rgba(31,90,115,0.34)',
+              borderColor: 'rgba(31,90,115,0.55)',
+            }}
           >
             Fixed rate
           </span>
@@ -110,14 +115,21 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
 
       {/* MasterChef — Protocol-token stakers (orange) */}
       <section
-        className="mb-4 rounded-[18px] border border-pxusd-orange-400/[0.32] p-3.5"
+        className="mb-4 rounded-[18px] border p-3.5"
         style={{
           background:
             'linear-gradient(180deg, rgba(255,140,66,.11), rgba(10,28,40,0) 78%)',
+          borderColor: 'rgba(255,140,66,0.32)',
         }}
       >
         <div className="mb-[3px] flex items-center gap-2.5">
-          <span className="whitespace-nowrap rounded-md border border-pxusd-orange-400/[0.42] bg-pxusd-orange-400/[0.14] px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-pxusd-orange-300">
+          <span
+            className="whitespace-nowrap rounded-md border px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-pxusd-orange-300"
+            style={{
+              background: 'rgba(255,140,66,0.14)',
+              borderColor: 'rgba(255,140,66,0.42)',
+            }}
+          >
             MasterChef
           </span>
           <div className="text-sm font-extrabold tracking-[-0.01em] text-pxusd-white">
@@ -132,14 +144,19 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
 
       {/* Why is APY a range? */}
       <div
-        className="mt-1 flex items-start gap-3.5 rounded-[14px] border border-pxusd-teal-400/[0.22] px-4 py-4"
+        className="mt-1 flex items-start gap-3.5 rounded-[14px] border px-4 py-4"
         style={{
           background: 'linear-gradient(180deg, rgba(31,90,115,.14), rgba(10,28,40,0))',
+          borderColor: 'rgba(166,219,239,0.22)',
         }}
       >
         <div
-          className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg border border-pxusd-teal-400/[0.34] bg-pxusd-teal-400/[0.14] font-mono text-sm font-extrabold"
-          style={{ color: '#a6dbef' }}
+          className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg border font-mono text-sm font-extrabold"
+          style={{
+            color: '#a6dbef',
+            background: 'rgba(166,219,239,0.14)',
+            borderColor: 'rgba(166,219,239,0.34)',
+          }}
         >
           ?
         </div>

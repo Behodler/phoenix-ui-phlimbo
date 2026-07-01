@@ -91,10 +91,8 @@ export default function NftStakerAccordionRow({
 
   return (
     <div
-      className={[
-        'mb-2.5 overflow-hidden rounded-[14px] border bg-white/[0.02] transition-colors',
-        isOpen ? 'border-pxusd-orange-400/[0.42]' : 'border-border',
-      ].join(' ')}
+      className="mb-2.5 overflow-hidden rounded-[14px] border border-border bg-white/[0.02] transition-colors"
+      style={isOpen ? { borderColor: 'rgba(255,140,66,0.42)' } : undefined}
     >
       <button
         type="button"
