@@ -8,16 +8,24 @@ import { useMinterPageView, type TokenMintData } from '../../hooks/useMinterPage
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurface from './StakingSurface';
+import StakingSurfaceMock from './stakeMock/StakingSurfaceMock';
 import WhaleMintPanel from './WhaleMintPanel';
 
-export type NFTSubTab = 'mint' | 'stake';
+export type NFTSubTab = 'mint' | 'stake' | 'stake-mock';
 
 interface NFTListTabProps {
   subTab: NFTSubTab;
   onSubTabChange: (subTab: NFTSubTab) => void;
+  /**
+   * When true, expose the admin-only "Stake Preview" sub-tab (the unwired NFT
+   * staking redesign). Reuses VaultPage's existing `hasAdminAccess` signal so
+   * the preview ships to the live UI for design review without exposing it to
+   * end users. Non-admins never see the option and can never land on it.
+   */
+  canSeeStakePreview?: boolean;
 }
 
-export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) {
+export default function NFTListTab({ subTab, onSubTabChange, canSeeStakePreview = false }: NFTListTabProps) {
   const { addToast } = useToast();
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -145,17 +153,10 @@ export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) 
           onChange={onSubTabChange}
           options={[
             { value: 'mint', label: 'Mint' },
-            {
-              value: 'stake',
-              label: (
-                <span className="inline-flex items-center gap-1.5">
-                  Stake
-                  <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-gradient-to-r from-pink-400 via-orange-400 to-yellow-400 text-white shadow-sm animate-pulse">
-                    NEW
-                  </span>
-                </span>
-              ),
-            },
+            { value: 'stake', label: 'Stake' },
+            ...(canSeeStakePreview
+              ? [{ value: 'stake-mock' as const, label: 'Stake Preview' }]
+              : []),
           ]}
         />
       </div>
@@ -207,6 +208,12 @@ export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) 
             refetchMinterData={refetchMinterData}
           />
         </>
+      ) : subTab === 'stake-mock' && canSeeStakePreview ? (
+        // Admin-only redesign preview (mock data). Guarded so a non-admin who
+        // somehow holds this sub-tab value falls through to the wired surface.
+        <div className="max-w-4xl mx-auto">
+          <StakingSurfaceMock addToast={addToast} />
+        </div>
       ) : (
         <div className="max-w-4xl mx-auto">
           <StakingSurface addToast={addToast} />
