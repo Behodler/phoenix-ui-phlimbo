@@ -27,7 +27,7 @@ export default function ApyRangePill({ floor, ceil, variant }: ApyRangePillProps
   return (
     <span
       className={[
-        'inline-block rounded-full border px-[9px] py-[3px] font-mono text-xs font-bold tabular-nums',
+        'inline-block whitespace-nowrap rounded-full border px-[9px] py-[3px] font-mono text-xs font-bold tabular-nums',
         isMc ? 'text-pxusd-orange-300' : '',
       ].join(' ')}
       style={

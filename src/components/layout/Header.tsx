@@ -24,12 +24,13 @@ export default function Header() {
           <div className="hidden sm:block">
             <div className="text-xl leading-tight text-pxusd-white">Phoenix</div>
             <div className="text-sm font-semibold text-pxusd-white">phUSD minter</div>
-            <div className="text-sm text-muted-foreground font-semibold italic">B3 Tech</div>
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <PollingToggle />
-          <WalletBalances />
+          <div className="flex flex-col items-end gap-1">
+            <PollingToggle />
+            <WalletBalances />
+          </div>
           <ConnectButton />
         </div>
       </div>

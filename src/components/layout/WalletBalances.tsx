@@ -5,9 +5,10 @@ import { useWalletBalances } from '../../contexts/WalletBalancesContext';
 /**
  * WalletBalances Component
  *
- * Displays DOLA, phUSD, and USDC token balances for the connected wallet.
- * Now consumes balances from WalletBalancesContext for centralized refresh support.
- * Only renders when a wallet is connected.
+ * Displays DOLA, phUSD, USDC, and USDe token balances for the connected wallet.
+ * Consumes balances from WalletBalancesContext for centralized refresh support.
+ * Rendered as a compact horizontal row (wide/desktop screens only), all values
+ * formatted to 2 decimal places. Only renders when a wallet is connected.
  */
 export default function WalletBalances() {
   const { isConnected, address: walletAddress } = useAccount();
@@ -17,12 +18,15 @@ export default function WalletBalances() {
     dolaBalanceRaw,
     phUsdBalanceRaw,
     usdcBalanceRaw,
+    usdeBalanceRaw,
     dolaLoading,
     phUsdLoading,
     usdcLoading,
+    usdeLoading,
     dolaError,
     phUsdError,
-    usdcError
+    usdcError,
+    usdeError
   } = useWalletBalances();
 
   // Don't render if wallet not connected
@@ -30,64 +34,42 @@ export default function WalletBalances() {
     return null;
   }
 
-  // Convert balances from wei to decimal (18 decimals for DOLA/phUSD, 6 decimals for USDC)
+  // Convert balances from wei to decimal (18 decimals for DOLA/phUSD/USDe, 6 for USDC)
   const dolaBalance = dolaBalanceRaw ? parseFloat(formatUnits(dolaBalanceRaw, 18)) : 0;
   const phUSDBalance = phUsdBalanceRaw ? parseFloat(formatUnits(phUsdBalanceRaw, 18)) : 0;
   const usdcBalance = usdcBalanceRaw ? parseFloat(formatUnits(usdcBalanceRaw, 6)) : 0;
+  const usdeBalance = usdeBalanceRaw ? parseFloat(formatUnits(usdeBalanceRaw, 18)) : 0;
 
-  // Format balance with appropriate decimals
-  const formatBalance = (balance: number): string => {
-    if (balance === 0) return '0.00';
-    if (balance < 0.01) return balance.toFixed(4);
-    if (balance < 1) return balance.toFixed(3);
-    if (balance < 1000) return balance.toFixed(2);
-    // Add comma separators for large numbers
-    return balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  // Format every balance to exactly 2 decimal places (with comma separators).
+  const formatBalance = (balance: number): string =>
+    balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const renderItem = (
+    label: string,
+    balance: number,
+    loading: boolean,
+    error: boolean
+  ) => (
+    <div className="flex items-center gap-1">
+      <span className="text-[10px] text-muted-foreground">{label}:</span>
+      {loading ? (
+        <span className="text-[10px] text-muted-foreground animate-pulse">Loading...</span>
+      ) : error ? (
+        <span className="text-[10px] text-red-400">Error</span>
+      ) : (
+        <span className="text-xs font-semibold text-pxusd-white">
+          {formatBalance(balance)}
+        </span>
+      )}
+    </div>
+  );
 
   return (
-    <div className="hidden sm:flex flex-col gap-1 text-right mr-3">
-      {/* DOLA Balance */}
-      <div className="flex items-center gap-2 justify-end">
-        <span className="text-xs text-muted-foreground">DOLA:</span>
-        {dolaLoading ? (
-          <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
-        ) : dolaError ? (
-          <span className="text-xs text-red-400">Error</span>
-        ) : (
-          <span className="text-sm font-semibold text-pxusd-white">
-            {formatBalance(dolaBalance)}
-          </span>
-        )}
-      </div>
-
-      {/* phUSD Balance */}
-      <div className="flex items-center gap-2 justify-end">
-        <span className="text-xs text-muted-foreground">phUSD:</span>
-        {phUsdLoading ? (
-          <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
-        ) : phUsdError ? (
-          <span className="text-xs text-red-400">Error</span>
-        ) : (
-          <span className="text-sm font-semibold text-pxusd-white">
-            {formatBalance(phUSDBalance)}
-          </span>
-        )}
-      </div>
-
-      {/* USDC Balance */}
-      <div className="flex items-center gap-2 justify-end">
-        <span className="text-xs text-muted-foreground">USDC:</span>
-        {usdcLoading ? (
-          <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
-        ) : usdcError ? (
-          <span className="text-xs text-red-400">Error</span>
-        ) : (
-          <span className="text-sm font-semibold text-pxusd-white">
-            {formatBalance(usdcBalance)}
-          </span>
-        )}
-      </div>
+    <div className="hidden lg:flex flex-row flex-wrap items-center justify-end gap-x-3 gap-y-1">
+      {renderItem('DOLA', dolaBalance, dolaLoading, dolaError)}
+      {renderItem('phUSD', phUSDBalance, phUsdLoading, phUsdError)}
+      {renderItem('USDC', usdcBalance, usdcLoading, usdcError)}
+      {renderItem('USDe', usdeBalance, usdeLoading, usdeError)}
     </div>
   );
 }

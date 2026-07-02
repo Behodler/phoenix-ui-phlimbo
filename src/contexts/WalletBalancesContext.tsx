@@ -18,18 +18,24 @@ interface WalletBalancesContextState {
   phUsdBalanceRaw: bigint | undefined
   /** Raw USDC balance in wei (6 decimals) */
   usdcBalanceRaw: bigint | undefined
+  /** Raw USDe balance in wei (18 decimals) */
+  usdeBalanceRaw: bigint | undefined
   /** Loading state for DOLA balance */
   dolaLoading: boolean
   /** Loading state for phUSD balance */
   phUsdLoading: boolean
   /** Loading state for USDC balance */
   usdcLoading: boolean
+  /** Loading state for USDe balance */
+  usdeLoading: boolean
   /** Error state for DOLA balance */
   dolaError: boolean
   /** Error state for phUSD balance */
   phUsdError: boolean
   /** Error state for USDC balance */
   usdcError: boolean
+  /** Error state for USDe balance */
+  usdeError: boolean
   /** Refresh all wallet balances - call after successful transactions */
   refreshWalletBalances: () => void
 }
@@ -97,6 +103,17 @@ export function WalletBalancesProvider({ children }: WalletBalancesProviderProps
     addresses?.USDC as `0x${string}` | undefined
   )
 
+  // Fetch USDe balance
+  const {
+    balance: usdeBalanceRaw,
+    isLoading: usdeLoading,
+    isError: usdeError,
+    refetch: refetchUsde
+  } = useTokenBalance(
+    walletAddress,
+    addresses?.USDe as `0x${string}` | undefined
+  )
+
   /**
    * Refresh all wallet balances
    * Call this after successful transactions to update the navbar display
@@ -104,11 +121,12 @@ export function WalletBalancesProvider({ children }: WalletBalancesProviderProps
   const refreshWalletBalances = useCallback(() => {
     log.debug('WalletBalancesContext: Refreshing all wallet balances')
 
-    // Refetch all three balances
+    // Refetch all four balances
     refetchDola()
     refetchPhUsd()
     refetchUsdc()
-  }, [refetchDola, refetchPhUsd, refetchUsdc])
+    refetchUsde()
+  }, [refetchDola, refetchPhUsd, refetchUsdc, refetchUsde])
 
   return (
     <WalletBalancesContext.Provider
@@ -116,12 +134,15 @@ export function WalletBalancesProvider({ children }: WalletBalancesProviderProps
         dolaBalanceRaw,
         phUsdBalanceRaw,
         usdcBalanceRaw,
+        usdeBalanceRaw,
         dolaLoading,
         phUsdLoading,
         usdcLoading,
+        usdeLoading,
         dolaError,
         phUsdError,
         usdcError,
+        usdeError,
         refreshWalletBalances
       }}
     >

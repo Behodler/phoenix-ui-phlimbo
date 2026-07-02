@@ -83,7 +83,7 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
         pendingYield={pendingYield}
       />
 
-      {/* Fixed rate — Original stakers (teal) */}
+      {/* Liquidity Boosting Pools (teal) */}
       <section
         className="mb-4 rounded-[18px] border p-3.5"
         style={{
@@ -92,19 +92,9 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
           borderColor: 'rgba(31,90,115,0.42)',
         }}
       >
-        <div className="mb-[3px] flex items-center gap-2.5">
-          <span
-            className="whitespace-nowrap rounded-md border px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em]"
-            style={{
-              color: '#8fd0e8',
-              background: 'rgba(31,90,115,0.34)',
-              borderColor: 'rgba(31,90,115,0.55)',
-            }}
-          >
-            Fixed rate
-          </span>
+        <div className="mb-[3px]">
           <div className="text-sm font-extrabold tracking-[-0.01em] text-pxusd-white">
-            Original stakers
+            Liquidity Boosting Pools
           </div>
         </div>
         <p className="mx-0.5 mb-3 mt-[5px] max-w-[560px] text-[11.5px] leading-[1.55] text-muted-foreground">
@@ -113,7 +103,7 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
         {fixedRows.map(renderRow)}
       </section>
 
-      {/* MasterChef — Protocol-token stakers (orange) */}
+      {/* Protocol token pools (orange) */}
       <section
         className="mb-4 rounded-[18px] border p-3.5"
         style={{
@@ -122,18 +112,9 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
           borderColor: 'rgba(255,140,66,0.32)',
         }}
       >
-        <div className="mb-[3px] flex items-center gap-2.5">
-          <span
-            className="whitespace-nowrap rounded-md border px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-pxusd-orange-300"
-            style={{
-              background: 'rgba(255,140,66,0.14)',
-              borderColor: 'rgba(255,140,66,0.42)',
-            }}
-          >
-            MasterChef
-          </span>
+        <div className="mb-[3px]">
           <div className="text-sm font-extrabold tracking-[-0.01em] text-pxusd-white">
-            Protocol-token stakers
+            Protocol token pools
           </div>
         </div>
         <p className="mx-0.5 mb-3 mt-[5px] max-w-[560px] text-[11.5px] leading-[1.55] text-muted-foreground">
@@ -165,14 +146,14 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
             Why is APY a range?
           </div>
           <div className="text-[11.5px] leading-relaxed text-muted-foreground">
-            Each NFT was minted at many different prices, and once minted they're
-            interchangeable — so there's no way to tell which price any single NFT
-            paid.{' '}
+            NFTs were minted at many different prices, but once minted they're
+            interchangeable — so there's no way to know what any single NFT
+            originally cost.{' '}
             <b className="font-semibold text-pxusd-white/80">
-              Earlier mints cost less and earn a higher APY; later mints cost more
-              and earn less.
+              NFTs minted earlier cost less and earn a higher APY; those minted
+              later cost more and earn a lower one.
             </b>{' '}
-            Your real return sits somewhere between the two ends shown.
+            Your actual return lands somewhere inside the range shown.
           </div>
         </div>
       </div>

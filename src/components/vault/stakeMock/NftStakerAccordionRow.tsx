@@ -98,7 +98,7 @@ export default function NftStakerAccordionRow({
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
-        className="grid w-full cursor-pointer grid-cols-[1.7fr_0.92fr_0.62fr_0.92fr_auto] items-center gap-3 border-none bg-transparent px-3.5 py-3 text-left text-inherit"
+        className="grid w-full cursor-pointer grid-cols-[1.7fr_0.92fr_0.92fr_auto] items-center gap-3 border-none bg-transparent px-3.5 py-3 text-left text-inherit sm:grid-cols-[1.7fr_0.92fr_0.62fr_0.92fr_auto]"
       >
         {/* Name + sub */}
         <div className="flex min-w-0 items-center gap-3">
@@ -123,13 +123,13 @@ export default function NftStakerAccordionRow({
         {/* APY range pill + caption */}
         <div>
           <ApyRangePill floor={floorApy} ceil={ceilApy} variant={kind} />
-          <div className="mt-1 text-[8.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+          <div className="mt-1 hidden text-[8.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground sm:block">
             APY range
           </div>
         </div>
 
         {/* Staked */}
-        <div>
+        <div className="hidden sm:block">
           <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
             Staked
           </div>
