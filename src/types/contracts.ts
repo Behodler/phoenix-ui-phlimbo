@@ -35,16 +35,23 @@ export interface ContractAddresses {
   BurnRecorder: string;
   BalancerRouter: string;
   NFTMinter: string;
-  BurnerEYE: string;
-  BurnerSCX: string;
-  BurnerFlax: string;
+  UniboostEYE: string;
+  UniboostSCX: string;
+  UniboostFLX: string;
   BalancerPooler: string;
   GatherWBTC: string;
+  MultiPooler: string;
+  UniboostHookEYE: string;
+  UniboostHookSCX: string;
+  UniboostHookFLX: string;
   WaUSDC: string;
   SkyPSM: string;
   BalancerPoolerMintDebtHook: string;
   NFTStaker: string;
   BatchNFTMinter: string;
+  UniboostStakerEYE: string;
+  UniboostStakerSCX: string;
+  UniboostStakerFLX: string;
   NudgeRatchet: string;
   NudgeRatchetMintDebtHook: string;
   RatchetNFTStaker: string;
@@ -55,7 +62,6 @@ export interface ContractAddresses {
   DepositPageView: string;
   MintPageView: string;
 }
-
 
 /**
  * Response structure from local development address server
