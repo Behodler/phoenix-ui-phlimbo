@@ -79,14 +79,6 @@ export default function NFTCard({ nft, price, onMintClick, showMintButton = true
               <span>Growth:</span>
               <span className="text-pxusd-orange-300 tabular-nums">{growthPercent}%</span>
             </div>
-            {nft.totalBurnt !== undefined && (
-              <div className="flex justify-between gap-2 text-xs text-muted-foreground">
-                <span>Total Burnt:</span>
-                <span className="text-pxusd-yellow-400 tabular-nums">
-                  {parseFloat(nft.totalBurnt).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                </span>
-              </div>
-            )}
           </div>
         </div>
 

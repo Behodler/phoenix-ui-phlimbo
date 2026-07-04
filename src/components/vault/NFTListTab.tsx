@@ -40,13 +40,6 @@ export default function NFTListTab({ subTab, onSubTabChange, canSeeStakePreview 
       // undefined and the defaults below apply.
       const tokenData = (minterData as unknown as Record<string, TokenMintData | undefined> | null | undefined)
         ?.[config.tokenPrefix];
-      // Determine totalBurnt for EYE, SCX, Flax
-      let totalBurnt: string | undefined;
-      if (minterData) {
-        if (config.tokenPrefix === 'EYE') totalBurnt = minterData.eyeTotalBurnt;
-        else if (config.tokenPrefix === 'SCX') totalBurnt = minterData.scxTotalBurnt;
-        else if (config.tokenPrefix === 'Flax') totalBurnt = minterData.flaxTotalBurnt;
-      }
 
       return {
         ...config,
@@ -59,7 +52,6 @@ export default function NFTListTab({ subTab, onSubTabChange, canSeeStakePreview 
         decimals: config.decimals,
         growthBasisPoints: tokenData?.growthBasisPoints ?? 0,
         dispatcherIndex: tokenData?.dispatcherIndex ?? 0,
-        totalBurnt,
       };
     });
   }, [minterData]);

@@ -85,8 +85,6 @@ export interface NFTData {
   growthBasisPoints: number;
   /** Dispatcher index used by NFTMinter.mint() to identify this token's dispatcher */
   dispatcherIndex: number;
-  /** Formatted total burnt (only for EYE, SCX, Flax) */
-  totalBurnt?: string;
   /**
    * Mirrors `NFTStaticConfig.batchEnabled`. When true and the resolved
    * `batchMinterKey` address is non-zero, the mint modal renders the batch UI.
@@ -109,11 +107,11 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     id: 1,
     name: "EYE ignition",
     image: eyeImg,
-    action: "EYE is burnt",
+    action: "EYE price and liquidity boosted",
     reason: "Returning value to the OG Behoblins. Patience has been rewarded!",
     tokenPrefix: "EYE",
-    tokenDisplayName: "EYE",
-    decimals: 18,
+    tokenDisplayName: "USDC",
+    decimals: 6,
   },
   {
     id: 2,
@@ -131,11 +129,11 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     id: 3,
     name: "Smouldering Scarcity",
     image: scxImg,
-    action: "SCX is burnt",
+    action: "SCX price and liquidity boosted",
     reason: "All time low set by the Seychelles; all time high set by Phoenix",
     tokenPrefix: "SCX",
-    tokenDisplayName: "SCX",
-    decimals: 18,
+    tokenDisplayName: "USDC",
+    decimals: 6,
   },
   {
     id: 4,
@@ -151,11 +149,11 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     id: 5,
     name: "Flax Wild Fire",
     image: flaxImg,
-    action: "Flax is burnt",
+    action: "FLAX price and liquidity boosted",
     reason: "Flax was a seed which grew into phUSD. DeFi will pay back that investment.",
     tokenPrefix: "Flax",
-    tokenDisplayName: "FLAX",
-    decimals: 18,
+    tokenDisplayName: "USDC",
+    decimals: 6,
   },
   {
     id: 6,
@@ -230,9 +228,9 @@ export const STAKEABLE_NFTS: StakeableNft[] = [
  * Used for approve() calls.
  */
 export const tokenPrefixToAddressKey: Record<string, string> = {
-  EYE: 'EYE',
-  SCX: 'SCX',
-  Flax: 'Flax',
+  EYE: 'USDC',
+  SCX: 'USDC',
+  Flax: 'USDC',
   WBTC: 'WBTC',
   USDS: 'USDS',
   USDC: 'USDC',
@@ -243,9 +241,9 @@ export const tokenPrefixToAddressKey: Record<string, string> = {
  * The prices hook uses slightly different keys (e.g., FLAX vs Flax, BTC vs WBTC).
  */
 export const tokenPrefixToPriceKey: Record<string, string> = {
-  EYE: 'EYE',
-  SCX: 'SCX',
-  Flax: 'FLAX',
+  EYE: 'USDC',
+  SCX: 'USDC',
+  Flax: 'USDC',
   USDS: 'USDS',
   WBTC: 'BTC',
   USDC: 'USDC',

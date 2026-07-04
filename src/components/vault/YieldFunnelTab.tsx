@@ -111,13 +111,6 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   const liveMappedNfts: NFTData[] = minterPageData
     ? nftStaticConfig.map((cfg) => {
         const live = (minterPageData as unknown as Record<string, TokenMintData>)[cfg.tokenPrefix];
-        // Only EYE/SCX/Flax have burn totals; nudge dispatchers (e.g. USDC /
-        // Reservoir Ratchet) have none, so this resolves to undefined.
-        const totalBurntMap: Record<string, string | undefined> = {
-          EYE: minterPageData.eyeTotalBurnt,
-          SCX: minterPageData.scxTotalBurnt,
-          Flax: minterPageData.flaxTotalBurnt,
-        };
         return {
           ...cfg,
           price: live.price,
@@ -128,7 +121,6 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
           balanceRaw: live.balanceRaw,
           growthBasisPoints: live.growthBasisPoints,
           dispatcherIndex: live.dispatcherIndex,
-          totalBurnt: totalBurntMap[cfg.tokenPrefix],
         };
       })
     : [];

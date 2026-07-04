@@ -46,9 +46,6 @@ export interface MinterPageViewData {
   USDS: TokenMintData;
   WBTC: TokenMintData;
   USDC: TokenMintData;
-  eyeTotalBurnt: string;
-  scxTotalBurnt: string;
-  flaxTotalBurnt: string;
 }
 
 export interface UseMinterPageViewReturn {
@@ -72,14 +69,6 @@ const TOKEN_OFFSETS = {
   // Reservoir Ratchet (USDC) row. Its on-chain dispatcher index parses to 7
   // from offset+5 — never hardcoded here (see story 072).
   USDC: 30,
-} as const;
-
-// Burn totals follow the 6 token rows (6 × 6 = 36 fields), so they sit at
-// 36/37/38 now that the USDC row occupies 30–35.
-const BURN_INDICES = {
-  eyeTotalBurnt: 36,
-  scxTotalBurnt: 37,
-  flaxTotalBurnt: 38,
 } as const;
 
 /** Decimals per token prefix, derived from static config */
@@ -177,9 +166,6 @@ export function useMinterPageView(): UseMinterPageViewReturn {
       USDS: parseTokenData(rawData, TOKEN_OFFSETS.USDS, TOKEN_DECIMALS.USDS),
       WBTC: parseTokenData(rawData, TOKEN_OFFSETS.WBTC, TOKEN_DECIMALS.WBTC),
       USDC: parseTokenData(rawData, TOKEN_OFFSETS.USDC, TOKEN_DECIMALS.USDC),
-      eyeTotalBurnt: formatUnits(rawData[BURN_INDICES.eyeTotalBurnt], 18),
-      scxTotalBurnt: formatUnits(rawData[BURN_INDICES.scxTotalBurnt], 18),
-      flaxTotalBurnt: formatUnits(rawData[BURN_INDICES.flaxTotalBurnt], 18),
     };
   }
 
