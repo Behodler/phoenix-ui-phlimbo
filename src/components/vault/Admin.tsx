@@ -992,6 +992,17 @@ export default function Admin() {
     query: { enabled: isNudgeRatchetDeployed },
   });
 
+  // Pending USDC held by the dispatcher = the upper limit for release(amount).
+  // The dispatcher's primeToken is 6-decimal USDC and release() transfers raw units.
+  const nudgeRatchetUsdcAddress = addresses?.USDC as `0x${string}` | undefined;
+  const { data: nudgeRatchetPendingUsdc, refetch: refetchNudgeRatchetPendingUsdc } = useReadContract({
+    address: nudgeRatchetUsdcAddress,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: nudgeRatchetAddress ? [nudgeRatchetAddress] : undefined,
+    query: { enabled: isNudgeRatchetDeployed && !!nudgeRatchetUsdcAddress },
+  });
+
   const isAuthorisedReleaser = useMemo(() => {
     if (!walletAddress) return false;
     const w = walletAddress.toLowerCase();
@@ -1005,7 +1016,8 @@ export default function Admin() {
     const trimmed = releaseAmountInput.trim();
     if (!trimmed) return null;
     try {
-      return parseUnits(trimmed, 18);
+      // USDC is 6 decimals; release() transfers raw token units.
+      return parseUnits(trimmed, 6);
     } catch {
       return null;
     }
@@ -1026,6 +1038,7 @@ export default function Admin() {
       refetchNudgeRatchetOwner();
       refetchNudgeRatchetIsReleaser();
       refetchNudgeRatchetPaused();
+      refetchNudgeRatchetPendingUsdc();
       addToast({
         type: 'success',
         title: 'Release Confirmed',
@@ -2677,6 +2690,24 @@ export default function Admin() {
           <>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Pending USDC:</span>
+                {typeof nudgeRatchetPendingUsdc === 'bigint' && nudgeRatchetPendingUsdc > 0n ? (
+                  <button
+                    type="button"
+                    onClick={() => setReleaseAmountInput(formatUnits(nudgeRatchetPendingUsdc, 6))}
+                    disabled={isReleaseExecuting}
+                    title="Release limit — click to fill the amount with the full pending balance"
+                    className="text-sm font-mono text-accent hover:text-accent/80 underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                  >
+                    {Number(formatUnits(nudgeRatchetPendingUsdc, 6)).toFixed(2)} USDC
+                  </button>
+                ) : (
+                  <span className="text-sm font-mono text-foreground">
+                    {typeof nudgeRatchetPendingUsdc === 'bigint' ? '0.00 USDC' : '—'}
+                  </span>
+                )}
+              </div>
+              <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Paused:</span>
                 <span className={
                   'text-sm font-mono ' + (nudgeRatchetPaused ? 'text-red-500' : 'text-foreground')
@@ -2746,6 +2777,7 @@ export default function Admin() {
                   refetchNudgeRatchetOwner();
                   refetchNudgeRatchetIsReleaser();
                   refetchNudgeRatchetPaused();
+                  refetchNudgeRatchetPendingUsdc();
                 }}
                 className="text-xs text-accent hover:text-accent/80 underline"
               >
@@ -2754,9 +2786,10 @@ export default function Admin() {
             </div>
             <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
               <strong>Note:</strong> Calls <code>release(amount)</code> on the NudgeRatchetDelayRelease
-              dispatcher. The amount is entered as a decimal and scaled by 10^18. The connected wallet
-              must be an authorised releaser (<code>setReleaser</code>) or the owner, and the contract
-              must not be paused.
+              dispatcher, forwarding held USDC to the batchMinter. The amount is entered as a decimal
+              number of USDC (6 decimals) and cannot exceed the pending balance shown above. The
+              connected wallet must be an authorised releaser (<code>setReleaser</code>) or the owner,
+              and the contract must not be paused.
             </p>
           </>
         )}
