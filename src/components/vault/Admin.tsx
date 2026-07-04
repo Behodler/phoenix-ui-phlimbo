@@ -10,6 +10,8 @@ import {
   stableYieldAccumulatorAbi,
   balancerPoolerV2Abi,
   stableStakerAbi,
+  multiPoolerAbi,
+  nudgeRatchetDelayReleaseAbi,
 } from '@behodler/phase2-wagmi-hooks';
 import { pauserAbi } from '../../lib/pauserAbi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
@@ -22,6 +24,39 @@ import type { Abi, AbiFunction } from 'viem';
 import type { ContractAddresses } from '../../types/contracts';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
+// The three Uniboost dispatchers fed by the MultiPooler. Each table row maps a
+// short label to its address key in ContractAddresses; the MultiPooler.pool()
+// call takes one PoolCall struct per non-blank row.
+const UNIBOOST_ROWS = [
+  { label: 'EYE', addressKey: 'UniboostEYE' },
+  { label: 'SCX', addressKey: 'UniboostSCX' },
+  { label: 'FLX', addressKey: 'UniboostFLX' },
+] as const;
+
+type UniboostLabel = (typeof UNIBOOST_ROWS)[number]['label'];
+
+// Editable fields of one MultiPooler.PoolCall row (raw decimal strings; the
+// `uniboost` address is resolved from ContractAddresses at submit time).
+interface PoolRowInput {
+  amountIn: string;
+  minPairOut: string;
+  minTargetOut: string;
+  minLP: string;
+}
+
+const emptyPoolRow = (): PoolRowInput => ({
+  amountIn: '',
+  minPairOut: '',
+  minTargetOut: '',
+  minLP: '',
+});
+
+const emptyPoolRows = (): Record<UniboostLabel, PoolRowInput> => ({
+  EYE: emptyPoolRow(),
+  SCX: emptyPoolRow(),
+  FLX: emptyPoolRow(),
+});
 
 // PhusdStableMinter V1 (retired). DOLA/USDC migrated their positions to the V2
 // minter (now in addresses.PhusdStableMinter), but USDe retained its position in
@@ -786,6 +821,158 @@ export default function Admin() {
   }, [poolConfirmed, poolTxHash]);
   // ========== END BALANCER POOLER V2 DISPATCH SECTION ==========
 
+  // ========== UNIBOOST MULTIPOOLER SECTION ==========
+  const multiPoolerAddress = addresses?.MultiPooler as `0x${string}` | undefined;
+  const isMultiPoolerDeployed = !!multiPoolerAddress &&
+    multiPoolerAddress.toLowerCase() !== ZERO_ADDRESS;
+
+  // Authorisation mirrors BalancerPoolerV2: the connected wallet must be the
+  // MultiPooler's single authorised pooler (setPooler) or its owner.
+  const { data: multiPoolerPooler, refetch: refetchMultiPoolerPooler } = useReadContract({
+    address: multiPoolerAddress,
+    abi: multiPoolerAbi,
+    functionName: 'pooler',
+    query: { enabled: isMultiPoolerDeployed },
+  });
+
+  const { data: multiPoolerOwner, refetch: refetchMultiPoolerOwner } = useReadContract({
+    address: multiPoolerAddress,
+    abi: multiPoolerAbi,
+    functionName: 'owner',
+    query: { enabled: isMultiPoolerDeployed },
+  });
+
+  const isAuthorisedMultiPooler = useMemo(() => {
+    if (!walletAddress) return false;
+    const w = walletAddress.toLowerCase();
+    const pooler = typeof multiPoolerPooler === 'string' ? multiPoolerPooler.toLowerCase() : undefined;
+    const owner = typeof multiPoolerOwner === 'string' ? multiPoolerOwner.toLowerCase() : undefined;
+    return w === pooler || w === owner;
+  }, [walletAddress, multiPoolerPooler, multiPoolerOwner]);
+
+  const [multiPoolRows, setMultiPoolRows] = useState<Record<UniboostLabel, PoolRowInput>>(emptyPoolRows);
+
+  // Validate all rows in one pass for the button gating. A row is "included"
+  // once amountIn parses to > 0; mins must each be > 0 on an included row (a 0
+  // slippage floor on a public mempool invites an MEV sandwich, same rationale
+  // as the BalancerPoolerV2 minBPT guard).
+  const multiPoolValidation = useMemo(() => {
+    let validCount = 0;
+    let anyMinInvalid = false;
+    let anyNumberInvalid = false;
+    for (const { label } of UNIBOOST_ROWS) {
+      const row = multiPoolRows[label];
+      if (!row.amountIn.trim()) continue;
+      try {
+        const amountIn = parseUnits(row.amountIn.trim(), 18);
+        const minPairOut = parseUnits(row.minPairOut.trim() || '0', 18);
+        const minTargetOut = parseUnits(row.minTargetOut.trim() || '0', 18);
+        const minLP = parseUnits(row.minLP.trim() || '0', 18);
+        if (amountIn <= 0n) continue;
+        validCount++;
+        if (minPairOut <= 0n || minTargetOut <= 0n || minLP <= 0n) anyMinInvalid = true;
+      } catch {
+        anyNumberInvalid = true;
+      }
+    }
+    return { validCount, anyMinInvalid, anyNumberInvalid };
+  }, [multiPoolRows]);
+
+  const [multiPoolTxHash, setMultiPoolTxHash] = useState<`0x${string}` | undefined>();
+  const [isMultiPoolExecuting, setIsMultiPoolExecuting] = useState(false);
+  const { isSuccess: multiPoolConfirmed } = useWaitForTransactionReceipt({
+    hash: multiPoolTxHash,
+    query: { enabled: !!multiPoolTxHash },
+  });
+
+  useEffect(() => {
+    if (multiPoolConfirmed && multiPoolTxHash) {
+      setIsMultiPoolExecuting(false);
+      setMultiPoolTxHash(undefined);
+      setMultiPoolRows(emptyPoolRows());
+      refetchMultiPoolerPooler();
+      refetchMultiPoolerOwner();
+      addToast({
+        type: 'success',
+        title: 'Pool Confirmed',
+        description: 'Uniboost dispatchers pooled via MultiPooler.',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [multiPoolConfirmed, multiPoolTxHash]);
+  // ========== END UNIBOOST MULTIPOOLER SECTION ==========
+
+  // ========== NUDGE RATCHET RELEASE SECTION ==========
+  const nudgeRatchetAddress = addresses?.NudgeRatchet as `0x${string}` | undefined;
+  const isNudgeRatchetDeployed = !!nudgeRatchetAddress &&
+    nudgeRatchetAddress.toLowerCase() !== ZERO_ADDRESS;
+
+  const { data: nudgeRatchetOwner, refetch: refetchNudgeRatchetOwner } = useReadContract({
+    address: nudgeRatchetAddress,
+    abi: nudgeRatchetDelayReleaseAbi,
+    functionName: 'owner',
+    query: { enabled: isNudgeRatchetDeployed },
+  });
+
+  const { data: nudgeRatchetIsReleaser, refetch: refetchNudgeRatchetIsReleaser } = useReadContract({
+    address: nudgeRatchetAddress,
+    abi: nudgeRatchetDelayReleaseAbi,
+    functionName: 'releasers',
+    args: walletAddress ? [walletAddress as `0x${string}`] : undefined,
+    query: { enabled: isNudgeRatchetDeployed && !!walletAddress },
+  });
+
+  const { data: nudgeRatchetPaused, refetch: refetchNudgeRatchetPaused } = useReadContract({
+    address: nudgeRatchetAddress,
+    abi: nudgeRatchetDelayReleaseAbi,
+    functionName: 'paused',
+    query: { enabled: isNudgeRatchetDeployed },
+  });
+
+  const isAuthorisedReleaser = useMemo(() => {
+    if (!walletAddress) return false;
+    const w = walletAddress.toLowerCase();
+    const owner = typeof nudgeRatchetOwner === 'string' ? nudgeRatchetOwner.toLowerCase() : undefined;
+    return w === owner || nudgeRatchetIsReleaser === true;
+  }, [walletAddress, nudgeRatchetOwner, nudgeRatchetIsReleaser]);
+
+  const [releaseAmountInput, setReleaseAmountInput] = useState<string>('');
+
+  const parsedReleaseAmount = useMemo<bigint | null>(() => {
+    const trimmed = releaseAmountInput.trim();
+    if (!trimmed) return null;
+    try {
+      return parseUnits(trimmed, 18);
+    } catch {
+      return null;
+    }
+  }, [releaseAmountInput]);
+
+  const [releaseTxHash, setReleaseTxHash] = useState<`0x${string}` | undefined>();
+  const [isReleaseExecuting, setIsReleaseExecuting] = useState(false);
+  const { isSuccess: releaseConfirmed } = useWaitForTransactionReceipt({
+    hash: releaseTxHash,
+    query: { enabled: !!releaseTxHash },
+  });
+
+  useEffect(() => {
+    if (releaseConfirmed && releaseTxHash) {
+      setIsReleaseExecuting(false);
+      setReleaseTxHash(undefined);
+      setReleaseAmountInput('');
+      refetchNudgeRatchetOwner();
+      refetchNudgeRatchetIsReleaser();
+      refetchNudgeRatchetPaused();
+      addToast({
+        type: 'success',
+        title: 'Release Confirmed',
+        description: 'NudgeRatchet release executed.',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [releaseConfirmed, releaseTxHash]);
+  // ========== END NUDGE RATCHET RELEASE SECTION ==========
+
   // Wagmi hooks for contract write and transaction tracking
   const { data: txHash, writeContractAsync } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({
@@ -1438,6 +1625,172 @@ export default function Admin() {
   };
 
   /**
+   * Handle Uniboost MultiPooler batch pool. Builds one PoolCall struct per
+   * non-blank row and submits them all in a single MultiPooler.pool() tx.
+   */
+  const handleMultiPool = async () => {
+    if (!isConnected || !walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet to pool.',
+      });
+      return;
+    }
+    if (!multiPoolerAddress || !isMultiPoolerDeployed) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Available',
+        description: 'MultiPooler is not deployed on this chain.',
+      });
+      return;
+    }
+
+    const calls: {
+      uniboost: `0x${string}`;
+      amountIn: bigint;
+      minPairOut: bigint;
+      minTargetOut: bigint;
+      minLP: bigint;
+    }[] = [];
+
+    for (const { label, addressKey } of UNIBOOST_ROWS) {
+      const row = multiPoolRows[label];
+      // Blank rows are skipped, not submitted as zero-amount calls.
+      if (!row.amountIn.trim()) continue;
+
+      let amountIn: bigint;
+      let minPairOut: bigint;
+      let minTargetOut: bigint;
+      let minLP: bigint;
+      try {
+        amountIn = parseUnits(row.amountIn.trim(), 18);
+        minPairOut = parseUnits(row.minPairOut.trim() || '0', 18);
+        minTargetOut = parseUnits(row.minTargetOut.trim() || '0', 18);
+        minLP = parseUnits(row.minLP.trim() || '0', 18);
+      } catch {
+        addToast({
+          type: 'error',
+          title: 'Invalid Amount',
+          description: `Row ${label} has a value that is not a valid number.`,
+        });
+        return;
+      }
+
+      if (amountIn <= 0n) continue;
+
+      const uniboost = addresses?.[addressKey] as `0x${string}` | undefined;
+      if (!uniboost || uniboost.toLowerCase() === ZERO_ADDRESS) {
+        addToast({
+          type: 'error',
+          title: 'Dispatcher Not Available',
+          description: `Uniboost ${label} address is missing on this chain.`,
+        });
+        return;
+      }
+
+      // Block zero slippage floors — same MEV sandwich rationale as minBPT.
+      if (minPairOut <= 0n || minTargetOut <= 0n || minLP <= 0n) {
+        addToast({
+          type: 'error',
+          title: 'Invalid Slippage Floor',
+          description: `Row ${label}: minPairOut, minTargetOut and minLP must each be > 0 — 0 invites MEV sandwich attacks.`,
+        });
+        return;
+      }
+
+      calls.push({ uniboost, amountIn, minPairOut, minTargetOut, minLP });
+    }
+
+    if (calls.length === 0) {
+      addToast({
+        type: 'error',
+        title: 'Nothing to Pool',
+        description: 'Enter an amountIn (> 0) for at least one dispatcher.',
+      });
+      return;
+    }
+
+    setIsMultiPoolExecuting(true);
+    try {
+      const hash = await writeContractAsync({
+        address: multiPoolerAddress,
+        abi: multiPoolerAbi,
+        functionName: 'pool',
+        args: [calls],
+      });
+      setMultiPoolTxHash(hash);
+      addToast({
+        type: 'info',
+        title: 'Pool Submitted',
+        description: `Waiting for confirmation (${calls.length} dispatcher${calls.length > 1 ? 's' : ''})...`,
+      });
+    } catch (err) {
+      setIsMultiPoolExecuting(false);
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      addToast({
+        type: 'error',
+        title: 'Pool Failed',
+        description: msg,
+      });
+    }
+  };
+
+  /**
+   * Handle NudgeRatchet delayed release.
+   */
+  const handleRelease = async () => {
+    if (!isConnected || !walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet to release.',
+      });
+      return;
+    }
+    if (!nudgeRatchetAddress || !isNudgeRatchetDeployed) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Available',
+        description: 'NudgeRatchet is not deployed on this chain.',
+      });
+      return;
+    }
+    if (parsedReleaseAmount === null || parsedReleaseAmount <= 0n) {
+      addToast({
+        type: 'error',
+        title: 'Invalid Amount',
+        description: 'Release amount must be a number greater than 0.',
+      });
+      return;
+    }
+
+    setIsReleaseExecuting(true);
+    try {
+      const hash = await writeContractAsync({
+        address: nudgeRatchetAddress,
+        abi: nudgeRatchetDelayReleaseAbi,
+        functionName: 'release',
+        args: [parsedReleaseAmount],
+      });
+      setReleaseTxHash(hash);
+      addToast({
+        type: 'info',
+        title: 'Release Submitted',
+        description: 'Waiting for release confirmation...',
+      });
+    } catch (err) {
+      setIsReleaseExecuting(false);
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      addToast({
+        type: 'error',
+        title: 'Release Failed',
+        description: msg,
+      });
+    }
+  };
+
+  /**
    * Handle mint yield button click
    * Mints DOLA to the AutoDOLA underlying vault for testing
    */
@@ -2070,6 +2423,241 @@ export default function Admin() {
               <code> batchDonationSize == 0</code> the donation phase is skipped entirely. The
               connected wallet must have been authorised by the contract owner via
               <code> setAuthorizedPooler</code>.
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* Uniboost MultiPooler Panel */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            Uniboost MultiPooler
+          </h3>
+          <span className={
+            'text-xs font-mono ' + (isAuthorisedMultiPooler ? 'text-green-500' : 'text-red-500')
+          }>
+            {isAuthorisedMultiPooler ? 'authorised' : 'not authorised'}
+          </span>
+        </div>
+        {!isMultiPoolerDeployed ? (
+          <p className="text-sm text-muted-foreground">
+            MultiPooler not deployed on this chain.
+          </p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-muted-foreground border-b border-border">
+                    <th className="py-2 pr-2 font-medium">Dispatcher</th>
+                    <th className="py-2 px-2 font-medium">amountIn</th>
+                    <th className="py-2 px-2 font-medium">minPairOut</th>
+                    <th className="py-2 px-2 font-medium">minTargetOut</th>
+                    <th className="py-2 pl-2 font-medium">minLP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {UNIBOOST_ROWS.map(({ label, addressKey }) => {
+                    const uniboost = addresses?.[addressKey] as string | undefined;
+                    const uniboostMissing = !uniboost || uniboost.toLowerCase() === ZERO_ADDRESS;
+                    const row = multiPoolRows[label];
+                    const setField = (field: keyof PoolRowInput, value: string) =>
+                      setMultiPoolRows((prev) => ({
+                        ...prev,
+                        [label]: { ...prev[label], [field]: value },
+                      }));
+                    const cellClass =
+                      'w-full px-2 py-1 bg-background border border-border rounded text-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed';
+                    return (
+                      <tr key={label} className="border-b border-border last:border-b-0">
+                        <td className="py-2 pr-2 align-middle">
+                          <div className="font-mono text-foreground">{label}</div>
+                          {uniboostMissing && (
+                            <div className="text-[10px] text-red-500">address missing</div>
+                          )}
+                        </td>
+                        {(['amountIn', 'minPairOut', 'minTargetOut', 'minLP'] as const).map((field) => (
+                          <td key={field} className="py-2 px-2 align-middle">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={row[field]}
+                              onChange={(e) => setField(field, e.target.value)}
+                              placeholder="0.0"
+                              disabled={isMultiPoolExecuting || uniboostMissing}
+                              className={cellClass}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {multiPoolValidation.anyNumberInvalid && (
+              <p className="text-xs text-red-500 mt-2">
+                One or more fields is not a valid number.
+              </p>
+            )}
+            {multiPoolValidation.anyMinInvalid && (
+              <p className="text-xs text-red-500 mt-2">
+                Each populated row must set minPairOut, minTargetOut and minLP &gt; 0 — 0 invites MEV sandwich attacks.
+              </p>
+            )}
+
+            <div className="mt-4 pt-4 border-t border-border">
+              {(() => {
+                const { validCount, anyMinInvalid, anyNumberInvalid } = multiPoolValidation;
+                let tooltip: string | undefined;
+                if (!isAuthorisedMultiPooler) tooltip = 'Wallet not authorised. MultiPooler owner must call setPooler(<your-address>).';
+                else if (validCount === 0) tooltip = 'Enter an amountIn (> 0) for at least one dispatcher';
+                else if (anyNumberInvalid) tooltip = 'One or more fields is not a valid number';
+                else if (anyMinInvalid) tooltip = 'Slippage floors must be > 0 (MEV sandwich risk)';
+
+                const disabled = !isAuthorisedMultiPooler
+                  || validCount === 0
+                  || anyNumberInvalid
+                  || anyMinInvalid
+                  || isMultiPoolExecuting;
+
+                return (
+                  <div title={tooltip}>
+                    <ActionButton
+                      disabled={disabled}
+                      onAction={handleMultiPool}
+                      label={isMultiPoolExecuting ? 'Pooling…' : 'Pool'}
+                      variant="primary"
+                      isLoading={isMultiPoolExecuting}
+                    />
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-border">
+              <button
+                onClick={() => { refetchMultiPoolerPooler(); refetchMultiPoolerOwner(); }}
+                className="text-xs text-accent hover:text-accent/80 underline"
+              >
+                Refresh Authorisation
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+              <strong>Note:</strong> Each row is one <code>MultiPooler.PoolCall</code> for a Uniboost
+              dispatcher (buy-and-pool into its UniV2 pool). Populated rows are batched into a single
+              <code> pool()</code> transaction; blank rows (no <code>amountIn</code>) are skipped. All
+              values are entered as decimals and scaled by 10^18. <code>minPairOut</code>,
+              <code> minTargetOut</code> and <code>minLP</code> are slippage floors and must be &gt; 0.
+              The connected wallet must be the MultiPooler's authorised pooler
+              (<code> setPooler</code>) or its owner.
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* NudgeRatchet Release Panel */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            NudgeRatchet — Release
+          </h3>
+          <span className={
+            'text-xs font-mono ' + (isAuthorisedReleaser ? 'text-green-500' : 'text-red-500')
+          }>
+            {isAuthorisedReleaser ? 'authorised' : 'not authorised'}
+          </span>
+        </div>
+        {!isNudgeRatchetDeployed ? (
+          <p className="text-sm text-muted-foreground">
+            NudgeRatchet not deployed on this chain.
+          </p>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Paused:</span>
+                <span className={
+                  'text-sm font-mono ' + (nudgeRatchetPaused ? 'text-red-500' : 'text-foreground')
+                }>
+                  {nudgeRatchetPaused ? 'yes' : 'no'}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-border">
+              <label
+                htmlFor="nudge-release-amount"
+                className="block text-sm font-medium text-foreground mb-2"
+              >
+                Release amount
+              </label>
+              <input
+                id="nudge-release-amount"
+                type="text"
+                inputMode="decimal"
+                value={releaseAmountInput}
+                onChange={(e) => setReleaseAmountInput(e.target.value)}
+                placeholder="Amount to release"
+                disabled={isReleaseExecuting}
+                className={
+                  'w-full px-3 py-2 bg-background border rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ' +
+                  ((parsedReleaseAmount === null || parsedReleaseAmount <= 0n) && releaseAmountInput !== ''
+                    ? 'border-red-500'
+                    : 'border-border')
+                }
+              />
+              {releaseAmountInput !== '' && (parsedReleaseAmount === null || parsedReleaseAmount <= 0n) && (
+                <p className="text-xs text-red-500 mt-1">
+                  Amount must be a number greater than 0.
+                </p>
+              )}
+
+              {(() => {
+                const amountInvalid = parsedReleaseAmount === null || parsedReleaseAmount <= 0n;
+                let tooltip: string | undefined;
+                if (nudgeRatchetPaused) tooltip = 'NudgeRatchet is paused';
+                else if (!isAuthorisedReleaser) tooltip = 'Wallet not authorised. Owner must call setReleaser(<your-address>, true).';
+                else if (amountInvalid) tooltip = 'Enter an amount > 0';
+
+                const disabled = !!nudgeRatchetPaused
+                  || !isAuthorisedReleaser
+                  || amountInvalid
+                  || isReleaseExecuting;
+
+                return (
+                  <div className="mt-3" title={tooltip}>
+                    <ActionButton
+                      disabled={disabled}
+                      onAction={handleRelease}
+                      label={isReleaseExecuting ? 'Releasing…' : 'Release'}
+                      variant="primary"
+                      isLoading={isReleaseExecuting}
+                    />
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-border">
+              <button
+                onClick={() => {
+                  refetchNudgeRatchetOwner();
+                  refetchNudgeRatchetIsReleaser();
+                  refetchNudgeRatchetPaused();
+                }}
+                className="text-xs text-accent hover:text-accent/80 underline"
+              >
+                Refresh Status
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+              <strong>Note:</strong> Calls <code>release(amount)</code> on the NudgeRatchetDelayRelease
+              dispatcher. The amount is entered as a decimal and scaled by 10^18. The connected wallet
+              must be an authorised releaser (<code>setReleaser</code>) or the owner, and the contract
+              must not be paused.
             </p>
           </>
         )}

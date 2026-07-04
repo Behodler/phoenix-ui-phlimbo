@@ -18,9 +18,6 @@ import { log } from '../utils/logger'
 export interface NFTPrimaryView {
   NFTMinter: string
   BalancerPooler: string
-  BurnerEYE: string
-  BurnerSCX: string
-  BurnerFlax: string
   GatherWBTC: string
   MintPageView: string
 }
@@ -121,9 +118,6 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
     return {
       NFTMinter: addresses.NFTMinter,
       BalancerPooler: addresses.BalancerPooler,
-      BurnerEYE: addresses.BurnerEYE,
-      BurnerSCX: addresses.BurnerSCX,
-      BurnerFlax: addresses.BurnerFlax,
       GatherWBTC: addresses.GatherWBTC,
       MintPageView: addresses.MintPageView,
     }
