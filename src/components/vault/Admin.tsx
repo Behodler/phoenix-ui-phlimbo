@@ -20,6 +20,7 @@ import ActionButton from '../ui/ActionButton';
 import NftStakerRunwayPanel from './NftStakerRunwayPanel';
 import { useTokenBalance } from '../../hooks/useContractInteractions';
 import { useSolvencyInfo } from '../../hooks/useSolvencyInfo';
+import { useUniboostAutofill } from '../../hooks/useUniboostAutofill';
 import type { Abi, AbiFunction } from 'viem';
 import type { ContractAddresses } from '../../types/contracts';
 
@@ -852,6 +853,61 @@ export default function Admin() {
 
   const [multiPoolRows, setMultiPoolRows] = useState<Record<UniboostLabel, PoolRowInput>>(emptyPoolRows);
 
+  // MEV-safe auto-fill. Unlike BalancerPoolerV2 (getIdealBPT on-chain quote), the
+  // Uniboost dispatcher exposes no quote, so each row's floors are reconstructed
+  // off-chain from the dispatcher's prime balance + UniV2 quotes/reserves at 1%
+  // slippage — see useUniboostAutofill. One hook per dispatcher, unrolled (never
+  // in a loop) to keep hook order stable.
+  const eyeAutofill = useUniboostAutofill(addresses?.UniboostEYE as `0x${string}` | undefined);
+  const scxAutofill = useUniboostAutofill(addresses?.UniboostSCX as `0x${string}` | undefined);
+  const flxAutofill = useUniboostAutofill(addresses?.UniboostFLX as `0x${string}` | undefined);
+  const uniboostAutofills: Record<UniboostLabel, ReturnType<typeof useUniboostAutofill>> = {
+    EYE: eyeAutofill,
+    SCX: scxAutofill,
+    FLX: flxAutofill,
+  };
+
+  // Once the user edits any field of a row we stop auto-overwriting it (mirrors
+  // BalancerPoolerV2's userEditedMinBpt guard). Cleared after a successful pool
+  // and by the per-row "auto" reset.
+  const [userEditedRows, setUserEditedRows] = useState<Record<UniboostLabel, boolean>>({
+    EYE: false,
+    SCX: false,
+    FLX: false,
+  });
+
+  // Auto-populate each un-edited row from its dispatcher's suggestion. Only writes
+  // when the suggestion differs from the current row, so it never loops.
+  useEffect(() => {
+    setMultiPoolRows((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const { label } of UNIBOOST_ROWS) {
+        if (userEditedRows[label]) continue;
+        const s = uniboostAutofills[label].suggestion;
+        if (!s) continue;
+        const cur = prev[label];
+        if (
+          cur.amountIn === s.amountIn &&
+          cur.minPairOut === s.minPairOut &&
+          cur.minTargetOut === s.minTargetOut &&
+          cur.minLP === s.minLP
+        ) {
+          continue;
+        }
+        next[label] = {
+          amountIn: s.amountIn,
+          minPairOut: s.minPairOut,
+          minTargetOut: s.minTargetOut,
+          minLP: s.minLP,
+        };
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userEditedRows, eyeAutofill.suggestion, scxAutofill.suggestion, flxAutofill.suggestion]);
+
   // Validate all rows in one pass for the button gating. A row is "included"
   // once amountIn parses to > 0; mins must each be > 0 on an included row (a 0
   // slippage floor on a public mempool invites an MEV sandwich, same rationale
@@ -864,10 +920,11 @@ export default function Admin() {
       const row = multiPoolRows[label];
       if (!row.amountIn.trim()) continue;
       try {
-        const amountIn = parseUnits(row.amountIn.trim(), 18);
-        const minPairOut = parseUnits(row.minPairOut.trim() || '0', 18);
-        const minTargetOut = parseUnits(row.minTargetOut.trim() || '0', 18);
-        const minLP = parseUnits(row.minLP.trim() || '0', 18);
+        const d = label === 'EYE' ? eyeAutofill.decimals : label === 'SCX' ? scxAutofill.decimals : flxAutofill.decimals;
+        const amountIn = parseUnits(row.amountIn.trim(), d.amountIn);
+        const minPairOut = parseUnits(row.minPairOut.trim() || '0', d.minPairOut);
+        const minTargetOut = parseUnits(row.minTargetOut.trim() || '0', d.minTargetOut);
+        const minLP = parseUnits(row.minLP.trim() || '0', d.minLP);
         if (amountIn <= 0n) continue;
         validCount++;
         if (minPairOut <= 0n || minTargetOut <= 0n || minLP <= 0n) anyMinInvalid = true;
@@ -876,7 +933,7 @@ export default function Admin() {
       }
     }
     return { validCount, anyMinInvalid, anyNumberInvalid };
-  }, [multiPoolRows]);
+  }, [multiPoolRows, eyeAutofill.decimals, scxAutofill.decimals, flxAutofill.decimals]);
 
   const [multiPoolTxHash, setMultiPoolTxHash] = useState<`0x${string}` | undefined>();
   const [isMultiPoolExecuting, setIsMultiPoolExecuting] = useState(false);
@@ -890,6 +947,12 @@ export default function Admin() {
       setIsMultiPoolExecuting(false);
       setMultiPoolTxHash(undefined);
       setMultiPoolRows(emptyPoolRows());
+      // Clear the edit guards and refetch balances/quotes so the drained
+      // dispatchers re-auto-populate (to blank while balances are 0).
+      setUserEditedRows({ EYE: false, SCX: false, FLX: false });
+      eyeAutofill.refetch();
+      scxAutofill.refetch();
+      flxAutofill.refetch();
       refetchMultiPoolerPooler();
       refetchMultiPoolerOwner();
       addToast({
@@ -1664,10 +1727,13 @@ export default function Admin() {
       let minTargetOut: bigint;
       let minLP: bigint;
       try {
-        amountIn = parseUnits(row.amountIn.trim(), 18);
-        minPairOut = parseUnits(row.minPairOut.trim() || '0', 18);
-        minTargetOut = parseUnits(row.minTargetOut.trim() || '0', 18);
-        minLP = parseUnits(row.minLP.trim() || '0', 18);
+        // Each field is parsed with its token's native decimals (primeToken can
+        // be non-18, e.g. USDC = 6) so the raw on-chain value is exact.
+        const d = uniboostAutofills[label].decimals;
+        amountIn = parseUnits(row.amountIn.trim(), d.amountIn);
+        minPairOut = parseUnits(row.minPairOut.trim() || '0', d.minPairOut);
+        minTargetOut = parseUnits(row.minTargetOut.trim() || '0', d.minTargetOut);
+        minLP = parseUnits(row.minLP.trim() || '0', d.minLP);
       } catch {
         addToast({
           type: 'error',
@@ -2462,11 +2528,20 @@ export default function Admin() {
                     const uniboost = addresses?.[addressKey] as string | undefined;
                     const uniboostMissing = !uniboost || uniboost.toLowerCase() === ZERO_ADDRESS;
                     const row = multiPoolRows[label];
-                    const setField = (field: keyof PoolRowInput, value: string) =>
+                    // Manual edits mark the row so the auto-fill stops clobbering it.
+                    const setField = (field: keyof PoolRowInput, value: string) => {
                       setMultiPoolRows((prev) => ({
                         ...prev,
                         [label]: { ...prev[label], [field]: value },
                       }));
+                      setUserEditedRows((prev) => (prev[label] ? prev : { ...prev, [label]: true }));
+                    };
+                    const isEdited = userEditedRows[label];
+                    const hasSuggestion = !!uniboostAutofills[label].suggestion;
+                    const resetToAuto = () => {
+                      setUserEditedRows((prev) => ({ ...prev, [label]: false }));
+                      uniboostAutofills[label].refetch();
+                    };
                     const cellClass =
                       'w-full px-2 py-1 bg-background border border-border rounded text-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed';
                     return (
@@ -2475,6 +2550,17 @@ export default function Admin() {
                           <div className="font-mono text-foreground">{label}</div>
                           {uniboostMissing && (
                             <div className="text-[10px] text-red-500">address missing</div>
+                          )}
+                          {!uniboostMissing && isEdited && (
+                            <button
+                              onClick={resetToAuto}
+                              className="text-[10px] text-accent hover:text-accent/80 underline"
+                            >
+                              ↻ auto
+                            </button>
+                          )}
+                          {!uniboostMissing && !isEdited && hasSuggestion && (
+                            <div className="text-[10px] text-green-500">auto · 1%</div>
                           )}
                         </td>
                         {(['amountIn', 'minPairOut', 'minTargetOut', 'minLP'] as const).map((field) => (
@@ -2539,19 +2625,32 @@ export default function Admin() {
 
             <div className="mt-3 pt-3 border-t border-border">
               <button
-                onClick={() => { refetchMultiPoolerPooler(); refetchMultiPoolerOwner(); }}
+                onClick={() => {
+                  refetchMultiPoolerPooler();
+                  refetchMultiPoolerOwner();
+                  eyeAutofill.refetch();
+                  scxAutofill.refetch();
+                  flxAutofill.refetch();
+                }}
                 className="text-xs text-accent hover:text-accent/80 underline"
               >
-                Refresh Authorisation
+                Refresh
               </button>
             </div>
             <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
               <strong>Note:</strong> Each row is one <code>MultiPooler.PoolCall</code> for a Uniboost
               dispatcher (buy-and-pool into its UniV2 pool). Populated rows are batched into a single
-              <code> pool()</code> transaction; blank rows (no <code>amountIn</code>) are skipped. All
-              values are entered as decimals and scaled by 10^18. <code>minPairOut</code>,
+              <code> pool()</code> transaction; blank rows (no <code>amountIn</code>) are skipped. Each
+              value is entered in its token's native units — <code>amountIn</code> in the prime token
+              (e.g. USDC, 6 decimals), <code>minPairOut</code>/<code>minTargetOut</code> in the pair/target
+              tokens, <code>minLP</code> in LP tokens (18 decimals). <code>minPairOut</code>,
               <code> minTargetOut</code> and <code>minLP</code> are slippage floors and must be &gt; 0.
-              The connected wallet must be the MultiPooler's authorised pooler
+              Rows tagged <span className="text-green-500">auto · 1%</span> are auto-filled to 1%-safe
+              MEV floors, derived off-chain from each dispatcher's prime balance and its UniV2
+              quotes/reserves (the two swaps + LP mint of <code>Uniboost.pool()</code>); the Uniboost
+              dispatcher has no on-chain quote, so these are computed against the worst-case output of
+              each leg. Editing any field switches that row to manual — use <code>↻ auto</code> to
+              restore. The connected wallet must be the MultiPooler's authorised pooler
               (<code> setPooler</code>) or its owner.
             </p>
           </>
