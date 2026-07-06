@@ -38,6 +38,9 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
   // The batch minter this NFT routes through, named by its static config:
   //   - Liquid Sky Phoenix → BatchNFTMinter (USDS)
   //   - Reservoir Ratchet   → RatchetBatchNFTMinter (USDC)
+  //   - EYE ignition        → EyeBatchNFTMinter (USDC)
+  //   - Smouldering Scarcity → ScxBatchNFTMinter (USDC)
+  //   - Flax Wild Fire      → FlxBatchNFTMinter (USDC)
   // Each helper holds its own target NFT minter, payment token, and dispatcher
   // index in contract state, so the UI just resolves the right address.
   const batchMinterAddress = nft?.batchMinterKey

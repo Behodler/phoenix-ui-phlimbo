@@ -34,17 +34,25 @@ export interface NFTStaticConfig {
   /**
    * When true, the mint flow routes through a batch minter (slider 1..20 + textbox)
    * instead of the single-mint path. The specific batch minter is named by
-   * `batchMinterKey`. Set on Liquid Sky Phoenix and Reservoir Ratchet.
+   * `batchMinterKey`. Set on Liquid Sky Phoenix, Reservoir Ratchet, EYE ignition,
+   * Smouldering Scarcity (SCX), and Flax Wild Fire.
    */
   batchEnabled?: boolean;
   /**
    * ContractAddresses key for the batch minter this NFT routes through when
    * `batchEnabled` is true. Liquid Sky Phoenix → `BatchNFTMinter`,
-   * Reservoir Ratchet → `RatchetBatchNFTMinter`. Each batch minter holds its
-   * own target NFT minter, payment token, and dispatcher index in contract
-   * state, so the UI only needs to pick the right helper address here.
+   * Reservoir Ratchet → `RatchetBatchNFTMinter`, EYE ignition → `EyeBatchNFTMinter`,
+   * Smouldering Scarcity → `ScxBatchNFTMinter`, Flax Wild Fire → `FlxBatchNFTMinter`.
+   * Each batch minter holds its own target NFT minter, payment token, and
+   * dispatcher index in contract state, so the UI only needs to pick the right
+   * helper address here.
    */
-  batchMinterKey?: 'BatchNFTMinter' | 'RatchetBatchNFTMinter';
+  batchMinterKey?:
+    | 'BatchNFTMinter'
+    | 'RatchetBatchNFTMinter'
+    | 'EyeBatchNFTMinter'
+    | 'ScxBatchNFTMinter'
+    | 'FlxBatchNFTMinter';
   /**
    * When true, this NFT is not yet deployed on-chain (mock-only). Clicking "Mint"
    * surfaces a "coming soon" toast instead of opening the mint modal, and the NFT
@@ -91,7 +99,12 @@ export interface NFTData {
    */
   batchEnabled?: boolean;
   /** Mirrors `NFTStaticConfig.batchMinterKey` — which batch minter to route through. */
-  batchMinterKey?: 'BatchNFTMinter' | 'RatchetBatchNFTMinter';
+  batchMinterKey?:
+    | 'BatchNFTMinter'
+    | 'RatchetBatchNFTMinter'
+    | 'EyeBatchNFTMinter'
+    | 'ScxBatchNFTMinter'
+    | 'FlxBatchNFTMinter';
   /** Mirrors `NFTStaticConfig.comingSoon`. When true, mint shows a "coming soon" toast. */
   comingSoon?: boolean;
   /** Purely cosmetic. When true, the selector renders a small "NEW" badge. Never reaches a contract call. */
@@ -112,6 +125,8 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     tokenPrefix: "EYE",
     tokenDisplayName: "USDC",
     decimals: 6,
+    batchEnabled: true,
+    batchMinterKey: "EyeBatchNFTMinter",
   },
   {
     id: 2,
@@ -134,6 +149,8 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     tokenPrefix: "SCX",
     tokenDisplayName: "USDC",
     decimals: 6,
+    batchEnabled: true,
+    batchMinterKey: "ScxBatchNFTMinter",
   },
   {
     id: 4,
@@ -154,6 +171,8 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     tokenPrefix: "Flax",
     tokenDisplayName: "USDC",
     decimals: 6,
+    batchEnabled: true,
+    batchMinterKey: "FlxBatchNFTMinter",
   },
   {
     id: 6,

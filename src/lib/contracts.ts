@@ -105,5 +105,9 @@ export const mainnetAddresses: ContractAddresses = {
   // Dedicated BatchNFTMinter for the NudgeRatchet NFT (UI batch-mint entrypoint; pays USDC,
   // rewards USDS) — not yet deployed on mainnet (story 068). Patch by hand when it ships.
   RatchetBatchNFTMinter: "0x81896f48a95abea255cd38a3010e985b6051a1c7",
+
+  EyeBatchNFTMinter: "0x0000000000000000000000000000000000000000",
+  FlxBatchNFTMinter: "0x0000000000000000000000000000000000000000",
+  ScxBatchNFTMinter: "0x0000000000000000000000000000000000000000"
 };
 

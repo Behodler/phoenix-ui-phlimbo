@@ -13,8 +13,10 @@ import WhaleMintConfirmModal from './WhaleMintConfirmModal';
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 /**
- * Liquid Sky Phoenix is the only `batchEnabled` row in nftStaticConfig and
- * its tokenPrefix resolves to USDS. Hard-coding the prefix here keeps the
+ * This panel is intentionally Liquid-Sky-only (it hard-codes `BatchNFTMinter`
+ * below); other `batchEnabled` rows (Reservoir Ratchet, EYE, SCX, Flax) mint
+ * through their own helpers but have no whale panel by design. Liquid Sky
+ * Phoenix's tokenPrefix resolves to USDS — hard-coding the prefix here keeps the
  * panel decoupled from the static-config array order.
  */
 const LIQUID_SKY_PHOENIX_TOKEN_PREFIX = 'USDS' as const;

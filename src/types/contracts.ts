@@ -52,6 +52,9 @@ export interface ContractAddresses {
   UniboostStakerEYE: string;
   UniboostStakerSCX: string;
   UniboostStakerFLX: string;
+  EyeBatchNFTMinter: string;
+  ScxBatchNFTMinter: string;
+  FlxBatchNFTMinter: string;
   NudgeRatchet: string;
   NudgeRatchetMintDebtHook: string;
   RatchetNFTStaker: string;
