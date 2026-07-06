@@ -8,7 +8,7 @@ import {
 } from 'wagmi';
 import { formatUnits } from 'viem';
 import type { Address, Hash } from 'viem';
-import { nftStakerAbi } from '@behodler/phase2-wagmi-hooks';
+import { nftStakerAbi, nftStakerDepletionAbi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { useMinterPageView } from './useMinterPageView';
 import { useBalancerPrice } from './useBalancerPrice';
@@ -54,6 +54,12 @@ export interface StakingPageData {
   highestPrice: number;
   /** Annual phUSD reward stream in USD (rate × seconds × phUSD/USD). */
   annualRewardDollars: number;
+  /**
+   * Stake-independent annual emission in USD implied by the funded budget
+   * (`totalBudget × 12 / depletionWindowMonths × phUSD/USD`). Empty-pool APY
+   * numerator for depletion stakers; 0 for fixed stakers.
+   */
+  annualBudgetDollars: number;
 
   // ERC1155 approval state
   isApprovedForAll: boolean;
@@ -212,10 +218,54 @@ export function useStakingPageData(
     },
   });
 
+  // ── Depletion budget/window (separate, conditional reads) ──────────
+  // Empty-pool APY numerator for depletion stakers. `currentRewardRate` reads 0
+  // until the pool has stake (its on-chain rate = `rewardBudget / windowSeconds`
+  // and the schedule only re-arms on stake/claim/mint), so it cannot anchor the
+  // empty-pool projection. `totalBudget` (= reward balance + pending mint debt)
+  // and `depletionWindowMonths` are stake-independent and yield the funded
+  // emission the pool WILL pay. Gated on `!hasTargetApy` — fixed stakers don't
+  // expose `depletionWindowMonths` and use the `targetAPY` starting-APY path.
+  const depletionReadsEnabled = stakerReadsEnabled && !hasTargetApy;
+  const {
+    data: depletionReads,
+    refetch: refetchDepletionReads,
+  } = useReadContracts({
+    contracts: depletionReadsEnabled
+      ? [
+          {
+            address: stakerAddress as Address,
+            abi: nftStakerDepletionAbi,
+            functionName: 'totalBudget',
+          },
+          {
+            address: stakerAddress as Address,
+            abi: nftStakerDepletionAbi,
+            functionName: 'depletionWindowMonths',
+          },
+        ]
+      : [],
+    query: {
+      enabled: depletionReadsEnabled,
+      refetchInterval: REFETCH_INTERVAL_MS,
+      refetchOnWindowFocus: false,
+    },
+  });
+
   const currentRewardRate = useMemo<bigint>(() => {
     const r = stakerReads?.[0];
     return r?.status === 'success' ? (r.result as bigint) : 0n;
   }, [stakerReads]);
+
+  const totalBudgetRaw = useMemo<bigint>(() => {
+    const r = depletionReads?.[0];
+    return r?.status === 'success' ? (r.result as bigint) : 0n;
+  }, [depletionReads]);
+
+  const depletionWindowMonths = useMemo<number>(() => {
+    const r = depletionReads?.[1];
+    return r?.status === 'success' ? Number(r.result as bigint) : 0;
+  }, [depletionReads]);
 
   const totalStakedRaw = useMemo<bigint>(() => {
     const r = stakerReads?.[1];
@@ -266,6 +316,19 @@ export function useStakingPageData(
   const annualRewardDollars =
     (Number(currentRewardRate) / 1e18) * 86_400 * 365 * phUsdPriceSafe;
 
+  // Stake-independent annual emission from the funded budget, for the depletion
+  // empty-pool projection. The on-chain per-second rate is `totalBudget /
+  // windowSeconds` where `windowSeconds = depletionWindowMonths × (365d / 12)`,
+  // so annualised: `totalBudget × SECONDS_PER_YEAR / windowSeconds` collapses to
+  // `totalBudget × 12 / depletionWindowMonths`. Zero for fixed stakers (window
+  // read disabled → 0) and safely 0 when unfunded.
+  const annualBudgetDollars =
+    depletionWindowMonths > 0
+      ? (Number(totalBudgetRaw) / 1e18) *
+        (12 / depletionWindowMonths) *
+        phUsdPriceSafe
+      : 0;
+
   const highestPrice =
     Number(backOutGrowthStep(priceRaw, growthBasisPoints)) / 10 ** priceDecimals;
 
@@ -310,9 +373,16 @@ export function useStakingPageData(
   const refetchAll = useCallback(() => {
     refetchStakerReads();
     refetchTargetApy();
+    refetchDepletionReads();
     refetchMinterData();
     refetchApproval();
-  }, [refetchStakerReads, refetchTargetApy, refetchMinterData, refetchApproval]);
+  }, [
+    refetchStakerReads,
+    refetchTargetApy,
+    refetchDepletionReads,
+    refetchMinterData,
+    refetchApproval,
+  ]);
 
   // Stake confirmation
   useEffect(() => {
@@ -320,8 +390,13 @@ export function useStakingPageData(
       setIsStaking(false);
       setStakeHash(undefined);
       refetchAll();
+      addToast?.({
+        type: 'success',
+        title: 'Stake Confirmed',
+        description: `Your ${nftName} stake is confirmed on-chain.`,
+      });
     }
-  }, [stakeConfirmed, stakeHash, refetchAll]);
+  }, [stakeConfirmed, stakeHash, refetchAll, addToast, nftName]);
 
   // Unstake confirmation
   useEffect(() => {
@@ -329,8 +404,13 @@ export function useStakingPageData(
       setIsUnstaking(false);
       setUnstakeHash(undefined);
       refetchAll();
+      addToast?.({
+        type: 'success',
+        title: 'Unstake Confirmed',
+        description: `Your ${nftName} unstake is confirmed and pending phUSD was claimed.`,
+      });
     }
-  }, [unstakeConfirmed, unstakeHash, refetchAll]);
+  }, [unstakeConfirmed, unstakeHash, refetchAll, addToast, nftName]);
 
   // Claim confirmation
   useEffect(() => {
@@ -338,8 +418,13 @@ export function useStakingPageData(
       setIsClaiming(false);
       setClaimHash(undefined);
       refetchAll();
+      addToast?.({
+        type: 'success',
+        title: 'Rewards Claimed',
+        description: `Your ${nftName} phUSD rewards were claimed on-chain.`,
+      });
     }
-  }, [claimConfirmed, claimHash, refetchAll]);
+  }, [claimConfirmed, claimHash, refetchAll, addToast, nftName]);
 
   // Approval confirmation
   useEffect(() => {
@@ -504,6 +589,7 @@ export function useStakingPageData(
     minApy,
     highestPrice,
     annualRewardDollars,
+    annualBudgetDollars,
     isApprovedForAll,
     approveAll,
     isApproving,

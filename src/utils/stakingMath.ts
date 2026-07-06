@@ -86,6 +86,14 @@ export function computeMinApy(
 export interface ApyRangeInputs {
   /** Global annual phUSD reward stream in USD (rate × seconds × phUSD/USD). */
   annualRewardDollars: number;
+  /**
+   * Stake-independent annual emission in USD implied by the funded budget
+   * (`totalBudget × 12 / depletionWindowMonths × phUSD/USD`). Used as the
+   * depletion empty-pool numerator, since `annualRewardDollars` (derived from
+   * the live `currentRewardRate`) reads 0 until the pool has stake. Ignored for
+   * fixed stakers. Defaults to 0 when unknown.
+   */
+  annualBudgetDollars?: number;
   /** Global staked units across all holders. */
   totalStaked: number;
   /** The connected wallet's owned (unstaked) units. */
@@ -127,18 +135,27 @@ export interface ApyRangeInputs {
  * on an empty pool a sole staker earns `targetAPY` regardless of price, i.e.
  * floor == ceil, no range).
  *
- * Depletion stakers (`!hasTargetApy`): a fixed budget emits a non-zero reward
- * rate even at zero stake, so a **conservative, wallet-based denominator**
- * (mirroring the stable-staker empty-pool precedent,
- * `useStableStakerPools.ts` / `usePhUsdStakePool.ts`) keeps the displayed APY
- * representative instead of spiking:
- *   - pool has stake → real APY off the live total;
+ * Depletion stakers (`!hasTargetApy`): a fixed budget emits over a depletion
+ * window, so a **conservative, wallet-based denominator** (mirroring the
+ * stable-staker empty-pool precedent, `useStableStakerPools.ts` /
+ * `usePhUsdStakePool.ts`) keeps the displayed APY representative instead of
+ * spiking:
+ *   - pool has stake → real APY off the live total (numerator = live
+ *     `annualRewardDollars`, from the running `currentRewardRate`);
  *   - empty, wallet has NFTs → as if all their wallet NFTs were the sole stake;
  *   - empty, no NFTs → as if 1 NFT were staked (at the latest price).
  * This floors expectations so a user's own commit can't make the number collapse.
+ *
+ * ⚠️ Empty-pool numerator: on an empty depletion pool the live
+ * `currentRewardRate` reads **0** (the on-chain rate is `rewardBudget /
+ * windowSeconds` and the schedule only re-arms on stake/claim/mint), so
+ * `annualRewardDollars` is 0 and would collapse the band to 0–0%. The funded
+ * emission (`annualBudgetDollars`, from `totalBudget / depletionWindow`) is the
+ * correct stake-independent numerator for that state.
  */
 export function computeApyRange({
   annualRewardDollars,
+  annualBudgetDollars = 0,
   totalStaked,
   ownedUnits,
   highestPriceUsd,
@@ -160,16 +177,20 @@ export function computeApyRange({
     ceilApy =
       totalStaked > 0 ? floorApy * (latestPrice / initialPriceUsd) : floorApy;
   } else {
-    // Depletion staker — conservative wallet-based denominator.
+    // Depletion staker — conservative wallet-based denominator. Live pool uses
+    // the running emission; empty pool uses the funded-budget emission (the
+    // live rate reads 0 until someone stakes — see the JSDoc warning).
+    const annualReward =
+      totalStaked > 0 ? annualRewardDollars : annualBudgetDollars;
     const effectiveUnits =
       totalStaked > 0 ? totalStaked : ownedUnits > 0 ? ownedUnits : 1;
     floorApy =
-      annualRewardDollars > 0 && latestPrice > 0
-        ? (annualRewardDollars / (effectiveUnits * latestPrice)) * 100
+      annualReward > 0 && latestPrice > 0
+        ? (annualReward / (effectiveUnits * latestPrice)) * 100
         : 0;
     ceilApy =
-      annualRewardDollars > 0 && initialPriceUsd > 0
-        ? (annualRewardDollars / (effectiveUnits * initialPriceUsd)) * 100
+      annualReward > 0 && initialPriceUsd > 0
+        ? (annualReward / (effectiveUnits * initialPriceUsd)) * 100
         : 0;
   }
 

@@ -85,6 +85,7 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
     const state = states[wiring.id];
     const { floorApy, ceilApy } = computeApyRange({
       annualRewardDollars: state.annualRewardDollars,
+      annualBudgetDollars: state.annualBudgetDollars,
       totalStaked: state.totalStaked,
       ownedUnits: state.ownedUnits,
       highestPriceUsd: state.highestPrice,
