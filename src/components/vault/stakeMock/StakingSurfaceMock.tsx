@@ -1,70 +1,140 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import type { Address } from 'viem';
 import type { Toast } from '../../../types/toast';
-import { MOCK_STAKER_ROWS, type MockStakerRow } from '../../../data/nftStakeMockData';
+import {
+  STAKER_WIRINGS,
+  type StakerId,
+  type StakerWiring,
+} from '../../../data/nftStakeMockData';
+import { useStakingPageData } from '../../../hooks/useStakingPageData';
+import type { StakingPageData } from '../../../hooks/useStakingPageData';
+import { useContractAddresses } from '../../../contexts/ContractAddressContext';
+import { computeApyRange } from '../../../utils/stakingMath';
 import EarningPanel from '../staking/EarningPanel';
 import NftStakerAccordionRow from './NftStakerAccordionRow';
 
 type AddToast = (toast: Omit<Toast, 'id'>) => string;
 
 export interface StakingSurfaceMockProps {
-  /** Toast dispatcher, used for the "coming soon" stubs on this unwired surface. */
+  /** Toast dispatcher, threaded into each per-staker hook's tx lifecycle. */
   addToast: AddToast;
 }
 
+/** A wiring descriptor bound to its live per-staker hook state + derived APY band. */
+interface StakerRow {
+  wiring: StakerWiring;
+  state: StakingPageData;
+  floorApy: number;
+  ceilApy: number;
+}
+
 /**
- * Redesigned NFT staking surface — MOCK DATA ONLY (Story 073).
+ * Redesigned NFT staking surface — LIVE on-chain wiring (Story 076).
  *
- * This is the sole reader of `nftStakeMockData`. It owns the accordion's
- * one-open-at-a-time state and aggregates the mock rows into the shared
- * `EarningPanel` hero. Every value here is mock; Stake/Unstake/Claim are
- * stubbed no-ops (a "coming soon" toast). The future wiring story replaces the
- * single `MOCK_STAKER_ROWS` read with explicit per-staker hooks returning the
- * same `MockStakerRow` shape — no presentational component changes needed.
+ * Drives the admin-only Stake Preview accordion off real per-staker contract
+ * data. Each of the five stakers gets its OWN explicit `useStakingPageData`
+ * call (never in a `.map`, per the Rules of Hooks); the generic hook reads
+ * staked/owned units, live pending phUSD, rate-per-second and APY, and executes
+ * the real `setApprovalForAll` / `stake` / `unstake` / `claim` writes. Rows are
+ * bound to their static `STAKER_WIRINGS` descriptor by id and the `floor → ceil`
+ * APY band is derived here via `computeApyRange` from values the hook returns.
  */
 export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps) {
+  const { addresses } = useContractAddresses();
+
   // Default the SCX row open (matches the redesign HTML `expanded: 'scx'`).
-  const [expandedId, setExpandedId] = useState<string | null>('scx');
+  const [expandedId, setExpandedId] = useState<StakerId | null>('scx');
 
-  const rows = MOCK_STAKER_ROWS;
-  const fixedRows = useMemo(() => rows.filter((r) => r.kind === 'fixed'), [rows]);
-  const mcRows = useMemo(() => rows.filter((r) => r.kind === 'mc'), [rows]);
+  // ── Five explicit per-staker hook calls (fixed order, never in a loop) ──
+  const lsp = useStakingPageData(addToast, {
+    stakerAddress: addresses?.NFTStaker as Address | undefined,
+    ownedRowKey: 'USDS',
+    nftName: 'Liquid Sky Phoenix',
+    hasTargetApy: true,
+  });
+  const ratchet = useStakingPageData(addToast, {
+    stakerAddress: addresses?.RatchetNFTStaker as Address | undefined,
+    ownedRowKey: 'USDC',
+    nftName: 'Reservoir Ratchet',
+    hasTargetApy: true,
+  });
+  const eye = useStakingPageData(addToast, {
+    stakerAddress: addresses?.UniboostStakerEYE as Address | undefined,
+    ownedRowKey: 'EYE',
+    nftName: 'EYE Ignition',
+    hasTargetApy: false,
+  });
+  const scx = useStakingPageData(addToast, {
+    stakerAddress: addresses?.UniboostStakerSCX as Address | undefined,
+    ownedRowKey: 'SCX',
+    nftName: 'Smouldering Scarcity',
+    hasTargetApy: false,
+  });
+  const flx = useStakingPageData(addToast, {
+    stakerAddress: addresses?.UniboostStakerFLX as Address | undefined,
+    ownedRowKey: 'Flax',
+    nftName: 'Flax Wild Fire',
+    hasTargetApy: false,
+  });
 
-  // Aggregate mock totals for the hero panel.
-  const totalUnits = useMemo(() => rows.reduce((s, r) => s + r.stakedUnits, 0), [rows]);
-  const pendingYield = useMemo(() => rows.reduce((s, r) => s + r.pendingYield, 0), [rows]);
-  const ratePerSecond = useMemo(() => rows.reduce((s, r) => s + r.ratePerSec, 0), [rows]);
+  const states: Record<StakerId, StakingPageData> = { lsp, ratchet, eye, scx, flx };
 
-  const toggle = (id: string) =>
+  // Bind each descriptor to its hook state + derived APY band (pure map — the
+  // hooks above are what must stay out of a loop, not this presentational map).
+  const rows: StakerRow[] = STAKER_WIRINGS.map((wiring) => {
+    const state = states[wiring.id];
+    const { floorApy, ceilApy } = computeApyRange({
+      annualRewardDollars: state.annualRewardDollars,
+      totalStaked: state.totalStaked,
+      ownedUnits: state.ownedUnits,
+      highestPriceUsd: state.highestPrice,
+      minApy: state.minApy,
+      hasTargetApy: wiring.hasTargetApy,
+    });
+    return { wiring, state, floorApy, ceilApy };
+  });
+
+  const fixedRows = rows.filter((r) => r.wiring.kind === 'fixed');
+  const mcRows = rows.filter((r) => r.wiring.kind === 'mc');
+
+  // ── Real hero aggregation over the live results ─────────────────────────
+  const totalUnits = rows.reduce((s, r) => s + r.state.stakedUnits, 0);
+  const pendingYield = rows.reduce((s, r) => s + r.state.pendingYield, 0);
+  const ratePerSecond = rows.reduce((s, r) => s + r.state.ratePerSec, 0);
+
+  const toggle = (id: StakerId) =>
     setExpandedId((cur) => (cur === id ? null : id));
 
-  const comingSoon = (verb: string) => (
-    addToast({
-      type: 'info',
-      title: 'Coming soon',
-      description: `NFT ${verb} is not wired up yet.`,
-    })
-  );
-
-  const renderRow = (row: MockStakerRow) => (
-    <NftStakerAccordionRow
-      key={row.id}
-      name={row.name}
-      sub={row.sub}
-      image={row.image}
-      kind={row.kind}
-      floorApy={row.floorApy}
-      ceilApy={row.ceilApy}
-      stakedUnits={row.stakedUnits}
-      ownedUnits={row.ownedUnits}
-      pendingYield={row.pendingYield}
-      ratePerSec={row.ratePerSec}
-      isOpen={expandedId === row.id}
-      onToggle={() => toggle(row.id)}
-      onStake={() => comingSoon('staking')}
-      onUnstake={() => comingSoon('unstaking')}
-      onClaim={() => comingSoon('claiming')}
-    />
-  );
+  const renderRow = (row: StakerRow) => {
+    const { wiring, state } = row;
+    return (
+      <NftStakerAccordionRow
+        key={wiring.id}
+        name={wiring.name}
+        sub={wiring.sub}
+        image={wiring.image}
+        kind={wiring.kind}
+        floorApy={row.floorApy}
+        ceilApy={row.ceilApy}
+        stakedUnits={state.stakedUnits}
+        ownedUnits={state.ownedUnits}
+        pendingYield={state.pendingYield}
+        ratePerSec={state.ratePerSec}
+        isStakerDeployed={state.isStakerDeployed}
+        isApprovedForAll={state.isApprovedForAll}
+        isApproving={state.isApproving}
+        isStaking={state.isStaking}
+        isUnstaking={state.isUnstaking}
+        isClaiming={state.isClaiming}
+        isOpen={expandedId === wiring.id}
+        onToggle={() => toggle(wiring.id)}
+        onApprove={() => void state.approveAll()}
+        onStake={(u) => void state.stake(u)}
+        onUnstake={(u) => void state.unstake(u)}
+        onClaim={() => void state.claim()}
+      />
+    );
+  };
 
   return (
     <div>

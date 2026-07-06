@@ -140,9 +140,26 @@ When executing stories:
 4. Ensure big number conversions are correct (10^18 scaling)
 5. Verify contract address loading works for both mainnet and local
 
-## NFT Tab — Mock Data Only
+## NFT Tab — Real Contract Integration
 
-The NFT tab (`src/components/vault/NFTTab.tsx`) uses **entirely mocked data** from `src/data/nftMockData.ts`. There are no contract calls, wagmi hooks, or on-chain interactions for NFT operations. All wallet balances, token prices, approval states, and minting actions are simulated in local component state. Do not add real contract integration to the NFT tab without explicit instruction to do so.
+The NFT tab makes **real on-chain calls** via wagmi — it is **not** mock-driven.
+
+- **Minting** (`src/components/vault/NFTListMintModal.tsx`) reads live price / balance /
+  allowance through `useMinterPageView` (decoding `MintPageView.getData()`) and executes
+  real `approve` + `mint(dispatcherIndex, recipient)` transactions.
+- **Staking** (`src/components/vault/StakingSurface.tsx` + `useStakingPageData`) reads live
+  staked units / pending phUSD / rate-per-second / APY and executes real
+  `setApprovalForAll` / `stake` / `unstake` / `claim` transactions.
+- **`src/data/nftMockData.ts` holds STATIC CONFIG ONLY** (names, images, decimals,
+  `tokenPrefix`, and the prefix→address / prefix→price maps) — despite the filename, it is
+  not a source of simulated on-chain values.
+
+The admin-only **Stake Preview** accordion (`src/components/vault/stakeMock/`) began as a
+mock (`nftStakeMockData.ts`); story 076 wires it to real per-staker contracts. After that,
+`nftStakeMockData.ts` is a static per-staker **wiring descriptor**, not live-value mock data.
+
+_Historical note: this tab was mock-only very early in development. That has not been true
+since the minter/staking wiring landed — do not treat the tab as mock-only._
 
 ## Questions?
 

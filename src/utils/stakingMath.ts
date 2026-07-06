@@ -82,6 +82,111 @@ export function computeMinApy(
   return (annualRewardDollars / denom) * 100;
 }
 
+/** Inputs for {@link computeApyRange}, all pre-derived by `useStakingPageData`. */
+export interface ApyRangeInputs {
+  /** Global annual phUSD reward stream in USD (rate × seconds × phUSD/USD). */
+  annualRewardDollars: number;
+  /** Global staked units across all holders. */
+  totalStaked: number;
+  /** The connected wallet's owned (unstaked) units. */
+  ownedUnits: number;
+  /** Latest / highest historical mint price in USD — the floor-APY anchor. */
+  highestPriceUsd: number;
+  /**
+   * Pre-computed min APY from {@link computeMinApy}. Used verbatim as the
+   * fixed-staker floor (correct for both the live pool and the empty
+   * `targetAPY` starting-APY path), so the fixed-staker math is not duplicated.
+   */
+  minApy: number;
+  /**
+   * True for fixed stakers (targetAPY auto-scaled rate), false for depletion
+   * (fixed-budget) stakers — selects the empty-pool APY path.
+   */
+  hasTargetApy: boolean;
+  /**
+   * Earliest / initial mint price in USD — the ceil-APY anchor. Protocol
+   * convention pins this at 10 ($10, since USDS ≈ USDC = $1).
+   */
+  initialPriceUsd?: number;
+}
+
+/**
+ * Compute a row's `floor → ceil` APY band (percentages, low → high).
+ *
+ * ⚠️ Direction is counter-intuitive: **earliest mint = cheapest = HIGHEST APY =
+ * ceil**; **latest mint = priciest = LOWEST APY = floor**. NFTs are
+ * interchangeable and every staked unit earns an equal per-unit reward, so
+ * APY = reward ÷ cost-basis: an early (cheap) mint earns more, a late (expensive)
+ * mint earns less. `floor` is anchored at the latest/highest price
+ * (`highestPriceUsd`); `ceil` at the fixed initial price (`initialPriceUsd`, 10).
+ *
+ * Fixed stakers (`hasTargetApy`): the reward rate auto-scales to hit `targetAPY`
+ * and reads 0 until someone stakes, so the wallet-projection below would be
+ * wrong. The floor comes straight from `computeMinApy` (which already handles the
+ * empty pool via the `targetAPY` starting-APY, where the mint price cancels — so
+ * on an empty pool a sole staker earns `targetAPY` regardless of price, i.e.
+ * floor == ceil, no range).
+ *
+ * Depletion stakers (`!hasTargetApy`): a fixed budget emits a non-zero reward
+ * rate even at zero stake, so a **conservative, wallet-based denominator**
+ * (mirroring the stable-staker empty-pool precedent,
+ * `useStableStakerPools.ts` / `usePhUsdStakePool.ts`) keeps the displayed APY
+ * representative instead of spiking:
+ *   - pool has stake → real APY off the live total;
+ *   - empty, wallet has NFTs → as if all their wallet NFTs were the sole stake;
+ *   - empty, no NFTs → as if 1 NFT were staked (at the latest price).
+ * This floors expectations so a user's own commit can't make the number collapse.
+ */
+export function computeApyRange({
+  annualRewardDollars,
+  totalStaked,
+  ownedUnits,
+  highestPriceUsd,
+  minApy,
+  hasTargetApy,
+  initialPriceUsd = 10,
+}: ApyRangeInputs): { floorApy: number; ceilApy: number } {
+  const latestPrice = highestPriceUsd > 0 ? highestPriceUsd : initialPriceUsd;
+
+  let floorApy: number;
+  let ceilApy: number;
+
+  if (hasTargetApy) {
+    // Fixed staker — reuse computeMinApy's result for the floor.
+    floorApy = minApy;
+    // On a live pool, ceil = floor scaled from the latest price up to the
+    // (cheaper) initial price. On an empty pool the sole-staker APY equals
+    // targetAPY regardless of mint price, so there is no range.
+    ceilApy =
+      totalStaked > 0 ? floorApy * (latestPrice / initialPriceUsd) : floorApy;
+  } else {
+    // Depletion staker — conservative wallet-based denominator.
+    const effectiveUnits =
+      totalStaked > 0 ? totalStaked : ownedUnits > 0 ? ownedUnits : 1;
+    floorApy =
+      annualRewardDollars > 0 && latestPrice > 0
+        ? (annualRewardDollars / (effectiveUnits * latestPrice)) * 100
+        : 0;
+    ceilApy =
+      annualRewardDollars > 0 && initialPriceUsd > 0
+        ? (annualRewardDollars / (effectiveUnits * initialPriceUsd)) * 100
+        : 0;
+  }
+
+  // Guard against any residual NaN / Infinity from divide-by-zero.
+  if (!Number.isFinite(floorApy)) floorApy = 0;
+  if (!Number.isFinite(ceilApy)) ceilApy = 0;
+
+  // Clamp floor ≤ ceil (swap if a sub-initial latest price ever inverts them).
+  if (ceilApy < floorApy) {
+    const tmp = floorApy;
+    floorApy = ceilApy;
+    ceilApy = tmp;
+  }
+
+  return { floorApy, ceilApy };
+}
+
 /**
  * User's share of the global reward stream, in phUSD/sec.
  *

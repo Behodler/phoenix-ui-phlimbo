@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   useAccount,
+  useReadContract,
   useReadContracts,
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -38,6 +39,8 @@ export interface StakingPageData {
 
   // Balances
   stakedUnits: number;
+  /** Global units staked across all holders (denominator for pool-wide APY). */
+  totalStaked: number;
   ownedUnits: number;
   /** User's live claimable phUSD (baseline for LiveYieldCounter). */
   pendingYield: number;
@@ -84,6 +87,14 @@ export interface StakingPageDataOptions {
   ownedRowKey?: OwnedRowKey;
   /** NFT display name woven into action toasts. Defaults to `'Liquid Sky Phoenix'`. */
   nftName?: string;
+  /**
+   * Whether this staker exposes `targetAPY()`. Defaults to `true` (fixed
+   * stakers). Pass `false` for the Uniboost depletion stakers so the missing
+   * `targetAPY` contract is omitted from the batch — avoiding a noisy
+   * failed-call in the console. `targetApyRaw` then defaults to `0n`, which is
+   * already the status-guarded fallback, so behaviour is unchanged.
+   */
+  hasTargetApy?: boolean;
 }
 
 /**
@@ -118,6 +129,7 @@ export function useStakingPageData(
 
   const ownedRowKey: OwnedRowKey = options?.ownedRowKey ?? 'USDS';
   const nftName = options?.nftName ?? 'Liquid Sky Phoenix';
+  const hasTargetApy = options?.hasTargetApy ?? true;
 
   const stakerAddress = (options?.stakerAddress ??
     (addresses?.NFTStaker as Address | undefined)) as Address | undefined;
@@ -174,15 +186,27 @@ export function useStakingPageData(
             functionName: 'users',
             args: [userAddress as Address],
           },
-          {
-            address: stakerAddress as Address,
-            abi: nftStakerAbi,
-            functionName: 'targetAPY',
-          },
         ]
       : [],
     query: {
       enabled: stakerReadsEnabled,
+      refetchInterval: REFETCH_INTERVAL_MS,
+      refetchOnWindowFocus: false,
+    },
+  });
+
+  // ── targetAPY (separate, conditional read) ─────────────────────────
+  // The Uniboost depletion stakers don't expose `targetAPY()`, so it is read
+  // on its own hook gated by `hasTargetApy`. Keeping it out of the batch above
+  // means depletion stakers never fire a failed call (no console noise); when
+  // disabled the read simply returns `undefined`, so `targetApyRaw` is 0n —
+  // exactly the status-guarded fallback the batched read would have produced.
+  const { data: targetApyData, refetch: refetchTargetApy } = useReadContract({
+    address: stakerAddress as Address,
+    abi: nftStakerAbi,
+    functionName: 'targetAPY',
+    query: {
+      enabled: stakerReadsEnabled && hasTargetApy,
       refetchInterval: REFETCH_INTERVAL_MS,
       refetchOnWindowFocus: false,
     },
@@ -212,10 +236,10 @@ export function useStakingPageData(
     return tuple[0];
   }, [stakerReads]);
 
-  const targetApyRaw = useMemo<bigint>(() => {
-    const r = stakerReads?.[4];
-    return r?.status === 'success' ? (r.result as bigint) : 0n;
-  }, [stakerReads]);
+  const targetApyRaw = useMemo<bigint>(
+    () => (typeof targetApyData === 'bigint' ? targetApyData : 0n),
+    [targetApyData],
+  );
 
   // ── NFT data from useMinterPageView (Liquid Sky → USDS, Ratchet → USDC) ──
   const ownedRow = minterData?.[ownedRowKey];
@@ -231,6 +255,7 @@ export function useStakingPageData(
   const phUsdPriceSafe = phUsdPrice ?? 1; // USDS pinned to $1; phUSD ≈ $1
 
   const stakedUnits = Number(userStakedRaw);
+  const totalStaked = Number(totalStakedRaw);
   const pendingYield = Number(pendingRewardRaw) / 1e18;
   const ratePerSec = computeUserRatePerSec(
     currentRewardRate,
@@ -284,9 +309,10 @@ export function useStakingPageData(
 
   const refetchAll = useCallback(() => {
     refetchStakerReads();
+    refetchTargetApy();
     refetchMinterData();
     refetchApproval();
-  }, [refetchStakerReads, refetchMinterData, refetchApproval]);
+  }, [refetchStakerReads, refetchTargetApy, refetchMinterData, refetchApproval]);
 
   // Stake confirmation
   useEffect(() => {
@@ -471,6 +497,7 @@ export function useStakingPageData(
   return {
     isStakerDeployed,
     stakedUnits,
+    totalStaked,
     ownedUnits,
     pendingYield,
     ratePerSec,

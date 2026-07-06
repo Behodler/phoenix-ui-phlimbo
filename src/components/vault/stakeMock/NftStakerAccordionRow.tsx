@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { StakerKind } from '../../../data/nftStakeMockData';
 import SegmentedControl from '../../ui/SegmentedControl';
-import ActionButton from '../../ui/ActionButton';
+import ActionButton, { LoadingSpinner } from '../../ui/ActionButton';
 import LiveYieldCounter from '../staking/LiveYieldCounter';
 import PhUsdCoin from '../staking/PhUsdCoin';
 import ApyRangePill from './ApyRangePill';
@@ -27,7 +27,22 @@ export interface NftStakerAccordionRowProps {
   /** Accordion open state (one row open at a time — controlled by parent). */
   isOpen: boolean;
   onToggle: () => void;
-  /** Stubbed action callbacks (no-op in the mock orchestrator). */
+  /**
+   * Whether this NFT's staker is deployed (non-zero address) on the active
+   * network. When false the row's actions are disabled with a "not live yet"
+   * affordance (defensive — on mainnet the Uniboost stakers are zero-address).
+   */
+  isStakerDeployed: boolean;
+  /** ERC-1155 `setApprovalForAll(staker, true)` flag for the connected wallet. */
+  isApprovedForAll: boolean;
+  /** Approve the staker to move the wallet's NFT units (ERC-1155). */
+  onApprove: () => void;
+  /** Per-action in-flight flags — disable + spin the relevant button. */
+  isApproving: boolean;
+  isStaking: boolean;
+  isUnstaking: boolean;
+  isClaiming: boolean;
+  /** Live action callbacks (real chain writes via the staker hook). */
   onStake: (units: number) => void;
   onUnstake: (units: number) => void;
   onClaim: () => void;
@@ -60,6 +75,13 @@ export default function NftStakerAccordionRow({
   ratePerSec,
   isOpen,
   onToggle,
+  isStakerDeployed,
+  isApprovedForAll,
+  onApprove,
+  isApproving,
+  isStaking,
+  isUnstaking,
+  isClaiming,
   onStake,
   onUnstake,
   onClaim,
@@ -69,6 +91,11 @@ export default function NftStakerAccordionRow({
 
   const moveMax = action === 'stake' ? ownedUnits : stakedUnits;
   const clampedVal = Math.min(Math.max(0, sliderVal), moveMax);
+
+  // Any live tx disables sibling actions to avoid overlapping writes.
+  const txInFlight = isApproving || isStaking || isUnstaking || isClaiming;
+  // Stake CTA flips to "Approve" until the ERC-1155 flag confirms.
+  const needsApproval = isStakerDeployed && !isApprovedForAll;
 
   // Reset to Stake + a sensible slider default whenever the row (re)opens,
   // mirroring the redesign HTML (toggle resets sub→'stake', stake→1).
@@ -117,6 +144,11 @@ export default function NftStakerAccordionRow({
             <div className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground">
               Earn phUSD · {sub}
             </div>
+            {!isStakerDeployed && (
+              <span className="mt-1 inline-block rounded-full border border-pxusd-orange-500/40 bg-pxusd-orange-900/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-pxusd-orange-300">
+                Not live yet
+              </span>
+            )}
           </div>
         </div>
 
@@ -255,8 +287,9 @@ export default function NftStakerAccordionRow({
               </div>
               <ActionButton
                 variant="primary"
-                label="Claim phUSD"
-                disabled={!hasPending}
+                label={isStakerDeployed ? 'Claim phUSD' : 'Not live yet'}
+                disabled={!isStakerDeployed || !hasPending || txInFlight}
+                isLoading={isClaiming}
                 onAction={onClaim}
               />
             </>
@@ -285,26 +318,44 @@ export default function NftStakerAccordionRow({
                 </div>
               </div>
               {action === 'stake' ? (
-                <ActionButton
-                  variant="primary"
-                  label={`Stake ${unitLabel(clampedVal)}`}
-                  disabled={clampedVal === 0}
-                  onAction={() => onStake(clampedVal)}
-                />
+                needsApproval ? (
+                  <ActionButton
+                    variant="approve"
+                    label="Approve for staking"
+                    disabled={txInFlight}
+                    isLoading={isApproving}
+                    onAction={onApprove}
+                  />
+                ) : (
+                  <ActionButton
+                    variant="primary"
+                    label={
+                      isStakerDeployed
+                        ? `Stake ${unitLabel(clampedVal)}`
+                        : 'Not live yet'
+                    }
+                    disabled={!isStakerDeployed || clampedVal === 0 || txInFlight}
+                    isLoading={isStaking}
+                    onAction={() => onStake(clampedVal)}
+                  />
+                )
               ) : (
                 <div className="mt-6">
                   <button
                     type="button"
-                    disabled={clampedVal === 0}
+                    disabled={!isStakerDeployed || clampedVal === 0 || txInFlight}
                     onClick={() => onUnstake(clampedVal)}
                     className={[
-                      'w-full rounded-xl bg-gradient-to-br from-red-500 to-pxusd-orange-400 px-4 py-2.5 text-[13px] font-bold text-pxusd-white transition-[filter,transform] duration-150',
-                      clampedVal === 0
+                      'flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-red-500 to-pxusd-orange-400 px-4 py-2.5 text-[13px] font-bold text-pxusd-white transition-[filter,transform] duration-150',
+                      !isStakerDeployed || clampedVal === 0 || txInFlight
                         ? 'cursor-not-allowed opacity-50'
                         : 'hover:-translate-y-px hover:brightness-110',
                     ].join(' ')}
                   >
-                    Unstake {unitLabel(clampedVal)}
+                    {isUnstaking && <LoadingSpinner />}
+                    {isStakerDeployed
+                      ? `Unstake ${unitLabel(clampedVal)}`
+                      : 'Not live yet'}
                   </button>
                 </div>
               )}
