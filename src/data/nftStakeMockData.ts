@@ -64,7 +64,7 @@ export interface StakerWiring {
 }
 
 /**
- * The five stakers driving the admin Stake Preview accordion.
+ * The five stakers driving the Stake accordion.
  *
  * Order within each `kind` group is the display order. The orchestrator
  * (`StakingSurfaceMock`) binds each descriptor to its own explicit

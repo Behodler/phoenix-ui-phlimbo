@@ -7,25 +7,17 @@ import { useNFTPrices } from '../../hooks/useNFTPrices';
 import { useMinterPageView, type TokenMintData } from '../../hooks/useMinterPageView';
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
-import StakingSurface from './StakingSurface';
 import StakingSurfaceMock from './stakeMock/StakingSurfaceMock';
 import WhaleMintPanel from './WhaleMintPanel';
 
-export type NFTSubTab = 'mint' | 'stake' | 'stake-mock';
+export type NFTSubTab = 'mint' | 'stake';
 
 interface NFTListTabProps {
   subTab: NFTSubTab;
   onSubTabChange: (subTab: NFTSubTab) => void;
-  /**
-   * When true, expose the admin-only "Stake Preview" sub-tab (the unwired NFT
-   * staking redesign). Reuses VaultPage's existing `hasAdminAccess` signal so
-   * the preview ships to the live UI for design review without exposing it to
-   * end users. Non-admins never see the option and can never land on it.
-   */
-  canSeeStakePreview?: boolean;
 }
 
-export default function NFTListTab({ subTab, onSubTabChange, canSeeStakePreview = false }: NFTListTabProps) {
+export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) {
   const { addToast } = useToast();
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -146,9 +138,6 @@ export default function NFTListTab({ subTab, onSubTabChange, canSeeStakePreview 
           options={[
             { value: 'mint', label: 'Mint' },
             { value: 'stake', label: 'Stake' },
-            ...(canSeeStakePreview
-              ? [{ value: 'stake-mock' as const, label: 'Stake Preview' }]
-              : []),
           ]}
         />
       </div>
@@ -200,15 +189,9 @@ export default function NFTListTab({ subTab, onSubTabChange, canSeeStakePreview 
             refetchMinterData={refetchMinterData}
           />
         </>
-      ) : subTab === 'stake-mock' && canSeeStakePreview ? (
-        // Admin-only redesign preview (mock data). Guarded so a non-admin who
-        // somehow holds this sub-tab value falls through to the wired surface.
-        <div className="max-w-4xl mx-auto">
-          <StakingSurfaceMock addToast={addToast} />
-        </div>
       ) : (
         <div className="max-w-4xl mx-auto">
-          <StakingSurface addToast={addToast} />
+          <StakingSurfaceMock addToast={addToast} />
         </div>
       )}
     </div>

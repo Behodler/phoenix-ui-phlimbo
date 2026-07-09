@@ -185,7 +185,6 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     decimals: 6,
     batchEnabled: true,
     batchMinterKey: "RatchetBatchNFTMinter",
-    isNew: true,
   },
 ];
 

@@ -820,7 +820,7 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "NFT" ? (
               <ErrorBoundary>
-                <NFTListTab subTab={nftSubTab} onSubTabChange={setNftSubTab} canSeeStakePreview={hasAdminAccess} />
+                <NFTListTab subTab={nftSubTab} onSubTabChange={setNftSubTab} />
               </ErrorBoundary>
             ) : null}
           </div>

@@ -31,7 +31,7 @@ interface StakerRow {
 /**
  * Redesigned NFT staking surface — LIVE on-chain wiring (Story 076).
  *
- * Drives the admin-only Stake Preview accordion off real per-staker contract
+ * Drives the Stake accordion off real per-staker contract
  * data. Each of the five stakers gets its OWN explicit `useStakingPageData`
  * call (never in a `.map`, per the Rules of Hooks); the generic hook reads
  * staked/owned units, live pending phUSD, rate-per-second and APY, and executes
