@@ -35,6 +35,13 @@ export interface UniboostFieldDecimals {
 export interface UseUniboostAutofillResult {
   suggestion: UniboostSuggestion | null;
   decimals: UniboostFieldDecimals;
+  /**
+   * Raw balance of the target UniV2 pair (LP) token held by the dispatcher —
+   * the protocol-owned liquidity that accrues on each pool(). undefined until
+   * loaded. Always 18 decimals (UniV2 pair). See Uniboost.pool()'s addLiquidity
+   * to `address(this)`.
+   */
+  lpOwned: bigint | undefined;
   /** Refetch the balance/quote/reserve reads (e.g. after a fresh NFT mint). */
   refetch: () => void;
 }
@@ -122,9 +129,21 @@ export function useUniboostAutofill(
     query: { enabled: enabled && !!targetToken },
   });
 
+  // Protocol-owned LP: the target UniV2 pair token IS the LP token, and pool()
+  // mints it to the dispatcher itself, so its balance here is the liquidity the
+  // protocol currently owns via this dispatcher.
+  const lpOwnedRead = useReadContract({
+    address: targetPool,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: dispatcher ? [dispatcher] : undefined,
+    query: { enabled: enabled && !!targetPool },
+  });
+
   const primeBal = asBig(primeBalRead.data);
   const pairPre = asBig(pairPreRead.data);
   const targetPre = asBig(targetPreRead.data);
+  const lpOwned = asBig(lpOwnedRead.data);
 
   // Native decimals of each token, used only for display/parse encoding — the
   // pool math itself works entirely in raw units.
@@ -266,11 +285,12 @@ export function useUniboostAutofill(
     primeBalRead.refetch();
     pairPreRead.refetch();
     targetPreRead.refetch();
+    lpOwnedRead.refetch();
     step1Quote.refetch();
     step2Quote.refetch();
     reservesRead.refetch();
     totalSupplyRead.refetch();
   };
 
-  return { suggestion, decimals, refetch };
+  return { suggestion, decimals, lpOwned, refetch };
 }

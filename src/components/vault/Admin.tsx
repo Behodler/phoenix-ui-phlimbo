@@ -21,6 +21,7 @@ import NftStakerRunwayPanel from './NftStakerRunwayPanel';
 import { useTokenBalance } from '../../hooks/useContractInteractions';
 import { useSolvencyInfo } from '../../hooks/useSolvencyInfo';
 import { useUniboostAutofill } from '../../hooks/useUniboostAutofill';
+import { TOL_PCT_LABEL } from '../../lib/uniboostPoolMath';
 import type { Abi, AbiFunction } from 'viem';
 import type { ContractAddresses } from '../../types/contracts';
 
@@ -1085,6 +1086,16 @@ export default function Admin() {
   // Format a raw token amount for display, scaling by the token's decimals.
   const fmtAmount = (value: bigint, decimals: number): string =>
     Number(formatUnits(value, decimals)).toFixed(2);
+
+  // Format a raw LP (UniV2 pair, 18 decimals) balance for display. LP amounts
+  // span a wide magnitude range, so show up to 6 significant fractional digits
+  // and flag dust rather than rounding a non-zero balance down to 0.00.
+  const fmtLp = (value: bigint): string => {
+    const n = Number(formatUnits(value, 18));
+    if (n === 0) return '0';
+    if (n < 0.000001) return '<0.000001';
+    return n.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  };
 
   // Per-strategy panel config. Each strategy shows line items split by client
   // (StableMinter + StableStaker) with a per-strategy total row. The StableMinter
@@ -2573,7 +2584,7 @@ export default function Admin() {
                             </button>
                           )}
                           {!uniboostMissing && !isEdited && hasSuggestion && (
-                            <div className="text-[10px] text-green-500">auto · 1%</div>
+                            <div className="text-[10px] text-green-500">auto · {TOL_PCT_LABEL}</div>
                           )}
                         </td>
                         {(['amountIn', 'minPairOut', 'minTargetOut', 'minLP'] as const).map((field) => (
@@ -2636,6 +2647,36 @@ export default function Admin() {
               })()}
             </div>
 
+            {/* Protocol-owned LP: the LP (target UniV2 pair) token minted by each
+                pool() accrues on its dispatcher, so its balance there is the
+                liquidity the protocol currently owns per dispatcher. */}
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="text-xs font-medium text-muted-foreground mb-2">
+                Protocol-owned LP
+              </div>
+              <div className="space-y-1">
+                {UNIBOOST_ROWS.map(({ label, addressKey }) => {
+                  const uniboost = addresses?.[addressKey] as string | undefined;
+                  const uniboostMissing = !uniboost || uniboost.toLowerCase() === ZERO_ADDRESS;
+                  const lpOwned = uniboostAutofills[label].lpOwned;
+                  return (
+                    <div key={label} className="flex justify-between items-center text-sm">
+                      <span className="font-mono text-muted-foreground">{label}</span>
+                      <span className="font-mono text-foreground">
+                        {uniboostMissing ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : lpOwned === undefined ? (
+                          <span className="text-muted-foreground">…</span>
+                        ) : (
+                          <>{fmtLp(lpOwned)} <span className="text-muted-foreground">LP</span></>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="mt-3 pt-3 border-t border-border">
               <button
                 onClick={() => {
@@ -2658,7 +2699,7 @@ export default function Admin() {
               (e.g. USDC, 6 decimals), <code>minPairOut</code>/<code>minTargetOut</code> in the pair/target
               tokens, <code>minLP</code> in LP tokens (18 decimals). <code>minPairOut</code>,
               <code> minTargetOut</code> and <code>minLP</code> are slippage floors and must be &gt; 0.
-              Rows tagged <span className="text-green-500">auto · 1%</span> are auto-filled to 1%-safe
+              Rows tagged <span className="text-green-500">auto · {TOL_PCT_LABEL}</span> are auto-filled to {TOL_PCT_LABEL}-safe
               MEV floors, derived off-chain from each dispatcher's prime balance and its UniV2
               quotes/reserves (the two swaps + LP mint of <code>Uniboost.pool()</code>); the Uniboost
               dispatcher has no on-chain quote, so these are computed against the worst-case output of

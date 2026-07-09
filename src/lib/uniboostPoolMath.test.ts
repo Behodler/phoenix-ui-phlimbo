@@ -1,17 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { computeStep1, computeStep2 } from './uniboostPoolMath';
+import { computeStep1, computeStep2, TOL_NUM, TOL_DEN } from './uniboostPoolMath';
 
 const E = 10n ** 18n; // 1 token, 18 decimals
+// Mirror of the module's slippage haircut so these checks track the configured
+// tolerance instead of a hardcoded percentage.
+const tol = (x: bigint): bigint => (x * TOL_NUM) / TOL_DEN;
 
 describe('uniboostPoolMath.computeStep1', () => {
-  it('applies 1% tolerance to the prime->pair quote and halves the worst-case pair balance', () => {
+  it('applies the configured tolerance to the prime->pair quote and halves the worst-case pair balance', () => {
     // pairOutExp 1000, plus 10 pre-existing pair dust.
-    const r = computeStep1({ pairPre: 10n * E, pairOutExp: 1000n * E });
+    const pairPre = 10n * E;
+    const pairOutExp = 1000n * E;
+    const r = computeStep1({ pairPre, pairOutExp });
     expect(r).not.toBeNull();
-    // minPairOut = 1000 * 99/100 = 990
-    expect(r!.minPairOut).toBe(990n * E);
-    // pairBalWorst = 10 + 990 = 1000; halfWorst = 500
-    expect(r!.halfWorst).toBe(500n * E);
+    // minPairOut = pairOutExp * TOL
+    expect(r!.minPairOut).toBe(tol(pairOutExp));
+    // pairBalWorst = pairPre + minPairOut; halfWorst = pairBalWorst / 2
+    expect(r!.halfWorst).toBe((pairPre + tol(pairOutExp)) / 2n);
   });
 
   it('returns null when there is no prime->pair output to pool', () => {
@@ -20,16 +25,17 @@ describe('uniboostPoolMath.computeStep1', () => {
 });
 
 describe('uniboostPoolMath.computeStep2', () => {
-  // Hand-worked exact scenario:
-  //   minTargetOut = 100 * 99/100          = 99
-  //   pairRemainingWorst = 200 - 100        = 100
-  //   targetBalWorst = 0 + 99               = 99
-  //   rPairAfter   = 900 + 100              = 1000
-  //   rTargetAfter = 1000 - 100             = 900
-  //   lpFromTarget = 99 * 1000 / 900        = 110
-  //   lpFromPair   = 100 * 1000 / 1000      = 100
-  //   expectedLP   = min(110, 100)          = 100  (the naive 50/50 split makes one side limit)
-  //   minLP        = 100 * 99/100           = 99
+  // Hand-worked scenario, written against the tolerance haircut tol() so it
+  // holds for any configured tolerance in the realistic 0–10% band:
+  //   minTargetOut = tol(100)
+  //   targetBalWorst = 0 + minTargetOut      = tol(100)
+  //   pairRemainingWorst = 200 - 100          = 100
+  //   rPairAfter   = 900 + 100                = 1000
+  //   rTargetAfter = 1000 - 100               = 900
+  //   lpFromTarget = tol(100) * 1000 / 900   (>= 100 while tolerance <= 10%)
+  //   lpFromPair   = 100 * 1000 / 1000        = 100  (the limiting side here)
+  //   expectedLP   = min(lpFromTarget, 100)   = 100
+  //   minLP        = tol(100)
   const base = {
     pairPre: 0n,
     targetPre: 0n,
@@ -44,8 +50,11 @@ describe('uniboostPoolMath.computeStep2', () => {
   it('derives minTargetOut and minLP against the worst-case legs', () => {
     const r = computeStep2(base);
     expect(r).not.toBeNull();
-    expect(r!.minTargetOut).toBe(99n * E);
-    expect(r!.minLP).toBe(99n * E);
+    // minTargetOut = targetOutExp * TOL
+    expect(r!.minTargetOut).toBe(tol(base.targetOutExp));
+    // The pair side limits at expectedLP = 100E for any tolerance in the
+    // realistic 0–10% band, so minLP = 100E * TOL.
+    expect(r!.minLP).toBe(tol(100n * E));
   });
 
   it('returns null on an empty target pool (totalSupply 0)', () => {

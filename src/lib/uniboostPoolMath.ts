@@ -22,10 +22,18 @@
 // UniV2 LP token is always 18) and re-parses with the same decimals at submit,
 // so the raw value round-trips exactly. See useUniboostAutofill's decimals.
 
-// Default slippage tolerance: 1% below expected, matching BalancerPoolerV2's
-// minBPT auto-fill (Admin.tsx `expected * 99n / 100n`).
-export const TOL_NUM = 99n;
-export const TOL_DEN = 100n;
+// Slippage tolerance for the auto-filled floors: each floor is set to
+// TOL_NUM/TOL_DEN of the expected output, so the remainder (TOL_DEN-TOL_NUM) is
+// the tolerated slippage. Currently 2.5%. Too tight reverts live pools with
+// `Uniboost: insufficient LP` (thin/moving target pools drift between the
+// autofill quote and execution, and the LP step is the min of two swap-dependent
+// sides — the 1% floor reverted in practice); too loose exposes pool() to MEV.
+export const TOL_NUM = 975n;
+export const TOL_DEN = 1000n;
+
+// Human-readable tolerance for UI labels, derived from the multiplier so it can
+// never drift from the floors actually applied. e.g. 975/1000 -> "2.5%".
+export const TOL_PCT_LABEL = `${(Number(TOL_DEN - TOL_NUM) * 100) / Number(TOL_DEN)}%`;
 
 const applyTol = (x: bigint, num = TOL_NUM, den = TOL_DEN): bigint => (x * num) / den;
 
