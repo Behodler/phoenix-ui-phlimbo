@@ -17,6 +17,7 @@ import { pauserAbi } from '../../lib/pauserAbi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
+import FAQEditor from './FAQEditor';
 import NftStakerRunwayPanel from './NftStakerRunwayPanel';
 import { useTokenBalance } from '../../hooks/useContractInteractions';
 import { useSolvencyInfo } from '../../hooks/useSolvencyInfo';
@@ -2972,6 +2973,9 @@ export default function Admin() {
           )}
         </div>
       )}
+
+      {/* FAQ Editor — no-code editing of /faq-data.json via the FAQ write API */}
+      <FAQEditor />
 
       {/* Admin Notice */}
       <div className="mt-6 p-4 bg-card border border-border rounded-lg">

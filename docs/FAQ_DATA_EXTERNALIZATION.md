@@ -1,5 +1,18 @@
 # Plan: Externalize `faq-data.json` for Rebuild-Free Updates
 
+## Status
+
+**Implemented — 2026-07-18.** The S3 object `s3://phusd.behodler.io/faq-data.json`
+is live and authoritative. Local changes landed:
+
+- `src/components/vault/FAQ.tsx` — static import replaced with a runtime
+  `fetch('/faq-data.json')` (degrades to empty on failure).
+- `package.json` — deploy sync now carries `--exclude "faq-data.json"`.
+- `src/assets/faq-data.json` — moved to `docs/faq-data.seed.json` (seed/reference only).
+
+The "Steps" section below is retained as the record of what was done. See
+[Future: No-Code Admin Editor](#future-no-code-admin-editor) for the next phase.
+
 ## Goal
 
 Move `src/assets/faq-data.json` out of the JS bundle so the FAQ content can be
@@ -138,3 +151,123 @@ so the S3 object is never uploaded from the build and never deleted by `--delete
 - `src/assets/faq-data.json` — removed (moved to `docs/faq-data.seed.json` as seed).
 - `package.json` — add `--exclude "faq-data.json"` to the `deploy` sync.
 - S3: `s3://phusd.behodler.io/faq-data.json` — new authoritative copy (uploaded once).
+
+---
+
+## Future: No-Code Admin Editor
+
+Goal: let a non-coder teammate (with admin-page access) edit the FAQ through the UI
+instead of hand-editing JSON in the S3 console.
+
+### Threat model (keep it honest)
+
+The **entire blast radius is FAQ content** — worst case, a bad actor or a mistake
+defaces or blanks the FAQ. No funds, keys, or contract state are reachable. So the
+security bar is "prevent casual/accidental damage and public defacement," not
+"protect a treasury." That justifies a *simple* auth scheme — but not *no* auth.
+
+**Key point:** hiding the editor behind the admin tab is **cosmetic only**. Client-side
+route gating stops nobody from calling the write endpoint directly. The real control
+must live **server-side on the write path**. Every write must independently
+authenticate — the UI gate is just UX.
+
+### Recommended shape
+
+Reads stay public (the site already `fetch`es `/faq-data.json`; no auth needed).
+Only **writes** need protection.
+
+```
+Admin UI (editor)  ──GET──▶  /faq-data.json           (public, existing)
+Admin UI (Publish) ──PUT──▶  API Gateway ─▶ Lambda ─▶ validate ─▶ S3 write ─▶ CloudFront invalidate
+                                              ▲
+                                        checks secret
+```
+
+1. **API Gateway + one Lambda** with a single `PUT` (write whole document).
+2. **Auth = shared password/token**, held in a **Lambda environment variable**
+   (`FAQ_EDITOR_PASSWORD`), **never in the frontend bundle**. The teammate types the
+   password into the admin UI; it's sent over HTTPS in an `Authorization` header; the
+   Lambda compares it server-side with a timing-safe check. Reject on mismatch. (This
+   is adequate *because* the blast radius is FAQ-only. If scope ever grows, swap the
+   env var for Secrets Manager — the Lambda already supports `FAQ_SECRET_ARN` — or a
+   Cognito login + API Gateway authorizer, same Lambda underneath.)
+3. **Server-side validation before writing** — the Lambda re-checks the payload
+   against the `FAQData` shape (top-level map of `{ componentName, items: [{title,
+   body}] }`). This is what actually protects the live site: a malformed save is
+   rejected, not shipped. Do **not** rely on the client for this.
+4. **Write + invalidate** — Lambda `PutObject`s to `s3://phusd.behodler.io/faq-data.json`
+   then creates a CloudFront invalidation for `/faq-data.json` so the change is live
+   immediately.
+
+### Editor UX (client)
+
+Whole-document, edit-in-memory, publish-all — no partial patching:
+
+1. On open, `fetch('/faq-data.json')` into local state.
+2. **Dropdown 1 — Tab group** (`MintTab`, `DepositTab`, …): keys of the document.
+3. **Dropdown 2 — Item**: the `items[]` of the selected group, labelled by `title`.
+4. Selecting an item fills two fields: **Title** (header) and **Body** (message).
+5. **CRUD controls**: add/delete item within a group, edit title/body, reorder
+   (optional). Everything mutates the in-memory copy only.
+6. **Publish** button → `PUT` the entire edited document to the Lambda. On success,
+   show confirmation; the CloudFront invalidation makes it live within seconds.
+
+Single teammate → no concurrent-edit locking needed. If that ever changes, add an
+ETag/If-Match check in the Lambda.
+
+### Why not the alternatives
+
+- **Direct browser → S3 write (Cognito Identity Pool):** removes the Lambda but needs
+  scoped IAM + Cognito setup, and you lose the server-side validation choke point.
+  More moving parts for no real gain at this scale.
+- **Just edit JSON in the S3 console:** free, but error-prone for a non-coder — one
+  bad comma blanks the FAQ. The Lambda's validation is the main reason to build UI.
+
+### Build checklist
+
+- [x] Lambda: `PUT` handler — auth check → schema validate → `PutObject` → CloudFront
+      invalidation. Secret in Secrets Manager **or** `FAQ_EDITOR_PASSWORD` env.
+      → `lambda/index.js` (+ `package.json`, `README.md`). `npm run build` → `function.zip`.
+- [x] Admin editor component: two dropdowns + title/body fields + CRUD + Publish.
+      → `src/components/vault/FAQEditor.tsx`, rendered inside `src/components/vault/Admin.tsx`.
+- [x] Password prompt in the admin UI (session-scoped state, never persisted/bundled).
+- [x] Client + server schema validation; success/error toasts.
+- [x] **Deploy the Lambda** behind an **API Gateway HTTP API**. One-step:
+      `cd lambda && export FAQ_EDITOR_PASSWORD=… && ./deploy.sh` (creates the IAM
+      role, function, env vars, and HTTP API; prints the endpoint). See
+      `lambda/README.md` for details and the manual path.
+      → Endpoint live: `https://hngbq8pbff.execute-api.us-east-1.amazonaws.com/`
+- [x] **Set `VITE_FAQ_API_URL`** to the endpoint and rebuild the UI. Added to
+      `.envrc` (gitignored); rebuild with `yarn build && yarn deploy`.
+- [ ] Keep a **manual backup copy** of the current `faq-data.json` (e.g.
+      `docs/faq-data.seed.json`, already in the repo) so a bad edit can be reverted by
+      re-uploading it. (Bucket versioning intentionally left off.)
+
+### Wiring the endpoint into the UI
+
+The editor reads the write endpoint from `import.meta.env.VITE_FAQ_API_URL` at build
+time. Until it's set, the editor loads and previews content but disables Publish
+(shows a "not configured" notice). To enable publishing, set the var (e.g. in
+`.envrc`/`.env` or the build environment) and run `yarn build`:
+
+```bash
+# API Gateway HTTP API endpoint — trailing slash, no stage path ($default stage):
+export VITE_FAQ_API_URL="https://<api-id>.execute-api.<region>.amazonaws.com/"
+```
+
+> **Why API Gateway, not a Lambda Function URL?** We originally chose a Function
+> URL for simplicity, but this AWS account is in an Organization whose policy
+> blocks public (Auth type `NONE`) function URLs — they return 403 regardless of
+> the resource policy, and a member account can't override the org policy. API
+> Gateway HTTP API is a different resource type not covered by that guardrail. The
+> in-code password is still the real gate; CORS is handled by the Lambda (the
+> `$default` route forwards `OPTIONS` to it), so no CORS config is set on the API.
+
+Reads stay on the public `/faq-data.json`; only Publish uses this endpoint.
+
+### Files added for the editor
+
+- `src/components/vault/FAQEditor.tsx` — the admin editor (fetch → edit → PUT).
+- `src/components/vault/Admin.tsx` — renders `<FAQEditor />`.
+- `lambda/` — self-contained Node package for the write endpoint (`index.js`,
+  `package.json`, `README.md`, `.gitignore`). `cd lambda && npm run build`.
