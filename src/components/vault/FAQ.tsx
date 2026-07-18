@@ -1,19 +1,41 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FAQProps, FAQData } from '../../types/vault';
-import faqDataJson from '../../assets/faq-data.json';
 import { parseTextWithLinks } from '../../utils/urlParser';
 
 export default function FAQ({ componentName }: FAQProps) {
+  // State for tracking which items are expanded
+  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+
+  // FAQ content is fetched at runtime from /faq-data.json (hosted alongside the
+  // app in the same S3/CloudFront origin) so it can be updated without a rebuild.
+  const [allFaqData, setAllFaqData] = useState<Record<string, FAQData> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/faq-data.json')
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data: Record<string, FAQData>) => {
+        if (!cancelled) setAllFaqData(data);
+      })
+      .catch(() => {
+        // Degrade silently — the FAQ is supplementary content.
+        if (!cancelled) setAllFaqData({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Don't render if no component name is provided
   if (!componentName) {
     return null;
   }
 
-  // State for tracking which items are expanded
-  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
-
-  // Load FAQ data from JSON file based on component name
-  const faqData: FAQData | undefined = (faqDataJson as Record<string, FAQData>)[componentName];
+  // Look up FAQ data for this component once loaded
+  const faqData: FAQData | undefined = allFaqData?.[componentName];
 
   // Only show FAQ if we have data for this component
   if (!faqData) {
