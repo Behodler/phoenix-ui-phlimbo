@@ -33,7 +33,9 @@ function baseMock(tokens: NudgeMockToken[]) {
   return {
     nftCount: 40,
     nftCollectionName: 'Liquid Sky Phoenix',
-    mintCostFormatted: '8,412.5316 USDS',
+    mintCostFormatted: '25,000.00 USDS',
+    mintCostUsd: 25000,
+    mintTokenLogo: '/assets/USDS.png',
     whaleArt: '/assets/whale-phoenix.png',
     tokens,
   };
@@ -52,7 +54,7 @@ describe('NudgeMockPanel', () => {
     expect(screen.getByTestId('nudge-mock-panel')).toBeInTheDocument();
   });
 
-  it('renders the eyebrow, heading and mint-cost sub-copy', () => {
+  it('renders the eyebrow and heading, without the wordy sub-copy', () => {
     render(<NudgeMockPanel addToast={addToast} />);
 
     expect(screen.getByTestId('nudge-mock-eyebrow')).toHaveTextContent(
@@ -61,9 +63,117 @@ describe('NudgeMockPanel', () => {
     expect(
       screen.getByRole('heading', { name: 'Claim the nudge reward' })
     ).toBeInTheDocument();
-    expect(screen.getByText('8,412.5316 USDS')).toBeInTheDocument();
-    expect(screen.getByTestId('nudge-mock-panel')).toHaveTextContent(
+    // The "Pay … once. You keep all 40 …" paragraph was replaced by the
+    // stacked Mint cost / Pot value / Net mint cost line items.
+    expect(screen.getByTestId('nudge-mock-panel')).not.toHaveTextContent(
       'You keep all 40 Liquid Sky Phoenix NFTs'
+    );
+  });
+
+  it('shows the mint cost beside the pot value, amount split from unit', () => {
+    render(<NudgeMockPanel addToast={addToast} />);
+
+    const cost = screen.getByTestId('nudge-mock-mint-cost');
+    expect(cost).toHaveTextContent('25,000.00');
+    expect(cost).toHaveTextContent('USDS');
+  });
+
+  it('renders Net mint cost as mint cost minus pot value (USDS valued at $1)', () => {
+    render(<NudgeMockPanel addToast={addToast} />);
+
+    // 25000 − (12480 + 6294 + 1942 + 980 + 1104) = 2200
+    expect(screen.getByText('Net mint cost')).toBeInTheDocument();
+    expect(screen.getByTestId('nudge-mock-net-cost')).toHaveTextContent(
+      '$2,200.00'
+    );
+  });
+
+  it('labels an over-sized pot as a Net credit rather than a negative cost', () => {
+    // Pot ($22,800) worth more than the mint — a mispricing, not a normal
+    // state, but it must not render as "-$…" under a "Net cost" label.
+    fixture.value = {
+      ...baseMock(REAL_TOKENS),
+      mintCostFormatted: '8,412.5316 USDS',
+      mintCostUsd: 8412.5316,
+    };
+    render(<NudgeMockPanel addToast={addToast} />);
+
+    expect(screen.getByText('Net credit')).toBeInTheDocument();
+    expect(screen.queryByText('Net mint cost')).not.toBeInTheDocument();
+    expect(screen.getByTestId('nudge-mock-net-cost')).toHaveTextContent(
+      '$14,387.47'
+    );
+  });
+
+  it('renders a single "You pay" chip carrying the mint cost and its unit', () => {
+    render(<NudgeMockPanel addToast={addToast} />);
+
+    expect(screen.getByText('You pay')).toBeInTheDocument();
+    const chip = screen.getByTestId('nudge-mock-chip-pay');
+    expect(chip).toHaveTextContent('25,000.00');
+    expect(chip).toHaveTextContent('USDS');
+    expect(
+      screen.queryByTestId('nudge-mock-pay-logo-fallback')
+    ).not.toBeInTheDocument();
+  });
+
+  it('switches the pot between the full fixture and a USDC + KENDU pair', async () => {
+    const user = userEvent.setup();
+    render(<NudgeMockPanel addToast={addToast} />);
+
+    const toggle = screen.getByTestId('nudge-mock-pot-size-switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('nudge-mock-token-count')).toHaveTextContent(
+      '5 tokens'
+    );
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByTestId('nudge-mock-token-count')).toHaveTextContent(
+      '2 tokens'
+    );
+    // Only USDC + KENDU survive, in whitelist order — the filter never re-sorts.
+    const strip = screen.getByTestId('nudge-mock-chip-strip');
+    expect(
+      Array.from(strip.children)
+        .slice(1)
+        .map((c) => c.getAttribute('data-testid'))
+    ).toEqual(['nudge-mock-chip-USDC', 'nudge-mock-chip-KENDU']);
+
+    await user.click(toggle);
+    expect(screen.getByTestId('nudge-mock-chip-sDOLA')).toBeInTheDocument();
+    expect(screen.getByTestId('nudge-mock-token-count')).toHaveTextContent(
+      '5 tokens'
+    );
+  });
+
+  it('orders "You pay" above "You receive", swap-UI style', () => {
+    render(<NudgeMockPanel addToast={addToast} />);
+
+    const pay = screen.getByText('You pay');
+    const receive = screen.getByText('You receive');
+    expect(
+      pay.compareDocumentPosition(receive) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('falls back to a lettered circle when the payment token has no logo', () => {
+    fixture.value = { ...baseMock(REAL_TOKENS), mintTokenLogo: undefined };
+    render(<NudgeMockPanel addToast={addToast} />);
+
+    expect(
+      screen.getByTestId('nudge-mock-pay-logo-fallback')
+    ).toHaveTextContent('U');
+  });
+
+  it('degrades to amount-only when the cost string carries no unit', () => {
+    fixture.value = { ...baseMock(REAL_TOKENS), mintCostFormatted: '8412.5316' };
+    render(<NudgeMockPanel addToast={addToast} />);
+
+    expect(screen.getByTestId('nudge-mock-mint-cost')).toHaveTextContent(
+      '8412.5316'
     );
   });
 
@@ -111,7 +221,7 @@ describe('NudgeMockPanel', () => {
 
     // 12480 + 6294 + 1942 + 980 + 1104 = 22800
     expect(screen.getByTestId('nudge-mock-pot-total')).toHaveTextContent(
-      '≈ $22,800'
+      '$22,800'
     );
     expect(screen.getByTestId('nudge-mock-footer')).toHaveTextContent(
       'totaling $22,800.'
@@ -124,7 +234,7 @@ describe('NudgeMockPanel', () => {
 
     // 12480 + 6294 = 18774
     expect(screen.getByTestId('nudge-mock-pot-total')).toHaveTextContent(
-      '≈ $18,774'
+      '$18,774'
     );
   });
 
@@ -176,10 +286,10 @@ describe('NudgeMockPanel', () => {
     );
   });
 
-  it('applies the scroll-snap chip strip container', () => {
+  it('wraps the chip strip instead of scrolling it horizontally', () => {
     render(<NudgeMockPanel addToast={addToast} />);
     const strip = screen.getByTestId('nudge-mock-chip-strip');
-    expect(strip.className).toContain('overflow-x-auto');
-    expect(strip).toHaveStyle({ scrollSnapType: 'x proximity' });
+    expect(strip.className).toContain('flex-wrap');
+    expect(strip.className).not.toContain('overflow-x-auto');
   });
 });

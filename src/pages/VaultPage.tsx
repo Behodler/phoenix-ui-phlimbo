@@ -753,7 +753,7 @@ export default function VaultPage() {
     <div className="min-h-screen bg-background text-foreground antialiased">
       <Header />
 
-      <main className="mx-auto max-w-6xl px-4 py-8 pb-20 grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6">
+      <main className="mx-auto max-w-6xl lg:max-w-[93rem] px-4 py-8 pb-20 grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6">
         {/* Left: Main card */}
         <section className="min-w-0">
           <div className="phoenix-card p-0 overflow-hidden">

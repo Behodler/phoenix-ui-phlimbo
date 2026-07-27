@@ -4,6 +4,7 @@ import kenduLogo from '../assets/KENDU.png';
 import sDolaLogo from '../assets/sDOLA.png';
 import usdeLogo from '../assets/USDe.png';
 import flaxLogo from '../assets/Flax.png';
+import usdsLogo from '../assets/USDS.png';
 
 /**
  * Multi-token nudge reward pot — MOCK FIXTURE.
@@ -48,7 +49,16 @@ export const NUDGE_MOCK = {
   /** Collection name shown on the NFT chip. */
   nftCollectionName: 'Liquid Sky Phoenix',
   /** Pre-formatted one-off mint cost, including the payment token symbol. */
-  mintCostFormatted: '8,412.5316 USDS',
+  mintCostFormatted: '25,000.00 USDS',
+  /**
+   * Same figure as a plain number, used for the "Net cost" subtraction. The
+   * payment token is a USD stablecoin, so 1 unit is treated as $1 and the
+   * amount doubles as its own USD value — do NOT reuse this assumption for a
+   * non-stable payment token.
+   */
+  mintCostUsd: 25000,
+  /** Payment token art, shown on the single "You pay" chip. */
+  mintTokenLogo: usdsLogo,
   /** Pixel-art used for the banner's left column and the NFT chip. */
   whaleArt: whalePhoenixImg,
   /**

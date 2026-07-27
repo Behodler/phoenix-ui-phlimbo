@@ -205,7 +205,9 @@ export default function NFTListTab({ subTab, onSubTabChange, canSeeNudgeMock = f
         // Admin-only redesign preview (mock data). Double-guarded so a
         // non-admin who somehow holds this sub-tab value falls through to the
         // wired staking surface below.
-        <div className="max-w-4xl mx-auto">
+        // `lg:max-w-none` lets the panel fill the widened desktop column
+        // instead of being re-capped at 4xl.
+        <div className="max-w-4xl lg:max-w-none mx-auto">
           <NudgeMockPanel addToast={addToast} />
         </div>
       ) : (
