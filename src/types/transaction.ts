@@ -25,6 +25,8 @@ export const TransactionErrorType = {
   NETWORK_ERROR: 'NETWORK_ERROR',
   CONTRACT_REVERT: 'CONTRACT_REVERT',
   WRONG_NETWORK: 'WRONG_NETWORK',
+  /** Wallet connection went stale and can no longer sign; user must reconnect. */
+  WALLET_DISCONNECTED: 'WALLET_DISCONNECTED',
   UNKNOWN_ERROR: 'UNKNOWN_ERROR',
 } as const
 

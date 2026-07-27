@@ -13,6 +13,12 @@ import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { useMinterPageView } from './useMinterPageView';
 import { useBalancerPrice } from './useBalancerPrice';
 import { useERC1155ApprovalForAll } from './useERC1155ApprovalForAll';
+import { useWalletRecovery } from './useWalletRecovery';
+import {
+  isStaleConnectorError,
+  STALE_CONNECTOR_MESSAGE,
+  STALE_CONNECTOR_TITLE,
+} from '../utils/walletConnectionErrors';
 import { computeMinApy, computeUserRatePerSec, backOutGrowthStep } from '../utils/stakingMath';
 import type { Toast } from '../types/toast';
 
@@ -161,6 +167,9 @@ export function useStakingPageData(
     isStakerDeployed ? stakerAddress : undefined,
     nftMinterAddress,
   );
+
+  // Recovery path offered when a write fails against a stale connector.
+  const { recoverConnection } = useWalletRecovery();
 
   // ── Batched NFTStaker reads ────────────────────────────────────────
   const stakerReadsEnabled = isStakerDeployed && !!userAddress;
@@ -444,6 +453,20 @@ export function useStakingPageData(
   const handleError = useCallback(
     (err: unknown, fallbackTitle: string) => {
       const msg = err instanceof Error ? err.message : 'Unknown error';
+
+      // A stale connector can never be retried into working — the only useful
+      // response is to offer the reconnect, so check for it before anything else.
+      if (isStaleConnectorError(err)) {
+        addToast?.({
+          type: 'error',
+          title: STALE_CONNECTOR_TITLE,
+          description: STALE_CONNECTOR_MESSAGE,
+          duration: 0,
+          action: { label: 'Reconnect Wallet', onClick: () => void recoverConnection() },
+        });
+        return;
+      }
+
       const isRejection =
         msg.toLowerCase().includes('user rejected') ||
         msg.toLowerCase().includes('user denied');
@@ -453,7 +476,7 @@ export function useStakingPageData(
         description: isRejection ? 'You cancelled the transaction.' : msg,
       });
     },
-    [addToast],
+    [addToast, recoverConnection],
   );
 
   const stake = useCallback(

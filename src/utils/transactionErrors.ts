@@ -1,4 +1,9 @@
 import { TransactionErrorType, type TransactionError } from '../types/transaction'
+import {
+  isStaleConnectorError,
+  STALE_CONNECTOR_MESSAGE,
+  STALE_CONNECTOR_TITLE,
+} from './walletConnectionErrors'
 
 /**
  * Parses a transaction error and categorizes it
@@ -8,6 +13,20 @@ import { TransactionErrorType, type TransactionError } from '../types/transactio
  */
 export function parseTransactionError(error: Error): TransactionError {
   const errorMessage = error.message.toLowerCase()
+
+  // Stale wallet connection — must be checked before the WRONG_NETWORK branch
+  // below, whose 'chain' substring test otherwise swallows
+  // "connector.getChainId is not a function" and tells the user to switch
+  // networks, which cannot fix it. Not recoverable: retrying re-runs against
+  // the same inert connector. See utils/walletConnectionErrors.ts.
+  if (isStaleConnectorError(error)) {
+    return {
+      type: TransactionErrorType.WALLET_DISCONNECTED,
+      message: STALE_CONNECTOR_MESSAGE,
+      originalError: error,
+      recoverable: false,
+    }
+  }
 
   // User rejected transaction in wallet
   if (
@@ -108,6 +127,8 @@ export function getErrorTitle(errorType: TransactionErrorType): string {
       return 'Transaction Failed'
     case TransactionErrorType.WRONG_NETWORK:
       return 'Wrong Network'
+    case TransactionErrorType.WALLET_DISCONNECTED:
+      return STALE_CONNECTOR_TITLE
     case TransactionErrorType.UNKNOWN_ERROR:
       return 'Transaction Error'
     default:
@@ -122,6 +143,10 @@ export function getErrorTitle(errorType: TransactionErrorType): string {
  * @returns Whether retry should be offered
  */
 export function shouldOfferRetry(errorType: TransactionErrorType): boolean {
-  // Don't offer retry for user cancellation
-  return errorType !== TransactionErrorType.USER_REJECTED
+  // No retry for user cancellation, nor for a stale connection — the latter
+  // fails identically on every attempt until the wallet is reconnected.
+  return (
+    errorType !== TransactionErrorType.USER_REJECTED &&
+    errorType !== TransactionErrorType.WALLET_DISCONNECTED
+  )
 }
