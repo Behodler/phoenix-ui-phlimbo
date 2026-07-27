@@ -8,16 +8,25 @@ import { useMinterPageView, type TokenMintData } from '../../hooks/useMinterPage
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurfaceMock from './stakeMock/StakingSurfaceMock';
+import NudgeMockPanel from './nudgeMock/NudgeMockPanel';
 import WhaleMintPanel from './WhaleMintPanel';
 
-export type NFTSubTab = 'mint' | 'stake';
+export type NFTSubTab = 'mint' | 'stake' | 'nudge-mock';
 
 interface NFTListTabProps {
   subTab: NFTSubTab;
   onSubTabChange: (subTab: NFTSubTab) => void;
+  /**
+   * When true, expose the admin-only "Nudge-mock" sub-tab (the unwired
+   * multi-token nudge reward banner). Reuses VaultPage's existing
+   * `hasAdminAccess` signal — do NOT re-derive admin status here — so the
+   * preview ships to the live UI for design review without exposing it to end
+   * users. Non-admins never see the option and can never land on it.
+   */
+  canSeeNudgeMock?: boolean;
 }
 
-export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) {
+export default function NFTListTab({ subTab, onSubTabChange, canSeeNudgeMock = false }: NFTListTabProps) {
   const { addToast } = useToast();
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -138,6 +147,9 @@ export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) 
           options={[
             { value: 'mint', label: 'Mint' },
             { value: 'stake', label: 'Stake' },
+            ...(canSeeNudgeMock
+              ? [{ value: 'nudge-mock' as const, label: 'Nudge-mock' }]
+              : []),
           ]}
         />
       </div>
@@ -189,6 +201,13 @@ export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) 
             refetchMinterData={refetchMinterData}
           />
         </>
+      ) : subTab === 'nudge-mock' && canSeeNudgeMock ? (
+        // Admin-only redesign preview (mock data). Double-guarded so a
+        // non-admin who somehow holds this sub-tab value falls through to the
+        // wired staking surface below.
+        <div className="max-w-4xl mx-auto">
+          <NudgeMockPanel addToast={addToast} />
+        </div>
       ) : (
         <div className="max-w-4xl mx-auto">
           <StakingSurfaceMock addToast={addToast} />
