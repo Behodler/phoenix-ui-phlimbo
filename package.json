@@ -8,7 +8,7 @@
     "dev:ui": "vite",
     "build": "tsc -b && vite build",
     "aws:invalidate": "bash scripts/invalidateCDN.sh",
-    "deploy": "yarn build && aws s3 sync dist/build s3://phusd.behodler.io --delete --exclude \"faq-data.json\" && yarn aws:invalidate",
+    "deploy": "yarn build && aws s3 sync dist/build/assets s3://phusd.behodler.io/assets --delete --cache-control \"public,max-age=31536000,immutable\" && aws s3 sync dist/build s3://phusd.behodler.io --delete --exclude \"faq-data.json\" --exclude \"assets/*\" --cache-control \"no-cache\" && yarn aws:invalidate",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
