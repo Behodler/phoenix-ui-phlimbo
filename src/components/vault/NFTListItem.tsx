@@ -21,6 +21,10 @@ export default function NFTListItem({ nft, price, onMintClick }: NFTListItemProp
       <img
         src={nft.image}
         alt={nft.name}
+        width={40}
+        height={40}
+        loading="lazy"
+        decoding="async"
         className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
       />
 

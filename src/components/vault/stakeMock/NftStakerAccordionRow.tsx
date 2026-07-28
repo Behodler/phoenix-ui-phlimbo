@@ -134,6 +134,8 @@ export default function NftStakerAccordionRow({
             alt={name}
             width={46}
             height={46}
+            loading="lazy"
+            decoding="async"
             className="block h-[46px] w-[46px] flex-none select-none rounded-[11px] bg-black object-cover"
             draggable={false}
           />

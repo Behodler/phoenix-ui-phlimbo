@@ -3,7 +3,7 @@ import usdcLogo from '../assets/usdc-logo.svg';
 import kenduLogo from '../assets/KENDU.png';
 import sDolaLogo from '../assets/sDOLA.png';
 import usdeLogo from '../assets/USDe.png';
-import flaxLogo from '../assets/Flax.png';
+import flaxLogo from '../assets/Flax.webp';
 import usdsLogo from '../assets/USDS.png';
 
 /**

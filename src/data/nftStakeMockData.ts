@@ -1,8 +1,8 @@
-import eyeImg from '../assets/EYE.png';
-import sUsdsImg from '../assets/sUSDS.png';
-import scxImg from '../assets/SCX.png';
-import flaxImg from '../assets/Flax.png';
-import ratchetImg from '../assets/Ratchet.png';
+import eyeImg from '../assets/EYE.webp';
+import sUsdsImg from '../assets/sUSDS.webp';
+import scxImg from '../assets/SCX.webp';
+import flaxImg from '../assets/Flax.webp';
+import ratchetImg from '../assets/Ratchet.webp';
 import type { ContractAddresses } from '../types/contracts';
 
 /**

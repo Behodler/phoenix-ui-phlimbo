@@ -79,6 +79,8 @@ export default function StakedNftCard({
               alt={nft.name}
               width={72}
               height={72}
+              loading="lazy"
+              decoding="async"
               className="block h-[72px] w-[72px] select-none object-cover"
               draggable={false}
             />

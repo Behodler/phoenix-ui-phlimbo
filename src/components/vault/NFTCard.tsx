@@ -33,6 +33,7 @@ export default function NFTCard({ nft, price, onMintClick, showMintButton = true
               <img
                 src={nft.image}
                 alt={nft.name}
+                decoding="async"
                 className="w-full h-full object-cover"
               />
             </div>

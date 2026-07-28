@@ -1,9 +1,9 @@
-import eyeImg from '../assets/EYE.png';
-import sUsdsImg from '../assets/sUSDS.png';
-import scxImg from '../assets/SCX.png';
-import bitcoinImg from '../assets/Bitcoin.png';
-import flaxImg from '../assets/Flax.png';
-import ratchetImg from '../assets/Ratchet.png';
+import eyeImg from '../assets/EYE.webp';
+import sUsdsImg from '../assets/sUSDS.webp';
+import scxImg from '../assets/SCX.webp';
+import bitcoinImg from '../assets/Bitcoin.webp';
+import flaxImg from '../assets/Flax.webp';
+import ratchetImg from '../assets/Ratchet.webp';
 
 /**
  * Static configuration for each NFT (non-contract fields).

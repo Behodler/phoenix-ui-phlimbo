@@ -67,9 +67,21 @@ export default function NFTSelectorGrid({
                   NEW
                 </span>
               )}
+              {/*
+                The desktop grid and the mobile list below BOTH render an
+                <img> for every NFT, toggled by `hidden sm:grid` / `sm:hidden`.
+                A `display: none` <img> is still fetched and decoded — unless
+                it is lazy, in which case the browser skips it as not-near-
+                viewport. So `loading="lazy"` here is what stops each NFT's
+                art being downloaded twice per render.
+              */}
               <img
                 src={nft.image}
                 alt={nft.name}
+                width={64}
+                height={64}
+                loading="lazy"
+                decoding="async"
                 className="w-16 h-16 rounded-lg object-cover mb-1"
               />
               <span className="text-xs font-medium text-foreground truncate max-w-full">
@@ -106,9 +118,14 @@ export default function NFTSelectorGrid({
                 }
               `}
             >
+              {/* Lazy for the same reason as the desktop grid above. */}
               <img
                 src={nft.image}
                 alt={nft.name}
+                width={40}
+                height={40}
+                loading="lazy"
+                decoding="async"
                 className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
               />
               <span className="text-sm font-medium text-foreground flex-1 text-left truncate">
