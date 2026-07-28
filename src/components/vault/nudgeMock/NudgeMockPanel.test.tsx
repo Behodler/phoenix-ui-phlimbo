@@ -286,6 +286,56 @@ describe('NudgeMockPanel', () => {
     );
   });
 
+  it('turns a token with a URL into a new-tab link, and leaves the rest inert', () => {
+    fixture.value = baseMock([
+      REAL_TOKENS[0],
+      { ...REAL_TOKENS[1], url: 'https://www.coingecko.com/en/coins/kendu' },
+    ]);
+    render(<NudgeMockPanel addToast={addToast} />);
+
+    const link = screen.getByTestId('nudge-mock-chip-link-KENDU');
+    expect(link).toHaveAttribute(
+      'href',
+      'https://www.coingecko.com/en/coins/kendu'
+    );
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+
+    // The un-linked leg stays a plain chip — no anchor, no animation hooks.
+    expect(
+      screen.queryByTestId('nudge-mock-chip-link-USDC')
+    ).not.toBeInTheDocument();
+    const usdc = screen.getByTestId('nudge-mock-chip-USDC');
+    expect(usdc.querySelector('.nudge-mock-sheen')).toBeNull();
+    expect(usdc.querySelector('.nudge-mock-flip')).toBeNull();
+  });
+
+  it('gives a linked chip the sheen and coin-flip treatment', () => {
+    fixture.value = baseMock([
+      { ...REAL_TOKENS[1], url: 'https://www.coingecko.com/en/coins/kendu' },
+    ]);
+    render(<NudgeMockPanel addToast={addToast} />);
+
+    const chip = screen.getByTestId('nudge-mock-chip-KENDU');
+    expect(chip.querySelector('.nudge-mock-sheen')).not.toBeNull();
+    // The logo itself is what flips.
+    expect(
+      chip.querySelector('.nudge-mock-flip img')
+    ).toHaveAttribute('src', REAL_TOKENS[1].logo!);
+  });
+
+  it('treats a blank URL as no URL', () => {
+    fixture.value = baseMock([{ ...REAL_TOKENS[0], url: '   ' }]);
+    render(<NudgeMockPanel addToast={addToast} />);
+
+    expect(
+      screen.queryByTestId('nudge-mock-chip-link-USDC')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('nudge-mock-chip-USDC').querySelector('.nudge-mock-sheen')
+    ).toBeNull();
+  });
+
   it('wraps the chip strip instead of scrolling it horizontally', () => {
     render(<NudgeMockPanel addToast={addToast} />);
     const strip = screen.getByTestId('nudge-mock-chip-strip');

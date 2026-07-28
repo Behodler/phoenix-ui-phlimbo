@@ -41,6 +41,15 @@ export interface NudgeMockToken {
   amountFormatted: string;
   /** Approximate USD value of this leg. */
   usd: number;
+  /**
+   * Optional external link for the token — a price page, project site or block
+   * explorer. Purely presentational metadata: when set (and non-empty) the chip
+   * becomes an anchor that opens in a new tab, and picks up the sheen + coin
+   * flip treatment that advertises it as clickable. When absent the chip is an
+   * inert div with no animation, which is the default for whitelisted tokens
+   * we have no link for.
+   */
+  url?: string;
 }
 
 export const NUDGE_MOCK = {
@@ -68,7 +77,13 @@ export const NUDGE_MOCK = {
    */
   tokens: [
     { symbol: 'USDC', logo: usdcLogo, amountFormatted: '12,480.00', usd: 12480 },
-    { symbol: 'KENDU', logo: kenduLogo, amountFormatted: '118,000', usd: 6294 },
+    {
+      symbol: 'KENDU',
+      logo: kenduLogo,
+      amountFormatted: '118,000',
+      usd: 6294,
+      url: 'https://www.coingecko.com/en/coins/kendu',
+    },
     { symbol: 'sDOLA', logo: sDolaLogo, amountFormatted: '1,904.20', usd: 1942 },
     { symbol: 'USDe', logo: usdeLogo, amountFormatted: '980.00', usd: 980 },
     { symbol: 'FLAX', logo: flaxLogo, amountFormatted: '48,000.00', usd: 1104 },

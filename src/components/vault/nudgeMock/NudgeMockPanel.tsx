@@ -373,36 +373,46 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                   so there is never a dangling separator — including the
                   single-token and empty-pot cases.
                 */}
-                {tokens.map((token: NudgeMockToken, index: number) => (
-                  <div
-                    key={`${token.symbol}-${index}`}
-                    className="flex-none flex items-center gap-2.5"
-                    data-testid={`nudge-mock-chip-${token.symbol}`}
-                  >
+                {tokens.map((token: NudgeMockToken, index: number) => {
+                  // Only a non-empty URL earns the link treatment — a token
+                  // whose metadata carries `url: ''` must stay an inert chip.
+                  const href = token.url?.trim() ? token.url.trim() : undefined;
+
+                  const logo = token.logo ? (
+                    <img
+                      src={token.logo}
+                      alt=""
+                      className="flex-none w-[26px] h-[26px] rounded-full object-cover bg-[#050a14]"
+                    />
+                  ) : (
+                    // Lettered-circle fallback. Unused by the fixture (all
+                    // five tokens ship real art) but required once the
+                    // live version hits whitelisted tokens with no
+                    // bundled logo.
                     <span
-                      aria-hidden="true"
-                      className="flex-none grid place-items-center w-3.5 text-[15px] font-semibold text-[rgba(240,245,248,0.45)]"
+                      className="flex-none grid place-items-center w-[26px] h-[26px] rounded-full bg-[rgba(255,255,255,0.08)] text-[11px] font-bold uppercase text-foreground"
+                      data-testid={`nudge-mock-logo-fallback-${token.symbol}`}
                     >
-                      +
+                      {token.symbol.charAt(0)}
                     </span>
-                    <div className="flex-none flex items-center gap-2.5 rounded-[10px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] py-2.5 pl-2.5 pr-3.5">
-                      {token.logo ? (
-                        <img
-                          src={token.logo}
-                          alt=""
-                          className="flex-none w-[26px] h-[26px] rounded-full object-cover bg-[#050a14]"
-                        />
-                      ) : (
-                        // Lettered-circle fallback. Unused by the fixture (all
-                        // five tokens ship real art) but required once the
-                        // live version hits whitelisted tokens with no
-                        // bundled logo.
+                  );
+
+                  const chipBody = (
+                    <>
+                      {/*
+                        Linked chips spin their logo like a flipping coin. The
+                        stagger keeps five chips from flipping in unison, which
+                        reads as a glitch rather than as an invitation.
+                      */}
+                      {href ? (
                         <span
-                          className="flex-none grid place-items-center w-[26px] h-[26px] rounded-full bg-[rgba(255,255,255,0.08)] text-[11px] font-bold uppercase text-foreground"
-                          data-testid={`nudge-mock-logo-fallback-${token.symbol}`}
+                          className="flex-none nudge-mock-flip"
+                          style={{ animationDelay: `${index * 0.45}s` }}
                         >
-                          {token.symbol.charAt(0)}
+                          {logo}
                         </span>
+                      ) : (
+                        logo
                       )}
                       <div className="flex flex-col gap-[3px]">
                         <span className="font-mono text-[15px] font-semibold leading-none text-foreground tabular-nums whitespace-nowrap">
@@ -412,9 +422,51 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                           {token.symbol}
                         </span>
                       </div>
+                      {/* Sheen — a skewed highlight that sweeps across the
+                          chip on the same slow cycle as the flip. Purely
+                          decorative and clipped by the chip's own radius. */}
+                      {href && (
+                        <span
+                          aria-hidden="true"
+                          className="nudge-mock-sheen"
+                          style={{ animationDelay: `${index * 0.45}s` }}
+                        />
+                      )}
+                    </>
+                  );
+
+                  const chipClass =
+                    'flex-none flex items-center gap-2.5 rounded-[10px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] py-2.5 pl-2.5 pr-3.5';
+
+                  return (
+                    <div
+                      key={`${token.symbol}-${index}`}
+                      className="flex-none flex items-center gap-2.5"
+                      data-testid={`nudge-mock-chip-${token.symbol}`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="flex-none grid place-items-center w-3.5 text-[15px] font-semibold text-[rgba(240,245,248,0.45)]"
+                      >
+                        +
+                      </span>
+                      {href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${token.symbol} — open token page in a new tab`}
+                          className={`${chipClass} relative overflow-hidden no-underline cursor-pointer transition-colors hover:border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.07)]`}
+                          data-testid={`nudge-mock-chip-link-${token.symbol}`}
+                        >
+                          {chipBody}
+                        </a>
+                      ) : (
+                        <div className={chipClass}>{chipBody}</div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -435,8 +487,13 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
 
       {/*
         Component-local styles so we don't touch global CSS: the eyebrow pulse
-        keyframes. (The chip strip's custom scrollbar went away with the switch
-        from horizontal scrolling to wrapping.)
+        plus the linked-chip affordances (sheen sweep + coin flip). Both of the
+        latter run on the same 3s cycle with most of it spent idle, so a chip
+        catches the eye every few seconds without ever being busy. Motion is
+        dropped entirely under `prefers-reduced-motion` — the anchor, hover
+        state and cursor still carry the affordance.
+        (The chip strip's custom scrollbar went away with the switch from
+        horizontal scrolling to wrapping.)
       */}
       <style>{`
         @keyframes nudge-mock-pulse {
@@ -445,6 +502,46 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
         }
         .nudge-mock-dot {
           animation: nudge-mock-pulse 1.6s ease-in-out infinite;
+        }
+
+        @keyframes nudge-mock-sheen-sweep {
+          0%      { transform: translateX(-160%) skewX(-20deg); opacity: 0; }
+          8%      { opacity: 1; }
+          32%     { transform: translateX(160%) skewX(-20deg); opacity: 0; }
+          100%    { transform: translateX(160%) skewX(-20deg); opacity: 0; }
+        }
+        .nudge-mock-sheen {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 0;
+          width: 55%;
+          pointer-events: none;
+          background: linear-gradient(
+            100deg,
+            transparent 0%,
+            rgba(255,255,255,0.05) 35%,
+            rgba(255,255,255,0.30) 50%,
+            rgba(255,255,255,0.05) 65%,
+            transparent 100%
+          );
+          animation: nudge-mock-sheen-sweep 3s ease-in-out infinite;
+        }
+
+        @keyframes nudge-mock-coin-flip {
+          0%      { transform: rotateY(0deg); }
+          30%     { transform: rotateY(360deg); }
+          100%    { transform: rotateY(360deg); }
+        }
+        .nudge-mock-flip {
+          display: inline-grid;
+          transform-style: preserve-3d;
+          animation: nudge-mock-coin-flip 3s ease-in-out infinite;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .nudge-mock-sheen { display: none; }
+          .nudge-mock-flip { animation: none; }
         }
       `}</style>
     </div>
