@@ -145,11 +145,26 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
       <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden">
         <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr]">
           {/* Whale art + explainer */}
+          {/*
+            Seam handling. The art PNG is opaque RGB with a baked-in near-black
+            (~#070507) background, so its square edge used to butt straight up
+            against the teal panel with a hard divider rule on top of it —
+            reading as a stark black border. Two changes feather it away:
+
+              1. The column gradient now resolves to the panel's own teal at its
+                 outer edge instead of stopping at near-black, and the divider
+                 border is gone. The column dissolves into the body rather than
+                 being fenced off from it.
+              2. The image gets a radial alpha mask so its own black backdrop
+                 fades out before the column edge, instead of ending on a hard
+                 rectangle. The fade only bites the outer ~quarter of the
+                 radius, where the art is sparse embers on black.
+          */}
           <div
-            className="flex flex-col items-center gap-3.5 border-b sm:border-b-0 sm:border-r border-pxusd-teal-600 p-5"
+            className="flex flex-col items-center gap-3.5 p-5"
             style={{
               background:
-                'radial-gradient(ellipse at 50% 50%, #1a2440 0%, #050a14 75%)',
+                'radial-gradient(ellipse at 50% 42%, #1a2440 0%, #050a14 55%, #0a1823 80%, var(--pxusd-teal-700) 100%)',
             }}
           >
             <img
@@ -159,6 +174,10 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
               style={{
                 imageRendering: 'pixelated',
                 filter: 'drop-shadow(0 0 18px oklch(60% 0.15 30 / 0.3))',
+                WebkitMaskImage:
+                  'radial-gradient(ellipse at 50% 50%, #000 62%, transparent 100%)',
+                maskImage:
+                  'radial-gradient(ellipse at 50% 50%, #000 62%, transparent 100%)',
               }}
             />
             {/*
