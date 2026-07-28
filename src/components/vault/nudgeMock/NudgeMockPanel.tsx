@@ -144,9 +144,9 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
 
       <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden">
         <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr]">
-          {/* Whale art */}
+          {/* Whale art + explainer */}
           <div
-            className="grid place-items-center border-b sm:border-b-0 sm:border-r border-pxusd-teal-600 p-5"
+            className="flex flex-col items-center gap-3.5 border-b sm:border-b-0 sm:border-r border-pxusd-teal-600 p-5"
             style={{
               background:
                 'radial-gradient(ellipse at 50% 50%, #1a2440 0%, #050a14 75%)',
@@ -161,13 +161,33 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                 filter: 'drop-shadow(0 0 18px oklch(60% 0.15 30 / 0.3))',
               }}
             />
+            {/*
+              The explainer sits under the art rather than beside the heading:
+              the art column has spare height below a square image, and moving
+              the copy there lets the body column collapse to the numbers, which
+              is most of the banner's height saving.
+            */}
+            <p
+              className="m-0 text-[16px] leading-[1.6] text-muted-foreground text-justify hyphens-auto"
+              data-testid="nudge-mock-footer"
+            >
+              NFTs can be used to claim yield from the yield funnel. On top of
+              the NFTs, you receive the entire pot of nudge reward tokens,
+              totaling {totalUsdFormatted}.
+            </p>
           </div>
 
           {/* Body */}
           <div className="p-5 sm:p-6 flex flex-col gap-4 min-w-0">
-            {/* Header: meta + aggregate pot value */}
-            <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-3">
-              <div className="flex-1 min-w-0 basis-64">
+            {/*
+              Heading + "You pay" share a column so the stat stack can sit
+              beside BOTH of them, bottom-aligned: the figures then land just
+              above the "You receive" strip rather than floating up next to the
+              heading, and the two blocks overlap vertically instead of
+              stacking — which is where the remaining height saving comes from.
+            */}
+            <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-4">
+              <div className="flex-1 min-w-0 basis-64 flex flex-col gap-4">
                 <div
                   className="flex items-center gap-2 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em]"
                   style={{ color: NUDGE_MOCK_CYAN }}
@@ -186,22 +206,52 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                   />
                   Whale Mint · Phoenix ×{nftCount}
                 </div>
-                <h2 className="m-0 mb-1.5 text-[22px] font-bold tracking-tight text-foreground">
+                <h2 className="m-0 text-[22px] font-bold tracking-tight text-foreground">
                   Claim the nudge reward
                 </h2>
+
                 {/*
-                  The explainer lives here rather than beside the CTA: it fills
-                  the space the old "Pay … once" paragraph left behind, and the
-                  footer collapses to a left-aligned button.
+                  "You pay" mirrors the receive strip with a single
+                  payment-token chip, so the trade reads as two symmetrical
+                  rows rather than a reward list with the cost buried in a stat
+                  block. Pay sits ABOVE receive to match every swap UI (and the
+                  stat column's cost → pot → net order), and so the reward
+                  strip is the last thing read before the CTA.
                 */}
-                <p
-                  className="m-0 text-sm leading-relaxed text-muted-foreground max-w-[52ch]"
-                  data-testid="nudge-mock-footer"
-                >
-                  NFTs can be used to claim yield from the yield funnel. On top
-                  of the NFTs, you receive the entire pot of nudge reward
-                  tokens, totaling {totalUsdFormatted}.
-                </p>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2.5">
+                    You pay
+                  </div>
+                  <div className="flex items-stretch">
+                    <div
+                      className="flex-none flex items-center gap-2.5 rounded-[10px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] py-2.5 pl-2.5 pr-3.5"
+                      data-testid="nudge-mock-chip-pay"
+                    >
+                      {mintTokenLogo ? (
+                        <img
+                          src={mintTokenLogo}
+                          alt=""
+                          className="flex-none w-[26px] h-[26px] rounded-full object-cover bg-[#050a14]"
+                        />
+                      ) : (
+                        <span
+                          className="flex-none grid place-items-center w-[26px] h-[26px] rounded-full bg-[rgba(255,255,255,0.08)] text-[11px] font-bold uppercase text-foreground"
+                          data-testid="nudge-mock-pay-logo-fallback"
+                        >
+                          {mintCostUnit.charAt(0)}
+                        </span>
+                      )}
+                      <div className="flex flex-col gap-[3px]">
+                        <span className="font-mono text-[15px] font-semibold leading-none text-foreground tabular-nums whitespace-nowrap">
+                          {mintCostAmount}
+                        </span>
+                        <span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground whitespace-nowrap">
+                          {mintCostUnit}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/*
@@ -210,9 +260,9 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                 real outlay. Same font and size throughout so the figures stay
                 directly comparable; the rule above Net cost is the sum line.
               */}
-              <div className="flex-none flex flex-col gap-2.5 min-w-[190px]">
+              <div className="flex-none flex flex-col gap-2 min-w-[190px]">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1.5">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
                     Mint cost
                   </div>
                   <div
@@ -229,7 +279,7 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                 </div>
 
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1.5">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
                     Pot value
                   </div>
                   <div
@@ -242,7 +292,7 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                 </div>
 
                 <div className="pt-2.5 border-t border-[rgba(255,255,255,0.12)]">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1.5">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
                     {isCredit ? 'Net credit' : 'Net mint cost'}
                   </div>
                   <div
@@ -250,49 +300,6 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                     data-testid="nudge-mock-net-cost"
                   >
                     {netUsdFormatted}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/*
-              "You pay" mirrors the receive strip with a single payment-token
-              chip, so the trade reads as two symmetrical rows rather than a
-              reward list with the cost buried in a stat block. Pay sits ABOVE
-              receive to match every swap UI (and the stat column's
-              cost → pot → net order), and so the reward strip is the last
-              thing read before the CTA.
-            */}
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2.5">
-                You pay
-              </div>
-              <div className="flex items-stretch">
-                <div
-                  className="flex-none flex items-center gap-2.5 rounded-[10px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] py-2.5 pl-2.5 pr-3.5"
-                  data-testid="nudge-mock-chip-pay"
-                >
-                  {mintTokenLogo ? (
-                    <img
-                      src={mintTokenLogo}
-                      alt=""
-                      className="flex-none w-[26px] h-[26px] rounded-full object-cover bg-[#050a14]"
-                    />
-                  ) : (
-                    <span
-                      className="flex-none grid place-items-center w-[26px] h-[26px] rounded-full bg-[rgba(255,255,255,0.08)] text-[11px] font-bold uppercase text-foreground"
-                      data-testid="nudge-mock-pay-logo-fallback"
-                    >
-                      {mintCostUnit.charAt(0)}
-                    </span>
-                  )}
-                  <div className="flex flex-col gap-[3px]">
-                    <span className="font-mono text-[15px] font-semibold leading-none text-foreground tabular-nums whitespace-nowrap">
-                      {mintCostAmount}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground whitespace-nowrap">
-                      {mintCostUnit}
-                    </span>
                   </div>
                 </div>
               </div>
