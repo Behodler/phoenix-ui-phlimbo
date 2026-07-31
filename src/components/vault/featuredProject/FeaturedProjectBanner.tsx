@@ -1,5 +1,5 @@
 import { WHALE_DISCOUNT_CYAN } from '../../../data/nudgeTokenMeta';
-import kenduArt from '../../../assets/KENDU.png';
+import kenduArt from '../../../assets/KENDUbanner.png';
 
 /**
  * Featured project banner — a static promo card rendered under the Whale
