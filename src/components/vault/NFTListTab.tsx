@@ -8,25 +8,25 @@ import { useMinterPageView, type TokenMintData } from '../../hooks/useMinterPage
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurfaceMock from './stakeMock/StakingSurfaceMock';
-import NudgeMockPanel from './nudgeMock/NudgeMockPanel';
+import WhaleDiscountPanel from './whaleDiscount/WhaleDiscountPanel';
 import WhaleMintPanel from './WhaleMintPanel';
 
-export type NFTSubTab = 'mint' | 'stake' | 'nudge-mock';
+export type NFTSubTab = 'mint' | 'stake' | 'whale-discount';
 
 interface NFTListTabProps {
   subTab: NFTSubTab;
   onSubTabChange: (subTab: NFTSubTab) => void;
   /**
-   * When true, expose the admin-only "Nudge-mock" sub-tab (the unwired
-   * multi-token nudge reward banner). Reuses VaultPage's existing
-   * `hasAdminAccess` signal — do NOT re-derive admin status here — so the
-   * preview ships to the live UI for design review without exposing it to end
-   * users. Non-admins never see the option and can never land on it.
+   * When true, expose the admin-only "Whale Discount" sub-tab (the multi-token
+   * nudge reward banner). Reuses VaultPage's existing `hasAdminAccess` signal
+   * — do NOT re-derive admin status here — so the surface ships to the live UI
+   * for review without exposing it to end users. Non-admins never see the
+   * option and can never land on it.
    */
-  canSeeNudgeMock?: boolean;
+  canSeeWhaleDiscount?: boolean;
 }
 
-export default function NFTListTab({ subTab, onSubTabChange, canSeeNudgeMock = false }: NFTListTabProps) {
+export default function NFTListTab({ subTab, onSubTabChange, canSeeWhaleDiscount = false }: NFTListTabProps) {
   const { addToast } = useToast();
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -147,8 +147,8 @@ export default function NFTListTab({ subTab, onSubTabChange, canSeeNudgeMock = f
           options={[
             { value: 'mint', label: 'Mint' },
             { value: 'stake', label: 'Stake' },
-            ...(canSeeNudgeMock
-              ? [{ value: 'nudge-mock' as const, label: 'Nudge-mock' }]
+            ...(canSeeWhaleDiscount
+              ? [{ value: 'whale-discount' as const, label: 'Whale Discount' }]
               : []),
           ]}
         />
@@ -201,14 +201,13 @@ export default function NFTListTab({ subTab, onSubTabChange, canSeeNudgeMock = f
             refetchMinterData={refetchMinterData}
           />
         </>
-      ) : subTab === 'nudge-mock' && canSeeNudgeMock ? (
-        // Admin-only redesign preview (mock data). Double-guarded so a
-        // non-admin who somehow holds this sub-tab value falls through to the
-        // wired staking surface below.
+      ) : subTab === 'whale-discount' && canSeeWhaleDiscount ? (
+        // Admin-only surface. Double-guarded so a non-admin who somehow holds
+        // this sub-tab value falls through to the wired staking surface below.
         // `lg:max-w-none` lets the panel fill the widened desktop column
         // instead of being re-capped at 4xl.
         <div className="max-w-4xl lg:max-w-none mx-auto">
-          <NudgeMockPanel addToast={addToast} />
+          <WhaleDiscountPanel />
         </div>
       ) : (
         <div className="max-w-4xl mx-auto">

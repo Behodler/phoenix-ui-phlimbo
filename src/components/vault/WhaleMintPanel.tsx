@@ -70,7 +70,10 @@ export default function WhaleMintPanel() {
 
   // Read nudgePaymentToken from BatchNFTMinter so a future payment-token swap
   // doesn't silently keep showing the old token's balance.
-  const { data: nudgePaymentTokenRaw } = useReadContract({
+  const {
+    data: nudgePaymentTokenRaw,
+    isError: isNudgePaymentTokenError,
+  } = useReadContract({
     address: batchMinter,
     abi: batchNftMinterAbi,
     functionName: 'nudgePaymentToken',
@@ -104,7 +107,13 @@ export default function WhaleMintPanel() {
   // Hide the panel entirely when BatchNFTMinter is undeployed. Mainnet
   // currently lacks the helper; matches the NFTListMintModal `useBatchFlow`
   // graceful-fallback policy.
-  if (!batchMinterAvailable) {
+  //
+  // A reverting `nudgePaymentToken()` means the deployed BatchNFTMinter is the
+  // multi-token variant, whose reward is a whitelist rather than one token —
+  // this single-token panel cannot describe it, and the Whale Discount surface
+  // does. Hide rather than sit on the skeleton forever waiting for a read that
+  // will never resolve.
+  if (!batchMinterAvailable || isNudgePaymentTokenError) {
     return null;
   }
 

@@ -158,6 +158,23 @@ The admin-only **Stake Preview** accordion (`src/components/vault/stakeMock/`) b
 mock (`nftStakeMockData.ts`); story 076 wires it to real per-staker contracts. After that,
 `nftStakeMockData.ts` is a static per-staker **wiring descriptor**, not live-value mock data.
 
+The admin-only **Whale Discount** sub-tab (`src/components/vault/whaleDiscount/`) is fully
+wired. It began life as "Nudge-mock" (`nudgeMockData.ts`, since deleted) — do not look for
+that fixture. Its data comes from `useNudgePot`:
+
+- The reward token set is read from `BatchNFTMinterMultiToken.getNudgeTokens()`, never
+  listed in the UI, so it adapts per chain on its own. **Do NOT hard-code a token list.**
+- A reward leg is `balanceOf(minter) + NudgeStreamer.pendingStream(minter, token)`.
+  `batchMint` calls `pullPendingStream` over the whole whitelist before it snapshots
+  balances, so the accrued-but-unsettled amount is genuinely part of the payout. Using
+  `balanceOf` alone under-reports the pot, sometimes by ~100%.
+- `useLiveNudgePot` extrapolates that accrual between polls for the live counter. It is
+  **display only** — `minRewards` must always be signed from the block-attested `totalRaw`,
+  never from the extrapolation, or a browser clock ahead of `block.timestamp` reverts
+  honest mints.
+- `src/data/nudgeTokenMeta.ts` is static presentation only (art, links, price source),
+  keyed by canonical symbol so one entry covers Anvil's `m`-prefixed mocks and mainnet.
+
 _Historical note: this tab was mock-only very early in development. That has not been true
 since the minter/staking wiring landed — do not treat the tab as mock-only._
 

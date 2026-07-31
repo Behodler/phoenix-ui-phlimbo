@@ -1,147 +1,157 @@
 import { useMemo, useState } from 'react';
-import type { Toast } from '../../../types/toast';
+import { formatUnits } from 'viem';
 import {
-  NUDGE_MOCK,
-  NUDGE_MOCK_CYAN,
-  type NudgeMockToken,
-} from '../../../data/nudgeMockData';
+  WHALE_ART,
+  WHALE_DISCOUNT_CYAN,
+  WHALE_PAYMENT_LOGO,
+} from '../../../data/nudgeTokenMeta';
+import { useNudgePot } from '../../../hooks/useNudgePot';
+import {
+  useLiveNudgePot,
+  type LiveNudgeToken,
+} from '../../../hooks/useLiveNudgePot';
+import WhaleDiscountConfirmModal from './WhaleDiscountConfirmModal';
 
-type AddToast = (toast: Omit<Toast, 'id'>) => string;
-
-export interface NudgeMockPanelProps {
-  /** Toast dispatcher, used only for the stubbed "coming soon" CTA. */
-  addToast: AddToast;
-}
+/** Collection the whale batch mint buys. Priced in USDS. */
+const NFT_COLLECTION_NAME = 'Liquid Sky Phoenix';
+const PAYMENT_SYMBOL = 'USDS';
 
 /**
- * Multi-token nudge reward banner — PURE MOCK, admin-only design preview.
+ * Whale Discount banner — the live multi-token nudge reward.
  *
- * Renders the redesigned Whale Mint banner in which the single-token "Pot"
- * figure is replaced by a horizontally-scrolling strip of reward chips (the
- * NFT chip first, then one chip per reward token) plus an aggregate USD pot
- * value in the header.
+ * Everything on this panel is read from chain via `useNudgePot`: the reward
+ * token set comes from `BatchNFTMinterMultiToken.getNudgeTokens()`, and the
+ * mint cost is the exact geometric price ramp `batchMint` will charge.
+ * Switching networks re-reads that chain's whitelist, so the chip strip adapts
+ * with no code change.
  *
- * Everything here is driven by `src/data/nudgeMockData.ts`. There are
- * deliberately **no wagmi hooks, no `useReadContract`, no contract addresses**
- * — the multi-token nudge contracts (`nft-staking:022` / `:025`) are not
- * deployed. The CTA is stubbed with an informational toast.
+ * Each reward amount is what a mint pays out *now*: the minter's settled
+ * balance plus the NudgeStreamer's accrued-but-unsettled stream, which
+ * `batchMint` flushes into the pot before it snapshots. Since the streamer
+ * meters in every second, `useLiveNudgePot` counts the figures forward between
+ * polls instead of letting them jump on refetch.
  *
- * Unlike `WhaleMintPanel`, this panel never self-hides: it is a design preview
- * and must always render for an admin.
+ * USD figures ("Pot value", "Net mint cost") mix three price sources — $1 for
+ * USD stablecoins, the Balancer phUSD spot, and a CoinGecko KENDU quote — see
+ * `useNudgePot`. A whitelisted token we cannot price still renders its chip; it
+ * is just left out of the total, which is then labelled as a lower bound.
  *
  * Theme note: the `pxusd-*` colour tokens resolve to raw hex CSS variables, so
  * Tailwind opacity modifiers on them (`bg-pxusd-yellow-400/10`) emit no CSS at
  * all. Every translucent fill/border below therefore uses an explicit `rgba()`
  * arbitrary value or an inline style.
  */
-/**
- * The pared-back pot the preview switch falls back to. Mock-only: it exists so
- * the chip strip can be eyeballed at two token counts (2 vs the full fixture).
- */
-const MINIMAL_POT_SYMBOLS = ['USDC', 'KENDU'];
-
-export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
+export default function WhaleDiscountPanel() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const {
-    nftCount,
-    nftCollectionName,
-    mintCostFormatted,
+    tokens,
+    nudgeSizeRaw,
+    count,
+    mintCostRaw,
     mintCostUsd,
-    mintTokenLogo,
-    whaleArt,
-    tokens: allTokens,
-  } = NUDGE_MOCK;
+    isPotValuePartial,
+    hasReward,
+    isLoading,
+    isUnavailable,
+    readAtMs,
+    refetch,
+  } = useNudgePot();
 
-  // Design-review affordance, NOT product behaviour: swap between the full pot
-  // and a two-leg pot so the chip strip can be eyeballed at both counts. The
-  // switch lives outside the banner and disappears with the whole admin-gated
-  // sub-tab — nothing here should survive into the wired version.
-  const [showFullPot, setShowFullPot] = useState(true);
-  const tokens = useMemo(
+  // The pot keeps filling between polls — the streamer meters into it every
+  // second — so the displayed figures are carried forward from the last read
+  // rather than sitting still until the next one. Display only: the modal
+  // still signs the block-attested `tokens`.
+  const {
+    tokens: liveTokens,
+    potUsd,
+    isStreaming,
+  } = useLiveNudgePot(tokens, readAtMs);
+
+  // The mint cost is displayed to 4dp to match the mint list's Liquid Sky
+  // Phoenix row, while the USD figures below stay at 2dp — they are dollars,
+  // not token units.
+  const mintCostAmount = useMemo(
     () =>
-      showFullPot
-        ? allTokens
-        : allTokens.filter((t) => MINIMAL_POT_SYMBOLS.includes(t.symbol)),
-    [allTokens, showFullPot]
+      Number(formatUnits(mintCostRaw, 18)).toLocaleString('en-US', {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4,
+      }),
+    [mintCostRaw]
   );
 
-  // The fixture ships the cost as one "<amount> <UNIT>" string. Split on the
-  // last space so the amount can carry the big mono weight and the unit sits
-  // beside it as a small suffix — matching the "$" the pot figure gets for
-  // free. A cost string with no space degrades to amount-only, no unit.
-  const [mintCostAmount, mintCostUnit] = useMemo(() => {
-    const cut = mintCostFormatted.lastIndexOf(' ');
-    return cut === -1
-      ? [mintCostFormatted, '']
-      : [mintCostFormatted.slice(0, cut), mintCostFormatted.slice(cut + 1)];
-  }, [mintCostFormatted]);
-
-  // Aggregate pot value is derived from the ordered token legs, never
-  // hard-coded, so the figure stays honest if the fixture changes.
-  const totalUsd = useMemo(
-    () => tokens.reduce((sum, t) => sum + t.usd, 0),
-    [tokens]
-  );
-  const totalUsdFormatted = `$${totalUsd.toLocaleString('en-US')}`;
+  const potUsdFormatted = `${isPotValuePartial ? '≥ ' : ''}$${potUsd.toLocaleString(
+    'en-US',
+    { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+  )}`;
 
   // Net cost = what you pay minus the sweetener, with the USD-stable payment
   // token valued at $1. The pot is an incentive, not arbitrage: it is expected
   // to be SMALLER than the mint cost, so this is normally positive. A pot worth
   // more than the mint would be a protocol mispricing rather than a normal
   // state, so it is surfaced as an explicit "net credit" instead of a
-  // nonsensical negative cost.
-  const netUsd = mintCostUsd - totalUsd;
+  // nonsensical negative cost. When the pot total is a lower bound the net cost
+  // is correspondingly an upper bound.
+  const netUsd = mintCostUsd - potUsd;
   const isCredit = netUsd < 0;
-  const netUsdFormatted = `$${Math.abs(netUsd).toLocaleString('en-US', {
+  const netUsdFormatted = `${isPotValuePartial && !isCredit ? '≤ ' : ''}$${Math.abs(
+    netUsd
+  ).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
 
-  const handleClaim = () => {
-    addToast({
-      type: 'info',
-      title: 'Coming soon',
-      description:
-        'The multi-token nudge reward is a design preview — the contracts are not deployed yet.',
-    });
-  };
+  if (isUnavailable) {
+    return (
+      <div className="mt-6" data-testid="whale-discount-panel">
+        <div
+          className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-6 text-sm text-muted-foreground"
+          data-testid="whale-discount-unavailable"
+        >
+          The multi-token nudge minter is not deployed on this network, so there
+          is no whale discount to show here.
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="mt-6" data-testid="whale-discount-panel">
+        <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden">
+          <div
+            className="p-6 grid place-items-center text-xs uppercase tracking-[0.22em] text-muted-foreground"
+            data-testid="whale-discount-skeleton"
+          >
+            <span>
+              <span
+                className="inline-block whale-discount-dot mr-2"
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: WHALE_DISCOUNT_CYAN,
+                  boxShadow: `0 0 8px ${WHALE_DISCOUNT_CYAN}`,
+                }}
+              />
+              Loading Whale Discount…
+            </span>
+          </div>
+        </div>
+        <style>{`
+          @keyframes whale-discount-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.4); }
+          }
+          .whale-discount-dot {
+            animation: whale-discount-pulse 1.6s ease-in-out infinite;
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
-    <div className="mt-6" data-testid="nudge-mock-panel">
-      {/* Preview-only control — sits outside the banner so it can never be
-          mistaken for part of the design. */}
-      <div className="flex items-center justify-end gap-2.5 mb-2">
-        <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          Preview: full pot
-        </span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={showFullPot}
-          aria-label={`Show the full reward pot instead of just ${MINIMAL_POT_SYMBOLS.join(
-            ' + '
-          )}`}
-          onClick={() => setShowFullPot((on) => !on)}
-          className="relative w-9 h-5 rounded-full transition-colors"
-          style={{
-            background: showFullPot
-              ? NUDGE_MOCK_CYAN
-              : 'rgba(255,255,255,0.18)',
-          }}
-          data-testid="nudge-mock-pot-size-switch"
-        >
-          <span
-            className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
-            style={{ left: showFullPot ? 18 : 2 }}
-          />
-        </button>
-        <span
-          className="font-mono text-[11px] tabular-nums text-muted-foreground w-[74px]"
-          data-testid="nudge-mock-token-count"
-        >
-          {tokens.length} tokens
-        </span>
-      </div>
-
+    <div className="mt-6" data-testid="whale-discount-panel">
       <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden">
         <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr]">
           {/* Whale art + explainer */}
@@ -168,7 +178,7 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
             }}
           >
             <img
-              src={whaleArt}
+              src={WHALE_ART}
               alt="Whale Phoenix"
               className="w-full aspect-square"
               style={{
@@ -188,11 +198,11 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
             */}
             <p
               className="m-0 text-[16px] leading-[1.6] text-muted-foreground text-justify hyphens-auto"
-              data-testid="nudge-mock-footer"
+              data-testid="whale-discount-footer"
             >
               NFTs can be used to claim yield from the yield funnel. On top of
               the NFTs, you receive the entire pot of nudge reward tokens,
-              totaling {totalUsdFormatted}.
+              totaling {potUsdFormatted}.
             </p>
           </div>
 
@@ -209,21 +219,21 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
               <div className="flex-1 min-w-0 basis-64 flex flex-col gap-4">
                 <div
                   className="flex items-center gap-2 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em]"
-                  style={{ color: NUDGE_MOCK_CYAN }}
-                  data-testid="nudge-mock-eyebrow"
+                  style={{ color: WHALE_DISCOUNT_CYAN }}
+                  data-testid="whale-discount-eyebrow"
                 >
                   <span
-                    className="inline-block nudge-mock-dot"
+                    className="inline-block whale-discount-dot"
                     style={{
                       width: 6,
                       height: 6,
                       borderRadius: '50%',
-                      background: NUDGE_MOCK_CYAN,
-                      boxShadow: `0 0 8px ${NUDGE_MOCK_CYAN}`,
+                      background: WHALE_DISCOUNT_CYAN,
+                      boxShadow: `0 0 8px ${WHALE_DISCOUNT_CYAN}`,
                       flex: 'none',
                     }}
                   />
-                  Whale Mint · Phoenix ×{nftCount}
+                  Whale Mint · Phoenix ×{count}
                 </div>
                 <h2 className="m-0 text-[22px] font-bold tracking-tight text-foreground">
                   Claim the nudge reward
@@ -244,28 +254,19 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                   <div className="flex items-stretch">
                     <div
                       className="flex-none flex items-center gap-2.5 rounded-[10px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] py-2.5 pl-2.5 pr-3.5"
-                      data-testid="nudge-mock-chip-pay"
+                      data-testid="whale-discount-chip-pay"
                     >
-                      {mintTokenLogo ? (
-                        <img
-                          src={mintTokenLogo}
-                          alt=""
-                          className="flex-none w-[26px] h-[26px] rounded-full object-cover bg-[#050a14]"
-                        />
-                      ) : (
-                        <span
-                          className="flex-none grid place-items-center w-[26px] h-[26px] rounded-full bg-[rgba(255,255,255,0.08)] text-[11px] font-bold uppercase text-foreground"
-                          data-testid="nudge-mock-pay-logo-fallback"
-                        >
-                          {mintCostUnit.charAt(0)}
-                        </span>
-                      )}
+                      <img
+                        src={WHALE_PAYMENT_LOGO}
+                        alt=""
+                        className="flex-none w-[26px] h-[26px] rounded-full object-cover bg-[#050a14]"
+                      />
                       <div className="flex flex-col gap-[3px]">
                         <span className="font-mono text-[15px] font-semibold leading-none text-foreground tabular-nums whitespace-nowrap">
                           {mintCostAmount}
                         </span>
                         <span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground whitespace-nowrap">
-                          {mintCostUnit}
+                          {PAYMENT_SYMBOL}
                         </span>
                       </div>
                     </div>
@@ -286,27 +287,34 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                   </div>
                   <div
                     className="flex items-baseline gap-1.5 font-mono text-[19px] font-semibold tracking-tight text-foreground leading-none tabular-nums"
-                    data-testid="nudge-mock-mint-cost"
+                    data-testid="whale-discount-mint-cost"
                   >
                     {mintCostAmount}
-                    {mintCostUnit && (
-                      <span className="text-[11px] font-sans font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        {mintCostUnit}
-                      </span>
-                    )}
+                    <span className="text-[11px] font-sans font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                      {PAYMENT_SYMBOL}
+                    </span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
                     Pot value
+                    {isStreaming && (
+                      <span
+                        className="normal-case tracking-normal text-[10px]"
+                        style={{ color: WHALE_DISCOUNT_CYAN }}
+                        data-testid="whale-discount-streaming-badge"
+                      >
+                        streaming
+                      </span>
+                    )}
                   </div>
                   <div
                     className="flex items-baseline gap-1.5 font-mono text-[19px] font-semibold tracking-tight leading-none tabular-nums"
-                    style={{ color: NUDGE_MOCK_CYAN }}
-                    data-testid="nudge-mock-pot-total"
+                    style={{ color: WHALE_DISCOUNT_CYAN }}
+                    data-testid="whale-discount-pot-total"
                   >
-                    {totalUsdFormatted}
+                    {potUsdFormatted}
                   </div>
                 </div>
 
@@ -316,7 +324,7 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                   </div>
                   <div
                     className="font-mono text-[19px] font-semibold tracking-tight text-foreground leading-none tabular-nums"
-                    data-testid="nudge-mock-net-cost"
+                    data-testid="whale-discount-net-cost"
                   >
                     {netUsdFormatted}
                   </div>
@@ -337,7 +345,7 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
               */}
               <div
                 className="flex flex-wrap items-stretch gap-2.5"
-                data-testid="nudge-mock-chip-strip"
+                data-testid="whale-discount-chip-strip"
               >
                 {/* NFT chip — visually distinguished with the cyan tint */}
                 <div
@@ -346,36 +354,34 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                     borderColor: 'oklch(78% 0.13 220 / 0.45)',
                     background: 'oklch(78% 0.13 220 / 0.08)',
                   }}
-                  data-testid="nudge-mock-chip-nft"
+                  data-testid="whale-discount-chip-nft"
                 >
                   <img
-                    src={whaleArt}
+                    src={WHALE_ART}
                     alt=""
                     className="flex-none w-[26px] h-[26px] rounded-md object-cover bg-[#050a14]"
                     style={{ imageRendering: 'pixelated' }}
                   />
                   <div className="flex flex-col gap-[3px]">
                     <span className="font-mono text-[15px] font-semibold leading-none text-foreground tabular-nums whitespace-nowrap">
-                      {nftCount} NFTs
+                      {count} NFTs
                     </span>
                     <span
                       className="text-[10px] uppercase tracking-[0.08em] whitespace-nowrap"
-                      style={{ color: NUDGE_MOCK_CYAN }}
+                      style={{ color: WHALE_DISCOUNT_CYAN }}
                     >
-                      {nftCollectionName}
+                      {NFT_COLLECTION_NAME}
                     </span>
                   </div>
                 </div>
 
                 {/*
-                  One chip per reward token, in whitelist order. The `+` sits
-                  BEFORE each token chip and after the always-present NFT chip,
-                  so there is never a dangling separator — including the
-                  single-token and empty-pot cases.
+                  One chip per reward token, in on-chain whitelist order. The
+                  `+` sits BEFORE each token chip and after the always-present
+                  NFT chip, so there is never a dangling separator — including
+                  the single-token and empty-pot cases.
                 */}
-                {tokens.map((token: NudgeMockToken, index: number) => {
-                  // Only a non-empty URL earns the link treatment — a token
-                  // whose metadata carries `url: ''` must stay an inert chip.
+                {liveTokens.map((token: LiveNudgeToken, index: number) => {
                   const href = token.url?.trim() ? token.url.trim() : undefined;
 
                   const logo = token.logo ? (
@@ -385,13 +391,12 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                       className="flex-none w-[26px] h-[26px] rounded-full object-cover bg-[#050a14]"
                     />
                   ) : (
-                    // Lettered-circle fallback. Unused by the fixture (all
-                    // five tokens ship real art) but required once the
-                    // live version hits whitelisted tokens with no
-                    // bundled logo.
+                    // Lettered-circle fallback for a whitelisted token we have
+                    // no bundled art for — the expected case once the owner
+                    // adds a token we have not shipped a logo for.
                     <span
                       className="flex-none grid place-items-center w-[26px] h-[26px] rounded-full bg-[rgba(255,255,255,0.08)] text-[11px] font-bold uppercase text-foreground"
-                      data-testid={`nudge-mock-logo-fallback-${token.symbol}`}
+                      data-testid={`whale-discount-logo-fallback-${token.canonical}`}
                     >
                       {token.symbol.charAt(0)}
                     </span>
@@ -401,12 +406,12 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                     <>
                       {/*
                         Linked chips spin their logo like a flipping coin. The
-                        stagger keeps five chips from flipping in unison, which
-                        reads as a glitch rather than as an invitation.
+                        stagger keeps several chips from flipping in unison,
+                        which reads as a glitch rather than as an invitation.
                       */}
                       {href ? (
                         <span
-                          className="flex-none nudge-mock-flip"
+                          className="flex-none whale-discount-flip"
                           style={{ animationDelay: `${index * 0.45}s` }}
                         >
                           {logo}
@@ -415,11 +420,40 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                         logo
                       )}
                       <div className="flex flex-col gap-[3px]">
-                        <span className="font-mono text-[15px] font-semibold leading-none text-foreground tabular-nums whitespace-nowrap">
-                          {token.amountFormatted}
+                        <span
+                          className="font-mono text-[15px] font-semibold leading-none text-foreground tabular-nums whitespace-nowrap"
+                          data-testid={`whale-discount-amount-${token.canonical}`}
+                        >
+                          {token.liveAmountFormatted}
                         </span>
-                        <span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground whitespace-nowrap">
+                        <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground whitespace-nowrap">
                           {token.symbol}
+                          {/*
+                            A streaming leg is mostly money that has not landed
+                            in the minter's balance yet, so the chip says so
+                            rather than letting a silently-climbing number look
+                            like a rendering glitch.
+                          */}
+                          {token.isStreaming && (
+                            <span
+                              className="inline-block whale-discount-dot"
+                              style={{
+                                width: 4,
+                                height: 4,
+                                borderRadius: '50%',
+                                background: WHALE_DISCOUNT_CYAN,
+                                boxShadow: `0 0 6px ${WHALE_DISCOUNT_CYAN}`,
+                              }}
+                              title={`${token.symbol}: ${formatUnits(
+                                token.balanceRaw,
+                                token.decimals
+                              )} in the pot + ${formatUnits(
+                                token.livePendingRaw,
+                                token.decimals
+                              )} streamed in and claimed on mint`}
+                              data-testid={`whale-discount-streaming-${token.canonical}`}
+                            />
+                          )}
                         </span>
                       </div>
                       {/* Sheen — a skewed highlight that sweeps across the
@@ -428,7 +462,7 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                       {href && (
                         <span
                           aria-hidden="true"
-                          className="nudge-mock-sheen"
+                          className="whale-discount-sheen"
                           style={{ animationDelay: `${index * 0.45}s` }}
                         />
                       )}
@@ -440,9 +474,9 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
 
                   return (
                     <div
-                      key={`${token.symbol}-${index}`}
+                      key={token.address}
                       className="flex-none flex items-center gap-2.5"
-                      data-testid={`nudge-mock-chip-${token.symbol}`}
+                      data-testid={`whale-discount-chip-${token.canonical}`}
                     >
                       <span
                         aria-hidden="true"
@@ -457,7 +491,7 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
                           rel="noopener noreferrer"
                           aria-label={`${token.symbol} — open token page in a new tab`}
                           className={`${chipClass} relative overflow-hidden no-underline cursor-pointer transition-colors hover:border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.07)]`}
-                          data-testid={`nudge-mock-chip-link-${token.symbol}`}
+                          data-testid={`whale-discount-chip-link-${token.canonical}`}
                         >
                           {chipBody}
                         </a>
@@ -474,12 +508,21 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
             <div className="flex flex-wrap items-center gap-3.5 pt-4 border-t border-[rgba(255,255,255,0.12)]">
               <button
                 type="button"
-                onClick={handleClaim}
-                className="phoenix-btn-primary whitespace-nowrap !rounded-md !text-[13px]"
-                data-testid="nudge-mock-cta"
+                onClick={() => setIsModalOpen(true)}
+                disabled={!hasReward || mintCostRaw === 0n}
+                className="phoenix-btn-primary whitespace-nowrap !rounded-md !text-[13px] disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="whale-discount-cta"
               >
-                Mint {nftCount} — Claim Reward
+                Mint {count} — Claim Reward
               </button>
+              {!hasReward && (
+                <span
+                  className="text-xs text-muted-foreground"
+                  data-testid="whale-discount-empty-pot"
+                >
+                  The nudge pot is currently empty.
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -492,25 +535,23 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
         catches the eye every few seconds without ever being busy. Motion is
         dropped entirely under `prefers-reduced-motion` — the anchor, hover
         state and cursor still carry the affordance.
-        (The chip strip's custom scrollbar went away with the switch from
-        horizontal scrolling to wrapping.)
       */}
       <style>{`
-        @keyframes nudge-mock-pulse {
+        @keyframes whale-discount-pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.4; transform: scale(1.4); }
         }
-        .nudge-mock-dot {
-          animation: nudge-mock-pulse 1.6s ease-in-out infinite;
+        .whale-discount-dot {
+          animation: whale-discount-pulse 1.6s ease-in-out infinite;
         }
 
-        @keyframes nudge-mock-sheen-sweep {
+        @keyframes whale-discount-sheen-sweep {
           0%      { transform: translateX(-160%) skewX(-20deg); opacity: 0; }
           8%      { opacity: 1; }
           32%     { transform: translateX(160%) skewX(-20deg); opacity: 0; }
           100%    { transform: translateX(160%) skewX(-20deg); opacity: 0; }
         }
-        .nudge-mock-sheen {
+        .whale-discount-sheen {
           position: absolute;
           top: 0;
           bottom: 0;
@@ -525,25 +566,38 @@ export default function NudgeMockPanel({ addToast }: NudgeMockPanelProps) {
             rgba(255,255,255,0.05) 65%,
             transparent 100%
           );
-          animation: nudge-mock-sheen-sweep 3s ease-in-out infinite;
+          animation: whale-discount-sheen-sweep 3s ease-in-out infinite;
         }
 
-        @keyframes nudge-mock-coin-flip {
+        @keyframes whale-discount-coin-flip {
           0%      { transform: rotateY(0deg); }
           30%     { transform: rotateY(360deg); }
           100%    { transform: rotateY(360deg); }
         }
-        .nudge-mock-flip {
+        .whale-discount-flip {
           display: inline-grid;
           transform-style: preserve-3d;
-          animation: nudge-mock-coin-flip 3s ease-in-out infinite;
+          animation: whale-discount-coin-flip 3s ease-in-out infinite;
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .nudge-mock-sheen { display: none; }
-          .nudge-mock-flip { animation: none; }
+          .whale-discount-sheen { display: none; }
+          .whale-discount-flip { animation: none; }
         }
       `}</style>
+
+      {nudgeSizeRaw !== undefined && (
+        <WhaleDiscountConfirmModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          count={count}
+          mintCostRaw={mintCostRaw}
+          tokens={tokens}
+          nudgeSizeRaw={nudgeSizeRaw}
+          readAtMs={readAtMs}
+          refetchPot={refetch}
+        />
+      )}
     </div>
   );
 }
