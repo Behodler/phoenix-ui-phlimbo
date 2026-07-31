@@ -64,7 +64,15 @@ function basePot(overrides: Partial<UseNudgePotResult> = {}): UseNudgePotResult 
     ],
     nudgeSizeRaw: 40n,
     count: 40,
+    payment: {
+      address: '0x00000000000000000000000000000000000000aa',
+      prefix: 'USDS',
+      symbol: 'USDS',
+      decimals: 18,
+      usdPerUnit: 1,
+    },
     mintCostRaw: 25_000n * 10n ** 18n,
+    mintBudgetRaw: 25_500n * 10n ** 18n,
     mintCostUsd: 25000,
     potUsd: 18774,
     isPotValuePartial: false,
@@ -122,7 +130,7 @@ describe('WhaleDiscountPanel', () => {
     );
   });
 
-  it('marks the total as a lower bound when a leg has no price', () => {
+  it('leaves an unpriced leg out of the USD total, without qualifying it', () => {
     potResult.value = basePot({
       tokens: [
         token(),
@@ -143,11 +151,19 @@ describe('WhaleDiscountPanel', () => {
 
     render(<WhaleDiscountPanel />);
 
+    // FLAX has no price, so it contributes nothing to the total — but the
+    // figures are shown plainly, with no ≥/≤ qualifier.
     expect(screen.getByTestId('whale-discount-pot-total')).toHaveTextContent(
-      '≥ $12,480.00'
+      '$12,480.00'
+    );
+    expect(screen.getByTestId('whale-discount-pot-total').textContent).not.toMatch(
+      /[≥≤]/
     );
     expect(screen.getByTestId('whale-discount-net-cost')).toHaveTextContent(
-      '≤ $12,520.00'
+      '$12,520.00'
+    );
+    expect(screen.getByTestId('whale-discount-net-cost').textContent).not.toMatch(
+      /[≥≤]/
     );
   });
 
@@ -231,19 +247,18 @@ describe('WhaleDiscountPanel', () => {
 
       render(<WhaleDiscountPanel />);
 
+      // The per-chip dot is the whole affordance — the "streaming" word next
+      // to Pot value was removed as noise.
       expect(
         screen.getByTestId('whale-discount-streaming-USDC')
       ).toBeInTheDocument();
-      expect(
-        screen.getByTestId('whale-discount-streaming-badge')
-      ).toBeInTheDocument();
+      expect(screen.queryByText('streaming')).toBeNull();
     });
 
     it('leaves a settled-only pot static, with no streaming affordance', () => {
       render(<WhaleDiscountPanel />);
 
       expect(screen.queryByTestId('whale-discount-streaming-USDC')).toBeNull();
-      expect(screen.queryByTestId('whale-discount-streaming-badge')).toBeNull();
     });
 
     it('counts a stream up over time, and stops at the buffer', () => {

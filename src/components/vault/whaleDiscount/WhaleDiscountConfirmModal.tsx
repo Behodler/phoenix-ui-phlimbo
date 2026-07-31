@@ -15,7 +15,10 @@ import {
   useTokenApproval,
   useTokenBalance,
 } from '../../../hooks/useContractInteractions';
-import type { NudgePotToken } from '../../../hooks/useNudgePot';
+import type {
+  NudgePayment,
+  NudgePotToken,
+} from '../../../hooks/useNudgePot';
 import { useLiveNudgePot } from '../../../hooks/useLiveNudgePot';
 import { WHALE_DISCOUNT_CYAN } from '../../../data/nudgeTokenMeta';
 
@@ -26,8 +29,19 @@ interface WhaleDiscountConfirmModalProps {
   onClose: () => void;
   /** Fixed mint count (== on-chain nudgeSize, displayed as a number). */
   count: number;
-  /** Total USDS cost as raw bigint — the exact amount the minter pulls. */
+  /** Exact cumulative charge as raw bigint, in the payment token's own units. */
   mintCostRaw: bigint;
+  /**
+   * What to approve and pass as `paymentAmount` — `mintCostRaw` plus headroom
+   * for the dispatcher's price ramping before the tx lands. `batchMint` refunds
+   * the unspent remainder in the same transaction.
+   */
+  mintBudgetRaw: bigint;
+  /**
+   * The token `batchMint` will actually charge, derived from the minter's
+   * pinned `dispatcherIndex` — NOT assumed to be USDS.
+   */
+  payment: NudgePayment;
   /**
    * The live pot, in on-chain whitelist order. Order is load-bearing: the
    * `minRewards` array passed to `batchMint` is positional and the contract
@@ -43,9 +57,11 @@ interface WhaleDiscountConfirmModalProps {
   refetchPot: () => void;
 }
 
-function formatUsds(raw: bigint): string {
+function formatPayment(raw: bigint, decimals: number): string {
   // Match the 4-decimal display used by the mint list for Liquid Sky Phoenix.
-  return Number(formatUnits(raw, 18)).toLocaleString('en-US', {
+  // Scaled by the payment token's OWN decimals — a 6-decimal payment token
+  // rendered at 18 would show a cost 12 orders of magnitude too small.
+  return Number(formatUnits(raw, decimals)).toLocaleString('en-US', {
     minimumFractionDigits: 4,
     maximumFractionDigits: 4,
   });
@@ -72,6 +88,8 @@ export default function WhaleDiscountConfirmModal({
   onClose,
   count,
   mintCostRaw,
+  mintBudgetRaw,
+  payment,
   tokens,
   nudgeSizeRaw,
   readAtMs,
@@ -83,7 +101,7 @@ export default function WhaleDiscountConfirmModal({
   const { addToast } = useToast();
   const { writeContractAsync } = useWriteContract();
 
-  const usdsAddress = addresses?.USDS as Address | undefined;
+  const paymentTokenAddress = payment.address;
   const batchMinter = addresses?.BatchNFTMinter as Address | undefined;
 
   const [isApproving, setIsApproving] = useState(false);
@@ -91,17 +109,17 @@ export default function WhaleDiscountConfirmModal({
   const [approvalTxHash, setApprovalTxHash] = useState<`0x${string}` | undefined>(undefined);
   const [mintTxHash, setMintTxHash] = useState<`0x${string}` | undefined>(undefined);
 
-  // USDS allowance for the batch minter.
+  // Payment-token allowance for the batch minter.
   const { allowance, refetch: refetchAllowance } = useTokenAllowance(
     walletAddress,
     batchMinter,
-    usdsAddress,
+    paymentTokenAddress,
   );
 
-  // User's USDS balance for the insufficient-balance branch.
-  const { balance: userUsdsBalanceRaw } = useTokenBalance(
+  // User's payment-token balance for the insufficient-balance branch.
+  const { balance: userPaymentBalanceRaw } = useTokenBalance(
     walletAddress,
-    usdsAddress,
+    paymentTokenAddress,
   );
 
   // Each reward is shown as ONE number — what the mint pays out — with no
@@ -146,10 +164,17 @@ export default function WhaleDiscountConfirmModal({
       addToast({
         type: 'success',
         title: 'Approval Confirmed',
-        description: 'USDS approval confirmed on-chain. You can now mint.',
+        description: `${payment.symbol} approval confirmed on-chain. You can now mint.`,
       });
     }
-  }, [isApprovalSuccess, approvalTxHash, refetchAllowance, refetchPot, addToast]);
+  }, [
+    isApprovalSuccess,
+    approvalTxHash,
+    refetchAllowance,
+    refetchPot,
+    addToast,
+    payment.symbol,
+  ]);
 
   useEffect(() => {
     if (isMintSuccess && mintTxHash) {
@@ -188,19 +213,23 @@ export default function WhaleDiscountConfirmModal({
   if (!isOpen) return null;
 
   const isLoading = isApproving || isMinting;
+  // Both gates test the BUDGET, not the bare cost: the budget is what gets
+  // pulled, so an allowance or balance that only covers `mintCostRaw` would
+  // pass here and then revert inside `safeTransferFrom`.
   const isApproved =
-    allowance !== undefined && mintCostRaw > 0n && allowance >= mintCostRaw;
+    allowance !== undefined && mintBudgetRaw > 0n && allowance >= mintBudgetRaw;
   const hasInsufficientBalance =
-    userUsdsBalanceRaw !== undefined && userUsdsBalanceRaw < mintCostRaw;
+    userPaymentBalanceRaw !== undefined &&
+    userPaymentBalanceRaw < mintBudgetRaw;
 
-  const mintCostFormatted = formatUsds(mintCostRaw);
+  const mintCostFormatted = formatPayment(mintCostRaw, payment.decimals);
 
   const canExecute =
     !!walletAddress &&
-    !!usdsAddress &&
+    !!paymentTokenAddress &&
     !!batchMinter &&
     batchMinter.toLowerCase() !== ZERO_ADDRESS &&
-    usdsAddress.toLowerCase() !== ZERO_ADDRESS;
+    paymentTokenAddress.toLowerCase() !== ZERO_ADDRESS;
 
   const handleApprove = async () => {
     if (!canExecute) {
@@ -216,10 +245,14 @@ export default function WhaleDiscountConfirmModal({
       addToast({
         type: 'info',
         title: 'Confirm in Wallet',
-        description: 'Please confirm the USDS approval in your wallet.',
+        description: `Please confirm the ${payment.symbol} approval in your wallet.`,
         duration: 30000,
       });
-      const hash = await approve(usdsAddress!, batchMinter!, mintCostRaw);
+      const hash = await approve(
+        paymentTokenAddress!,
+        batchMinter!,
+        mintBudgetRaw,
+      );
       setApprovalTxHash(hash);
       addToast({
         type: 'info',
@@ -286,7 +319,7 @@ export default function WhaleDiscountConfirmModal({
         args: [
           nudgeSizeRaw,
           walletAddress!,
-          mintCostRaw,
+          mintBudgetRaw,
           tokens.map((token) => token.totalRaw),
         ],
       });
@@ -349,7 +382,7 @@ export default function WhaleDiscountConfirmModal({
           <div className="flex justify-between items-center text-sm py-1">
             <span className="text-muted-foreground">Mint cost</span>
             <span className="font-mono text-foreground font-medium">
-              {mintCostFormatted} USDS
+              {mintCostFormatted} {payment.symbol}
             </span>
           </div>
 
@@ -448,7 +481,7 @@ export default function WhaleDiscountConfirmModal({
               className="flex-1 px-4 py-2 bg-pxusd-orange-900/40 border border-pxusd-orange-500/50 text-pxusd-orange-300 font-medium rounded-lg cursor-not-allowed opacity-70"
               data-testid="whale-discount-modal-insufficient"
             >
-              Insufficient USDS Balance
+              Insufficient {payment.symbol} Balance
             </button>
           ) : (
             <button

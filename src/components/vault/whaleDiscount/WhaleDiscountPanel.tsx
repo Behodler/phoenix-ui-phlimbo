@@ -33,8 +33,8 @@ const PAYMENT_SYMBOL = 'USDS';
  *
  * USD figures ("Pot value", "Net mint cost") mix three price sources — $1 for
  * USD stablecoins, the Balancer phUSD spot, and a CoinGecko KENDU quote — see
- * `useNudgePot`. A whitelisted token we cannot price still renders its chip; it
- * is just left out of the total, which is then labelled as a lower bound.
+ * `useNudgePot`. A whitelisted token we cannot price still renders its chip
+ * with its amount; it is just left out of the USD total.
  *
  * Theme note: the `pxusd-*` colour tokens resolve to raw hex CSS variables, so
  * Tailwind opacity modifiers on them (`bg-pxusd-yellow-400/10`) emit no CSS at
@@ -47,9 +47,10 @@ export default function WhaleDiscountPanel() {
     tokens,
     nudgeSizeRaw,
     count,
+    payment,
     mintCostRaw,
+    mintBudgetRaw,
     mintCostUsd,
-    isPotValuePartial,
     hasReward,
     isLoading,
     isUnavailable,
@@ -61,44 +62,49 @@ export default function WhaleDiscountPanel() {
   // second — so the displayed figures are carried forward from the last read
   // rather than sitting still until the next one. Display only: the modal
   // still signs the block-attested `tokens`.
-  const {
-    tokens: liveTokens,
-    potUsd,
-    isStreaming,
-  } = useLiveNudgePot(tokens, readAtMs);
+  const { tokens: liveTokens, potUsd } = useLiveNudgePot(tokens, readAtMs);
 
   // The mint cost is displayed to 4dp to match the mint list's Liquid Sky
   // Phoenix row, while the USD figures below stay at 2dp — they are dollars,
-  // not token units.
+  // not token units. Scaled by the PAYMENT token's decimals, which come from
+  // the dispatcher the minter is pinned to rather than being assumed to be 18.
   const mintCostAmount = useMemo(
     () =>
-      Number(formatUnits(mintCostRaw, 18)).toLocaleString('en-US', {
+      Number(
+        formatUnits(mintCostRaw, payment?.decimals ?? 18)
+      ).toLocaleString('en-US', {
         minimumFractionDigits: 4,
         maximumFractionDigits: 4,
       }),
-    [mintCostRaw]
+    [mintCostRaw, payment?.decimals]
   );
 
-  const potUsdFormatted = `${isPotValuePartial ? '≥ ' : ''}$${potUsd.toLocaleString(
-    'en-US',
-    { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-  )}`;
-
-  // Net cost = what you pay minus the sweetener, with the USD-stable payment
-  // token valued at $1. The pot is an incentive, not arbitrage: it is expected
-  // to be SMALLER than the mint cost, so this is normally positive. A pot worth
-  // more than the mint would be a protocol mispricing rather than a normal
-  // state, so it is surfaced as an explicit "net credit" instead of a
-  // nonsensical negative cost. When the pot total is a lower bound the net cost
-  // is correspondingly an upper bound.
-  const netUsd = mintCostUsd - potUsd;
-  const isCredit = netUsd < 0;
-  const netUsdFormatted = `${isPotValuePartial && !isCredit ? '≤ ' : ''}$${Math.abs(
-    netUsd
-  ).toLocaleString('en-US', {
+  // Plain figures, no ≥/≤ qualifiers. An unpriced leg is left out of the total
+  // (see `useNudgePot`), so these are strictly a lower bound on the pot and an
+  // upper bound on the net cost — but the symbols read as an error state rather
+  // than as precision, and the per-token chips already show what is in the pot.
+  const potUsdFormatted = `$${potUsd.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+
+  // Net cost = what you pay minus the sweetener. The pot is an incentive, not
+  // arbitrage: it is expected to be SMALLER than the mint cost, so this is
+  // normally positive. A pot worth more than the mint would be a protocol
+  // mispricing rather than a normal state, so it is surfaced as an explicit
+  // "net credit" instead of a nonsensical negative cost.
+  //
+  // `mintCostUsd` is null when the payment token has no USD price, in which
+  // case there is no honest subtraction to show and the row reads "—".
+  const netUsd = mintCostUsd === null ? null : mintCostUsd - potUsd;
+  const isCredit = netUsd !== null && netUsd < 0;
+  const netUsdFormatted =
+    netUsd === null
+      ? '—'
+      : `$${Math.abs(netUsd).toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`;
 
   if (isUnavailable) {
     return (
@@ -257,7 +263,7 @@ export default function WhaleDiscountPanel() {
                       data-testid="whale-discount-chip-pay"
                     >
                       <img
-                        src={WHALE_PAYMENT_LOGO}
+                        src={payment?.logo ?? WHALE_PAYMENT_LOGO}
                         alt=""
                         className="flex-none w-[26px] h-[26px] rounded-full object-cover bg-[#050a14]"
                       />
@@ -266,7 +272,7 @@ export default function WhaleDiscountPanel() {
                           {mintCostAmount}
                         </span>
                         <span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground whitespace-nowrap">
-                          {PAYMENT_SYMBOL}
+                          {payment?.symbol ?? PAYMENT_SYMBOL}
                         </span>
                       </div>
                     </div>
@@ -291,23 +297,14 @@ export default function WhaleDiscountPanel() {
                   >
                     {mintCostAmount}
                     <span className="text-[11px] font-sans font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                      {PAYMENT_SYMBOL}
+                      {payment?.symbol ?? PAYMENT_SYMBOL}
                     </span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
                     Pot value
-                    {isStreaming && (
-                      <span
-                        className="normal-case tracking-normal text-[10px]"
-                        style={{ color: WHALE_DISCOUNT_CYAN }}
-                        data-testid="whale-discount-streaming-badge"
-                      >
-                        streaming
-                      </span>
-                    )}
                   </div>
                   <div
                     className="flex items-baseline gap-1.5 font-mono text-[19px] font-semibold tracking-tight leading-none tabular-nums"
@@ -586,12 +583,14 @@ export default function WhaleDiscountPanel() {
         }
       `}</style>
 
-      {nudgeSizeRaw !== undefined && (
+      {nudgeSizeRaw !== undefined && payment && (
         <WhaleDiscountConfirmModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           count={count}
+          payment={payment}
           mintCostRaw={mintCostRaw}
+          mintBudgetRaw={mintBudgetRaw}
           tokens={tokens}
           nudgeSizeRaw={nudgeSizeRaw}
           readAtMs={readAtMs}

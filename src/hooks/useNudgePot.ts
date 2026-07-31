@@ -7,23 +7,35 @@ import {
   nudgeStreamerAbi,
 } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
-import { useMinterPageView } from './useMinterPageView';
+import { useMinterPageView, type TokenMintData } from './useMinterPageView';
 import { useBalancerPrice } from './useBalancerPrice';
 import { useKenduPrice } from './useKenduPrice';
+import { useNFTPrices } from './useNFTPrices';
 import { geometricSumRaw } from '../utils/batchMintMath';
 import { canonicalSymbol, nudgeTokenMeta } from '../data/nudgeTokenMeta';
+import {
+  tokenPrefixToAddressKey,
+  tokenPrefixToPriceKey,
+} from '../data/nftMockData';
+import type { ContractAddresses } from '../types/contracts';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 /**
- * Liquid Sky Phoenix is the NFT the whale batch mints, and it is priced in
- * USDS. Hard-coding the prefix keeps this hook decoupled from the order of the
- * static-config array — same reasoning as `WhaleMintPanel`.
+ * Headroom added on top of the computed mint cost when sizing the approval and
+ * the `paymentAmount` budget.
+ *
+ * `batchMint` re-reads `configs(dispatcherIndex).price` before EVERY mint, and
+ * `NFTMinterV2._executeMint` ramps that price after each one. Anyone minting
+ * from the same dispatcher between our read and our transaction therefore
+ * pushes the whole ramp up, and a budget sized to the exact quote reverts with
+ * `BatchMint__PaymentBudgetExhausted`.
+ *
+ * Over-sending is safe and is the contract's own design: step 9 refunds the
+ * caller's UNSPENT budget before any payout, so the headroom comes straight
+ * back in the same transaction. It is a slippage tolerance, not a cost.
  */
-const LIQUID_SKY_PHOENIX_TOKEN_PREFIX = 'USDS' as const;
-
-/** USDS is a USD stablecoin, so one unit of mint cost is one dollar of mint cost. */
-const USDS_DECIMALS = 18;
+const MINT_BUDGET_HEADROOM_BPS = 200n; // 2%
 
 export interface NudgePotToken {
   /** ERC20 address, in on-chain whitelist order. */
@@ -59,6 +71,20 @@ export interface NudgePotToken {
   url?: string;
 }
 
+export interface NudgePayment {
+  /** ERC20 the caller must approve to the batch minter. */
+  address: Address | undefined;
+  /** MinterPageView key the dispatcher resolved to (`USDS`, `USDC`, …). */
+  prefix: string;
+  /** Ticker for display. */
+  symbol: string;
+  decimals: number;
+  /** Bundled art for the "You pay" chip, when we have any. */
+  logo?: string;
+  /** USD per whole token, or `null` when we cannot price it. */
+  usdPerUnit: number | null;
+}
+
 export interface UseNudgePotResult {
   /** Whitelist order is meaningful — `batchMint`'s `minRewards` is positional and must match. */
   tokens: NudgePotToken[];
@@ -66,10 +92,17 @@ export interface UseNudgePotResult {
   nudgeSizeRaw: bigint | undefined;
   /** `nudgeSize` as a number for display. `0` while loading. */
   count: number;
-  /** Exact USDS the minter will pull, matching the on-chain geometric price ramp. */
+  /**
+   * The token `batchMint` actually charges, DERIVED from the minter's pinned
+   * `dispatcherIndex` rather than assumed. Undefined until it resolves.
+   */
+  payment: NudgePayment | undefined;
+  /** Exact cumulative charge for `count` mints, matching the on-chain price ramp. */
   mintCostRaw: bigint;
-  /** `mintCostRaw` in dollars (USDS pinned to $1). */
-  mintCostUsd: number;
+  /** What to approve and pass as `paymentAmount`: `mintCostRaw` + headroom. Excess is refunded. */
+  mintBudgetRaw: bigint;
+  /** `mintCostRaw` in dollars, or `null` when the payment token has no USD price. */
+  mintCostUsd: number | null;
   /** Sum of the priced legs. Legs with no price contribute nothing. */
   potUsd: number;
   /** True when at least one leg has a balance but no USD price — the total is a lower bound. */
@@ -156,6 +189,21 @@ export function useNudgePot(): UseNudgePotResult {
     functionName: 'nudgeSize',
     query: { enabled: minterAvailable },
   });
+
+  // The payment asset is NOT a UI constant. `batchMint` derives it from the
+  // owner-pinned dispatcher —
+  // `configs(dispatcherIndex).dispatcher.primeToken()` — and charges
+  // `configs(dispatcherIndex).price`, re-read before every mint. Assuming USDS
+  // here would approve the wrong ERC20 the moment the owner repoints the
+  // dispatcher (and `tokenPrefixToAddressKey` already maps EYE/SCX/Flax to
+  // USDC, so "the payment token is USDS" was never a safe general assumption).
+  const { data: dispatcherIndexRaw, isLoading: isLoadingDispatcherIndex } =
+    useReadContract({
+      address: minterAddress,
+      abi: batchNftMinterMultiTokenAbi,
+      functionName: 'dispatcherIndex',
+      query: { enabled: minterAvailable },
+    });
 
   // The streamer buffers bursty donations and meters them into the pot
   // linearly, so a large share of the reward can be sitting on it rather than
@@ -336,14 +384,57 @@ export function useNudgePot(): UseNudgePotResult {
   );
 
   const count = nudgeSizeRaw !== undefined ? Number(nudgeSizeRaw) : 0;
-  const lsp = minterData?.[LIQUID_SKY_PHOENIX_TOKEN_PREFIX];
+  const pinnedDispatcherIndex =
+    dispatcherIndexRaw !== undefined ? Number(dispatcherIndexRaw) : undefined;
+
+  // Match the pinned dispatcher against MinterPageView's rows to recover the
+  // payment token AND its live price ramp in one step. Index 0 is the
+  // contract's own "unconfigured" sentinel, so it can never match.
+  const paymentRow = useMemo<[string, TokenMintData] | undefined>(() => {
+    if (!minterData || !pinnedDispatcherIndex) return undefined;
+    const rows = Object.entries(minterData) as [string, TokenMintData][];
+    return rows.find(
+      ([, row]) => row?.dispatcherIndex === pinnedDispatcherIndex
+    );
+  }, [minterData, pinnedDispatcherIndex]);
+
+  const { prices } = useNFTPrices();
+
+  const payment = useMemo<NudgePayment | undefined>(() => {
+    if (!paymentRow) return undefined;
+    const [prefix, row] = paymentRow;
+    const addressKey = tokenPrefixToAddressKey[prefix];
+    const meta = nudgeTokenMeta(prefix);
+    const priceKey = tokenPrefixToPriceKey[prefix] ?? prefix;
+    return {
+      address: addressKey
+        ? ((addresses?.[addressKey as keyof ContractAddresses] ?? undefined) as
+            | Address
+            | undefined)
+        : undefined,
+      prefix,
+      symbol: meta?.display ?? prefix,
+      decimals: row.decimals,
+      logo: meta?.logo,
+      usdPerUnit: prices[priceKey] ?? null,
+    };
+  }, [paymentRow, addresses, prices]);
 
   const mintCostRaw = useMemo(() => {
-    if (!lsp || lsp.priceRaw <= 0n || count <= 0) return 0n;
-    return geometricSumRaw(lsp.priceRaw, lsp.growthBasisPoints, count);
-  }, [lsp, count]);
+    const row = paymentRow?.[1];
+    if (!row || row.priceRaw <= 0n || count <= 0) return 0n;
+    return geometricSumRaw(row.priceRaw, row.growthBasisPoints, count);
+  }, [paymentRow, count]);
 
-  const mintCostUsd = Number(formatUnits(mintCostRaw, USDS_DECIMALS));
+  // Headroom against the dispatcher's price ramping between this read and the
+  // transaction landing. The contract refunds whatever is unspent.
+  const mintBudgetRaw =
+    (mintCostRaw * (10_000n + MINT_BUDGET_HEADROOM_BPS)) / 10_000n;
+
+  const mintCostUsd =
+    payment && payment.usdPerUnit !== null
+      ? Number(formatUnits(mintCostRaw, payment.decimals)) * payment.usdPerUnit
+      : null;
 
   const isLoading =
     minterAvailable &&
@@ -351,9 +442,10 @@ export function useNudgePot(): UseNudgePotResult {
     (isLoadingWhitelist ||
       isLoadingNudgeSize ||
       isLoadingStreamer ||
+      isLoadingDispatcherIndex ||
       (tokenAddresses.length > 0 && isLoadingTokenReads) ||
-      !lsp ||
-      lsp.priceRaw <= 0n);
+      !paymentRow ||
+      paymentRow[1].priceRaw <= 0n);
 
   const refetch = () => {
     refetchWhitelist();
@@ -365,7 +457,9 @@ export function useNudgePot(): UseNudgePotResult {
     tokens,
     nudgeSizeRaw: nudgeSizeRaw as bigint | undefined,
     count,
+    payment,
     mintCostRaw,
+    mintBudgetRaw,
     mintCostUsd,
     potUsd,
     isPotValuePartial,
