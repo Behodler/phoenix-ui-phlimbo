@@ -112,7 +112,8 @@ export const WHALE_PAYMENT_LOGO = usdsLogo;
 
 /**
  * Cyan accent shared with the Whale Mint banner (eyebrow text, pulsing dot and
- * the NFT chip's tint). Scoped to these two panels — do NOT promote it to a
- * global theme token.
+ * the NFT chip's tint) and with `FeaturedProjectBanner`, where it highlights the
+ * "Mint a whale batch…" reward sentence. Scoped to those three surfaces — all
+ * of them whale-mint reward UI — do NOT promote it to a global theme token.
  */
 export const WHALE_DISCOUNT_CYAN = 'oklch(78% 0.13 220)';

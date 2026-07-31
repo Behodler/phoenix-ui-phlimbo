@@ -9,6 +9,7 @@ import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurfaceMock from './stakeMock/StakingSurfaceMock';
 import WhaleDiscountPanel from './whaleDiscount/WhaleDiscountPanel';
+import FeaturedProjectBanner from './featuredProject/FeaturedProjectBanner';
 import WhaleMintPanel from './WhaleMintPanel';
 
 export type NFTSubTab = 'mint' | 'stake' | 'whale-discount';
@@ -208,6 +209,12 @@ export default function NFTListTab({ subTab, onSubTabChange, canSeeWhaleDiscount
         // instead of being re-capped at 4xl.
         <div className="max-w-4xl lg:max-w-none mx-auto">
           <WhaleDiscountPanel />
+          {/*
+            Promo for the project whose token is part of the nudge reward. It
+            carries its own `mt-6`, matching WhaleDiscountPanel's root, since
+            this wrapper supplies no vertical gap.
+          */}
+          <FeaturedProjectBanner />
         </div>
       ) : (
         <div className="max-w-4xl mx-auto">

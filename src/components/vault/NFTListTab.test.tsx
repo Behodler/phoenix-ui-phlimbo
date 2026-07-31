@@ -39,6 +39,10 @@ vi.mock('./whaleDiscount/WhaleDiscountPanel', () => ({
   default: () => <div data-testid="whale-discount-panel" />,
 }));
 
+vi.mock('./featuredProject/FeaturedProjectBanner', () => ({
+  default: () => <div data-testid="featured-project-banner" />,
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -67,6 +71,26 @@ describe('NFTListTab — admin-only Whale Discount sub-tab', () => {
 
     expect(screen.getByTestId('whale-discount-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('staking-surface-mock')).toBeNull();
+  });
+
+  it('renders the featured project banner after the Whale Discount panel', () => {
+    render(
+      <NFTListTab subTab="whale-discount" onSubTabChange={vi.fn()} canSeeWhaleDiscount />
+    );
+
+    const panel = screen.getByTestId('whale-discount-panel');
+    const banner = screen.getByTestId('featured-project-banner');
+
+    expect(banner).toBeInTheDocument();
+    // Siblings, banner second — DOCUMENT_POSITION_FOLLOWING is 4.
+    expect(panel.parentElement).toBe(banner.parentElement);
+    expect(panel.compareDocumentPosition(banner) & 4).toBeTruthy();
+  });
+
+  it('does not render the featured project banner for a non-admin', () => {
+    render(<NFTListTab subTab="whale-discount" onSubTabChange={vi.fn()} />);
+
+    expect(screen.queryByTestId('featured-project-banner')).toBeNull();
   });
 
   it('falls through to the wired Stake surface for a non-admin holding a stale whale-discount sub-tab', () => {
