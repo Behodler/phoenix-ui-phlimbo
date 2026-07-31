@@ -39,6 +39,9 @@ export const mainnetAddresses: ContractAddresses = {
   // External tokens
   USDS: "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
   SCX: "0x1B8568FbB47708E9E9D31Ff303254f748805bF21",
+  // Story 073 (2026-07-29): PLACEHOLDER. MockKendu exists only on the local anvil chain (its
+  // extractor-derived key is `Kendu`). Story 072 owns the mainnet Kendu address, if any.
+  Kendu: "0x0000000000000000000000000000000000000000",
   Flax: "0x0cf758D4303295C43CD95e1232f0101ADb3DA9E8",
   WBTC: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
   EYE: "0x155ff1A85F440EE0A382eA949f24CE4E0b751c65",
@@ -98,11 +101,14 @@ export const mainnetAddresses: ContractAddresses = {
   // Story 048: reverted from 0xeBEc50cD19310e6ed59D8153313Ec7C888152c1A (index-6 view)
   // to the prior index-4 view ahead of the dispatcher cutover. Verified on-chain:
   // getData(0)[23] == 4 for the address below.
-  MintPageView: "0x7e329338d319882ba1809b648eba584b3a4630cb",
+  MintPageView: "0x9b3ec09c14ec49fe2ac0981cdf43f3a2f69f8fb7",
   // NFT staking
   BalancerPoolerMintDebtHook: "0x4a26ad83306a2f17155799fdd9449f77eb3f8bd7",
   NFTStaker: "0xc8514f821a3d801fa8a8c435840a992a4365a13b",
   WaUSDC: "0xd4fa2d31b7968e448877f69a96de69f5de8cd23e",
+  // Story 073 (2026-07-29): PLACEHOLDER. The NudgeStreamer is deployed on the local anvil chain
+  // only; story 072 owns the mainnet deploy and will replace this with the broadcast address.
+  NudgeStreamer: "0x0000000000000000000000000000000000000000",
   BatchNFTMinter: "0x86866e01a115C17892Ed04c548F2e8638851029d",
   // Stable Staking — deployed 2026-06-10 by ResumeStableStakerMigration (story 055).
   // Pools: DOLA 5 / USDC 7 / USDe 10 phUSD per day, 10% set-aside buffer.

@@ -95,7 +95,9 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       RatchetBatchNFTMinter: data.RatchetBatchNFTMinter || '0x0000000000000000000000000000000000000000',
       ScxBatchNFTMinter: data.ScxBatchNFTMinter || '0x0000000000000000000000000000000000000000',
       FlxBatchNFTMinter: data.FlxBatchNFTMinter || '0x0000000000000000000000000000000000000000',
-      EyeBatchNFTMinter: data.EyeBatchNFTMinter || '0x0000000000000000000000000000000000000000'
+      EyeBatchNFTMinter: data.EyeBatchNFTMinter || '0x0000000000000000000000000000000000000000',
+      Kendu: data.Kendu || '0x0000000000000000000000000000000000000000',
+      NudgeStreamer: data.NudgeStreamer || '0x0000000000000000000000000000000000000000'
     }
     log.debug('📡 fetchLocalAddresses: Mapped addresses:', addresses)
 

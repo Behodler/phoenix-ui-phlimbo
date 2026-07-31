@@ -18,6 +18,7 @@ export interface ContractAddresses {
   Dola: string;
   EYE: string;
   SCX: string;
+  Kendu: string;
   Flax: string;
   WBTC: string;
   Pauser: string;
@@ -48,6 +49,7 @@ export interface ContractAddresses {
   SkyPSM: string;
   BalancerPoolerMintDebtHook: string;
   NFTStaker: string;
+  NudgeStreamer: string;
   BatchNFTMinter: string;
   UniboostStakerEYE: string;
   UniboostStakerSCX: string;
@@ -65,6 +67,7 @@ export interface ContractAddresses {
   DepositPageView: string;
   MintPageView: string;
 }
+
 
 /**
  * Response structure from local development address server
