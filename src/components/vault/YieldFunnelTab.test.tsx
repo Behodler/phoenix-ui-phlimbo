@@ -384,8 +384,31 @@ describe('YieldFunnelTab — exempt strategies checkboxes', () => {
     expect(writeContractMock).toHaveBeenCalledTimes(1);
     const callArgs = writeContractMock.mock.calls[0][0];
     expect(callArgs.functionName).toBe('claim');
-    expect(callArgs.args).toEqual([0n, 0n, []]);
+    // Second arg is the contract-quoted claimAmount, used as the
+    // front-running floor (minRewardTokenSupplied), not a slippage band.
+    expect(callArgs.args).toEqual([0n, 1_500_000n, []]);
     expect(callArgs.address).toBe(ACCUMULATOR_ADDRESS);
+  });
+
+  it('passes the exempt-adjusted claim quote as minRewardTokenSupplied', async () => {
+    // Unchecking B halves the claimable set, so the hook re-quotes the cost.
+    // The floor must track that re-quote — a stale full-set floor would revert
+    // every partial claim.
+    await renderAndAutoSelectNft();
+
+    const checkboxB = screen.getByTestId(
+      `yield-funnel-include-checkbox-${STRATEGY_B}`,
+    ) as HTMLInputElement;
+    fireEvent.click(checkboxB);
+
+    await triggerClaim();
+
+    expect(writeContractMock).toHaveBeenCalledTimes(1);
+    const callArgs = writeContractMock.mock.calls[0][0];
+    const [, minRewardTokenSupplied, exempt] = callArgs.args;
+    expect(exempt).toEqual([STRATEGY_B]);
+    expect(minRewardTokenSupplied).toBeGreaterThan(0n);
+    expect(minRewardTokenSupplied).toBeLessThan(1_500_000n);
   });
 
   it('claims with the live Reservoir Ratchet dispatcher index (7) when ratchet is selected', async () => {

@@ -324,16 +324,29 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       }
 
       // Call claim(nftIndex, minRewardTokenSupplied, exemptStrategies).
+      //
       // exemptStrategies is the list of yield-strategy addresses to skip. Use
       // `effectiveExemptStrategies`, which folds the user's unchecks together
       // with any source hidden from the checklist for having no claimable
       // yield — otherwise the contract would try to claim a zero-yield
       // ("underwater") source and revert, silently failing the claim.
+      //
+      // minRewardTokenSupplied is a front-running floor, not an AMM slippage
+      // band. In the accumulator it gates `actualPayment` — the USDC the
+      // claimer pays, which is a fixed discount off the yield actually skimmed
+      // — so it is denominated in reward-token (USDC, 6dp) units and is
+      // exactly what `calculateClaimAmount` quotes. Pending yield only
+      // accrues, so a stale (lower) quote is a weaker floor but never a false
+      // revert; the case it catches is a bot claiming a subset of the
+      // strategies out of the mempool ahead of us, leaving a residue that
+      // would burn the user's NFT for a fraction of the previewed yield.
+      // Passing the quote exactly (no tolerance) is safe: a shortfall reverts
+      // the whole tx, so the NFT is never consumed.
       const hash = await writeClaim({
         address: addresses.StableYieldAccumulator as `0x${string}`,
         abi: stableYieldAccumulatorAbi,
         functionName: 'claim',
-        args: [BigInt(selectedNft.dispatcherIndex), 0n, effectiveExemptStrategies],
+        args: [BigInt(selectedNft.dispatcherIndex), claimAmount, effectiveExemptStrategies],
       });
 
       // Show confirming toast
@@ -366,6 +379,18 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
           description: 'You cancelled the transaction. Please try again when ready.',
           duration: 8000,
         });
+      } else if (errorMessage.includes('InsufficientYield')) {
+        // The minRewardTokenSupplied floor rejected the claim: the yield on
+        // offer dropped between quote and execution, which in practice means
+        // someone claimed ahead of us. The NFT was not burned.
+        addToast({
+          type: 'error',
+          title: 'Yield Claimed by Someone Else',
+          description:
+            'The available yield dropped below the amount quoted, so the claim was rejected before your NFT was burned. Refresh to see the current yield.',
+          duration: 16000,
+        });
+        refetchYieldData();
       } else {
         addToast({
           type: 'error',
