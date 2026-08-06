@@ -1,13 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { erc20Abi, parseUnits } from 'viem';
+import { useMemo } from 'react';
+import { useAccount, useReadContract } from 'wagmi';
+import { erc20Abi } from 'viem';
 import {
   nftStakerAbi,
   nftMinterV2Abi,
   balancerPoolerMintDebtHookAbi,
 } from '@behodler/phase2-wagmi-hooks';
-import { useToast } from '../ui/ToastProvider';
-import ActionButton from '../ui/ActionButton';
+import StakerTopUpForm from './StakerTopUpForm';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -42,9 +41,7 @@ export default function NftStakerRunwayPanel({
   stakerLabel,
   idPrefix,
 }: NftStakerRunwayPanelProps) {
-  const { isConnected, address: walletAddress } = useAccount();
-  const { addToast } = useToast();
-  const { writeContractAsync } = useWriteContract();
+  const { address: walletAddress } = useAccount();
 
   const isNftStakerDeployed = !!stakerAddress &&
     stakerAddress.toLowerCase() !== ZERO_ADDRESS;
@@ -182,49 +179,10 @@ export default function NftStakerRunwayPanel({
     query: { enabled: isNftStakerDeployed && isDispatcherHookValid },
   });
 
-  const [topUpAmountInput, setTopUpAmountInput] = useState<string>('');
-  const [topUpInputError, setTopUpInputError] = useState<string | null>(null);
-
-  // Parse the user input into a bigint amount, surfacing parse errors inline.
-  const parsedTopUpAmount = useMemo<bigint | null>(() => {
-    const trimmed = topUpAmountInput.trim();
-    if (!trimmed) return null;
-    try {
-      const value = parseUnits(trimmed, 18);
-      return value > 0n ? value : null;
-    } catch {
-      return null;
-    }
-  }, [topUpAmountInput]);
-
-  const { data: nftStakerPhUsdAllowance, refetch: refetchNftStakerAllowance } = useReadContract({
-    address: phUsdAddress,
-    abi: erc20Abi,
-    functionName: 'allowance',
-    args: walletAddress && stakerAddress
-      ? [walletAddress as `0x${string}`, stakerAddress]
-      : undefined,
-    query: { enabled: isNftStakerDeployed && !!phUsdAddress && !!walletAddress },
-  });
-
   const isNftStakerOwner = useMemo(() => {
     if (!walletAddress || !nftStakerOwner) return false;
     return (nftStakerOwner as string).toLowerCase() === walletAddress.toLowerCase();
   }, [walletAddress, nftStakerOwner]);
-
-  const [topUpTxHash, setTopUpTxHash] = useState<`0x${string}` | undefined>();
-  const [topUpApproveTxHash, setTopUpApproveTxHash] = useState<`0x${string}` | undefined>();
-  const [isTopUpApproving, setIsTopUpApproving] = useState(false);
-  const [isTopUpExecuting, setIsTopUpExecuting] = useState(false);
-
-  const { isSuccess: topUpApproveConfirmed } = useWaitForTransactionReceipt({
-    hash: topUpApproveTxHash,
-    query: { enabled: !!topUpApproveTxHash },
-  });
-  const { isSuccess: topUpConfirmed } = useWaitForTransactionReceipt({
-    hash: topUpTxHash,
-    query: { enabled: !!topUpTxHash },
-  });
 
   const refetchNftStakerStats = () => {
     refetchRunwaySeconds();
@@ -233,7 +191,6 @@ export default function NftStakerRunwayPanel({
     refetchTotalDebt();
     refetchTargetApy();
     refetchTotalStakedRaw();
-    refetchNftStakerAllowance();
     refetchMaxSupply();
     refetchNftStakerPhUsdBalance();
     refetchNftMinterConfig();
@@ -298,131 +255,6 @@ export default function NftStakerRunwayPanel({
     nftStakerTargetApy,
     nftStakerMintDebt,
   ]);
-
-  useEffect(() => {
-    if (topUpApproveConfirmed && topUpApproveTxHash) {
-      setIsTopUpApproving(false);
-      setTopUpApproveTxHash(undefined);
-      refetchNftStakerAllowance();
-      addToast({
-        type: 'success',
-        title: 'Approval Confirmed',
-        description: `phUSD allowance set for ${stakerLabel}. You can now top up.`,
-      });
-    }
-    // refetchNftStakerAllowance is stable from wagmi; addToast pulled from context
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topUpApproveConfirmed, topUpApproveTxHash]);
-
-  useEffect(() => {
-    if (topUpConfirmed && topUpTxHash) {
-      setIsTopUpExecuting(false);
-      setTopUpTxHash(undefined);
-      refetchNftStakerStats();
-      addToast({
-        type: 'success',
-        title: 'Top Up Confirmed',
-        description: `phUSD has been transferred to ${stakerLabel}. Runway updated.`,
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topUpConfirmed, topUpTxHash]);
-
-  const handleNftStakerApprove = async () => {
-    if (!isConnected || !walletAddress) {
-      addToast({
-        type: 'error',
-        title: 'Wallet Not Connected',
-        description: 'Please connect your wallet to approve.',
-      });
-      return;
-    }
-    if (!phUsdAddress || !stakerAddress) {
-      addToast({
-        type: 'error',
-        title: 'Contract Not Available',
-        description: `phUSD or ${stakerLabel} address missing.`,
-      });
-      return;
-    }
-    if (parsedTopUpAmount === null) {
-      setTopUpInputError('Enter a valid phUSD amount > 0.');
-      return;
-    }
-    setTopUpInputError(null);
-    setIsTopUpApproving(true);
-    try {
-      const hash = await writeContractAsync({
-        address: phUsdAddress,
-        abi: erc20Abi,
-        functionName: 'approve',
-        args: [stakerAddress, parsedTopUpAmount],
-      });
-      setTopUpApproveTxHash(hash);
-      addToast({
-        type: 'info',
-        title: 'Approval Submitted',
-        description: 'Waiting for approval confirmation...',
-      });
-    } catch (err) {
-      setIsTopUpApproving(false);
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      addToast({
-        type: 'error',
-        title: 'Approval Failed',
-        description: msg,
-      });
-    }
-  };
-
-  const handleNftStakerTopUp = async () => {
-    if (!isConnected || !walletAddress) {
-      addToast({
-        type: 'error',
-        title: 'Wallet Not Connected',
-        description: 'Please connect your wallet to top up.',
-      });
-      return;
-    }
-    if (!stakerAddress) {
-      addToast({
-        type: 'error',
-        title: 'Contract Not Available',
-        description: `${stakerLabel} address missing.`,
-      });
-      return;
-    }
-    if (parsedTopUpAmount === null) {
-      setTopUpInputError('Enter a valid phUSD amount > 0.');
-      return;
-    }
-    setTopUpInputError(null);
-    setIsTopUpExecuting(true);
-    try {
-      const hash = await writeContractAsync({
-        address: stakerAddress,
-        abi: nftStakerAbi,
-        functionName: 'topUp',
-        args: [parsedTopUpAmount],
-      });
-      setTopUpTxHash(hash);
-      addToast({
-        type: 'info',
-        title: 'Top Up Submitted',
-        description: 'Waiting for top-up confirmation...',
-      });
-    } catch (err) {
-      setIsTopUpExecuting(false);
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      addToast({
-        type: 'error',
-        title: 'Top Up Failed',
-        description: msg,
-      });
-    }
-  };
-
-  const inputId = `${idPrefix}-topup-amount`;
 
   return (
     <div>
@@ -507,72 +339,15 @@ export default function NftStakerRunwayPanel({
             </div>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-border">
-            <label
-              htmlFor={inputId}
-              className="block text-sm font-medium text-foreground mb-2"
-            >
-              Top up phUSD
-            </label>
-            <input
-              id={inputId}
-              type="text"
-              inputMode="decimal"
-              value={topUpAmountInput}
-              onChange={(e) => {
-                setTopUpAmountInput(e.target.value);
-                setTopUpInputError(null);
-              }}
-              placeholder="e.g. 1000"
-              disabled={isTopUpApproving || isTopUpExecuting}
-              className={
-                'w-full px-3 py-2 bg-background border rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ' +
-                (topUpInputError ? 'border-red-500' : 'border-border')
-              }
-            />
-            {topUpInputError && (
-              <p className="text-xs text-red-500 mt-1">{topUpInputError}</p>
-            )}
-
-            <div className="flex gap-3 mt-3">
-              {(() => {
-                const allowanceBigint = typeof nftStakerPhUsdAllowance === 'bigint'
-                  ? nftStakerPhUsdAllowance
-                  : 0n;
-                const requiredAmount = parsedTopUpAmount ?? 0n;
-                const needsApproval = requiredAmount > 0n && allowanceBigint < requiredAmount;
-                const txInFlight = isTopUpApproving || isTopUpExecuting;
-
-                if (needsApproval) {
-                  return (
-                    <ActionButton
-                      disabled={txInFlight || parsedTopUpAmount === null}
-                      onAction={handleNftStakerApprove}
-                      label={isTopUpApproving ? 'Approving…' : 'Approve phUSD'}
-                      variant="primary"
-                      isLoading={isTopUpApproving}
-                    />
-                  );
-                }
-                return (
-                  <div title={!isNftStakerOwner ? `${stakerLabel}.owner only` : undefined}>
-                    <ActionButton
-                      disabled={txInFlight || parsedTopUpAmount === null || !isNftStakerOwner}
-                      onAction={handleNftStakerTopUp}
-                      label={isTopUpExecuting ? 'Topping Up…' : 'Top Up'}
-                      variant="primary"
-                      isLoading={isTopUpExecuting}
-                    />
-                  </div>
-                );
-              })()}
-            </div>
-            {!isNftStakerOwner && walletAddress && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Connected wallet is not the {stakerLabel} owner — Top Up will revert on-chain.
-              </p>
-            )}
-          </div>
+          <StakerTopUpForm
+            stakerAddress={stakerAddress}
+            stakerAbi={nftStakerAbi}
+            rewardTokenAddress={phUsdAddress}
+            stakerLabel={stakerLabel}
+            idPrefix={idPrefix}
+            isOwner={isNftStakerOwner}
+            onToppedUp={refetchNftStakerStats}
+          />
 
           <div className="mt-3 pt-3 border-t border-border">
             <button

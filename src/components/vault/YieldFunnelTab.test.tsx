@@ -384,9 +384,11 @@ describe('YieldFunnelTab — exempt strategies checkboxes', () => {
     expect(writeContractMock).toHaveBeenCalledTimes(1);
     const callArgs = writeContractMock.mock.calls[0][0];
     expect(callArgs.functionName).toBe('claim');
-    // Second arg is the contract-quoted claimAmount, used as the
-    // front-running floor (minRewardTokenSupplied), not a slippage band.
-    expect(callArgs.args).toEqual([0n, 1_500_000n, []]);
+    // Second arg is the contract-quoted claimAmount less the 10% tolerance,
+    // used as the front-running floor (minRewardTokenSupplied). The slack is
+    // there so USDe's rebasing between quote and execution does not revert an
+    // honest claim.
+    expect(callArgs.args).toEqual([0n, 1_350_000n, []]);
     expect(callArgs.address).toBe(ACCUMULATOR_ADDRESS);
   });
 

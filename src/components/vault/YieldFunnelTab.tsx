@@ -16,6 +16,13 @@ import { getErrorTitle, shouldOfferRetry } from '../../utils/transactionErrors';
 import { log } from '../../utils/logger';
 import { nftStaticConfig, type NFTData } from '../../data/nftMockData';
 
+// Slack allowed below the contract-quoted claim amount when setting the
+// `minRewardTokenSupplied` front-running floor. USDe's rebasing moves the
+// quote between preview and execution, so a near-exact floor reverts honest
+// claims; 1000bps (10%) tolerates that drift and still blocks a front-runner
+// from leaving the user a fraction of the previewed yield.
+const CLAIM_FLOOR_TOLERANCE_BPS = 1000;
+
 // Props interface for YieldFunnelTab
 interface YieldFunnelTabProps {
   isPaused?: boolean;
@@ -340,13 +347,23 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       // revert; the case it catches is a bot claiming a subset of the
       // strategies out of the mempool ahead of us, leaving a residue that
       // would burn the user's NFT for a fraction of the previewed yield.
-      // Passing the quote exactly (no tolerance) is safe: a shortfall reverts
-      // the whole tx, so the NFT is never consumed.
+      //
+      // The floor is the quote less CLAIM_FLOOR_TOLERANCE_BPS. USDe rebases
+      // between quote and execution, so a tight floor rejects honest claims;
+      // 10% of slack absorbs that while still catching a front-run that takes
+      // a meaningful slice of the yield.
+      const minRewardTokenSupplied =
+        (claimAmount * BigInt(10_000 - CLAIM_FLOOR_TOLERANCE_BPS)) / 10_000n;
+
       const hash = await writeClaim({
         address: addresses.StableYieldAccumulator as `0x${string}`,
         abi: stableYieldAccumulatorAbi,
         functionName: 'claim',
-        args: [BigInt(selectedNft.dispatcherIndex), claimAmount, effectiveExemptStrategies],
+        args: [
+          BigInt(selectedNft.dispatcherIndex),
+          minRewardTokenSupplied,
+          effectiveExemptStrategies,
+        ],
       });
 
       // Show confirming toast

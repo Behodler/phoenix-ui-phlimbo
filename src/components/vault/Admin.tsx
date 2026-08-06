@@ -19,6 +19,7 @@ import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
 import FAQEditor from './FAQEditor';
 import NftStakerRunwayPanel from './NftStakerRunwayPanel';
+import NftStakerDepletionRunwayPanel from './NftStakerDepletionRunwayPanel';
 import { useTokenBalance } from '../../hooks/useContractInteractions';
 import { useSolvencyInfo } from '../../hooks/useSolvencyInfo';
 import { useUniboostAutofill } from '../../hooks/useUniboostAutofill';
@@ -622,6 +623,11 @@ export default function Admin() {
   const nftStakerAddress = addresses?.NFTStaker as `0x${string}` | undefined;
   const ratchetNftStakerAddress = addresses?.RatchetNFTStaker as `0x${string}` | undefined;
   const phUsdAddress = addresses?.PhUSD as `0x${string}` | undefined;
+  // The three protocol-token (EYE/SCX/FLX) stakers are NFTStakerDepletion
+  // contracts, not fixed-rate NFTStakers, so they get their own panel.
+  const eyeStakerAddress = addresses?.UniboostStakerEYE as `0x${string}` | undefined;
+  const scxStakerAddress = addresses?.UniboostStakerSCX as `0x${string}` | undefined;
+  const flxStakerAddress = addresses?.UniboostStakerFLX as `0x${string}` | undefined;
   // ========== END NFT STAKER RUNWAY SECTION ==========
 
   // ========== BALANCER POOLER V2 DISPATCH SECTION ==========
@@ -2347,6 +2353,37 @@ export default function Admin() {
           phUsdAddress={phUsdAddress}
           stakerLabel="NFTStaker"
           idPrefix="lsp-nft-staker"
+        />
+      </div>
+
+      {/* Protocol-token NFT Stakers (EYE / SCX / FLX) — depletion Runway Panels */}
+      <div className="bg-card border border-border rounded-lg p-4 mb-6">
+        <NftStakerDepletionRunwayPanel
+          title="EYE NFT Staker — Runway"
+          stakerAddress={eyeStakerAddress}
+          phUsdAddress={phUsdAddress}
+          stakerLabel="UniboostStakerEYE"
+          idPrefix="eye-nft-staker"
+        />
+
+        <div className="my-6 border-t border-border" />
+
+        <NftStakerDepletionRunwayPanel
+          title="SCX NFT Staker — Runway"
+          stakerAddress={scxStakerAddress}
+          phUsdAddress={phUsdAddress}
+          stakerLabel="UniboostStakerSCX"
+          idPrefix="scx-nft-staker"
+        />
+
+        <div className="my-6 border-t border-border" />
+
+        <NftStakerDepletionRunwayPanel
+          title="Flax NFT Staker — Runway"
+          stakerAddress={flxStakerAddress}
+          phUsdAddress={phUsdAddress}
+          stakerLabel="UniboostStakerFLX"
+          idPrefix="flx-nft-staker"
         />
       </div>
 
