@@ -1,13 +1,36 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import FeaturedProjectBanner from './FeaturedProjectBanner';
 
 // ---------------------------------------------------------------------------
-// The banner is static presentation: zero props, no hooks, no chain reads, so
-// there is nothing to mock. Assertions go through `data-testid` rather than
+// The banner is static presentation: zero props, no hooks, no chain reads. The
+// only thing to mock is its visibility switch, which ships false — the content
+// tests below flip it on. Assertions go through `data-testid` rather than
 // class names, matching `WhaleDiscountPanel.test.tsx`.
 // ---------------------------------------------------------------------------
+const flag = vi.hoisted(() => ({ visible: true }));
+
+vi.mock('../../../config/featuredProject', () => ({
+  get FEATURED_PROJECT_VISIBLE() {
+    return flag.visible;
+  },
+}));
+
 describe('FeaturedProjectBanner', () => {
+  beforeEach(() => {
+    flag.visible = true;
+  });
+
+  it('renders nothing at all while the visibility switch is off', () => {
+    flag.visible = false;
+
+    const { container } = render(<FeaturedProjectBanner />);
+
+    // Empty markup, not hidden markup: nothing exists to flash into view.
+    expect(screen.queryByTestId('featured-project-banner')).toBeNull();
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('renders the card', () => {
     render(<FeaturedProjectBanner />);
 

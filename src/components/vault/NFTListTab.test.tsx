@@ -27,10 +27,6 @@ vi.mock('./NFTListMintModal', () => ({
   default: () => <div data-testid="nft-list-mint-modal" />,
 }));
 
-vi.mock('./WhaleMintPanel', () => ({
-  default: () => <div data-testid="whale-mint-panel" />,
-}));
-
 vi.mock('./stakeMock/StakingSurfaceMock', () => ({
   default: () => <div data-testid="staking-surface-mock" />,
 }));
@@ -47,36 +43,29 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('NFTListTab — admin-only Whale Discount sub-tab', () => {
-  it('hides the Whale Discount option when canSeeWhaleDiscount is false', () => {
+describe('NFTListTab — sub-tabs', () => {
+  it('offers all three sub-tabs to every user, admin or not', () => {
     render(<NFTListTab subTab="mint" onSubTabChange={vi.fn()} />);
 
     expect(screen.getByRole('tab', { name: 'Mint' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Stake' })).toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'Whale Discount' })).toBeNull();
+    expect(
+      screen.getByRole('tab', { name: 'Whale Discount' })
+    ).toBeInTheDocument();
   });
 
-  it('shows the Whale Discount option when canSeeWhaleDiscount is true', () => {
-    render(
-      <NFTListTab subTab="mint" onSubTabChange={vi.fn()} canSeeWhaleDiscount />
-    );
-
-    expect(screen.getByRole('tab', { name: 'Whale Discount' })).toBeInTheDocument();
-  });
-
-  it('renders the Whale Discount panel for an admin sitting on that sub-tab', () => {
-    render(
-      <NFTListTab subTab="whale-discount" onSubTabChange={vi.fn()} canSeeWhaleDiscount />
-    );
+  it('renders the Whale Discount panel on that sub-tab', () => {
+    render(<NFTListTab subTab="whale-discount" onSubTabChange={vi.fn()} />);
 
     expect(screen.getByTestId('whale-discount-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('staking-surface-mock')).toBeNull();
   });
 
   it('renders the featured project banner after the Whale Discount panel', () => {
-    render(
-      <NFTListTab subTab="whale-discount" onSubTabChange={vi.fn()} canSeeWhaleDiscount />
-    );
+    // The banner is stubbed here, so this pins placement only — whether it
+    // renders at all is `FEATURED_PROJECT_VISIBLE`'s job, covered by its own
+    // suite.
+    render(<NFTListTab subTab="whale-discount" onSubTabChange={vi.fn()} />);
 
     const panel = screen.getByTestId('whale-discount-panel');
     const banner = screen.getByTestId('featured-project-banner');
@@ -87,35 +76,17 @@ describe('NFTListTab — admin-only Whale Discount sub-tab', () => {
     expect(panel.compareDocumentPosition(banner) & 4).toBeTruthy();
   });
 
-  it('does not render the featured project banner for a non-admin', () => {
-    render(<NFTListTab subTab="whale-discount" onSubTabChange={vi.fn()} />);
+  it('shows only the NFT list on the mint sub-tab — no whale panel', () => {
+    render(<NFTListTab subTab="mint" onSubTabChange={vi.fn()} />);
 
-    expect(screen.queryByTestId('featured-project-banner')).toBeNull();
-  });
-
-  it('falls through to the wired Stake surface for a non-admin holding a stale whale-discount sub-tab', () => {
-    // Double guard: even with subTab === 'whale-discount', a non-admin must
-    // never see the panel.
-    render(<NFTListTab subTab="whale-discount" onSubTabChange={vi.fn()} />);
-
+    // The old single-nudge-token whale minter used to sit under the list.
+    expect(screen.queryByTestId('whale-mint-panel')).toBeNull();
     expect(screen.queryByTestId('whale-discount-panel')).toBeNull();
-    expect(screen.getByTestId('staking-surface-mock')).toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'Whale Discount' })).toBeNull();
+    expect(screen.getAllByTestId('nft-list-item').length).toBeGreaterThan(0);
   });
 
-  it('still renders the untouched Mint surface (WhaleMintPanel) on the mint sub-tab', () => {
-    render(
-      <NFTListTab subTab="mint" onSubTabChange={vi.fn()} canSeeWhaleDiscount />
-    );
-
-    expect(screen.getByTestId('whale-mint-panel')).toBeInTheDocument();
-    expect(screen.queryByTestId('whale-discount-panel')).toBeNull();
-  });
-
-  it('renders the Stake surface on the stake sub-tab regardless of admin status', () => {
-    render(
-      <NFTListTab subTab="stake" onSubTabChange={vi.fn()} canSeeWhaleDiscount />
-    );
+  it('renders the Stake surface on the stake sub-tab', () => {
+    render(<NFTListTab subTab="stake" onSubTabChange={vi.fn()} />);
 
     expect(screen.getByTestId('staking-surface-mock')).toBeInTheDocument();
     expect(screen.queryByTestId('whale-discount-panel')).toBeNull();

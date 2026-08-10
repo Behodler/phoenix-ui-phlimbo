@@ -1,4 +1,5 @@
 import { WHALE_DISCOUNT_CYAN } from '../../../data/nudgeTokenMeta';
+import { FEATURED_PROJECT_VISIBLE } from '../../../config/featuredProject';
 import kenduArt from '../../../assets/KENDUbanner.png';
 
 /**
@@ -11,8 +12,12 @@ import kenduArt from '../../../assets/KENDUbanner.png';
  * whale-mint nudge reward. There is deliberately no props/config/registry
  * layer yet — lifting the content out is a separate story.
  *
- * It reads no chain state and has no data hooks, so it never self-hides. The
- * surface it lives on is already admin-gated upstream (`canSeeWhaleDiscount`).
+ * It reads no chain state and has no data hooks. Visibility is a single
+ * build-time switch, `FEATURED_PROJECT_VISIBLE`, which defaults to false; the
+ * gate is here rather than at the call site so the banner cannot be turned on
+ * by accident from a new surface. Returning null on the first render (rather
+ * than rendering hidden markup) is what guarantees no flash of the promo — no
+ * banner element is ever created while the flag is off.
  *
  * Theme note (same as `WhaleDiscountPanel`): the `pxusd-*` colour tokens
  * resolve to raw hex CSS variables, so Tailwind opacity modifiers on them
@@ -21,6 +26,8 @@ import kenduArt from '../../../assets/KENDUbanner.png';
  * inline style.
  */
 export default function FeaturedProjectBanner() {
+  if (!FEATURED_PROJECT_VISIBLE) return null;
+
   return (
     <div className="mt-6" data-testid="featured-project-banner">
       <div className="bg-pxusd-teal-800 border border-pxusd-teal-600 rounded-lg overflow-hidden">

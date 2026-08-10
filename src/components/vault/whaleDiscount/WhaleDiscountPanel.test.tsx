@@ -195,6 +195,32 @@ describe('WhaleDiscountPanel', () => {
     ).toHaveTextContent('W');
   });
 
+  it('hides a whitelisted token that has nothing in the pot', () => {
+    potResult.value = basePot({
+      tokens: [
+        token(),
+        token({
+          address: '0x0000000000000000000000000000000000000002',
+          symbol: 'KENDU',
+          canonical: 'KENDU',
+          decimals: 18,
+          balanceRaw: 0n,
+          amountFormatted: '0',
+          usd: 0,
+          usdPerUnit: 0.05,
+        }),
+      ],
+    });
+
+    render(<WhaleDiscountPanel />);
+
+    // The NFT chip and the funded leg stay; the empty leg takes its leading
+    // `+` with it rather than leaving a dangling separator.
+    expect(screen.getByTestId('whale-discount-chip-USDC')).toBeInTheDocument();
+    expect(screen.queryByTestId('whale-discount-chip-KENDU')).toBeNull();
+    expect(screen.getByTestId('whale-discount-chip-nft')).toBeInTheDocument();
+  });
+
   it('disables the CTA and explains itself when the pot is empty', () => {
     potResult.value = basePot({ tokens: [], hasReward: false, potUsd: 0 });
 
@@ -285,7 +311,9 @@ describe('WhaleDiscountPanel', () => {
         const amount = () =>
           screen.getByTestId('whale-discount-amount-USDC').textContent;
 
-        expect(amount()).toBe('0.000');
+        // Nothing has streamed in yet, so the leg pays out nothing and its
+        // chip is not shown; it appears once the counter leaves zero.
+        expect(screen.queryByTestId('whale-discount-amount-USDC')).toBeNull();
 
         act(() => {
           vi.advanceTimersByTime(4_000);
