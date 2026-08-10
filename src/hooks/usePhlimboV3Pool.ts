@@ -13,7 +13,7 @@ import { useWalletBalances } from '../contexts/WalletBalancesContext';
 import { usePolling } from '../contexts/PollingContext';
 import { useApprovalTransaction } from './useTransaction';
 import { useTokenApproval } from './useContractInteractions';
-import { useDepositPageView } from './useDepositPageView';
+import { useDepositPageView, PromoPhase } from './useDepositPageView';
 import type { DepositPageViewData } from './useDepositPageView';
 import { useBalancerPrice } from './useBalancerPrice';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
@@ -60,6 +60,22 @@ export interface PhlimboV3Pool {
   pendingRewards: number;
   ratePerSecond: number;
   apy: number;
+  /**
+   * This wallet's share of the promo emission, in promo-token units per second.
+   * Zero unless a promotion is Active *and* still funded — a flushing or
+   * drained promotion accrues nothing, so a live counter ticking against it
+   * would invent yield the contract will never pay.
+   */
+  promoRatePerSecond: number;
+  /**
+   * The USD figure every APY on this farm divides by: staked phUSD priced in
+   * USD, falling back to this wallet's balance before anything is staked so a
+   * fresh farm still quotes a rate. Zero when neither is known.
+   *
+   * Exposed so a second reward stream can be annualised against exactly the
+   * same denominator as `apy`, rather than a re-derived near-copy of it.
+   */
+  apyDenominatorUSD: number;
   needsApproval: (amount: string) => boolean;
   isPaused: boolean;
   phUsdMarketPrice: number | null;
@@ -112,11 +128,11 @@ export function usePhlimboV3Pool(isActive: boolean): PhlimboV3Pool {
   const pendingRewards = view ? Number(view.pendingStableRewards) / 10 ** STABLE_DECIMALS : 0;
   const totalStaked = view ? Number(view.totalStaked) / 1e18 : 0;
 
-  // Same APY formula as the V2 pool, but sourced from the page view's own
-  // PRECISION (field 7) rather than a hardcoded 1e18.
-  const apy = (() => {
+  // Denominator shared by every reward stream's APY on this farm. Factored out
+  // of the stable-APY expression so the promo stream annualises against the
+  // identical base — see `apyDenominatorUSD` on the interface.
+  const apyDenominatorUSD = (() => {
     if (!view) return 0;
-    const annualStable = view.stableRewardsPerSecond * SECONDS_PER_YEAR;
 
     let denominatorInPhUsd: number;
     if (view.totalStaked > 0n) {
@@ -133,13 +149,36 @@ export function usePhlimboV3Pool(isActive: boolean): PhlimboV3Pool {
       phUsdPriceMultiplier = balancerPrice;
     }
 
-    return (annualStable / (denominatorInPhUsd * phUsdPriceMultiplier)) * 100;
+    return denominatorInPhUsd * phUsdPriceMultiplier;
   })();
+
+  // Same APY formula as the V2 pool, but sourced from the page view's own
+  // PRECISION (field 7) rather than a hardcoded 1e18. USDC is a dollar, so the
+  // annual emission is already a USD numerator.
+  const apy =
+    view && apyDenominatorUSD > 0
+      ? ((view.stableRewardsPerSecond * SECONDS_PER_YEAR) / apyDenominatorUSD) * 100
+      : 0;
 
   // This wallet's share of the pool-wide emission. Frozen when Live is off.
   const ratePerSecond =
     view && isPollingEnabled && totalStaked > 0 && stakedBalance > 0
       ? view.stableRewardsPerSecond * (stakedBalance / totalStaked)
+      : 0;
+
+  // The promo twin of `ratePerSecond`. Gated on the promotion actually paying:
+  // Flushing freezes accrual while the contract walks the staker set, and an
+  // Active promotion whose reward balance has drained to zero emits nothing
+  // until it is topped up.
+  const promoIsPaying =
+    !!view &&
+    view.hasPromo &&
+    view.promoPhase === PromoPhase.Active &&
+    view.promoRewardBalance > 0n;
+
+  const promoRatePerSecond =
+    view && isPollingEnabled && promoIsPaying && totalStaked > 0 && stakedBalance > 0
+      ? view.promoRewardPerSecond * (stakedBalance / totalStaked)
       : 0;
 
   const needsApproval = (amount: string): boolean => {
@@ -434,6 +473,8 @@ export function usePhlimboV3Pool(isActive: boolean): PhlimboV3Pool {
     pendingRewards,
     ratePerSecond,
     apy,
+    promoRatePerSecond,
+    apyDenominatorUSD,
     needsApproval,
     // The farm reports its own pause state (field 10). It is always true while
     // a promo is Flushing.

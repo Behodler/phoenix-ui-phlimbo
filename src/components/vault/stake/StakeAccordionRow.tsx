@@ -4,6 +4,44 @@ import SegmentedControl from '../../ui/SegmentedControl';
 import { fmtUSD, fmtAmount, fmtAPY } from './formatStake';
 
 /**
+ * One reward stream paid by a pool.
+ *
+ * Only pools that genuinely pay more than one token populate
+ * `StakeRowModel.rewards`. Every other pool leaves it unset, and the row
+ * synthesises a single leg from the scalar `earnToken` / `apy` /
+ * `pendingRewards` / … fields — so the one-token rendering is unchanged and
+ * callers that predate multi-reward need no edit.
+ */
+export interface RewardLeg {
+  /** On-chain ticker as displayed (`USDC`, `KENDU`). */
+  symbol: string;
+  /** Bundled logo. Absent ⇒ a lettered circle stands in. */
+  icon?: string;
+  /**
+   * Annualised percentage for this leg alone, or null when we have no USD
+   * price for the token. Null renders as an em dash: a reward rate without a
+   * price cannot be annualised, and showing `0.00%` would read as "this leg
+   * pays nothing" when in fact we simply cannot value it.
+   */
+  apy: number | null;
+  /** Claimable-now amount in this token (human units). */
+  pending: number;
+  /** This wallet's share of the emission, token units per second. */
+  ratePerSecond: number;
+  /** Fraction digits for this token's counter. */
+  decimals: number;
+  /** USD spot, or null when unknown (mirrors `apy`). */
+  priceUSD: number | null;
+  /**
+   * Tailwind text-colour class that identifies this leg wherever it appears.
+   * Colour — not a repeated label — is what ties the APY and Pending columns
+   * back to the token list beside the pool name, so it must be consistent
+   * across all three. Must be a literal class string for Tailwind to emit it.
+   */
+  accentClass: string;
+}
+
+/**
  * Normalized, layout-agnostic view of a single stake pool row. Both the real
  * phUSD pool and the mock stable pools are projected onto this shape so one
  * accordion row component renders them all.
@@ -63,6 +101,15 @@ export interface StakeRowModel {
    * zero and this. Undefined / 0 → the pool stakes and withdraws 1:1.
    */
   conversionBps?: number;
+  /**
+   * Every reward stream this pool pays, in the order the chain reports them.
+   * Leave unset (or length ≤ 1) for a single-reward pool — the row then falls
+   * back to the scalar fields above and renders exactly as it always has.
+   *
+   * PhlimboV3 populates this with the stable stream plus its promo slot, and
+   * drops back to unset whenever no promotion is configured.
+   */
+  rewards?: RewardLeg[];
 }
 
 type SubAction = 'stake' | 'withdraw' | 'claim';
@@ -89,6 +136,38 @@ const vaultSlippageTip = (kind: 'stake' | 'withdraw') =>
   kind === 'stake'
     ? `Estimated. Your deposit is routed into an underlying yield vault, and the vault's share-price rounding can leave the amount actually staked a touch different from the figure shown. This is a normal part of the vault mechanics, not a fee.`
     : `Estimated. Your withdrawal is redeemed from an underlying yield vault, and the vault's share-price rounding can leave the amount you receive a touch different from the figure shown. This is a normal part of the vault mechanics, not a fee.`;
+
+/**
+ * Token art with a graceful fallback.
+ *
+ * A promo slot can hold any ERC20, including one we ship no logo for, so an
+ * unknown token has to render as something stable — a lettered circle in the
+ * leg's own colour — rather than a broken-image glyph.
+ */
+function TokenGlyph({
+  symbol,
+  icon,
+  size,
+  accentClass,
+}: {
+  symbol: string;
+  icon?: string;
+  size: number;
+  accentClass: string;
+}) {
+  if (icon) {
+    return <img src={icon} alt={symbol} className="rounded-full" style={{ width: size, height: size }} />;
+  }
+  return (
+    <span
+      aria-hidden
+      className={`inline-flex shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.06] font-semibold ${accentClass}`}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.55) }}
+    >
+      {symbol.replace(/^m/, '').charAt(0).toUpperCase()}
+    </span>
+  );
+}
 
 function AmountField({
   label,
@@ -335,6 +414,34 @@ export default function StakeAccordionRow({
   const showEstimateTip = !pool.isLegacy && (pool.conversionBps ?? 0) === 0;
   const needsApprove = pool.needsApproval ? pool.needsApproval(stakeAmount) : false;
 
+  /**
+   * Reward streams for this row. A single-reward pool passes no `rewards`
+   * array, so one leg is synthesised from the scalar fields — which keeps this
+   * component's single-token output byte-identical to what it rendered before
+   * multi-reward existed.
+   */
+  const legs: RewardLeg[] =
+    pool.rewards && pool.rewards.length > 0
+      ? pool.rewards
+      : [
+          {
+            symbol: pool.earnToken,
+            icon: pool.earnIcon,
+            apy: pool.apy,
+            pending: pool.pendingRewards,
+            ratePerSecond: pool.ratePerSecond,
+            decimals: pool.pendingDecimals,
+            priceUSD: pool.earnPriceUSD,
+            accentClass: pool.isLegacy ? 'text-pxusd-teal-400' : 'text-pxusd-orange-300',
+          },
+        ];
+  const isMultiReward = legs.length > 1;
+  // A leg with a live ticker and a non-zero rate is "pending" even at exactly
+  // zero, because the counter is about to move off zero.
+  const hasAnyPending = legs.some(
+    (leg) => leg.pending > 0 || (pool.liveTicker && leg.ratePerSecond > 0),
+  );
+
   // Per-pool underwater status. Only meaningful when the global pause is NOT
   // active (the global pause takes precedence in messaging).
   const isUnderwater = !pool.disabled && pool.withdrawDisabled === true;
@@ -354,7 +461,8 @@ export default function StakeAccordionRow({
     !isBusy &&
     !pool.disabled &&
     !overBuffer;
-  const canClaim = pool.pendingRewards > 0 && !isBusy;
+  // One on-chain `claim` settles every leg, so any leg with a balance enables it.
+  const canClaim = legs.some((leg) => leg.pending > 0) && !isBusy;
 
   const handleStakeSubmit = async () => {
     if (needsApprove && onApprove) {
@@ -396,22 +504,49 @@ export default function StakeAccordionRow({
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-[16px] font-bold text-pxusd-white">{pool.stakeToken}</span>
             <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11.5px] text-muted-foreground">
-              <span className="flex items-center gap-1.5 whitespace-nowrap">
+              {/* The reward-token list doubles as the colour legend: each leg's
+                  accent here is the same one its APY and Pending figures carry,
+                  which is what ties the three columns together without
+                  repeating the ticker on every number. */}
+              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                 Earn
-                <img src={pool.earnIcon} alt={pool.earnToken} className="h-3.5 w-3.5 rounded-full" />
-                <span className={`font-semibold ${pool.isLegacy ? 'text-pxusd-teal-400' : 'text-pxusd-orange-300'}`}>
-                  {pool.earnToken}
-                </span>
+                {legs.map((leg, i) => (
+                  <span key={leg.symbol} className="flex items-center gap-1.5 whitespace-nowrap">
+                    {i > 0 && <span className="text-muted-foreground">+</span>}
+                    <TokenGlyph symbol={leg.symbol} icon={leg.icon} size={14} accentClass={leg.accentClass} />
+                    <span className={`font-semibold ${leg.accentClass}`}>{leg.symbol}</span>
+                  </span>
+                ))}
               </span>
               {/* APY lives in its own header column from sm up; below that the
                   column is hidden, so surface it inline here instead. Grouped
                   so the dot and value wrap to a new line as one unit. */}
-              <span className="flex items-center gap-1.5 whitespace-nowrap sm:hidden">
-                ·
-                <span className={`font-mono font-semibold ${pool.isLegacy ? 'text-pxusd-teal-400' : 'text-pxusd-orange-300'}`}>
-                  {fmtAPY(pool.apy)} APY
+              {isMultiReward ? (
+                /* Two rates will not fit on one mobile line without truncating,
+                   so below sm they get their own full-width chip row — one chip
+                   per leg, each keeping its rate legible at 10px. */
+                <span className="flex w-full flex-wrap items-center gap-1.5 pt-0.5 sm:hidden">
+                  {legs.map((leg) => (
+                    <span
+                      key={leg.symbol}
+                      className="inline-flex items-center gap-1 rounded-full border border-border bg-white/[0.05] px-1.5 py-0.5"
+                    >
+                      <span className={`text-[8px] leading-none ${leg.accentClass}`}>●</span>
+                      <span className={`font-mono text-[10px] font-semibold ${leg.accentClass}`}>
+                        {leg.apy === null ? '—' : fmtAPY(leg.apy)}
+                      </span>
+                      <span className="text-[9.5px] text-muted-foreground">{leg.symbol}</span>
+                    </span>
+                  ))}
                 </span>
-              </span>
+              ) : (
+                <span className="flex items-center gap-1.5 whitespace-nowrap sm:hidden">
+                  ·
+                  <span className={`font-mono font-semibold ${legs[0].accentClass}`}>
+                    {legs[0].apy === null ? '—' : fmtAPY(legs[0].apy)} APY
+                  </span>
+                </span>
+              )}
             </span>
             {isUnderwater && (
               <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-pxusd-yellow-400/35 bg-pxusd-yellow-400/10 px-2 py-0.5 text-[10.5px] font-semibold text-pxusd-yellow-400">
@@ -428,12 +563,22 @@ export default function StakeAccordionRow({
           </div>
         </div>
 
-        {/* APY */}
+        {/* APY. One line per reward stream, stacked in the single column: the
+            first at full size, any further leg a notch smaller beneath it, so
+            adding a second reward costs one line rather than a new column. */}
         <div className="hidden flex-col gap-0.5 sm:flex">
           <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground">APY</span>
-          <span className={`font-mono text-[18px] font-bold ${pool.isLegacy ? 'text-pxusd-teal-400' : 'text-pxusd-orange-300'}`}>
-            {fmtAPY(pool.apy)}
-          </span>
+          {legs.map((leg, i) => (
+            <span
+              key={leg.symbol}
+              className={`font-mono font-bold ${i === 0 ? 'text-[18px]' : 'text-[15px]'} ${leg.accentClass}`}
+            >
+              {leg.apy === null ? '—' : fmtAPY(leg.apy)}
+              {isMultiReward && (
+                <span className="ml-1 text-[10.5px] font-semibold text-muted-foreground">{leg.symbol}</span>
+              )}
+            </span>
+          ))}
         </div>
 
         {/* Your staked */}
@@ -453,23 +598,29 @@ export default function StakeAccordionRow({
             on-chain value so block refetches (not interpolation) drive it. */}
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Pending</span>
-          {pool.pendingRewards > 0 || (pool.liveTicker && pool.ratePerSecond > 0) ? (
-            <div className="flex flex-wrap items-center gap-x-1.5">
-              {pool.liveTicker ? (
-                <LiveYieldCounter
-                  ratePerSecond={pool.ratePerSecond}
-                  initial={pool.pendingRewards}
-                  decimals={pool.pendingDecimals}
-                  size={14}
-                  weight={600}
-                />
-              ) : (
-                <span className="font-mono text-[14px] font-semibold text-pxusd-white">
-                  {fmtAmount(pool.pendingRewards, pool.pendingDecimals)}
+          {hasAnyPending ? (
+            legs.map((leg, i) => (
+              <div key={leg.symbol} className="flex flex-wrap items-center gap-x-1.5">
+                {pool.liveTicker ? (
+                  <LiveYieldCounter
+                    ratePerSecond={leg.ratePerSecond}
+                    initial={leg.pending}
+                    decimals={leg.decimals}
+                    size={i === 0 ? 14 : 13}
+                    weight={600}
+                  />
+                ) : (
+                  <span
+                    className={`font-mono font-semibold text-pxusd-white ${i === 0 ? 'text-[14px]' : 'text-[13px]'}`}
+                  >
+                    {fmtAmount(leg.pending, leg.decimals)}
+                  </span>
+                )}
+                <span className={`${i === 0 ? 'text-[12px]' : 'text-[11px]'} text-muted-foreground`}>
+                  {leg.symbol}
                 </span>
-              )}
-              <span className="text-[12px] text-muted-foreground">{pool.earnToken}</span>
-            </div>
+              </div>
+            ))
           ) : (
             <span className="font-mono text-[14px] text-muted-foreground">—</span>
           )}
@@ -531,7 +682,12 @@ export default function StakeAccordionRow({
                     ? 'Confirming…'
                     : needsApprove && stakeParsed > 0
                       ? `Approve ${pool.stakeToken}`
-                      : `Stake ${pool.stakeToken} → Earn ${pool.earnToken}`}
+                      : isMultiReward
+                        ? // Naming one reward token would be wrong on a
+                          // multi-reward pool, and naming them all outgrows the
+                          // button as soon as the promo slot rotates.
+                          `Stake ${pool.stakeToken}`
+                        : `Stake ${pool.stakeToken} → Earn ${pool.earnToken}`}
               </button>
             </div>
           )}
@@ -610,26 +766,40 @@ export default function StakeAccordionRow({
             <div>
               <div className="mb-3.5 rounded-xl border border-border bg-white/[0.03] p-4">
                 <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Claimable now</div>
-                <div className="flex items-baseline gap-2.5">
-                  <img src={pool.earnIcon} alt={pool.earnToken} className="h-5 w-5 self-center rounded-full" />
-                  {pool.liveTicker ? (
-                    <LiveYieldCounter
-                      ratePerSecond={pool.ratePerSecond}
-                      initial={pool.pendingRewards}
-                      decimals={pool.pendingDecimals}
-                      size={18}
-                      weight={600}
-                    />
-                  ) : (
-                    <span className="font-mono tabular-nums text-[18px] font-semibold text-pxusd-white">
-                      {fmtAmount(pool.pendingRewards, pool.pendingDecimals)}
-                    </span>
-                  )}
-                  <span className="font-mono text-[13px] text-muted-foreground">{pool.earnToken}</span>
-                </div>
-                <div className="mt-1.5 text-[12px] text-muted-foreground">
-                  ≈ <span className="font-mono">{fmtUSD(pool.pendingRewards * pool.earnPriceUSD)}</span>
-                </div>
+                {/* One block per reward stream. A single on-chain `claim`
+                    settles all of them, so they share the button below. */}
+                {legs.map((leg, i) => (
+                  <div key={leg.symbol} className={i > 0 ? 'mt-3 border-t border-border pt-3' : ''}>
+                    <div className="flex items-baseline gap-2.5">
+                      <span className="self-center">
+                        <TokenGlyph symbol={leg.symbol} icon={leg.icon} size={20} accentClass={leg.accentClass} />
+                      </span>
+                      {pool.liveTicker ? (
+                        <LiveYieldCounter
+                          ratePerSecond={leg.ratePerSecond}
+                          initial={leg.pending}
+                          decimals={leg.decimals}
+                          size={18}
+                          weight={600}
+                        />
+                      ) : (
+                        <span className="font-mono tabular-nums text-[18px] font-semibold text-pxusd-white">
+                          {fmtAmount(leg.pending, leg.decimals)}
+                        </span>
+                      )}
+                      <span className={`font-mono text-[13px] ${leg.accentClass}`}>{leg.symbol}</span>
+                    </div>
+                    <div className="mt-1.5 text-[12px] text-muted-foreground">
+                      {leg.priceUSD === null ? (
+                        <span className="italic">No USD price available for this token.</span>
+                      ) : (
+                        <>
+                          ≈ <span className="font-mono">{fmtUSD(leg.pending * leg.priceUSD)}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
               <button
                 type="button"
@@ -637,7 +807,11 @@ export default function StakeAccordionRow({
                 disabled={!canClaim}
                 onClick={() => onClaim()}
               >
-                {pendingAction === 'claim' ? 'Confirming…' : `Claim ${pool.earnToken}`}
+                {pendingAction === 'claim'
+                  ? 'Confirming…'
+                  : isMultiReward
+                    ? 'Claim rewards'
+                    : `Claim ${pool.earnToken}`}
               </button>
             </div>
           )}

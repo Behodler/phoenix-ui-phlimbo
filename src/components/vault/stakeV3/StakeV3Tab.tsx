@@ -3,10 +3,12 @@ import { formatUnits } from 'viem';
 import { useReadContract } from 'wagmi';
 import { erc20Abi } from 'viem';
 import StakeAccordionRow from '../stake/StakeAccordionRow';
-import type { StakeRowModel } from '../stake/StakeAccordionRow';
+import type { RewardLeg, StakeRowModel } from '../stake/StakeAccordionRow';
 import { fmtAmount, fmtUSD } from '../stake/formatStake';
 import { usePhlimboV3Pool } from '../../../hooks/usePhlimboV3Pool';
 import { useRetiredPromoBanks } from '../../../hooks/useRetiredPromoBanks';
+import { useKenduPrice } from '../../../hooks/useKenduPrice';
+import { nudgeTokenMeta } from '../../../data/nudgeTokenMeta';
 import { PromoPhase } from '../../../hooks/useDepositPageView';
 import type { DepositPageViewData } from '../../../hooks/useDepositPageView';
 import phUSDIcon from '../../../assets/phUSD.png';
@@ -14,6 +16,16 @@ import usdcIcon from '../../../assets/usdc-logo.svg';
 
 const STABLE_USD = 1.0;
 const STABLE_DECIMALS = 6;
+const SECONDS_PER_YEAR = 31_536_000;
+
+/**
+ * Accent colours identifying each reward stream in the farm row. The stable
+ * leg keeps the teal this surface already uses for the successor farm; the
+ * promo leg takes pink so the two are never confused at a glance. Written as
+ * literals because Tailwind only emits classes it can find in the source.
+ */
+const STABLE_ACCENT = 'text-pxusd-teal-400';
+const PROMO_ACCENT = 'text-pxusd-pink-400';
 
 const PHASE_LABEL: Record<number, string> = {
   [PromoPhase.None]: 'None',
@@ -218,6 +230,79 @@ export default function StakeV3Tab() {
   const phUsdPrice =
     pool.phUsdMarketPrice !== null && pool.phUsdMarketPrice > 0 ? pool.phUsdMarketPrice : 1.0;
 
+  const { price: kenduPrice } = useKenduPrice();
+
+  /**
+   * The farm's second reward stream is its **promo slot**, not a fixed token.
+   * The symbol is read off the chain; art and price source are then looked up
+   * by canonical symbol, so Anvil's `mKENDU` mock and mainnet KENDU resolve to
+   * the same entry and a future rotation to a different token is followed
+   * automatically instead of being hard-coded here.
+   */
+  const promoMeta = view?.hasPromo ? nudgeTokenMeta(promoSymbol) : undefined;
+  const promoLabel = promoMeta?.display ?? promoSymbol;
+
+  const promoPriceUSD: number | null = (() => {
+    switch (promoMeta?.priceSource) {
+      case 'stable':
+        return STABLE_USD;
+      case 'phusd':
+        return phUsdPrice;
+      case 'kendu':
+        return kenduPrice;
+      default:
+        // A token we ship no price feed for. Null (not zero) so the row shows
+        // an em dash rather than claiming the leg is worthless.
+        return null;
+    }
+  })();
+
+  // A promotion that is Flushing, or Active but drained to a zero balance,
+  // pays nothing at this moment — its APY is genuinely 0, not merely unknown.
+  const promoPaying =
+    !!view && view.hasPromo && view.promoPhase === PromoPhase.Active && view.promoRewardBalance > 0n;
+  const promoDecimals = view?.promoTokenDecimals || 18;
+  const promoRatePoolWide = view?.promoRewardPerSecond ?? 0;
+
+  const promoApy: number | null =
+    promoPriceUSD === null
+      ? null
+      : promoPaying && pool.apyDenominatorUSD > 0
+        ? ((promoRatePoolWide * SECONDS_PER_YEAR * promoPriceUSD) / pool.apyDenominatorUSD) * 100
+        : 0;
+
+  /**
+   * Undefined whenever no promotion is configured, which drops the row back to
+   * the single-reward layout it has always had.
+   */
+  const rewards: RewardLeg[] | undefined =
+    view && view.hasPromo
+      ? [
+          {
+            symbol: 'USDC',
+            icon: usdcIcon,
+            apy: pool.apy,
+            pending: pool.pendingRewards,
+            ratePerSecond: pool.ratePerSecond,
+            decimals: STABLE_DECIMALS,
+            priceUSD: STABLE_USD,
+            accentClass: STABLE_ACCENT,
+          },
+          {
+            symbol: promoLabel,
+            icon: promoMeta?.logo,
+            apy: promoApy,
+            pending: Number(formatUnits(view.pendingPromoRewards, promoDecimals)),
+            ratePerSecond: pool.promoRatePerSecond,
+            // An 18-dp counter is far too wide for this column; 6 matches the
+            // stable leg and the entitlement rows below.
+            decimals: Math.min(promoDecimals, 6),
+            priceUSD: promoPriceUSD,
+            accentClass: PROMO_ACCENT,
+          },
+        ]
+      : undefined;
+
   const row: StakeRowModel = {
     id: 'phusd-v3',
     stakeToken: 'phUSD',
@@ -230,8 +315,11 @@ export default function StakeV3Tab() {
     pendingRewards: pool.pendingRewards,
     ratePerSecond: pool.ratePerSecond,
     liveTicker: true,
-    tagline: 'PhlimboV3 — stake phUSD, earn USDC streamed from the yield funnel.',
+    tagline: rewards
+      ? `PhlimboV3 — stake phUSD, earn USDC streamed from the yield funnel, plus ${promoLabel} emissions.`
+      : 'PhlimboV3 — stake phUSD, earn USDC streamed from the yield funnel.',
     pendingDecimals: STABLE_DECIMALS,
+    rewards,
     isLegacy: true,
     stakePriceUSD: phUsdPrice,
     earnPriceUSD: STABLE_USD,
@@ -274,7 +362,7 @@ export default function StakeV3Tab() {
       >
         <div className="mb-2.5 px-1.5">
           <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-pxusd-teal-400">
-            Stake phUSD · earn USDC — PhlimboV3
+            Stake phUSD · earn {rewards ? `USDC + ${promoLabel}` : 'USDC'} — PhlimboV3
           </div>
           <div className="mt-0.5 text-[12.5px] text-muted-foreground">
             The successor farm. The Stake tab still points at the incumbent V2 pool.
