@@ -5,6 +5,7 @@ import { wagmiConfig } from '../../wagmiConfig';
 import { erc20Abi, formatUnits, parseUnits, zeroAddress } from 'viem';
 import {
   phlimboV2Abi,
+  phlimboV3Abi,
   phusdStableMinterAbi,
   erc4626YieldStrategyAbi,
   stableYieldAccumulatorAbi,
@@ -127,6 +128,14 @@ const getContractConfigs = (): ContractConfig[] => [
     name: 'PhlimboEA',
     addressKey: 'PhlimboEA',
     abi: phlimboV2Abi as Abi,
+  },
+  // The successor farm. The PhlimboEA key deliberately still names V2 (mainnet
+  // parity), so V3 gets its own entry rather than replacing it — both are
+  // driveable while the cutover is being rehearsed.
+  {
+    name: 'PhlimboV3',
+    addressKey: 'PhlimboV3',
+    abi: phlimboV3Abi as Abi,
   },
 ];
 

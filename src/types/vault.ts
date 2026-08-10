@@ -1,4 +1,7 @@
-export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
+// "Stake V3" is a temporary cutover-rehearsal surface pointed at PhlimboV3,
+// sitting beside the incumbent "Stake" tab (PhlimboEA/V2). It goes away once
+// V3 becomes the only farm.
+export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Stake V3" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
 
 export interface VaultFormData {
   amount: string;

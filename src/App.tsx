@@ -21,6 +21,10 @@ export default function App() {
           <Route path="/" element={<VaultPage />} />
           <Route path="/stake" element={<VaultPage />} />
           <Route path="/staking" element={<VaultPage />} />
+          {/* Temporary cutover-rehearsal surface on PhlimboV3. Every path in
+              tabRoutes.ts needs a Route here too, or the "*" catch-all below
+              bounces it to "/" and the tab appears to reset to Mint. */}
+          <Route path="/stake-v3" element={<VaultPage />} />
           <Route path="/nft" element={<VaultPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

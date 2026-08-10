@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import type { Address } from 'viem';
-import { nftMinterV2Abi, batchNftMinterAbi } from '@behodler/phase2-wagmi-hooks';
+import {
+  nftMinterV2Abi,
+  batchNftMinterAbi,
+  batchNftMinterMultiTokenAbi,
+} from '@behodler/phase2-wagmi-hooks';
 import type { NFTData } from '../../data/nftMockData';
 import { tokenPrefixToAddressKey } from '../../data/nftMockData';
 import { LoadingSpinner } from '../ui/ActionButton';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useTokenAllowance, useTokenApproval } from '../../hooks/useContractInteractions';
 import { useToast } from '../ui/ToastProvider';
+import { decodeContractError } from '../../lib/decodeContractError';
 import NFTCard from './NFTCard';
 import BatchMintControlsView from './BatchMintControls';
 import { useBatchMintControls } from '../../utils/useBatchMintControls';
@@ -73,6 +78,24 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
     batchHelperAddress,
     batchPaymentToken,
   );
+
+  // The shared `BatchNFTMinter` key now holds BatchNFTMinterMultiToken, whose
+  // `batchMint` takes `uint256[] minRewards` instead of a scalar `minReward`.
+  // The four per-token helpers (Eye/Scx/Flx/Ratchet) are nudge-disabled and
+  // stay on the legacy single-token ABI, so the shape is chosen per NFT.
+  const isMultiTokenMinter = nft?.batchMinterKey === 'BatchNFTMinter';
+
+  // `minRewards` is positional against the on-chain whitelist, so its length
+  // must equal `getNudgeTokens().length` or the call reverts with
+  // BatchMint__ArrayLengthMismatch. Read fresh rather than cached: removal is
+  // swap-and-pop, so both the order and the length can change.
+  const { data: nudgeTokensRaw } = useReadContract({
+    address: batchHelperAddress,
+    abi: batchNftMinterMultiTokenAbi,
+    functionName: 'getNudgeTokens',
+    query: { enabled: useBatchFlow && isMultiTokenMinter },
+  });
+  const nudgeTokenCount = (nudgeTokensRaw as readonly Address[] | undefined)?.length ?? 0;
 
   // Batch-mint controls state. Always called for hook-order stability;
   // only the rendered output is gated on `useBatchFlow`.
@@ -161,8 +184,8 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
       addToast({ type: 'info', title: 'Transaction Submitted', description: 'Waiting for approval confirmation...' });
     } catch (error) {
       setIsApproving(false);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      if (errorMessage.toLowerCase().includes('user rejected') || errorMessage.toLowerCase().includes('user denied')) {
+      const { message: errorMessage, userRejected } = decodeContractError(error);
+      if (userRejected) {
         addToast({ type: 'error', title: 'Transaction Cancelled', description: 'You cancelled the approval transaction.' });
       } else {
         addToast({ type: 'error', title: 'Approval Failed', description: errorMessage });
@@ -195,19 +218,32 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
         // contract), so only count/recipient/payment are passed here. The helper
         // address itself is resolved per-NFT (BatchNFTMinter vs
         // RatchetBatchNFTMinter) via `batchMinterKey`.
-        // `minReward` is the slippage floor on the nudge reward; 0n accepts any
-        // reward, matching the pre-nudge contract's behaviour.
-        hash = await writeContractAsync({
-          address: batchHelperAddress as `0x${string}`,
-          abi: batchNftMinterAbi,
-          functionName: 'batchMint',
-          args: [
-            BigInt(batchControls.count),
-            walletAddress,
-            batchControls.requiredRaw,
-            0n,
-          ],
-        });
+        // `minReward(s)` is the slippage floor on the nudge reward. Zero floors
+        // accept any reward, matching the pre-nudge contract's behaviour — the
+        // Whale Discount panel is where a real floor is signed.
+        hash = isMultiTokenMinter
+          ? await writeContractAsync({
+              address: batchHelperAddress as `0x${string}`,
+              abi: batchNftMinterMultiTokenAbi,
+              functionName: 'batchMint',
+              args: [
+                BigInt(batchControls.count),
+                walletAddress,
+                batchControls.requiredRaw,
+                new Array<bigint>(nudgeTokenCount).fill(0n),
+              ],
+            })
+          : await writeContractAsync({
+              address: batchHelperAddress as `0x${string}`,
+              abi: batchNftMinterAbi,
+              functionName: 'batchMint',
+              args: [
+                BigInt(batchControls.count),
+                walletAddress,
+                batchControls.requiredRaw,
+                0n,
+              ],
+            });
       } else {
         // V2 NFTMinter: single 2-arg mint(index, recipient) path shared by every NFT.
         // Dispatcher-specific behaviour (burn / gather / balancer pool) is handled
@@ -224,8 +260,8 @@ export default function NFTListMintModal({ isOpen, onClose, nft, price, onMintSu
       addToast({ type: 'info', title: 'Transaction Submitted', description: 'Waiting for blockchain confirmation...' });
     } catch (error) {
       setIsMinting(false);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      if (errorMessage.toLowerCase().includes('user rejected') || errorMessage.toLowerCase().includes('user denied')) {
+      const { message: errorMessage, userRejected } = decodeContractError(error);
+      if (userRejected) {
         addToast({ type: 'error', title: 'Transaction Cancelled', description: 'You cancelled the mint transaction.' });
       } else {
         addToast({ type: 'error', title: 'Mint Failed', description: errorMessage });

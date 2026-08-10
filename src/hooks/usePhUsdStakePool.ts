@@ -14,14 +14,14 @@ import { useWalletBalances } from '../contexts/WalletBalancesContext';
 import { usePolling } from '../contexts/PollingContext';
 import { useApprovalTransaction } from './useTransaction';
 import { useTokenApproval } from './useContractInteractions';
-import { useDepositViewPolling } from './useDepositViewPolling';
+import { usePhlimboV2Reads } from './usePhlimboV2Reads';
 import { useBalancerPrice } from './useBalancerPrice';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
 import { log } from '../utils/logger';
 
 /**
  * Heartbeat for re-reading on-chain stake data while real-time updates are on
- * (roughly one mainnet block). Faster than the shared 60s DepositView poll so
+ * (roughly one mainnet block). Faster than the shared 60s farm poll so
  * the Stake tab's pending figure stays close to chain state.
  */
 const STAKE_REFRESH_INTERVAL_MS = 12_000;
@@ -36,9 +36,13 @@ export type PhUsdStakeAction = 'stake' | 'withdraw' | 'claim' | 'approve';
  *
  * The phUSD pool in the Stake tab is the "inverse" pool: users stake **phUSD**
  * and earn **USDC** streamed from the yield funnel. All numbers here are
- * derived from the exact same reads the legacy Deposit/Withdraw tabs use
- * (DepositView polling + desiredAPYBps + the USDC-APY formula), so they match
- * to the digit.
+ * derived from the exact same reads the legacy Deposit/Withdraw tabs used
+ * (see `usePhlimboV2Reads` + desiredAPYBps + the USDC-APY formula), so they
+ * match to the digit.
+ *
+ * This is the **incumbent** farm. After the V3 cutover it holds nothing and
+ * emits nothing, but it is deliberately left unpaused so late stakers can
+ * still exit — see `usePhlimboV3Pool` for the successor.
  */
 export interface PhUsdStakePool {
   /** Wallet phUSD balance (human, 18-decimal source). */
@@ -70,7 +74,7 @@ export interface PhUsdStakePool {
 /**
  * Encapsulates the real phUSD pool reads + writes for the Stake tab.
  *
- * NOTE (deliberate duplication): this hook re-derives the DepositView polling
+ * NOTE (deliberate duplication): this hook re-derives the farm polling
  * and the USDC-APY formula that currently live inline in VaultPage. This keeps
  * the new Stake surface isolated from the working legacy Deposit/Withdraw tabs
  * (story 068 Concerns: dedupe later once the legacy tabs are removed).
@@ -89,12 +93,12 @@ export function usePhUsdStakePool(isActive: boolean): PhUsdStakePool {
   // statically: no block refetches, and the live counter is frozen.
   const { isPollingEnabled } = usePolling();
 
-  // ---- Reads: DepositView polling (wallet/staked/pending/allowance) -------
+  // ---- Reads: PhlimboV2 direct (wallet/staked/pending/allowance) ----------
   const {
     data: depositViewData,
     isLoading: depositViewLoading,
     refresh: refreshDepositView,
-  } = useDepositViewPolling(isActive);
+  } = usePhlimboV2Reads(isActive);
 
   // Re-read the on-chain deposit data on a fixed 12s heartbeat (gated on the
   // same Live toggle) so the pending figure + balances track chain state in

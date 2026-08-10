@@ -8,6 +8,7 @@ export const PATH_TO_TAB: Record<string, Tab> = {
   // Repointed from 'Deposit' → 'Stake'. DeFi Llama deep-links to /staking, so
   // that external link must land on the new consolidated Stake surface.
   '/staking': 'Stake',
+  '/stake-v3': 'Stake V3',
   '/nft': 'NFT',
 };
 
@@ -16,6 +17,7 @@ export const TAB_TO_PATH: Partial<Record<Tab, string>> = {
   // here. DeFi Llama deep-links to /staking, so the canonical outbound path is
   // /staking. /stake remains a working alias in PATH_TO_TAB above.
   Stake: '/staking',
+  'Stake V3': '/stake-v3',
   NFT: '/nft',
 };
 

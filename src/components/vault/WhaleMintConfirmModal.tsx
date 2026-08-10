@@ -9,6 +9,7 @@ import {
 import { batchNftMinterAbi } from '@behodler/phase2-wagmi-hooks';
 import { LoadingSpinner } from '../ui/ActionButton';
 import { useToast } from '../ui/ToastProvider';
+import { decodeContractError } from '../../lib/decodeContractError';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import {
   useTokenAllowance,
@@ -203,11 +204,8 @@ export default function WhaleMintConfirmModal({
       });
     } catch (error) {
       setIsApproving(false);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      if (
-        errorMessage.toLowerCase().includes('user rejected') ||
-        errorMessage.toLowerCase().includes('user denied')
-      ) {
+      const { message: errorMessage, userRejected } = decodeContractError(error);
+      if (userRejected) {
         addToast({
           type: 'error',
           title: 'Transaction Cancelled',
@@ -261,11 +259,8 @@ export default function WhaleMintConfirmModal({
       });
     } catch (error) {
       setIsMinting(false);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      if (
-        errorMessage.toLowerCase().includes('user rejected') ||
-        errorMessage.toLowerCase().includes('user denied')
-      ) {
+      const { message: errorMessage, userRejected } = decodeContractError(error);
+      if (userRejected) {
         addToast({
           type: 'error',
           title: 'Transaction Cancelled',

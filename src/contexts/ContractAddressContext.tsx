@@ -19,7 +19,6 @@ export interface NFTPrimaryView {
   NFTMinter: string
   BalancerPooler: string
   GatherWBTC: string
-  MintPageView: string
 }
 
 /**
@@ -29,7 +28,8 @@ interface ContractAddressContextState {
   addresses: ContractAddresses | null
   /**
    * Opinionated NFT primary view resolved from the flat NFT contract
-   * addresses plus `MintPageView`. Null when `addresses` is null.
+   * addresses. Null when `addresses` is null. Page views are deliberately
+   * absent — they resolve through `ViewRouter.pages(...)`, never an address key.
    */
   nftPrimary: NFTPrimaryView | null
   loading: boolean
@@ -119,7 +119,6 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
       NFTMinter: addresses.NFTMinter,
       BalancerPooler: addresses.BalancerPooler,
       GatherWBTC: addresses.GatherWBTC,
-      MintPageView: addresses.MintPageView,
     }
   }, [addresses])
 

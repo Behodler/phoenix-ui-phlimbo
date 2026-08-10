@@ -20,6 +20,7 @@ import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
 import NFTListTab, { type NFTSubTab } from '../components/vault/NFTListTab';
 import StakeTab from '../components/vault/stake/StakeTab';
+import StakeV3Tab from '../components/vault/stakeV3/StakeV3Tab';
 import Admin from '../components/vault/Admin';
 import FAQ from '../components/vault/FAQ';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
@@ -215,11 +216,14 @@ export default function VaultPage() {
   // - Show Yield Funnel tab for claiming accumulated yield at a discount
   // - Safety/Emergency Pause is handled by the fixed footer, not a tab
   const tabs: readonly Tab[] = (() => {
+    // "Stake V3" is the temporary cutover-rehearsal surface on PhlimboV3. It
+    // sits beside "Stake" (still PhlimboEA/V2) so the two farms can be compared
+    // side by side, and is removed once V3 becomes the only farm.
     if (!isMounted) {
-      return ["Mint", "Stake", "Yield Funnel"];
+      return ["Mint", "Stake", "Stake V3", "Yield Funnel"];
     }
 
-    const tabList: Tab[] = ["Mint", "Stake", "Yield Funnel"];
+    const tabList: Tab[] = ["Mint", "Stake", "Stake V3", "Yield Funnel"];
 
     if (!isMainnet) {
       tabList.push("Testnet Faucet");
@@ -800,6 +804,10 @@ export default function VaultPage() {
             ) : activeTab === "Stake" ? (
               <ErrorBoundary>
                 <StakeTab />
+              </ErrorBoundary>
+            ) : activeTab === "Stake V3" ? (
+              <ErrorBoundary>
+                <StakeV3Tab />
               </ErrorBoundary>
             ) : activeTab === "Testnet Faucet" ? (
               <TestnetFaucet />
