@@ -278,7 +278,7 @@ export function usePhlimboV3Pool(isActive: boolean): PhlimboV3Pool {
       return false;
     }
     if (!phlimboV3) {
-      addToast({ type: 'error', title: 'Contract Not Ready', description: 'PhlimboV3 address is not loaded for this network.' });
+      addToast({ type: 'error', title: 'Contract Not Ready', description: 'The staking contract address is not loaded for this network.' });
       return false;
     }
     return true;

@@ -1,7 +1,8 @@
-// "Stake V3" is a temporary cutover-rehearsal surface pointed at PhlimboV3,
-// sitting beside the incumbent "Stake" tab (PhlimboEA/V2). It goes away once
-// V3 becomes the only farm.
-export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Stake V3" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
+// "Stake" is the public farm, pointed at PhlimboV3. "Stake (admin only)" is the
+// incumbent V2 surface (PhlimboEA), kept visible to admins alone so the two
+// farms can still be compared during the cutover; it goes away once V3 is the
+// only farm.
+export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Stake (admin only)" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
 
 export interface VaultFormData {
   amount: string;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { maxUint256, formatUnits } from 'viem';
 import { stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
 import ActionButton from '../ui/ActionButton';
@@ -26,60 +26,6 @@ const CLAIM_FLOOR_TOLERANCE_BPS = 1000;
 // Props interface for YieldFunnelTab
 interface YieldFunnelTabProps {
   isPaused?: boolean;
-}
-
-/**
- * Which deposit farm the accumulator is currently paying into.
- *
- * This tab never names a Phlimbo address itself — every yield read goes through
- * StableYieldAccumulator, which holds its own `phlimbo` pointer and is repointed
- * at V3 as part of the cutover. That makes a missed repoint invisible: the
- * funnel simply goes flat forever, with no error anywhere. Rendering the pointer
- * turns that silent failure into something you can see.
- */
-function FarmPointer() {
-  const { addresses } = useContractAddresses();
-
-  const { data: phlimboPointer } = useReadContract({
-    address: addresses?.StableYieldAccumulator as `0x${string}` | undefined,
-    abi: stableYieldAccumulatorAbi,
-    functionName: 'phlimbo',
-    query: { enabled: !!addresses?.StableYieldAccumulator },
-  });
-
-  const pointer = phlimboPointer as `0x${string}` | undefined;
-  if (!pointer) return null;
-
-  const lower = pointer.toLowerCase();
-  const isV3 = !!addresses?.PhlimboV3 && addresses.PhlimboV3.toLowerCase() === lower;
-  const isV2 = !!addresses?.PhlimboEA && addresses.PhlimboEA.toLowerCase() === lower;
-  const label = isV3 ? 'PhlimboV3' : isV2 ? 'PhlimboEA (V2)' : 'unrecognised';
-
-  return (
-    <div
-      className="mt-3 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground"
-      data-testid="yield-funnel-farm-pointer"
-    >
-      <span>Paying into</span>
-      <span
-        className={`rounded-full border px-2 py-0.5 font-semibold ${
-          isV3
-            ? 'border-pxusd-teal-400/40 text-pxusd-teal-400'
-            : 'border-pxusd-yellow-400/40 text-pxusd-yellow-400'
-        }`}
-      >
-        {label}
-      </span>
-      <span className="font-mono">
-        {pointer.slice(0, 6)}…{pointer.slice(-4)}
-      </span>
-      {!isV3 && (
-        <span className="text-pxusd-yellow-400">
-          — the accumulator has not been repointed at V3, so V3 stakers accrue nothing.
-        </span>
-      )}
-    </div>
-  );
 }
 
 export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps) {
@@ -711,7 +657,6 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
           <p className="text-sm text-muted-foreground">
             Yield flows from multiple sources. Supply USDC to claim accumulated yield tokens at a discount.
           </p>
-          <FarmPointer />
         </div>
 
         {/* NFT Selector Grid */}

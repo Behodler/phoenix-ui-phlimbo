@@ -216,14 +216,18 @@ export default function VaultPage() {
   // - Show Yield Funnel tab for claiming accumulated yield at a discount
   // - Safety/Emergency Pause is handled by the fixed footer, not a tab
   const tabs: readonly Tab[] = (() => {
-    // "Stake V3" is the temporary cutover-rehearsal surface on PhlimboV3. It
-    // sits beside "Stake" (still PhlimboEA/V2) so the two farms can be compared
-    // side by side, and is removed once V3 becomes the only farm.
+    // "Stake" is the public farm (PhlimboV3). "Stake (admin only)" is the
+    // incumbent V2 surface, shown to admins alone so the two farms can still be
+    // compared during the cutover; it is removed once V3 is the only farm.
     if (!isMounted) {
-      return ["Mint", "Stake", "Stake V3", "Yield Funnel"];
+      return ["Mint", "Stake", "Yield Funnel"];
     }
 
-    const tabList: Tab[] = ["Mint", "Stake", "Stake V3", "Yield Funnel"];
+    // The admin V2 surface keeps its old slot immediately left of the public
+    // farm, so the two sit side by side for comparison.
+    const tabList: Tab[] = hasAdminAccess
+      ? ["Mint", "Stake (admin only)", "Stake", "Yield Funnel"]
+      : ["Mint", "Stake", "Yield Funnel"];
 
     if (!isMainnet) {
       tabList.push("Testnet Faucet");
@@ -803,11 +807,11 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "Stake" ? (
               <ErrorBoundary>
-                <StakeTab />
-              </ErrorBoundary>
-            ) : activeTab === "Stake V3" ? (
-              <ErrorBoundary>
                 <StakeV3Tab />
+              </ErrorBoundary>
+            ) : activeTab === "Stake (admin only)" ? (
+              <ErrorBoundary>
+                <StakeTab />
               </ErrorBoundary>
             ) : activeTab === "Testnet Faucet" ? (
               <TestnetFaucet />

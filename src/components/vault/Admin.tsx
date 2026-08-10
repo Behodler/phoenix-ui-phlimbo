@@ -2758,11 +2758,13 @@ export default function Admin() {
         )}
       </div>
 
-      {/* NudgeRatchet Release Panel */}
+      {/* NudgeRatchet Release Panel.
+          Kept only until the cutover, to confirm nothing is left stranded in
+          NudgeRatchet. Delete the whole panel once that check is done. */}
       <div className="bg-card border border-border rounded-lg p-4 mb-6">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-sm font-semibold text-foreground">
-            NudgeRatchet — Release
+            NudgeRatchet — Release (TODO: remove panel)
           </h3>
           <span className={
             'text-xs font-mono ' + (isAuthorisedReleaser ? 'text-green-500' : 'text-red-500')

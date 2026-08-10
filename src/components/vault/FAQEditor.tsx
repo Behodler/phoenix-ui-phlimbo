@@ -74,7 +74,16 @@ export default function FAQEditor() {
     try {
       const res = await fetch(`/faq-data.json?t=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as FaqDoc;
+      // A 200 carrying HTML means the request fell through to an index.html
+      // fallback rather than reaching the real document. Say so plainly — the
+      // raw JSON parse error ("Unexpected token '<'") names no cause.
+      const body = await res.text();
+      if (body.trimStart().startsWith('<')) {
+        throw new Error(
+          'the server returned a web page instead of the FAQ document — /faq-data.json is not being served from this origin.'
+        );
+      }
+      const data = JSON.parse(body) as FaqDoc;
       setDoc(data);
       const firstGroup = Object.keys(data)[0] ?? '';
       setSelectedGroup(firstGroup);
