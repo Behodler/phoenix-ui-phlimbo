@@ -22,7 +22,8 @@ import FAQEditor from './FAQEditor';
 import NftStakerRunwayPanel from './NftStakerRunwayPanel';
 import NftStakerDepletionRunwayPanel from './NftStakerDepletionRunwayPanel';
 import { useTokenBalance } from '../../hooks/useContractInteractions';
-import { useSolvencyInfo } from '../../hooks/useSolvencyInfo';
+import { PromoPhase } from '../../hooks/useDepositPageView';
+import { useBalancerPrice } from '../../hooks/useBalancerPrice';
 import { useUniboostAutofill } from '../../hooks/useUniboostAutofill';
 import { TOL_PCT_LABEL } from '../../lib/uniboostPoolMath';
 import type { Abi, AbiFunction } from 'viem';
@@ -427,41 +428,133 @@ export default function Admin() {
   });
 
   // ========== PHLIMBO STATISTICS SECTION ==========
-  // Fetch PhlimboEA pool info: (totalStaked, accPhUSDPerShare, accStablePerShare, phUSDPerSecond, lastRewardTime)
+  // These stats describe the LIVE farm, which is PhlimboV3. PhlimboEA (V2) is
+  // wound down and mint-revoked; it stays reachable through the generic contract
+  // interaction panel above, but no longer drives this dashboard.
+  const phlimboV3Address = addresses?.PhlimboV3 as `0x${string}` | undefined;
+  const isPhlimboV3Deployed = !!phlimboV3Address && phlimboV3Address !== ZERO_ADDRESS;
+
+  // Fetch PhlimboV3 pool info: (totalStaked, accPhUSDPerShare, accStablePerShare, phUSDPerSecond, lastRewardTime)
   const { data: poolInfo, refetch: refetchPoolInfo, isLoading: poolInfoLoading } = useReadContract({
-    address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboV2Abi,
+    address: phlimboV3Address,
+    abi: phlimboV3Abi,
     functionName: 'getPoolInfo',
     query: {
-      enabled: !!addresses?.PhlimboEA,
+      enabled: isPhlimboV3Deployed,
     },
   });
 
-  // Fetch rewardPerSecond from PhlimboEA (linear depletion reward rate)
+  // Fetch rewardPerSecond from PhlimboV3 (linear depletion reward rate)
   const { data: rewardPerSecond, refetch: refetchRewardsPerSecond, isLoading: rewardPerSecondLoading } = useReadContract({
-    address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboV2Abi,
+    address: phlimboV3Address,
+    abi: phlimboV3Abi,
     functionName: 'rewardPerSecond',
     query: {
-      enabled: !!addresses?.PhlimboEA,
+      enabled: isPhlimboV3Deployed,
     },
   });
 
-  // Fetch depletionDuration from PhlimboEA (duration over which rewards are depleted, in seconds)
+  // Fetch depletionDuration from PhlimboV3 (duration over which rewards are depleted, in seconds)
   const { data: depletionDuration, refetch: refetchDepletionDuration, isLoading: depletionDurationLoading } = useReadContract({
-    address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboV2Abi,
+    address: phlimboV3Address,
+    abi: phlimboV3Abi,
     functionName: 'depletionDuration',
     query: {
-      enabled: !!addresses?.PhlimboEA,
+      enabled: isPhlimboV3Deployed,
     },
   });
 
-  // Fetch USDC balance held by PhlimboEA contract
+  // Undistributed USDC still owned by the reward accounting (V3's own view of
+  // its runway, as opposed to the raw token balance below).
+  const { data: rewardBalance, refetch: refetchRewardBalance, isLoading: rewardBalanceLoading } = useReadContract({
+    address: phlimboV3Address,
+    abi: phlimboV3Abi,
+    functionName: 'rewardBalance',
+    query: {
+      enabled: isPhlimboV3Deployed,
+    },
+  });
+
+  // Number of stakers. V3 walks this set during a promo flush, so it bounds how
+  // long a flush takes — see flushCursor in the promotion block below.
+  const { data: stakerCount, refetch: refetchStakerCount, isLoading: stakerCountLoading } = useReadContract({
+    address: phlimboV3Address,
+    abi: phlimboV3Abi,
+    functionName: 'stakerCount',
+    query: {
+      enabled: isPhlimboV3Deployed,
+    },
+  });
+
+  // The APY target V3 recalculates rewardPerSecond from, plus any proposal that
+  // is queued but not yet applied.
+  const { data: desiredAPYBps, refetch: refetchDesiredAPY, isLoading: desiredAPYLoading } = useReadContract({
+    address: phlimboV3Address,
+    abi: phlimboV3Abi,
+    functionName: 'desiredAPYBps',
+    query: {
+      enabled: isPhlimboV3Deployed,
+    },
+  });
+
+  const { data: pendingAPYInfo, refetch: refetchPendingAPY, isLoading: pendingAPYLoading } = useReadContract({
+    address: phlimboV3Address,
+    abi: phlimboV3Abi,
+    functionName: 'getPendingAPYInfo',
+    query: {
+      enabled: isPhlimboV3Deployed,
+    },
+  });
+
+  // phUSD spot price, for pricing staked TVL on the same basis as the farm's APY.
+  const { price: balancerPhUsdPrice } = useBalancerPrice();
+
+  // Fetch USDC balance held by the PhlimboV3 contract
   const { balance: phlimboUsdcBalance, refetch: refetchPhlimboUsdc, isLoading: phlimboUsdcLoading } = useTokenBalance(
-    addresses?.PhlimboEA as `0x${string}` | undefined,
+    phlimboV3Address,
     addresses?.USDC as `0x${string}` | undefined
   );
+
+  // ---- Promotion (V3-only) -------------------------------------------------
+  // getPromoInfo: (promoToken, promoRewardBalance, promoRewardPerSecond,
+  //                promoDepletionDuration, promoPhase, flushCursor)
+  const { data: promoInfo, refetch: refetchPromoInfo, isLoading: promoInfoLoading } = useReadContract({
+    address: phlimboV3Address,
+    abi: phlimboV3Abi,
+    functionName: 'getPromoInfo',
+    query: {
+      enabled: isPhlimboV3Deployed,
+    },
+  });
+
+  const promoToken = promoInfo?.[0] as `0x${string}` | undefined;
+  // A promo token of zero means no promotion has ever been configured on this
+  // farm; every other promo field is meaningless in that state.
+  const hasPromo = !!promoToken && promoToken !== ZERO_ADDRESS;
+
+  const { data: promoTokenSymbol, refetch: refetchPromoSymbol } = useReadContract({
+    address: promoToken,
+    abi: erc20Abi,
+    functionName: 'symbol',
+    query: { enabled: hasPromo },
+  });
+
+  const { data: promoTokenDecimals, refetch: refetchPromoDecimals } = useReadContract({
+    address: promoToken,
+    abi: erc20Abi,
+    functionName: 'decimals',
+    query: { enabled: hasPromo },
+  });
+
+  // The promo tokens physically sitting on the farm. Divergence from
+  // promoRewardBalance means someone transferred in without topUpPromotion.
+  const { data: promoTokenHeld, refetch: refetchPromoHeld } = useReadContract({
+    address: promoToken,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: phlimboV3Address ? [phlimboV3Address] : undefined,
+    query: { enabled: hasPromo && isPhlimboV3Deployed },
+  });
 
   // Fetch YieldFunnel DOLA pending yield from StableYieldAccumulator.getYield(dolaStrategy)
   const { data: dolaYield, refetch: refetchDolaYield, isLoading: dolaYieldLoading } = useReadContract({
@@ -570,6 +663,21 @@ export default function Admin() {
     : '0.00000000';
   const depletionDurationDisplay = formatDuration(depletionDuration as bigint | undefined);
   const totalStakedDisplay = (Number(phlimboTotalStaked) / 1e18).toFixed(2);
+
+  // Staked TVL in USD. Deliberately the SAME multiplier every APY on this farm
+  // divides by (see `apyDenominatorUSD` in usePhlimboV3Pool): the Balancer spot
+  // price on mainnet, but only when it is sane — a zero or above-$2 read is a
+  // broken oracle, not a repriced dollar, so it falls back to par rather than
+  // scaling TVL by a bad number. Off mainnet there is no pool, so par is exact.
+  const phUsdPriceMultiplier =
+    chainId === 1 && balancerPhUsdPrice !== null && balancerPhUsdPrice > 0 && balancerPhUsdPrice <= 2.0
+      ? balancerPhUsdPrice
+      : 1.0;
+  const stakedTvlUsd = (Number(phlimboTotalStaked) / 1e18) * phUsdPriceMultiplier;
+  const stakedTvlDisplay = `$${stakedTvlUsd.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
   const phlimboUsdcDisplay = phlimboUsdcBalance
     ? (Number(phlimboUsdcBalance) / 1e6).toFixed(2) // USDC has 6 decimals
     : '0.00';
@@ -582,48 +690,116 @@ export default function Admin() {
   const usdeFunnelYieldDisplay = usdeFunnelYield
     ? (Number(usdeFunnelYield) / 1e18).toFixed(2)
     : '0.00';
+  const rewardBalanceDisplay = typeof rewardBalance === 'bigint'
+    ? (Number(rewardBalance) / 1e6).toFixed(2)
+    : '0.00';
+
+  // ---- Time to depletion ---------------------------------------------------
+  // Driven by what the farm can ACTUALLY pay: min(rewardBalance, USDC held).
+  // rewardBalance is an internal counter, not a balance — an emergency withdraw
+  // empties the contract without decrementing it, and it only drains inside
+  // _updatePool, which no-ops while totalStaked is zero. Dividing the counter
+  // alone by the rate reports runway against USDC that is no longer there.
+  const backedRewardBalance =
+    typeof rewardBalance === 'bigint' && typeof phlimboUsdcBalance === 'bigint'
+      ? (rewardBalance < phlimboUsdcBalance ? rewardBalance : phlimboUsdcBalance)
+      : undefined;
+  // Non-zero means the counter and the token balance have desynced.
+  const rewardBalanceUnbacked =
+    typeof rewardBalance === 'bigint' && typeof phlimboUsdcBalance === 'bigint'
+      && rewardBalance > phlimboUsdcBalance
+      ? rewardBalance - phlimboUsdcBalance
+      : 0n;
+  // rewardPerSecond is PRECISION(1e18)-scaled raw USDC per second.
+  const depletionSeconds =
+    backedRewardBalance !== undefined && typeof rewardPerSecond === 'bigint' && rewardPerSecond > 0n
+      ? Number((backedRewardBalance * BigInt(1e18)) / rewardPerSecond)
+      : undefined;
+  const depletionDays = depletionSeconds !== undefined ? depletionSeconds / 86400 : undefined;
+  const timeToDepletionDisplay =
+    backedRewardBalance === 0n
+      ? 'Depleted'
+      : depletionSeconds === undefined
+        ? typeof rewardPerSecond === 'bigint' && rewardPerSecond === 0n
+          ? 'No distribution (rate is 0)'
+          : '—'
+        : `${depletionDays!.toFixed(1)} days (${formatDuration(BigInt(Math.floor(depletionSeconds)))})`;
+  const depletionColor =
+    depletionDays === undefined || backedRewardBalance === 0n
+      ? 'text-foreground'
+      : depletionDays >= 14
+        ? 'text-green-500'
+        : depletionDays >= 3
+          ? 'text-yellow-500'
+          : 'text-red-500';
+  const stakerCountDisplay = typeof stakerCount === 'bigint' ? stakerCount.toString() : '—';
+  const desiredAPYDisplay = typeof desiredAPYBps === 'bigint'
+    ? `${(Number(desiredAPYBps) / 100).toFixed(2)}%`
+    : '—';
+  // getPendingAPYInfo: (pendingAPYBps, pendingAPYBlockNumber, apySetInProgress).
+  // Only meaningful while a change is in flight — the raw bps is stale otherwise.
+  const pendingAPYInProgress = pendingAPYInfo?.[2] === true;
+  const pendingAPYDisplay = pendingAPYInProgress
+    ? `${(Number(pendingAPYInfo![0]) / 100).toFixed(2)}% (proposed at block ${pendingAPYInfo![1].toString()})`
+    : 'none';
+
+  // ---- Promotion display ---------------------------------------------------
+  const promoDecimals = typeof promoTokenDecimals === 'number' ? promoTokenDecimals : 18;
+  const promoSymbolDisplay = (promoTokenSymbol as string | undefined) ?? 'promo token';
+  const promoPhaseValue = promoInfo ? (Number(promoInfo[4]) as PromoPhase) : PromoPhase.None;
+  const promoPhaseLabel =
+    promoPhaseValue === PromoPhase.Active
+      ? 'Active'
+      : promoPhaseValue === PromoPhase.Flushing
+        ? 'Flushing'
+        : 'None';
+  const promoRewardBalanceRaw = promoInfo?.[1];
+  const promoRewardBalanceDisplay = typeof promoRewardBalanceRaw === 'bigint'
+    ? Number(formatUnits(promoRewardBalanceRaw, promoDecimals)).toFixed(4)
+    : '0.0000';
+  // promoRewardPerSecond carries the same double scaling as the stable rate:
+  // PRECISION (1e18) on top of the promo token's own decimals. Descaled in
+  // floating point because the true per-second figure is routinely sub-1-wei.
+  const promoRatePerSecondDisplay = promoInfo && promoInfo[2] > 0n
+    ? (Number(promoInfo[2]) / 1e18 / 10 ** promoDecimals).toFixed(8)
+    : '0.00000000';
+  const promoDepletionDisplay = formatDuration(promoInfo?.[3]);
+  const promoFlushCursorDisplay = promoInfo ? promoInfo[5].toString() : '0';
+  const promoTokenHeldDisplay = typeof promoTokenHeld === 'bigint'
+    ? Number(formatUnits(promoTokenHeld, promoDecimals)).toFixed(4)
+    : '0.0000';
+  // A positive gap is promo tokens sent to the farm without topUpPromotion —
+  // they sit on the contract but are not part of the distributed balance.
+  const promoUnbookedDisplay =
+    typeof promoTokenHeld === 'bigint' && typeof promoRewardBalanceRaw === 'bigint'
+      ? Number(formatUnits(
+          promoTokenHeld > promoRewardBalanceRaw ? promoTokenHeld - promoRewardBalanceRaw : 0n,
+          promoDecimals,
+        )).toFixed(4)
+      : '0.0000';
 
   // Combined loading state for Phlimbo statistics
-  const phlimboStatsLoading = poolInfoLoading || rewardPerSecondLoading || depletionDurationLoading || phlimboUsdcLoading || dolaYieldLoading || usdcFunnelYieldLoading || usdeFunnelYieldLoading;
+  const phlimboStatsLoading = poolInfoLoading || rewardPerSecondLoading || depletionDurationLoading || rewardBalanceLoading || stakerCountLoading || desiredAPYLoading || pendingAPYLoading || promoInfoLoading || phlimboUsdcLoading || dolaYieldLoading || usdcFunnelYieldLoading || usdeFunnelYieldLoading;
 
   // Refetch all Phlimbo statistics
   const refetchPhlimboStats = () => {
     refetchPoolInfo();
     refetchRewardsPerSecond();
     refetchDepletionDuration();
+    refetchRewardBalance();
+    refetchStakerCount();
+    refetchDesiredAPY();
+    refetchPendingAPY();
+    refetchPromoInfo();
+    refetchPromoSymbol();
+    refetchPromoDecimals();
+    refetchPromoHeld();
     refetchPhlimboUsdc();
     refetchDolaYield();
     refetchUsdcFunnelYield();
     refetchUsdeFunnelYield();
   };
   // ========== END PHLIMBO STATISTICS SECTION ==========
-
-  // ========== SOLVENCY STATUS SECTION ==========
-  // Use the custom solvency info hook for calculating solvency metrics
-  const {
-    actualBalanceFormatted: solvencyActualBalance,
-    owedToStakersFormatted,
-    runwayFormatted,
-    runwayTimeFormatted,
-    runwayHealth,
-    isLoading: solvencyLoading,
-    refetch: refetchSolvency,
-  } = useSolvencyInfo();
-
-  // Helper function to get color class based on runway health
-  const getRunwayHealthColor = (health: 'healthy' | 'warning' | 'critical'): string => {
-    switch (health) {
-      case 'healthy':
-        return 'text-green-500';
-      case 'warning':
-        return 'text-yellow-500';
-      case 'critical':
-        return 'text-red-500';
-      default:
-        return 'text-foreground';
-    }
-  };
-  // ========== END SOLVENCY STATUS SECTION ==========
 
   // ========== NFT STAKER RUNWAY SECTION ==========
   // The runway panels themselves live in <NftStakerRunwayPanel>; here we only
@@ -2131,12 +2307,21 @@ export default function Admin() {
       <div className="bg-card border border-border rounded-lg p-4 mb-6">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-sm font-semibold text-foreground">
-            Phlimbo Statistics
+            Phlimbo Statistics <span className="text-muted-foreground font-normal">(V3)</span>
           </h3>
           {phlimboStatsLoading && (
             <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
           )}
         </div>
+        {!isPhlimboV3Deployed ? (
+          <p className="text-sm text-muted-foreground">
+            PhlimboV3 not deployed on this chain.
+          </p>
+        ) : (
+          <>
+        <p className="text-xs font-mono text-muted-foreground mb-3 break-all">
+          {phlimboV3Address}
+        </p>
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">phUSDPerSecond:</span>
@@ -2157,17 +2342,56 @@ export default function Admin() {
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Total Staked:</span>
+            <span className="text-sm text-muted-foreground">desiredAPYBps:</span>
             <span className="text-sm font-mono text-foreground">
-              {totalStakedDisplay} phUSD
+              {desiredAPYDisplay}
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">USDC Balance (PhlimboEA):</span>
+            <span className="text-sm text-muted-foreground">Pending APY change:</span>
+            <span className={`text-sm font-mono ${pendingAPYInProgress ? 'text-yellow-500' : 'text-foreground'}`}>
+              {pendingAPYDisplay}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Total Staked:</span>
+            <span className="text-sm font-mono text-foreground">
+              {totalStakedDisplay} phUSD{' '}
+              <span className="text-muted-foreground">({stakedTvlDisplay})</span>
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Staker Count:</span>
+            <span className="text-sm font-mono text-foreground">
+              {stakerCountDisplay}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">rewardBalance (undistributed):</span>
+            <span className="text-sm font-mono text-foreground">
+              {rewardBalanceDisplay} USDC
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">USDC Balance (PhlimboV3):</span>
             <span className="text-sm font-mono text-foreground">
               {phlimboUsdcDisplay} USDC
             </span>
           </div>
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-foreground">Time to Depletion:</span>
+            <span className={`text-sm font-mono font-semibold ${depletionColor}`}>
+              {timeToDepletionDisplay}
+            </span>
+          </div>
+          {rewardBalanceUnbacked > 0n && (
+            <p className="text-xs text-yellow-500">
+              rewardBalance exceeds the USDC actually held by{' '}
+              {(Number(rewardBalanceUnbacked) / 1e6).toFixed(2)} USDC — the counter and the token
+              balance have desynced (an emergency withdraw does this). Time to Depletion is
+              computed from the USDC on hand, not the counter.
+            </p>
+          )}
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">YieldFunnel DOLA (Pending):</span>
             <span className="text-sm font-mono text-accent">
@@ -2187,6 +2411,104 @@ export default function Admin() {
             </span>
           </div>
         </div>
+
+        {/* Promotion (V3-only second reward stream) */}
+        <div className="mt-4 pt-3 border-t border-border">
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-sm font-semibold text-foreground">Promotion Token</h4>
+            <span
+              className={`text-xs font-mono font-semibold ${
+                promoPhaseValue === PromoPhase.Active
+                  ? 'text-green-500'
+                  : promoPhaseValue === PromoPhase.Flushing
+                    ? 'text-yellow-500'
+                    : 'text-muted-foreground'
+              }`}
+            >
+              {promoPhaseLabel}
+            </span>
+          </div>
+          {!hasPromo ? (
+            <p className="text-sm text-muted-foreground">
+              No promotion has been configured on this farm (promoToken is the zero address).
+              Start one with <span className="font-mono">startPromotion(token, amount, duration)</span> on
+              the PhlimboV3 contract panel above.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">promoToken:</span>
+                <span className="text-sm font-mono text-foreground">
+                  {promoSymbolDisplay}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Address:</span>
+                <span className="text-xs font-mono text-muted-foreground break-all">
+                  {promoToken}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Decimals:</span>
+                <span className="text-sm font-mono text-foreground">
+                  {typeof promoTokenDecimals === 'number' ? promoTokenDecimals : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">promoRewardBalance:</span>
+                <span className="text-sm font-mono text-accent">
+                  {promoRewardBalanceDisplay} {promoSymbolDisplay}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">promoRewardPerSecond:</span>
+                <span className="text-sm font-mono text-foreground">
+                  {promoRatePerSecondDisplay} {promoSymbolDisplay}/sec
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">promoDepletionDuration:</span>
+                <span className="text-sm font-mono text-foreground">
+                  {promoDepletionDisplay}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Token Balance (PhlimboV3):</span>
+                <span className="text-sm font-mono text-foreground">
+                  {promoTokenHeldDisplay} {promoSymbolDisplay}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Unbooked (held − balance):</span>
+                <span className={`text-sm font-mono ${promoUnbookedDisplay !== '0.0000' ? 'text-yellow-500' : 'text-foreground'}`}>
+                  {promoUnbookedDisplay} {promoSymbolDisplay}
+                </span>
+              </div>
+              {promoPhaseValue === PromoPhase.Flushing && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">flushCursor:</span>
+                  <span className="text-sm font-mono text-yellow-500">
+                    {promoFlushCursorDisplay} / {stakerCountDisplay} stakers
+                  </span>
+                </div>
+              )}
+              {promoPhaseValue === PromoPhase.Active && promoRewardBalanceRaw === 0n && (
+                <p className="text-xs text-yellow-500">
+                  Promotion is Active but its reward balance has drained to zero — stakers accrue
+                  nothing until it is topped up. There is no separate "drained" phase.
+                </p>
+              )}
+              {promoPhaseValue === PromoPhase.Flushing && (
+                <p className="text-xs text-yellow-500">
+                  Flushing pauses the farm and freezes promo accrual while the contract walks the
+                  staker set. Call beginFlush repeatedly until flushCursor reaches the staker count,
+                  then finalizePromotion(leftoverRecipient).
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="mt-3 pt-3 border-t border-border">
           <button
             onClick={refetchPhlimboStats}
@@ -2196,72 +2518,42 @@ export default function Admin() {
           </button>
         </div>
         <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-          <strong>Note:</strong> phUSDPerSecond is the current phUSD emission rate.
-          rewardPerSecond is the current USDC reward distribution rate (stored with 1e18 precision in contract), recalculated when users stake/unstake or USDC yield is injected.
-          depletionDuration is the configurable duration over which rewards are linearly depleted.
-          YieldFunnel DOLA/USDC/USDe show pending yield from each stable yield strategy.
-        </p>
-      </div>
-
-      {/* Solvency Status Section */}
-      <div className="bg-card border border-border rounded-lg p-4 mb-6">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="text-sm font-semibold text-foreground">
-            Solvency Status
-          </h3>
-          {solvencyLoading && (
-            <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
-          )}
-        </div>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Actual Balance (USDC held):</span>
-            <span className="text-sm font-mono text-foreground">
-              {solvencyActualBalance} USDC
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Owed to Stakers:</span>
-            <span className="text-sm font-mono text-foreground">
-              {owedToStakersFormatted} USDC
-            </span>
-          </div>
-          <div className="flex justify-between items-center pt-2 border-t border-border">
-            <span className="text-sm font-medium text-foreground">Runway (Available for Distribution):</span>
-            <span className={`text-sm font-mono font-semibold ${getRunwayHealthColor(runwayHealth)}`}>
-              {runwayFormatted} USDC
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Runway Time Estimate:</span>
-            <span className={`text-sm font-mono ${getRunwayHealthColor(runwayHealth)}`}>
-              {runwayTimeFormatted}
-            </span>
-          </div>
-        </div>
-        <div className="mt-3 pt-3 border-t border-border">
-          <button
-            onClick={refetchSolvency}
-            className="text-xs text-accent hover:text-accent/80 underline"
-          >
-            Refresh Solvency Status
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-          <strong>Solvency Calculation:</strong> Projects the reward balance as if _updatePool() ran now.
+          <strong>Note:</strong> These figures come from <strong>PhlimboV3</strong>, the live farm.
+          The retired V2 farm (PhlimboEA) is wound down and mint-revoked; read it through the
+          PhlimboEA entry in the contract interaction panel above if you need its residual numbers.
           <span className="block mt-1">
-            <strong>Owed to Stakers</strong> = Actual Balance - Projected Reward Balance (rewards already accrued but not claimed)
+            phUSDPerSecond is the current phUSD emission rate. rewardPerSecond is the current USDC
+            reward distribution rate (stored with 1e18 precision in the contract), recalculated when
+            users stake/unstake or USDC yield is injected. depletionDuration is the configurable
+            duration over which rewards are linearly depleted. desiredAPYBps is the target V3
+            recalculates that rate from.
           </span>
           <span className="block mt-1">
-            <strong>Runway</strong> = Projected Reward Balance (buffer available for future distribution)
+            The bracketed figure beside <strong>Total Staked</strong> is staked TVL in USD, priced
+            with the same phUSD multiplier the farm's APY divides by: the Balancer spot price on
+            mainnet when it reads sanely (above 0 and at or below $2), otherwise par. Off mainnet
+            there is no pool, so it is par exactly and the bracket equals the phUSD figure.
           </span>
-          <span className="block mt-2">
-            <strong>Health Indicators:</strong>{' '}
-            <span className="text-green-500">Green</span> = 14+ days runway,{' '}
-            <span className="text-yellow-500">Yellow</span> = 3-14 days,{' '}
-            <span className="text-red-500">Red</span> = less than 3 days
+          <span className="block mt-1">
+            <strong>Time to Depletion</strong> = min(rewardBalance, USDC held) ÷ rewardPerSecond.
+            It divides by the USDC actually on the contract rather than by rewardBalance alone,
+            because rewardBalance is an internal counter: withdrawing USDC does not decrement it,
+            and it only drains inside _updatePool, which no-ops while totalStaked is zero. Green =
+            14+ days, yellow = 3–14, red = under 3.
+          </span>
+          <span className="block mt-1">
+            <strong>Promotion</strong> is the V3-only second reward stream. promoRewardPerSecond
+            carries the same 1e18 precision scaling as rewardPerSecond, on top of the promo token's
+            own decimals. "Unbooked" is promo tokens transferred to the farm without going through
+            topUpPromotion — they sit on the contract but are not being distributed.
+          </span>
+          <span className="block mt-1">
+            YieldFunnel DOLA/USDC/USDe show pending yield from each stable yield strategy (minter
+            level, unchanged by the V2→V3 cutover).
           </span>
         </p>
+          </>
+        )}
       </div>
 
       {/* Stable Staker Section */}
