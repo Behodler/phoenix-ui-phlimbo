@@ -20,6 +20,7 @@ import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
 import NFTListTab, { type NFTSubTab } from '../components/vault/NFTListTab';
 import StakeTab from '../components/vault/stake/StakeTab';
+import StakeV3Tab from '../components/vault/stakeV3/StakeV3Tab';
 import Admin from '../components/vault/Admin';
 import FAQ from '../components/vault/FAQ';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
@@ -215,11 +216,18 @@ export default function VaultPage() {
   // - Show Yield Funnel tab for claiming accumulated yield at a discount
   // - Safety/Emergency Pause is handled by the fixed footer, not a tab
   const tabs: readonly Tab[] = (() => {
+    // "Stake" is the public farm (PhlimboV3). "Stake (admin only)" is the
+    // incumbent V2 surface, shown to admins alone so the two farms can still be
+    // compared during the cutover; it is removed once V3 is the only farm.
     if (!isMounted) {
       return ["Mint", "Stake", "Yield Funnel"];
     }
 
-    const tabList: Tab[] = ["Mint", "Stake", "Yield Funnel"];
+    // The admin V2 surface keeps its old slot immediately left of the public
+    // farm, so the two sit side by side for comparison.
+    const tabList: Tab[] = hasAdminAccess
+      ? ["Mint", "Stake (admin only)", "Stake", "Yield Funnel"]
+      : ["Mint", "Stake", "Yield Funnel"];
 
     if (!isMainnet) {
       tabList.push("Testnet Faucet");
@@ -799,6 +807,10 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "Stake" ? (
               <ErrorBoundary>
+                <StakeV3Tab />
+              </ErrorBoundary>
+            ) : activeTab === "Stake (admin only)" ? (
+              <ErrorBoundary>
                 <StakeTab />
               </ErrorBoundary>
             ) : activeTab === "Testnet Faucet" ? (
@@ -820,7 +832,7 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "NFT" ? (
               <ErrorBoundary>
-                <NFTListTab subTab={nftSubTab} onSubTabChange={setNftSubTab} canSeeWhaleDiscount={hasAdminAccess} />
+                <NFTListTab subTab={nftSubTab} onSubTabChange={setNftSubTab} />
               </ErrorBoundary>
             ) : null}
           </div>

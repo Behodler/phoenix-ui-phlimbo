@@ -62,11 +62,10 @@ export interface ContractAddresses {
   RatchetNFTStaker: string;
   RatchetBatchNFTMinter: string;
   StableStaker: string;
-  DepositView: string;
+  PhlimboV3: string;
   ViewRouter: string;
-  DepositPageView: string;
-  MintPageView: string;
 }
+
 
 
 /**

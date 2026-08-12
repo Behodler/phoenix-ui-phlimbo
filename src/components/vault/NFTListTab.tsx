@@ -10,24 +10,15 @@ import NFTListMintModal from './NFTListMintModal';
 import StakingSurfaceMock from './stakeMock/StakingSurfaceMock';
 import WhaleDiscountPanel from './whaleDiscount/WhaleDiscountPanel';
 import FeaturedProjectBanner from './featuredProject/FeaturedProjectBanner';
-import WhaleMintPanel from './WhaleMintPanel';
 
 export type NFTSubTab = 'mint' | 'stake' | 'whale-discount';
 
 interface NFTListTabProps {
   subTab: NFTSubTab;
   onSubTabChange: (subTab: NFTSubTab) => void;
-  /**
-   * When true, expose the admin-only "Whale Discount" sub-tab (the multi-token
-   * nudge reward banner). Reuses VaultPage's existing `hasAdminAccess` signal
-   * — do NOT re-derive admin status here — so the surface ships to the live UI
-   * for review without exposing it to end users. Non-admins never see the
-   * option and can never land on it.
-   */
-  canSeeWhaleDiscount?: boolean;
 }
 
-export default function NFTListTab({ subTab, onSubTabChange, canSeeWhaleDiscount = false }: NFTListTabProps) {
+export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) {
   const { addToast } = useToast();
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -148,9 +139,7 @@ export default function NFTListTab({ subTab, onSubTabChange, canSeeWhaleDiscount
           options={[
             { value: 'mint', label: 'Mint' },
             { value: 'stake', label: 'Stake' },
-            ...(canSeeWhaleDiscount
-              ? [{ value: 'whale-discount' as const, label: 'Whale Discount' }]
-              : []),
+            { value: 'whale-discount', label: 'Whale Discount' },
           ]}
         />
       </div>
@@ -189,9 +178,6 @@ export default function NFTListTab({ subTab, onSubTabChange, canSeeWhaleDiscount
             })}
           </div>
 
-          {/* Whale Mint panel — self-hides when nudge reward pot is zero */}
-          <WhaleMintPanel />
-
           {/* Mint Modal */}
           <NFTListMintModal
             isOpen={isModalOpen}
@@ -202,11 +188,9 @@ export default function NFTListTab({ subTab, onSubTabChange, canSeeWhaleDiscount
             refetchMinterData={refetchMinterData}
           />
         </>
-      ) : subTab === 'whale-discount' && canSeeWhaleDiscount ? (
-        // Admin-only surface. Double-guarded so a non-admin who somehow holds
-        // this sub-tab value falls through to the wired staking surface below.
-        // `lg:max-w-none` lets the panel fill the widened desktop column
-        // instead of being re-capped at 4xl.
+      ) : subTab === 'whale-discount' ? (
+        // Open to every user. `lg:max-w-none` lets the panel fill the widened
+        // desktop column instead of being re-capped at 4xl.
         <div className="max-w-4xl lg:max-w-none mx-auto">
           <WhaleDiscountPanel />
           {/*

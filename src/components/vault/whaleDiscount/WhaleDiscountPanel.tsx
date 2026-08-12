@@ -64,6 +64,15 @@ export default function WhaleDiscountPanel() {
   // still signs the block-attested `tokens`.
   const { tokens: liveTokens, potUsd } = useLiveNudgePot(tokens, readAtMs);
 
+  // A whitelisted token with nothing in the pot pays out nothing, so its chip
+  // is noise — and a "+ 0 KENDU" leg reads as a broken feed rather than as an
+  // empty one. Display only: `tokens` is still passed to the modal whole,
+  // because `minRewards` is positional over the full whitelist.
+  const visibleTokens = useMemo(
+    () => liveTokens.filter((token) => token.liveTotalRaw > 0n),
+    [liveTokens]
+  );
+
   // The mint cost is displayed to 4dp to match the mint list's Liquid Sky
   // Phoenix row, while the USD figures below stay at 2dp — they are dollars,
   // not token units. Scaled by the PAYMENT token's decimals, which come from
@@ -378,7 +387,7 @@ export default function WhaleDiscountPanel() {
                   NFT chip, so there is never a dangling separator — including
                   the single-token and empty-pot cases.
                 */}
-                {liveTokens.map((token: LiveNudgeToken, index: number) => {
+                {visibleTokens.map((token: LiveNudgeToken, index: number) => {
                   const href = token.url?.trim() ? token.url.trim() : undefined;
 
                   const logo = token.logo ? (

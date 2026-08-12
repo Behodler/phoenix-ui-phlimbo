@@ -25,6 +25,7 @@ const TAB_HEADING: Record<Tab, string> = {
   Mint: 'Mint Tab',
   'Yield Funnel': 'Yield Funnel Tab',
   Stake: 'Stake Tab',
+  'Stake (admin only)': 'Stake Admin Tab',
   'Testnet Faucet': 'Faucet Tab',
   Market: 'Market Tab',
   NFT: 'NFT Tab',

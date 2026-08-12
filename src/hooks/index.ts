@@ -12,9 +12,11 @@ export { useTransaction, useApprovalTransaction } from './useTransaction';
 export { useYieldFunnelData } from './useYieldFunnelData';
 export type { PendingYieldItem, YieldFunnelData } from './useYieldFunnelData';
 
-// Deposit view polling hooks
-export { useDepositViewPolling } from './useDepositViewPolling';
-export type { DepositViewData, UseDepositViewPollingReturn } from './useDepositViewPolling';
+// Deposit farm reads — V2 direct, V3 through ViewRouter
+export { usePhlimboV2Reads } from './usePhlimboV2Reads';
+export type { PhlimboV2ReadsData, UsePhlimboV2ReadsReturn } from './usePhlimboV2Reads';
+export { useDepositPageView, decodeDepositPageView, PromoPhase } from './useDepositPageView';
+export type { DepositPageViewData, UseDepositPageViewReturn } from './useDepositPageView';
 
 // Balancer price hook
 export { useBalancerPrice } from './useBalancerPrice';

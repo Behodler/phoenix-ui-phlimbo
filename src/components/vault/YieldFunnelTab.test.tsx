@@ -32,6 +32,10 @@ vi.mock('wagmi', () => ({
     isLoading: false,
     isSuccess: false,
   }),
+  // Only consumer is the FarmPointer readout (StableYieldAccumulator.phlimbo()).
+  // Undefined data makes it render nothing, keeping these tests focused on the
+  // claim path.
+  useReadContract: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
 const ACCUMULATOR_ADDRESS = '0xAccumulator0000000000000000000000000000000';

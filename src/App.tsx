@@ -21,6 +21,12 @@ export default function App() {
           <Route path="/" element={<VaultPage />} />
           <Route path="/stake" element={<VaultPage />} />
           <Route path="/staking" element={<VaultPage />} />
+          {/* Every path in tabRoutes.ts needs a Route here too, or the "*"
+              catch-all below bounces it to "/" and the tab appears to reset to
+              Mint. "/stake-v3" is the pre-rename alias for the Stake tab;
+              "/stake-admin" is the admin-only incumbent V2 surface. */}
+          <Route path="/stake-v3" element={<VaultPage />} />
+          <Route path="/stake-admin" element={<VaultPage />} />
           <Route path="/nft" element={<VaultPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

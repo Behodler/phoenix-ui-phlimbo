@@ -51,7 +51,6 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       PhlimboEA: data.PhlimboEA || '0x0000000000000000000000000000000000000000',
       AutoDOLA: data.AutoDOLA || '0x0000000000000000000000000000000000000000',
       AutoUSDC: data.AutoUSDC || '0x0000000000000000000000000000000000000000',
-      DepositView: data.DepositView || '0x0000000000000000000000000000000000000000',
       WBTC: data.WBTC || '0x0000000000000000000000000000000000000000',
       BalancerPool: data.BalancerPool || '0x0000000000000000000000000000000000000000',
       BalancerVault: data.BalancerVault || '0x0000000000000000000000000000000000000000',
@@ -75,8 +74,6 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       GatherWBTC: data.GatherWBTC || '0x0000000000000000000000000000000000000000',
 
       ViewRouter: data.ViewRouter || '0x0000000000000000000000000000000000000000',
-      DepositPageView: data.DepositPageView || '0x0000000000000000000000000000000000000000',
-      MintPageView: data.MintPageView || '0x0000000000000000000000000000000000000000',
       SUSDS: data.SUSDS || '0x0000000000000000000000000000000000000000',
 
       SUSDe: data.SUSDe || '0x0000000000000000000000000000000000000000',
@@ -97,7 +94,8 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       FlxBatchNFTMinter: data.FlxBatchNFTMinter || '0x0000000000000000000000000000000000000000',
       EyeBatchNFTMinter: data.EyeBatchNFTMinter || '0x0000000000000000000000000000000000000000',
       Kendu: data.Kendu || '0x0000000000000000000000000000000000000000',
-      NudgeStreamer: data.NudgeStreamer || '0x0000000000000000000000000000000000000000'
+      NudgeStreamer: data.NudgeStreamer || '0x0000000000000000000000000000000000000000',
+      PhlimboV3: data.PhlimboV3 || '0x0000000000000000000000000000000000000000'
     }
     log.debug('📡 fetchLocalAddresses: Mapped addresses:', addresses)
 

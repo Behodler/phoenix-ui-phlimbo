@@ -9,6 +9,7 @@ import {
 import { batchNftMinterMultiTokenAbi } from '@behodler/phase2-wagmi-hooks';
 import { LoadingSpinner } from '../../ui/ActionButton';
 import { useToast } from '../../ui/ToastProvider';
+import { decodeContractError } from '../../../lib/decodeContractError';
 import { useContractAddresses } from '../../../contexts/ContractAddressContext';
 import {
   useTokenAllowance,
@@ -261,11 +262,10 @@ export default function WhaleDiscountConfirmModal({
       });
     } catch (error) {
       setIsApproving(false);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      if (
-        errorMessage.toLowerCase().includes('user rejected') ||
-        errorMessage.toLowerCase().includes('user denied')
-      ) {
+      // Decodes BatchMint__* / NudgeStreamer__* custom errors — without this a
+      // reward-floor or array-length revert surfaces as raw hex.
+      const { message: errorMessage, userRejected } = decodeContractError(error);
+      if (userRejected) {
         addToast({
           type: 'error',
           title: 'Transaction Cancelled',
@@ -331,11 +331,10 @@ export default function WhaleDiscountConfirmModal({
       });
     } catch (error) {
       setIsMinting(false);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      if (
-        errorMessage.toLowerCase().includes('user rejected') ||
-        errorMessage.toLowerCase().includes('user denied')
-      ) {
+      // Decodes BatchMint__* / NudgeStreamer__* custom errors — without this a
+      // reward-floor or array-length revert surfaces as raw hex.
+      const { message: errorMessage, userRejected } = decodeContractError(error);
+      if (userRejected) {
         addToast({
           type: 'error',
           title: 'Transaction Cancelled',
