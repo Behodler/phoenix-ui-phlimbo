@@ -630,6 +630,16 @@ export default function Admin() {
     PHUSD_STABLE_MINTER_V1,
   );
 
+  // The wall clock, ticked so the depletion reading drains between refetches.
+  // Nothing else on this panel changes as time passes — see the unsettled-accrual
+  // note under "Time to depletion" below.
+  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    if (!isPhlimboV3Deployed) return;
+    const id = setInterval(() => setNowSeconds(Math.floor(Date.now() / 1000)), 5000);
+    return () => clearInterval(id);
+  }, [isPhlimboV3Deployed]);
+
   // Extract values from poolInfo tuple
   const phlimboTotalStaked = poolInfo ? poolInfo[0] : 0n;
   const phlimboPhUSDPerSecond = poolInfo ? poolInfo[3] : 0n;
@@ -695,15 +705,40 @@ export default function Admin() {
     : '0.00';
 
   // ---- Time to depletion ---------------------------------------------------
-  // Driven by what the farm can ACTUALLY pay: min(rewardBalance, USDC held).
-  // rewardBalance is an internal counter, not a balance — an emergency withdraw
-  // empties the contract without decrementing it, and it only drains inside
-  // _updatePool, which no-ops while totalStaked is zero. Dividing the counter
-  // alone by the rate reports runway against USDC that is no longer there.
-  const backedRewardBalance =
-    typeof rewardBalance === 'bigint' && typeof phlimboUsdcBalance === 'bigint'
-      ? (rewardBalance < phlimboUsdcBalance ? rewardBalance : phlimboUsdcBalance)
+  // rewardBalance is a lazily-settled counter: _updatePool only debits it when
+  // something pokes the farm (stake/unstake/claim/collectReward). Between pokes
+  // it still reads at its last settled value, so dividing it by the rate yields
+  // the FULL depletionDuration on an idle farm no matter how much of the window
+  // has already elapsed. Age it by the accrual the contract owes but has not
+  // booked, mirroring _updatePool exactly: rate * elapsed / PRECISION, skipped
+  // while totalStaked is zero (the contract's own no-op branch), capped at the
+  // counter. Display-only — nothing is signed off this clock.
+  const phlimboLastRewardTime = poolInfo ? poolInfo[4] : undefined;
+  const unsettledAccrual =
+    typeof rewardPerSecond === 'bigint'
+      && typeof phlimboLastRewardTime === 'bigint'
+      && phlimboTotalStaked > 0n
+      && BigInt(nowSeconds) > phlimboLastRewardTime
+      ? (rewardPerSecond * (BigInt(nowSeconds) - phlimboLastRewardTime)) / BigInt(1e18)
+      : 0n;
+  const liveRewardBalance =
+    typeof rewardBalance === 'bigint'
+      ? (rewardBalance > unsettledAccrual ? rewardBalance - unsettledAccrual : 0n)
       : undefined;
+
+  // Runway is driven by what the farm can ACTUALLY pay: min(live counter, USDC
+  // held). An emergency withdraw empties the contract without decrementing the
+  // counter, so the counter alone reports runway against USDC that is no longer
+  // there. (USDC held does not shrink on accrual — only on claim — so this floor
+  // binds in the desync case, not the ordinary one.)
+  const backedRewardBalance =
+    liveRewardBalance !== undefined && typeof phlimboUsdcBalance === 'bigint'
+      ? (liveRewardBalance < phlimboUsdcBalance ? liveRewardBalance : phlimboUsdcBalance)
+      : undefined;
+  const unsettledAccrualDisplay = (Number(unsettledAccrual) / 1e6).toFixed(2);
+  const liveRewardBalanceDisplay =
+    liveRewardBalance !== undefined ? `${(Number(liveRewardBalance) / 1e6).toFixed(2)} USDC` : '—';
+
   // Non-zero means the counter and the token balance have desynced.
   const rewardBalanceUnbacked =
     typeof rewardBalance === 'bigint' && typeof phlimboUsdcBalance === 'bigint'
@@ -2370,6 +2405,11 @@ export default function Admin() {
             <span className="text-sm text-muted-foreground">rewardBalance (undistributed):</span>
             <span className="text-sm font-mono text-foreground">
               {rewardBalanceDisplay} USDC
+              {unsettledAccrual > 0n && (
+                <span className="text-muted-foreground">
+                  {' '}(−{unsettledAccrualDisplay} unsettled → {liveRewardBalanceDisplay})
+                </span>
+              )}
             </span>
           </div>
           <div className="flex justify-between items-center">
