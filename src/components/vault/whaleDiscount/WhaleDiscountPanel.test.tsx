@@ -37,6 +37,8 @@ function token(overrides: Partial<NudgePotToken> = {}): NudgePotToken {
     totalRaw: balanceRaw + pendingRaw,
     bufferRaw: 0n,
     rewardPerSecondRaw: 0n,
+    durationSeconds: 0n,
+    lastUpdateSeconds: 0n,
     isStreaming: false,
     amountFormatted: '12,480',
     usd: 12480,
@@ -78,6 +80,7 @@ function basePot(overrides: Partial<UseNudgePotResult> = {}): UseNudgePotResult 
     isPotValuePartial: false,
     hasReward: true,
     minterAddress: '0x00000000000000000000000000000000000000ff',
+    streamerAddress: undefined,
     isLoading: false,
     isUnavailable: false,
     // Fixed anchor: with no streaming leg the live layer adds nothing, so the
