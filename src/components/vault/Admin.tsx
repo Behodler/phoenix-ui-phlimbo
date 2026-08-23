@@ -12,7 +12,6 @@ import {
   balancerPoolerV2Abi,
   stableStakerAbi,
   multiPoolerAbi,
-  nudgeRatchetDelayReleaseAbi,
 } from '@behodler/phase2-wagmi-hooks';
 import { pauserAbi } from '../../lib/pauserAbi';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
@@ -21,6 +20,7 @@ import ActionButton from '../ui/ActionButton';
 import FAQEditor from './FAQEditor';
 import NftStakerRunwayPanel from './NftStakerRunwayPanel';
 import NftStakerDepletionRunwayPanel from './NftStakerDepletionRunwayPanel';
+import NudgeStreamerStatsPanel from './NudgeStreamerStatsPanel';
 import { useTokenBalance } from '../../hooks/useContractInteractions';
 import { PromoPhase } from '../../hooks/useDepositPageView';
 import { useBalancerPrice } from '../../hooks/useBalancerPrice';
@@ -1193,89 +1193,6 @@ export default function Admin() {
   }, [multiPoolConfirmed, multiPoolTxHash]);
   // ========== END UNIBOOST MULTIPOOLER SECTION ==========
 
-  // ========== NUDGE RATCHET RELEASE SECTION ==========
-  const nudgeRatchetAddress = addresses?.NudgeRatchet as `0x${string}` | undefined;
-  const isNudgeRatchetDeployed = !!nudgeRatchetAddress &&
-    nudgeRatchetAddress.toLowerCase() !== ZERO_ADDRESS;
-
-  const { data: nudgeRatchetOwner, refetch: refetchNudgeRatchetOwner } = useReadContract({
-    address: nudgeRatchetAddress,
-    abi: nudgeRatchetDelayReleaseAbi,
-    functionName: 'owner',
-    query: { enabled: isNudgeRatchetDeployed },
-  });
-
-  const { data: nudgeRatchetIsReleaser, refetch: refetchNudgeRatchetIsReleaser } = useReadContract({
-    address: nudgeRatchetAddress,
-    abi: nudgeRatchetDelayReleaseAbi,
-    functionName: 'releasers',
-    args: walletAddress ? [walletAddress as `0x${string}`] : undefined,
-    query: { enabled: isNudgeRatchetDeployed && !!walletAddress },
-  });
-
-  const { data: nudgeRatchetPaused, refetch: refetchNudgeRatchetPaused } = useReadContract({
-    address: nudgeRatchetAddress,
-    abi: nudgeRatchetDelayReleaseAbi,
-    functionName: 'paused',
-    query: { enabled: isNudgeRatchetDeployed },
-  });
-
-  // Pending USDC held by the dispatcher = the upper limit for release(amount).
-  // The dispatcher's primeToken is 6-decimal USDC and release() transfers raw units.
-  const nudgeRatchetUsdcAddress = addresses?.USDC as `0x${string}` | undefined;
-  const { data: nudgeRatchetPendingUsdc, refetch: refetchNudgeRatchetPendingUsdc } = useReadContract({
-    address: nudgeRatchetUsdcAddress,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: nudgeRatchetAddress ? [nudgeRatchetAddress] : undefined,
-    query: { enabled: isNudgeRatchetDeployed && !!nudgeRatchetUsdcAddress },
-  });
-
-  const isAuthorisedReleaser = useMemo(() => {
-    if (!walletAddress) return false;
-    const w = walletAddress.toLowerCase();
-    const owner = typeof nudgeRatchetOwner === 'string' ? nudgeRatchetOwner.toLowerCase() : undefined;
-    return w === owner || nudgeRatchetIsReleaser === true;
-  }, [walletAddress, nudgeRatchetOwner, nudgeRatchetIsReleaser]);
-
-  const [releaseAmountInput, setReleaseAmountInput] = useState<string>('');
-
-  const parsedReleaseAmount = useMemo<bigint | null>(() => {
-    const trimmed = releaseAmountInput.trim();
-    if (!trimmed) return null;
-    try {
-      // USDC is 6 decimals; release() transfers raw token units.
-      return parseUnits(trimmed, 6);
-    } catch {
-      return null;
-    }
-  }, [releaseAmountInput]);
-
-  const [releaseTxHash, setReleaseTxHash] = useState<`0x${string}` | undefined>();
-  const [isReleaseExecuting, setIsReleaseExecuting] = useState(false);
-  const { isSuccess: releaseConfirmed } = useWaitForTransactionReceipt({
-    hash: releaseTxHash,
-    query: { enabled: !!releaseTxHash },
-  });
-
-  useEffect(() => {
-    if (releaseConfirmed && releaseTxHash) {
-      setIsReleaseExecuting(false);
-      setReleaseTxHash(undefined);
-      setReleaseAmountInput('');
-      refetchNudgeRatchetOwner();
-      refetchNudgeRatchetIsReleaser();
-      refetchNudgeRatchetPaused();
-      refetchNudgeRatchetPendingUsdc();
-      addToast({
-        type: 'success',
-        title: 'Release Confirmed',
-        description: 'NudgeRatchet release executed.',
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [releaseConfirmed, releaseTxHash]);
-  // ========== END NUDGE RATCHET RELEASE SECTION ==========
 
   // Wagmi hooks for contract write and transaction tracking
   const { data: txHash, writeContractAsync } = useWriteContract();
@@ -2048,60 +1965,6 @@ export default function Admin() {
       addToast({
         type: 'error',
         title: 'Pool Failed',
-        description: msg,
-      });
-    }
-  };
-
-  /**
-   * Handle NudgeRatchet delayed release.
-   */
-  const handleRelease = async () => {
-    if (!isConnected || !walletAddress) {
-      addToast({
-        type: 'error',
-        title: 'Wallet Not Connected',
-        description: 'Please connect your wallet to release.',
-      });
-      return;
-    }
-    if (!nudgeRatchetAddress || !isNudgeRatchetDeployed) {
-      addToast({
-        type: 'error',
-        title: 'Contract Not Available',
-        description: 'NudgeRatchet is not deployed on this chain.',
-      });
-      return;
-    }
-    if (parsedReleaseAmount === null || parsedReleaseAmount <= 0n) {
-      addToast({
-        type: 'error',
-        title: 'Invalid Amount',
-        description: 'Release amount must be a number greater than 0.',
-      });
-      return;
-    }
-
-    setIsReleaseExecuting(true);
-    try {
-      const hash = await writeContractAsync({
-        address: nudgeRatchetAddress,
-        abi: nudgeRatchetDelayReleaseAbi,
-        functionName: 'release',
-        args: [parsedReleaseAmount],
-      });
-      setReleaseTxHash(hash);
-      addToast({
-        type: 'info',
-        title: 'Release Submitted',
-        description: 'Waiting for release confirmation...',
-      });
-    } catch (err) {
-      setIsReleaseExecuting(false);
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      addToast({
-        type: 'error',
-        title: 'Release Failed',
         description: msg,
       });
     }
@@ -3090,132 +2953,7 @@ export default function Admin() {
         )}
       </div>
 
-      {/* NudgeRatchet Release Panel.
-          Kept only until the cutover, to confirm nothing is left stranded in
-          NudgeRatchet. Delete the whole panel once that check is done. */}
-      <div className="bg-card border border-border rounded-lg p-4 mb-6">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="text-sm font-semibold text-foreground">
-            NudgeRatchet — Release (TODO: remove panel)
-          </h3>
-          <span className={
-            'text-xs font-mono ' + (isAuthorisedReleaser ? 'text-green-500' : 'text-red-500')
-          }>
-            {isAuthorisedReleaser ? 'authorised' : 'not authorised'}
-          </span>
-        </div>
-        {!isNudgeRatchetDeployed ? (
-          <p className="text-sm text-muted-foreground">
-            NudgeRatchet not deployed on this chain.
-          </p>
-        ) : (
-          <>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Pending USDC:</span>
-                {typeof nudgeRatchetPendingUsdc === 'bigint' && nudgeRatchetPendingUsdc > 0n ? (
-                  <button
-                    type="button"
-                    onClick={() => setReleaseAmountInput(formatUnits(nudgeRatchetPendingUsdc, 6))}
-                    disabled={isReleaseExecuting}
-                    title="Release limit — click to fill the amount with the full pending balance"
-                    className="text-sm font-mono text-accent hover:text-accent/80 underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
-                  >
-                    {Number(formatUnits(nudgeRatchetPendingUsdc, 6)).toFixed(2)} USDC
-                  </button>
-                ) : (
-                  <span className="text-sm font-mono text-foreground">
-                    {typeof nudgeRatchetPendingUsdc === 'bigint' ? '0.00 USDC' : '—'}
-                  </span>
-                )}
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Paused:</span>
-                <span className={
-                  'text-sm font-mono ' + (nudgeRatchetPaused ? 'text-red-500' : 'text-foreground')
-                }>
-                  {nudgeRatchetPaused ? 'yes' : 'no'}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-border">
-              <label
-                htmlFor="nudge-release-amount"
-                className="block text-sm font-medium text-foreground mb-2"
-              >
-                Release amount
-              </label>
-              <input
-                id="nudge-release-amount"
-                type="text"
-                inputMode="decimal"
-                value={releaseAmountInput}
-                onChange={(e) => setReleaseAmountInput(e.target.value)}
-                placeholder="Amount to release"
-                disabled={isReleaseExecuting}
-                className={
-                  'w-full px-3 py-2 bg-background border rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ' +
-                  ((parsedReleaseAmount === null || parsedReleaseAmount <= 0n) && releaseAmountInput !== ''
-                    ? 'border-red-500'
-                    : 'border-border')
-                }
-              />
-              {releaseAmountInput !== '' && (parsedReleaseAmount === null || parsedReleaseAmount <= 0n) && (
-                <p className="text-xs text-red-500 mt-1">
-                  Amount must be a number greater than 0.
-                </p>
-              )}
-
-              {(() => {
-                const amountInvalid = parsedReleaseAmount === null || parsedReleaseAmount <= 0n;
-                let tooltip: string | undefined;
-                if (nudgeRatchetPaused) tooltip = 'NudgeRatchet is paused';
-                else if (!isAuthorisedReleaser) tooltip = 'Wallet not authorised. Owner must call setReleaser(<your-address>, true).';
-                else if (amountInvalid) tooltip = 'Enter an amount > 0';
-
-                const disabled = !!nudgeRatchetPaused
-                  || !isAuthorisedReleaser
-                  || amountInvalid
-                  || isReleaseExecuting;
-
-                return (
-                  <div className="mt-3" title={tooltip}>
-                    <ActionButton
-                      disabled={disabled}
-                      onAction={handleRelease}
-                      label={isReleaseExecuting ? 'Releasing…' : 'Release'}
-                      variant="primary"
-                      isLoading={isReleaseExecuting}
-                    />
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div className="mt-3 pt-3 border-t border-border">
-              <button
-                onClick={() => {
-                  refetchNudgeRatchetOwner();
-                  refetchNudgeRatchetIsReleaser();
-                  refetchNudgeRatchetPaused();
-                  refetchNudgeRatchetPendingUsdc();
-                }}
-                className="text-xs text-accent hover:text-accent/80 underline"
-              >
-                Refresh Status
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-              <strong>Note:</strong> Calls <code>release(amount)</code> on the NudgeRatchetDelayRelease
-              dispatcher, forwarding held USDC to the batchMinter. The amount is entered as a decimal
-              number of USDC (6 decimals) and cannot exceed the pending balance shown above. The
-              connected wallet must be an authorised releaser (<code>setReleaser</code>) or the owner,
-              and the contract must not be paused.
-            </p>
-          </>
-        )}
-      </div>
+      <NudgeStreamerStatsPanel />
 
       {/* Selected Contract Address Display */}
       {selectedContractKey && addresses && (

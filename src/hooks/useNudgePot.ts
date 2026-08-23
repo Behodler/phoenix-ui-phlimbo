@@ -59,6 +59,16 @@ export interface NudgePotToken {
   bufferRaw: bigint;
   /** Streamer depletion rate, scaled by 1e18. Drives the live counter. */
   rewardPerSecondRaw: bigint;
+  /**
+   * The stream's configured depletion window in seconds (`streams.duration`).
+   * This is the *setting* the rate was last sized against, not the time left —
+   * every `collectNudge` re-sizes `rewardPerSecond` from the whole buffer over
+   * this same window, so the actual runway drifts from it. `0n` when no stream
+   * is registered.
+   */
+  durationSeconds: bigint;
+  /** Chain timestamp of the streamer's last settlement for this leg (`streams.lastUpdate`). */
+  lastUpdateSeconds: bigint;
   /** True when this token has an active stream still paying out. */
   isStreaming: boolean;
   /** `totalRaw` rendered for display. */
@@ -118,6 +128,12 @@ export interface UseNudgePotResult {
   readAtMs: number;
   /** BatchNFTMinter address, or undefined when not deployed on this chain. */
   minterAddress: Address | undefined;
+  /**
+   * NudgeStreamer address as the minter itself reports it, or undefined when
+   * the minter has none wired. Read from the minter rather than the address
+   * book so it can never disagree with the streams the pot is built from.
+   */
+  streamerAddress: Address | undefined;
   isLoading: boolean;
   /** Set when the minter is missing or is not the multi-token variant. */
   isUnavailable: boolean;
@@ -313,8 +329,10 @@ export function useNudgePot(): UseNudgePotResult {
         streamResult?.status === 'success'
           ? (streamResult.result as readonly [bigint, bigint, bigint, bigint])
           : undefined;
+      const durationSeconds = stream?.[0] ?? 0n;
       const bufferRaw = stream?.[1] ?? 0n;
       const rewardPerSecondRaw = stream?.[2] ?? 0n;
+      const lastUpdateSeconds = stream?.[3] ?? 0n;
 
       const totalRaw = balanceRaw + pendingRaw;
 
@@ -352,6 +370,8 @@ export function useNudgePot(): UseNudgePotResult {
         totalRaw,
         bufferRaw,
         rewardPerSecondRaw,
+        durationSeconds,
+        lastUpdateSeconds,
         // A drained buffer still reads a non-zero rate — the rate is only
         // recomputed on deposit — so the buffer is what says "still paying".
         isStreaming: rewardPerSecondRaw > 0n && bufferRaw > 0n,
@@ -466,6 +486,7 @@ export function useNudgePot(): UseNudgePotResult {
     hasReward: tokens.some((token) => token.totalRaw > 0n),
     readAtMs: dataUpdatedAt || Date.now(),
     minterAddress: minterAvailable ? minterAddress : undefined,
+    streamerAddress: streamerAvailable ? nudgeStreamer : undefined,
     isLoading,
     // `isWhitelistError` also catches a minter that is the single-token
     // BatchNFTMinter: `getNudgeTokens()` simply is not on its ABI, so the call
