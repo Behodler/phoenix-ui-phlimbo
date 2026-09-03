@@ -178,6 +178,26 @@ that fixture. Its data comes from `useNudgePot`:
 _Historical note: this tab was mock-only very early in development. That has not been true
 since the minter/staking wiring landed — do not treat the tab as mock-only._
 
+## The "Stake (mock)" tab is deliberately fake — never wire it to contracts
+
+`Stake (mock)` (`src/components/vault/antimatterMock/`, literals in
+`src/data/antimatterMockData.ts`) is a design preview of the **Antimatter** overhaul of
+`stable-staker`, added in story 079 so the proposed surface can be contrasted side by side
+with the live `Stake` tab in the same app. It is admin-only, and every number on it is a
+literal advanced by a timer.
+
+This is the one surface in the repo where "it's a mock" is the permanent, intended state.
+Unlike `nftStakeMockData.ts` — which was a staging post on the way to real wiring — nothing
+here is waiting to be connected. Do **not** attach wagmi hooks, contract reads or writes to
+it. When Antimatter ships for real it gets its own surface; this one is a drawing, and
+connecting it would put an admin one click away from a page whose ticking figures look live
+but are not.
+
+It also has **no route**, deliberately: `/stake`, `/staking` and `/stake-v3` must all keep
+resolving to the live `Stake` tab, because `/staking` is DeFi Llama's outbound deep-link
+target. The mock is reachable by clicking its tab and by nothing else — do not add it to
+`src/lib/tabRoutes.ts`.
+
 ## Questions?
 
 If unclear about:

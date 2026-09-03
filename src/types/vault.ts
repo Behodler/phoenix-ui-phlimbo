@@ -1,7 +1,10 @@
 // "Stake" is the public farm, pointed at PhlimboV3. It is the only farm
 // surface: the incumbent V2 "Stake (admin only)" tab was removed once the
 // cutover was complete.
-export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
+// "Stake (mock)" is an admin-only, deliberately fake preview of the Antimatter
+// overhaul (story 079). It talks to no contract and has no route — see
+// src/components/vault/antimatterMock/.
+export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Stake (mock)" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
 
 export interface VaultFormData {
   amount: string;

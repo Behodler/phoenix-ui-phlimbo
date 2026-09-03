@@ -19,6 +19,10 @@ export default {
             700: "var(--pxusd-teal-700)",
             600: "var(--pxusd-teal-600)",
             400: "var(--pxusd-teal-400)",
+            300: "var(--pxusd-teal-300)",
+          },
+          purple: {
+            300: "var(--pxusd-purple-300)",
           },
           orange: {
             500: "var(--pxusd-orange-500)",

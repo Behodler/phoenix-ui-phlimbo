@@ -20,6 +20,7 @@ import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
 import NFTListTab, { type NFTSubTab } from '../components/vault/NFTListTab';
 import StakeV3Tab from '../components/vault/stakeV3/StakeV3Tab';
+import AntimatterStakeMockTab from '../components/vault/antimatterMock/AntimatterStakeMockTab';
 import Admin from '../components/vault/Admin';
 import FAQ from '../components/vault/FAQ';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
@@ -235,6 +236,10 @@ export default function VaultPage() {
     tabList.push("NFT");
 
     if (hasAdminAccess) {
+      // Admin-only Antimatter design preview (story 079). Deliberately fake and
+      // deliberately unrouted — see src/lib/tabRoutes.ts. Kept out of the
+      // !isMounted literal above so it never flashes before hydration.
+      tabList.push("Stake (mock)");
       tabList.push("Admin");
     }
 
@@ -802,6 +807,10 @@ export default function VaultPage() {
             ) : activeTab === "Stake" ? (
               <ErrorBoundary>
                 <StakeV3Tab />
+              </ErrorBoundary>
+            ) : activeTab === "Stake (mock)" ? (
+              <ErrorBoundary>
+                <AntimatterStakeMockTab />
               </ErrorBoundary>
             ) : activeTab === "Testnet Faucet" ? (
               <TestnetFaucet />

@@ -21,6 +21,10 @@
   --pxusd-teal-700: #102736;
   --pxusd-teal-600: #163343;
   --pxusd-teal-400: #1f5a73;
+  /* Light teal used by the Antimatter mock's legacy phUSD row APY (story 079) */
+  --pxusd-teal-300: #4b93ad;
+  /* Antimatter lavender — accents, borders, tail digits, token pill (story 079) */
+  --pxusd-purple-300: #C4AEEA;
   --pxusd-orange-500: #FF6A00;
   --pxusd-orange-400: #FF8C42;
   --pxusd-orange-300: #FFB566;
@@ -54,6 +58,10 @@
 }
 
 [data-theme="dark"], .dark {
+  /* Palette values are duplicated in both blocks per house style (story 079). */
+  --pxusd-teal-300: #4b93ad;
+  --pxusd-purple-300: #C4AEEA;
+
   /* Dark theme surfaces & text */
   --background: var(--pxusd-teal-950);
   --foreground: #F3F7FA;

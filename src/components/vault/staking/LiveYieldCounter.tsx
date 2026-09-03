@@ -13,7 +13,15 @@ export interface LiveYieldCounterProps {
   weight?: number;
   /** Text alignment */
   align?: 'left' | 'right' | 'center';
+  /**
+   * Colour of the trailing accent digits. Defaults to the yellow this counter
+   * has always used; the Antimatter mock passes lavender (story 079).
+   */
+  accentColor?: string;
 }
+
+/** The historic trailing-digit accent — kept as the default for every existing call site. */
+const DEFAULT_ACCENT = 'rgba(255,217,61,.92)';
 
 /**
  * requestAnimationFrame-driven counter.
@@ -34,6 +42,7 @@ export default function LiveYieldCounter({
   size = 32,
   weight = 700,
   align = 'left',
+  accentColor = DEFAULT_ACCENT,
 }: LiveYieldCounterProps) {
   const [value, setValue] = useState<number>(initial);
   const startRef = useRef<number>(typeof performance !== 'undefined' ? performance.now() : 0);
@@ -78,7 +87,7 @@ export default function LiveYieldCounter({
       }}
     >
       {head}
-      {tail && <span style={{ color: 'rgba(255,217,61,.92)' }}>{tail}</span>}
+      {tail && <span style={{ color: accentColor }}>{tail}</span>}
     </span>
   );
 }
