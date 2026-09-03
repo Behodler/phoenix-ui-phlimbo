@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import AntimatterAccordionRow from './AntimatterAccordionRow';
 import LiveYieldCounter from '../staking/LiveYieldCounter';
 import { fmtAPY, fmtAmount } from '../stake/formatStake';
+import { useToast } from '../../ui/ToastProvider';
 import {
   ANTIMATTER_ACCENT,
   ANTIMATTER_LEGACY_POOL,
@@ -10,8 +11,13 @@ import {
   ANTIMATTER_SYMBOL,
   antimatterPending,
   antimatterRate,
+  antimatterRebase,
 } from '../../../data/antimatterMockData';
-import type { AntimatterMockPool, AntimatterMockWallet } from '../../../data/antimatterMockData';
+import type {
+  AntimatterMockPool,
+  AntimatterMockWallet,
+  AntimatterSubTab,
+} from '../../../data/antimatterMockData';
 import antimatterIcon from '../../../assets/antimatter.png';
 import phUSDIcon from '../../../assets/phUSD-nobackground.png';
 import usdcIcon from '../../../assets/usdc-logo.svg';
@@ -33,9 +39,8 @@ import dolaIcon from '../../../assets/sDOLA.png';
  * out phUSD equal to the sum of both sides. The legacy phUSD → USDC pool stays
  * greyed out at the top as the contrast anchor.
  *
- * Story 079 delivers the shell — the collapsed rows and their live accrual.
- * The stake / withdraw / annihilate panel is story 080; rows currently expand
- * to a placeholder.
+ * Story 079 delivered the shell — the collapsed rows and their live accrual;
+ * story 080 fills in the expanded stake / withdraw / annihilate panel.
  *
  * All state lives in the single `useState` below and the rows are a `.map()`,
  * so the Rules of Hooks stay trivially satisfied however many pools exist.
@@ -51,7 +56,6 @@ interface AntimatterMockState {
   wallet: AntimatterMockWallet;
   pools: AntimatterMockPool[];
   expandedId: string | null;
-  toast: string | null;
 }
 
 export default function AntimatterStakeMockTab() {
@@ -59,7 +63,6 @@ export default function AntimatterStakeMockTab() {
     wallet: { ...ANTIMATTER_MOCK_WALLET },
     pools: ANTIMATTER_MOCK_POOLS.map((p) => ({ ...p })),
     expandedId: 'usdc',
-    toast: null,
   }));
 
   // Time origin for every pool whose `t0` is still 0. Fixed on first render so
@@ -74,8 +77,100 @@ export default function AntimatterStakeMockTab() {
     return () => clearInterval(id);
   }, []);
 
+  const { addToast } = useToast();
+
   const toggle = (id: string) =>
     setState((s) => ({ ...s, expandedId: s.expandedId === id ? null : id }));
+
+  /** Replace one pool in place, leaving the wallet untouched. */
+  const updatePool = (id: string, fn: (pool: AntimatterMockPool) => AntimatterMockPool) =>
+    setState((s) => ({ ...s, pools: s.pools.map((p) => (p.id === id ? fn(p) : p)) }));
+
+  const setTab = (id: string, tab: AntimatterSubTab) => updatePool(id, (p) => ({ ...p, tab }));
+
+  // Every transition that moves `staked` goes through `antimatterRebase`, which
+  // freezes the accrued figure into `amBase` and restarts the clock. Changing
+  // the stake without rebasing bends the accrual curve retroactively and the
+  // displayed counter jumps.
+  const doStake = (id: string) =>
+    setState((s) => {
+      const pool = s.pools.find((p) => p.id === id);
+      if (!pool) return s;
+      const amt = parseFloat(pool.stakeAmt) || 0;
+      const balance = s.wallet[pool.walletKey];
+      if (amt <= 0 || amt > balance) return s;
+      const next = antimatterRebase(pool, originRef.current, {
+        staked: pool.staked + amt,
+        stakeAmt: '',
+      });
+      return {
+        ...s,
+        wallet: { ...s.wallet, [pool.walletKey]: balance - amt },
+        pools: s.pools.map((p) => (p.id === id ? next : p)),
+      };
+    });
+
+  const doWithdraw = (id: string) =>
+    setState((s) => {
+      const pool = s.pools.find((p) => p.id === id);
+      if (!pool) return s;
+      const amt = parseFloat(pool.wdAmt) || 0;
+      if (amt <= 0 || amt > pool.staked) return s;
+      const next = antimatterRebase(pool, originRef.current, {
+        staked: pool.staked - amt,
+        wdAmt: '',
+      });
+      return {
+        ...s,
+        wallet: { ...s.wallet, [pool.walletKey]: s.wallet[pool.walletKey] + amt },
+        pools: s.pools.map((p) => (p.id === id ? next : p)),
+      };
+    });
+
+  /**
+   * Annihilate: match accrued Antimatter one-for-one against the user's own
+   * staked principal, destroy both sides, and pay out phUSD equal to their
+   * sum. Accrual beyond the staked balance cannot be matched, so the surplus
+   * is paid to the wallet as an ordinary claim.
+   */
+  const doAnnihilate = (id: string) => {
+    const pool = state.pools.find((p) => p.id === id);
+    if (!pool) return;
+    const am = antimatterPending(pool, originRef.current, Date.now());
+    const matched = Math.min(am, pool.staked);
+    if (matched <= 0) return;
+    const leftover = am - matched;
+
+    // Not `antimatterRebase`: the pending figure is consumed here, not carried
+    // forward, so the baseline resets to zero rather than to `am`.
+    const next: AntimatterMockPool = {
+      ...pool,
+      staked: pool.staked - matched,
+      amBase: 0,
+      t0: Date.now(),
+    };
+
+    setState((s) => ({
+      ...s,
+      wallet: {
+        ...s.wallet,
+        phusd: s.wallet.phusd + matched * 2,
+        am: s.wallet.am + leftover,
+      },
+      pools: s.pools.map((p) => (p.id === id ? next : p)),
+    }));
+
+    let description =
+      `${fmtAmount(matched, 6)} ${ANTIMATTER_SYMBOL} annihilated with ${fmtAmount(matched, 6)} ` +
+      `${pool.symbol} from your stake. ${fmtAmount(matched * 2, 6)} phUSD sent to your wallet.`;
+    // The epsilon, not `> 0`: accrual makes exact equality unreachable and a
+    // bare comparison announces a phantom surplus of a few wei-equivalents.
+    if (leftover > 1e-9) {
+      description += ` Surplus ${fmtAmount(leftover, 6)} ${ANTIMATTER_SYMBOL} paid out to your wallet.`;
+    }
+
+    addToast({ type: 'success', title: 'Annihilation confirmed', description, duration: 6000 });
+  };
 
   const origin = originRef.current;
   const now = Date.now();
@@ -236,18 +331,26 @@ export default function AntimatterStakeMockTab() {
           // pool's stake changes, which is exactly the intended behaviour.
           pendingBase={pool.amBase}
           ratePerSecond={antimatterRate(pool)}
+          // The panel's figures are plain text rather than a RAF counter, so
+          // they take the live value and advance on the 90 ms tick above.
+          pending={antimatterPending(pool, origin, now)}
           antimatterSymbol={ANTIMATTER_SYMBOL}
           expanded={state.expandedId === pool.id}
           onToggle={() => toggle(pool.id)}
-        >
-          {/* Story 080 replaces this with the stake / withdraw / annihilate panel. */}
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[12px] text-muted-foreground">{pool.tagline}</span>
-            <span className="text-[12px] text-muted-foreground">
-              Stake, withdraw and annihilate controls land in a follow-up story.
-            </span>
-          </div>
-        </AntimatterAccordionRow>
+          tagline={pool.tagline}
+          tab={pool.tab}
+          onTabChange={(tab) => setTab(pool.id, tab)}
+          walletBalance={state.wallet[pool.walletKey]}
+          walletPhusd={state.wallet.phusd}
+          walletAntimatter={state.wallet.am}
+          stakeAmt={pool.stakeAmt}
+          wdAmt={pool.wdAmt}
+          onStakeAmtChange={(value) => updatePool(pool.id, (p) => ({ ...p, stakeAmt: value }))}
+          onWdAmtChange={(value) => updatePool(pool.id, (p) => ({ ...p, wdAmt: value }))}
+          onStake={() => doStake(pool.id)}
+          onWithdraw={() => doWithdraw(pool.id)}
+          onAnnihilate={() => doAnnihilate(pool.id)}
+        />
       ))}
     </div>
   );
