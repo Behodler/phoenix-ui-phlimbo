@@ -3,6 +3,7 @@ import { useAccount, useReadContract } from 'wagmi';
 import { erc20Abi } from 'viem';
 import {
   nftStakerAbi,
+  nftStakerPriceScaledAbi,
   nftMinterV2Abi,
   balancerPoolerMintDebtHookAbi,
 } from '@behodler/phase2-wagmi-hooks';
@@ -127,6 +128,23 @@ export default function NftStakerRunwayPanel({
     query: { enabled: isNftStakerDeployed },
   });
 
+  // `NFTStakerPriceScaled` (the Ratchet staker) normalizes the dispatcher's
+  // mint price into reward-token units with an immutable `priceScale` before
+  // sizing the rate — 1e12 for the 6dp-priced NudgeRatchet dispatcher. The
+  // plain `NFTStaker` (Liquid Sky Phoenix) has no such function, so the read
+  // reverts there and we fall back to a scale of 1. Omitting this factor made
+  // Minimum Runway on the Ratchet panel come out ~1e12x too long.
+  const {
+    data: nftStakerPriceScale,
+    isError: isPriceScaleError,
+    refetch: refetchPriceScale,
+  } = useReadContract({
+    address: stakerAddress,
+    abi: nftStakerPriceScaledAbi,
+    functionName: 'priceScale',
+    query: { enabled: isNftStakerDeployed, retry: false },
+  });
+
   const isNftMinterValid = typeof nftStakerNftMinter === 'string'
     && (nftStakerNftMinter as string).toLowerCase() !== ZERO_ADDRESS;
 
@@ -195,6 +213,7 @@ export default function NftStakerRunwayPanel({
     refetchNftStakerPhUsdBalance();
     refetchNftMinterConfig();
     refetchMintDebt();
+    refetchPriceScale();
   };
 
   // Compute Minimum Runway: what the runway would be if `totalSupply(stakedId)`
@@ -231,6 +250,15 @@ export default function NftStakerRunwayPanel({
       latestPrice = (price * APY_PRECISION) / r;
     }
 
+    // A staker without `priceScale` reverts the read; that error is the signal
+    // to use 1. While the read is still in flight we know neither, so hold the
+    // dash rather than flash a number that is off by the scale factor.
+    if (typeof nftStakerPriceScale === 'bigint') {
+      latestPrice = latestPrice * nftStakerPriceScale;
+    } else if (!isPriceScaleError) {
+      return '—';
+    }
+
     if (latestPrice === 0n) return '0.00 days';
 
     if (typeof nftStakerTargetApy !== 'bigint' || nftStakerTargetApy === 0n) {
@@ -254,6 +282,8 @@ export default function NftStakerRunwayPanel({
     nftMinterConfig,
     nftStakerTargetApy,
     nftStakerMintDebt,
+    nftStakerPriceScale,
+    isPriceScaleError,
   ]);
 
   return (
