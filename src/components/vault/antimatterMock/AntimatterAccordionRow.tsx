@@ -138,8 +138,9 @@ function MockAmountField({
           onChange={(e) => onChange(e.target.value)}
           className={[
             'w-full rounded-xl border bg-card px-4 py-3 pr-28 font-mono text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring',
-            overBalance ? 'border-pxusd-pink-400/60' : 'border-input',
+            overBalance ? '' : 'border-input',
           ].join(' ')}
+          style={overBalance ? { borderColor: 'rgba(255,77,109,.6)' } : undefined}
         />
         <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
           <button
