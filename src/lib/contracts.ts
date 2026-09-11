@@ -14,10 +14,14 @@ export const mainnetAddresses: ContractAddresses = {
   // Deployed Phase 2 contracts
   Pauser: "0x7c5A8EeF1d836450C019FB036453ac6eC97885a3",
   PhusdStableMinter: "0x94855ACA13952D81507C92D3CdBb2e25D3bbE60C",
-  // V2 of PhlimboEA -- deployed by story 049 MigratePhlimboV1ToV2.s.sol.
-  // STAYS the V2 address after the promotion-ready cutover (story 076): V2 continues to
-  // exist, wound down and mint-revoked but NOT paused. PhlimboV3 is the separate key below.
-  PhlimboEA: "0x6084a02c2ac0127ddf1e617de257c61480a2aee0",
+  // The `PhlimboEA` key is RETIRED. It named PhlimboV2 (0x6084a02c2ac0127ddf1e617de257c61480a2aee0,
+  // deployed by story 049), which still exists on mainnet wound down, mint-revoked and NOT paused
+  // so a late staker can still exit -- but it is no longer UI surface, and DeployMocks stopped
+  // deploying a V2 locally once its V3 cutover had executed, so the key left the generated
+  // ContractAddresses interface. Same reasoning story 080 used when it dropped the live
+  // StableStakerV1 address: a registry key is a resolution path, and keeping one pointed at a
+  // superseded generation is how a UI silently keeps reading the wrong contract. Anything that
+  // still needs V2's address hardcodes it.
   PhlimboV3: "0x8D3A8E3ba43DEb8C7e2110DF437a92243523b6ca",
   StableYieldAccumulator: "0x0cD353bfda674D04823B2826ffafB83B560D21B6",
   // Story 055 migration (executed 2026-06-10: MigrateStableStakerMainnet run txs 1-20 +
@@ -105,9 +109,20 @@ export const mainnetAddresses: ContractAddresses = {
   WaUSDC: "0xd4fa2d31b7968e448877f69a96de69f5de8cd23e",
   NudgeStreamer: "0xF7e26179D6971985107AF66b078932D6484eBEAA",
   BatchNFTMinter: "0x068395556b8c43eDf257DC54D109EA5910aE15c7",
-  // Stable Staking — deployed 2026-06-10 by ResumeStableStakerMigration (story 055).
-  // Pools: DOLA 5 / USDC 7 / USDe 10 phUSD per day, 10% set-aside buffer.
-  StableStaker: "0xbce8ABC09BaEDCabE93419bF875f6186e182079A",
+  // Stable Staking. Story 080 RETIRED the `StableStaker` key and replaced it with
+  // `StableStakerV2`, deliberately dropping the live V1 address
+  // (0xbce8ABC09BaEDCabE93419bF875f6186e182079A, deployed 2026-06-10 by
+  // ResumeStableStakerMigration, story 055) out of the registry entirely, so the UI keeps no
+  // straggling V1 reference through the cutover. This is safe because the tooling that still
+  // needs V1's address hardcodes it rather than looking it up here
+  // (scripts/gather-migration-inputs.js, and the archived migration scripts).
+  //
+  // Neither StableStakerV2 nor Antimatter is deployed on mainnet yet; both are zero placeholders
+  // so this file still satisfies the ContractAddresses interface, whose key-set is the only drift
+  // guard between the generated interface and this hand-maintained file.
+  StableStakerV2: "0x0000000000000000000000000000000000000000",
+  // The Antimatter reward token StableStakerV2 pays instead of phUSD.
+  Antimatter: "0x0000000000000000000000000000000000000000",
   // NudgeRatchet dispatcher + its mint-debt hook — not yet deployed on mainnet (story 068).
   // Zero placeholders so this file still satisfies the ContractAddresses interface once the
   // local deploy added these fields. Patch by hand when they ship to mainnet.

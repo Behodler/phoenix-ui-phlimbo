@@ -36,6 +36,7 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
     // DOLA deposits. bondingToken is the ERC20 token it produces.
 
     const addresses: ContractAddresses = {
+      Antimatter: data.Antimatter || '0x0000000000000000000000000000000000000000',
       Dola: data.Dola || '0x0000000000000000000000000000000000000000',
       EYE: data.EYE || '0x0000000000000000000000000000000000000000',
       SCX: data.SCX || '0x0000000000000000000000000000000000000000',
@@ -48,7 +49,6 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       USDS: data.USDS || '0x0000000000000000000000000000000000000000',
       PhusdStableMinter: data.PhusdStableMinter || '0x0000000000000000000000000000000000000000',
       StableYieldAccumulator: data.StableYieldAccumulator || '0x0000000000000000000000000000000000000000',
-      PhlimboEA: data.PhlimboEA || '0x0000000000000000000000000000000000000000',
       AutoDOLA: data.AutoDOLA || '0x0000000000000000000000000000000000000000',
       AutoUSDC: data.AutoUSDC || '0x0000000000000000000000000000000000000000',
       WBTC: data.WBTC || '0x0000000000000000000000000000000000000000',
@@ -83,7 +83,7 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       NFTStaker: data.NFTStaker || '0x0000000000000000000000000000000000000000',
       BatchNFTMinter: data.BatchNFTMinter || '0x0000000000000000000000000000000000000000',
       WaUSDC: data.WaUSDC || '0x0000000000000000000000000000000000000000',
-      StableStaker: data.StableStaker || '0x0000000000000000000000000000000000000000',
+      StableStakerV2: data.StableStakerV2 || '0x0000000000000000000000000000000000000000',
       SkyPSM: data.SkyPSM || '0x0000000000000000000000000000000000000000',
       USDeAMMAdapter: data.USDeAMMAdapter || '0x0000000000000000000000000000000000000000',
       NudgeRatchet: data.NudgeRatchet || '0x0000000000000000000000000000000000000000',

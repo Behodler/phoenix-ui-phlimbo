@@ -7,7 +7,6 @@
  * - surplusTracker: Tracks surplus yield accumulation from the yield strategy
  * - surplusWithdrawer: Handles withdrawal of accumulated surplus yield
  */
-
 export interface ContractAddresses {
   PhUSD: string;
   USDC: string;
@@ -29,7 +28,7 @@ export interface ContractAddresses {
   USDeAMMAdapter: string;
   YieldStrategyUSDe: string;
   PhusdStableMinter: string;
-  PhlimboEA: string;
+  PhlimboV3: string;
   StableYieldAccumulator: string;
   BalancerPool: string;
   BalancerVault: string;
@@ -61,12 +60,10 @@ export interface ContractAddresses {
   NudgeRatchetMintDebtHook: string;
   RatchetNFTStaker: string;
   RatchetBatchNFTMinter: string;
-  StableStaker: string;
-  PhlimboV3: string;
+  Antimatter: string;
+  StableStakerV2: string;
   ViewRouter: string;
 }
-
-
 
 /**
  * Response structure from local development address server

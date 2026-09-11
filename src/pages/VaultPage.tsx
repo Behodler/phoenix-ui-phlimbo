@@ -6,7 +6,7 @@ import { PATH_TO_TAB, TAB_TO_PATH, DEFAULT_PATH } from '../lib/tabRoutes';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { parseUnits, maxUint256 } from 'viem';
-import { phlimboV2Abi, phusdStableMinterAbi } from '@behodler/phase2-wagmi-hooks';
+import { phlimboV3Abi, phusdStableMinterAbi } from '@behodler/phase2-wagmi-hooks';
 import { useTokenBalance, useTokenAllowance, useTokenApproval, useBalancerPrice, usePriceInterpolation } from '../hooks';
 import { useWalletBalances } from '../contexts/WalletBalancesContext';
 import { useApprovalTransaction } from '../hooks/useTransaction';
@@ -150,13 +150,13 @@ export default function VaultPage() {
     addresses?.PhUSD as `0x${string}` | undefined
   );
 
-  // Fetch the owner address from the PhlimboEA contract (new architecture)
+  // Fetch the owner address from PhlimboV3 (the live farm; the PhlimboEA/V2 key is retired)
   const { data: ownerAddress } = useReadContract({
-    address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboV2Abi,
+    address: addresses?.PhlimboV3 as `0x${string}` | undefined,
+    abi: phlimboV3Abi,
     functionName: 'owner',
     query: {
-      enabled: !!addresses?.PhlimboEA,
+      enabled: !!addresses?.PhlimboV3,
     },
   });
 
