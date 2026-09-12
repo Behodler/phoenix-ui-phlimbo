@@ -236,7 +236,7 @@ function useStableStakerPoolStats(
 
   return {
     buffer: typeof buffer === 'bigint' ? buffer : undefined,
-    // poolInfo tuple: (phusdPerSecond, accPhusdPerShare, lastRewardTime, totalStaked)
+    // poolInfo tuple: (antimatterPerSecond, accAntimatterPerShare, lastRewardTime, totalStaked)
     totalStaked: poolInfo ? poolInfo[3] : undefined,
     underwater: withdrawDisabled === true,
     isLoading: bufferLoading || poolInfoLoading || withdrawDisabledLoading,
