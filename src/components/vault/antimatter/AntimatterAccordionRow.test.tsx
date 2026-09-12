@@ -8,7 +8,7 @@ import type { AntimatterAccordionRowProps } from './AntimatterAccordionRow';
 // `.map()` over the pools, so every figure arrives as a prop already read from
 // the chain by `useStableStakerPools`. That makes it testable with no wagmi
 // mock at all: these tests fix the *presentation* contract (em-dash APY, the
-// gate's visible explanation, the closed-claim notice), while the gate's
+// gate's visible explanation, the surplus notice), while the gate's
 // decision logic is pinned in `src/hooks/useStableStakerPools.test.tsx`.
 //
 // Rows are queried as `getByRole('button', { name: '<SYMBOL> pool' })` with
@@ -23,10 +23,9 @@ const baseProps: AntimatterAccordionRowProps = {
   pendingBase: 10,
   ratePerSecond: 0.001,
   pending: 10,
-  unclaimed: 0,
   matchedStable: 10,
   surplusAntimatter: 0,
-  antimatterSymbol: 'AM',
+  antimatterSymbol: 'Antimatter',
   expanded: true,
   onToggle: () => {},
   tagline: 'Stake USDC into the yield-bearing TVL pool, accrue Antimatter.',
@@ -111,19 +110,17 @@ describe('AntimatterAccordionRow', () => {
     expect(screen.getByRole('button', { name: /Stake USDC/ })).toBeEnabled();
   });
 
-  it('says rewards are accruing but not claimable when the claim gate is closed', () => {
-    renderRow({ claimEnabled: false });
-    expect(screen.getByText(/Claiming is not open yet/)).toBeInTheDocument();
-  });
-
   it('hides the claim button entirely while the claim gate is closed', () => {
     renderRow({ tab: 'withdraw', claimEnabled: false });
     expect(screen.queryByRole('button', { name: /Claim/ })).not.toBeInTheDocument();
   });
 
   it('offers a claim button once the gate is open', () => {
-    renderRow({ tab: 'withdraw', claimEnabled: true, pending: 10, unclaimed: 2 });
-    expect(screen.getByRole('button', { name: /Claim 12 AM/ })).toBeEnabled();
+    // `pending` is `claimableReward` — the banked backlog plus the live
+    // projection — so the button states the whole figure, with nothing added
+    // to it here.
+    renderRow({ tab: 'withdraw', claimEnabled: true, pending: 12 });
+    expect(screen.getByRole('button', { name: /Claim 12 Antimatter/ })).toBeEnabled();
   });
 
   it('asks for an approval before staking when the allowance is short', () => {
@@ -140,12 +137,12 @@ describe('AntimatterAccordionRow', () => {
 
   it('surfaces the surplus notice only when Antimatter exceeds the staked principal', () => {
     renderRow({ surplusAntimatter: 0 });
-    expect(screen.queryByText(/Surplus AM\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Surplus Antimatter\./)).not.toBeInTheDocument();
   });
 
   it('explains the surplus when accrual has outrun the stake', () => {
     renderRow({ matchedStable: 100, surplusAntimatter: 25 });
-    expect(screen.getByText(/Surplus AM\./)).toBeInTheDocument();
+    expect(screen.getByText(/Surplus Antimatter\./)).toBeInTheDocument();
   });
 
   it('limits withdrawals to the set-aside buffer while the strategy is rebalancing', () => {

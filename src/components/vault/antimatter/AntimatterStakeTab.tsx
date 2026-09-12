@@ -314,7 +314,6 @@ export default function AntimatterStakeTab() {
             pendingBase={p.pendingAntimatter}
             ratePerSecond={p.ratePerSecond}
             pending={p.pendingAntimatter}
-            unclaimed={p.unclaimedAntimatter}
             matchedStable={p.matchedStable}
             surplusAntimatter={p.surplusAntimatter}
             antimatterSymbol={stable.antimatterSymbol}

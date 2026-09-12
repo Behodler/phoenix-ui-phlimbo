@@ -20,16 +20,23 @@
  *
  * Converting an Antimatter amount into stake-token units is NOT done with this
  * constant: `antimatterAbi.toStableAmount(stable, amount)` is the contract's
- * own conversion and is what the annihilation preview uses.
+ * own conversion and is what the annihilation preview uses. That view REVERTS
+ * on an amount finer than one stable unit rather than rounding it, so the
+ * amount handed to it is always floored to a multiple of `10 ** (18 - stable
+ * decimals)` first — see `useStableStakerPools`.
  */
 export const ANTIMATTER_DECIMALS = 18;
 
 /**
- * Ticker shown before `Antimatter.symbol()` has resolved, or when the contract
- * is not deployed on the current network. The real symbol is always read from
- * the chain.
+ * What the accrual token is called everywhere on this surface.
+ *
+ * The word, not the ticker. `Antimatter.symbol()` returns `AM`, and the chain
+ * is deliberately not consulted for the label: `AM` abbreviates nothing a user
+ * meeting the tab for the first time already knows, and the entire surface —
+ * the explainer, the annihilation preview, the irreversibility note — is built
+ * on the matter/antimatter metaphor that the abbreviation throws away.
  */
-export const ANTIMATTER_FALLBACK_SYMBOL = 'AM';
+export const ANTIMATTER_DISPLAY_NAME = 'Antimatter';
 
 /** Lavender accent applied to the trailing digits of Antimatter figures. */
 export const ANTIMATTER_ACCENT = 'rgba(196,174,234,.95)';

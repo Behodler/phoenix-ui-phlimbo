@@ -213,14 +213,30 @@ heartbeat.
   Antimatter against the user's own staked principal, destroys both sides and mints phUSD worth
   their sum. Use `antimatterAbi.toStableAmount(stable, amount)` to bridge 18-dec Antimatter to
   6-dec USDC — never hand-roll that scaling.
+- **`toStableAmount` REVERTS on a sub-unit amount; it does not round.** Anything finer than one
+  stable unit fails the call, and a live accrual is essentially never an exact multiple of
+  `10 ** (18 - decimals)`. Floor the amount to that multiple before passing it in, exactly as the
+  staker does (`netWanted = capped / scale`). Skipping the floor does not raise an error anywhere
+  visible: the wagmi read just returns `undefined`, and every figure derived from it silently
+  reads zero.
+- **The accrued figure is `claimableReward`, never `pendingReward`.** `stake` and `withdraw`
+  settle the outstanding projection into `unclaimedReward` and reset `rewardDebt`, so
+  `pendingReward` restarts at zero every time the user touches the pool while the real balance
+  sits in the backlog. `claimableReward` is `unclaimedReward + pendingReward`, which is the `owed`
+  figure both `claim` and `autoAnnihilate` consume.
 - **`claimEnabled()` is false by default.** Accrued Antimatter banks rather than pays until an
-  owner opens the gate. Read the flag and say so; a claim button that ignores it lies.
+  owner opens the gate. Read the flag and hide the claim button, but do NOT put a banner on the
+  panel about it: the gate is normal operating state, annihilation is unaffected by it, and the
+  notice only reads as a fault.
 - **Annihilation is gated on the phUSD price.** Net value per unit is `2p − 1`, so the action is
   disabled at `p <= 0.50` and when the price is genuinely unknown on mainnet. Use the **raw**
   `useBalancerPrice()` result for that decision — the repo's `?? 1.0` display clamp would turn a
   feed failure into an open gate. `stake` and `withdraw` are never gated this way: a user must
   always be able to exit.
 - **APY is story 083's.** The stablecoin rows render `apy: null` as an em dash. Never `0`.
+- **The reward token is called "Antimatter" on screen, never "AM".** `Antimatter.symbol()` returns
+  the `AM` ticker and is deliberately not read for the label; `ANTIMATTER_DISPLAY_NAME` in
+  `src/data/antimatterData.ts` is the single source.
 - **Iterate the static `STABLE_POOLS` config, not `getStakedTokens()`.** One
   `useStablePoolReads` call per fixed entry is what satisfies the rules of hooks.
 - **Zero-address guard.** `StableStakerV2` / `Antimatter` carry the zero address on mainnet

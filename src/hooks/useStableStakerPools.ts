@@ -19,7 +19,7 @@ import { usePolling } from '../contexts/PollingContext';
 import { useTokenApproval } from './useContractInteractions';
 import { useBalancerPrice } from './useBalancerPrice';
 import { STABLE_POOLS, type StablePoolConfig, type StablePoolId } from '../data/stableStakerPools';
-import { ANTIMATTER_DECIMALS, ANTIMATTER_FALLBACK_SYMBOL } from '../data/antimatterData';
+import { ANTIMATTER_DECIMALS, ANTIMATTER_DISPLAY_NAME } from '../data/antimatterData';
 import { computeAntimatterApy, SECONDS_PER_YEAR } from '../utils/stakingMath';
 import { log } from '../utils/logger';
 
@@ -57,14 +57,23 @@ export interface AntimatterStakeRow {
 
   walletBalance: number;
   stakedBalance: number;
-  /** Antimatter accrued but not yet banked (`pendingReward`). */
+  /**
+   * Total Antimatter this user has accrued in the pool, read from
+   * `claimableReward` — the settled `unclaimedReward` backlog plus the live
+   * `pendingReward` projection.
+   *
+   * `pendingReward` alone is the wrong figure and reads as zero at exactly the
+   * wrong moment: `stake()` and `withdraw()` settle the outstanding projection
+   * into `unclaimedReward` and reset `rewardDebt`, so a user who has just
+   * staked has a full backlog and a `pendingReward` of nothing.
+   * `autoAnnihilate` consumes `unclaimedReward + pending`, so `claimableReward`
+   * is also the figure the annihilation preview has to be built on.
+   */
   pendingAntimatter: number;
-  /** Antimatter banked by an earlier claim-gated accrual (`unclaimedReward`). */
-  unclaimedAntimatter: number;
   /** Antimatter accruing to this user per second, for the live counter. */
   ratePerSecond: number;
   /**
-   * Stake-token amount the pending Antimatter would match against, in human
+   * Stake-token amount the accrued Antimatter would match against, in human
    * units. Derived from the contract's own `toStableAmount` view (which owns
    * the 18-dec → native-dec conversion) and capped by the staked balance —
    * never hand-rolled decimal scaling.
@@ -72,7 +81,7 @@ export interface AntimatterStakeRow {
   matchedStable: number;
   /**
    * Antimatter that exceeds the staked principal and so cannot be matched.
-   * Paid out as an ordinary claim by the contract.
+   * Minted straight to the caller by the contract (its `excess`).
    */
   surplusAntimatter: number;
 
@@ -141,7 +150,12 @@ export interface UseStableStakerPools {
   claim: (id: StablePoolId) => Promise<void>;
   annihilate: (id: StablePoolId) => Promise<void>;
   approve: (id: StablePoolId) => Promise<void>;
-  /** Ticker of the accrual token, read from the Antimatter contract. */
+  /**
+   * What the accrual token is called on screen. The literal word
+   * **"Antimatter"**, not the `AM` ticker the ERC20's `symbol()` returns: the
+   * whole surface is built around the annihilation metaphor and a two-letter
+   * abbreviation throws it away.
+   */
   antimatterSymbol: string;
   /** Antimatter held loose in the connected wallet (human units). */
   walletAntimatter: number;
@@ -178,9 +192,10 @@ interface PoolReads {
    * `Antimatter.toStableAmount` — the APY numerator.
    */
   annualAntimatterAsStableRaw: bigint | undefined;
+  /** `claimableReward` in human units — the backlog plus the live projection. */
   pendingAntimatter: number;
+  /** The same figure, raw 18-dec. */
   pendingRaw: bigint;
-  unclaimedAntimatter: number;
   ratePerSecond: number;
   matchedStable: number;
   surplusAntimatter: number;
@@ -223,21 +238,16 @@ function useStablePoolReads(
     query: { enabled: enabledUser },
   });
 
+  // `claimableReward`, NOT `pendingReward`. The staker settles a position's
+  // outstanding projection into `unclaimedReward` on every `stake` / `withdraw`
+  // and resets `rewardDebt`, so `pendingReward` restarts from zero each time
+  // the user touches the pool while the real accrual sits in the backlog.
+  // `claimableReward` is `unclaimedReward + pendingReward`, which is exactly
+  // the `owed` figure `autoAnnihilate` and `claim` both consume.
   const { data: pending, isLoading: pendingLoading, refetch: refetchPending } = useReadContract({
     address: stableStaker,
     abi: stableStakerV2Abi,
-    functionName: 'pendingReward',
-    args: tokenAddress && walletAddress ? [tokenAddress, walletAddress] : undefined,
-    query: { enabled: enabledUser },
-  });
-
-  // Antimatter already banked for this user by an accrual that happened while
-  // the claim gate was shut. Distinct from `pendingReward`, which is what is
-  // still accruing.
-  const { data: unclaimed, refetch: refetchUnclaimed } = useReadContract({
-    address: stableStaker,
-    abi: stableStakerV2Abi,
-    functionName: 'unclaimedReward',
+    functionName: 'claimableReward',
     args: tokenAddress && walletAddress ? [tokenAddress, walletAddress] : undefined,
     query: { enabled: enabledUser },
   });
@@ -298,12 +308,29 @@ function useStablePoolReads(
   const totalStaked = pool ? pool[3] : 0n;
   const stakedRaw = userInfo ? (userInfo as [bigint, bigint])[0] : 0n;
 
+  /**
+   * Antimatter units per one raw unit of this stake token — the staker's own
+   * `_antimatterScale`, `10 ** (18 - decimals)`.
+   *
+   * It is used ONLY to round an amount down to something the stake token can
+   * express, never to perform the conversion itself. That distinction is
+   * load-bearing, because `Antimatter.toStableAmount` **reverts** (it does not
+   * round) on any amount finer than one stable unit, and an accrual figure is
+   * essentially never an exact multiple of 1e12. Passing a live `pendingReward`
+   * straight to it fails every call, which is what left the annihilation
+   * preview and the APY column reading zero. The staker floors the same way:
+   * `netWanted = capped / scale`.
+   */
+  const stableScale = 10n ** BigInt(ANTIMATTER_DECIMALS - config.decimals);
+  const floorToStable = (amount: bigint) => (amount / stableScale) * stableScale;
+
   // Annual pool-wide Antimatter emission, converted into this pool's native
   // stable decimals by the contract that owns the conversion. This is the APY
   // numerator, and the conversion is what keeps USDC's 6 decimals from being
   // divided by an 18-decimal numerator (a 1e12 error).
-  const annualAntimatterRaw =
-    antimatterPerSecond !== undefined ? antimatterPerSecond * BigInt(SECONDS_PER_YEAR) : 0n;
+  const annualAntimatterRaw = floorToStable(
+    antimatterPerSecond !== undefined ? antimatterPerSecond * BigInt(SECONDS_PER_YEAR) : 0n,
+  );
   const { data: annualAsStableRaw, refetch: refetchAnnualAsStable } = useReadContract({
     address: antimatterAddress,
     abi: antimatterAbi,
@@ -312,15 +339,22 @@ function useStablePoolReads(
     query: { enabled: !!antimatterAddress && !!tokenAddress && annualAntimatterRaw > 0n },
   });
 
-  // The 18-dec Antimatter figure expressed in this pool's native stable
-  // decimals. `toStableAmount` is the contract's own conversion — never
-  // hand-roll the 18 → 6 scaling for USDC.
+  // Annihilation matches accrued Antimatter 1:1 against the user's OWN staked
+  // principal; the remainder outruns the stake and is minted to them raw. Both
+  // sides are capped in raw units first, mirroring `autoAnnihilate` exactly.
+  const principalAsAntimatter = stakedRaw * stableScale;
+  const cappedRaw = pendingRaw < principalAsAntimatter ? pendingRaw : principalAsAntimatter;
+  const cappedFlooredRaw = floorToStable(cappedRaw);
+
+  // The matched amount expressed in this pool's native stable decimals.
+  // `toStableAmount` is the contract's own conversion — never hand-roll the
+  // 18 → 6 scaling for USDC.
   const { data: pendingAsStableRaw, refetch: refetchPendingAsStable } = useReadContract({
     address: antimatterAddress,
     abi: antimatterAbi,
     functionName: 'toStableAmount',
-    args: tokenAddress ? [tokenAddress, pendingRaw] : undefined,
-    query: { enabled: !!antimatterAddress && !!tokenAddress && pendingRaw > 0n },
+    args: tokenAddress ? [tokenAddress, cappedFlooredRaw] : undefined,
+    query: { enabled: !!antimatterAddress && !!tokenAddress && cappedFlooredRaw > 0n },
   });
 
   // Max slippage of the pool's ERC4626Market yield strategy, when it has one.
@@ -337,7 +371,6 @@ function useStablePoolReads(
     refetchPoolInfo();
     refetchUserInfo();
     refetchPending();
-    refetchUnclaimed();
     refetchWithdrawDisabled();
     refetchAnnihilateAvailable();
     refetchBuffer();
@@ -358,8 +391,6 @@ function useStablePoolReads(
   const walletBalance = walletBalanceRaw ? Number(walletBalanceRaw) / 10 ** config.decimals : 0;
   const stakedBalance = stakedRaw ? Number(stakedRaw) / 10 ** config.decimals : 0;
   const pendingAntimatter = pendingRaw ? Number(pendingRaw) / 10 ** ANTIMATTER_DECIMALS : 0;
-  const unclaimedRaw = (unclaimed as bigint | undefined) ?? 0n;
-  const unclaimedAntimatter = unclaimedRaw ? Number(unclaimedRaw) / 10 ** ANTIMATTER_DECIMALS : 0;
 
   // User's Antimatter/s share of emissions = antimatterPerSecond * stakedRaw / totalStaked.
   // Both stakedRaw and totalStaked are in token decimals, so the ratio is
@@ -371,17 +402,16 @@ function useStablePoolReads(
         (Number(stakedRaw) / Number(totalStaked))
       : 0;
 
-  // Annihilation matches Antimatter 1:1 against the user's own staked
-  // principal; accrual beyond the stake cannot be matched and is paid out as an
-  // ordinary claim. Both sides of the cap are compared in raw native units so
-  // the comparison mirrors the contract's.
-  const pendingAsStable = (pendingAsStableRaw as bigint | undefined) ?? 0n;
-  const matchedRaw = pendingAsStable < stakedRaw ? pendingAsStable : stakedRaw;
+  // The contract stays the authority on the conversion; the local floor is the
+  // fallback for the window before the read resolves, and for the case where
+  // the token's live `decimals()` disagrees with the static config (the staker
+  // reads it live, this config does not). Both produce the same number.
+  const matchedRaw = (pendingAsStableRaw as bigint | undefined) ?? cappedFlooredRaw / stableScale;
   const matchedStable = matchedRaw ? Number(matchedRaw) / 10 ** config.decimals : 0;
-  const surplusAntimatter =
-    pendingAsStable > stakedRaw && pendingAsStable > 0n
-      ? pendingAntimatter * (1 - Number(stakedRaw) / Number(pendingAsStable))
-      : 0;
+  // The contract's `excess`: reward with no principal left to annihilate it
+  // against, minted straight to the caller. Whatever is under one stable unit
+  // stays banked on the staker and is neither matched nor paid.
+  const surplusAntimatter = Number(pendingRaw - cappedRaw) / 10 ** ANTIMATTER_DECIMALS;
 
   return {
     walletBalance,
@@ -392,7 +422,6 @@ function useStablePoolReads(
     annualAntimatterAsStableRaw: annualAsStableRaw as bigint | undefined,
     pendingAntimatter,
     pendingRaw,
-    unclaimedAntimatter,
     ratePerSecond,
     matchedStable,
     surplusAntimatter,
@@ -519,13 +548,14 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
   });
   const claimEnabled = claimEnabledRaw === true;
 
-  const { data: antimatterSymbolRaw } = useReadContract({
-    address: antimatterAddress,
-    abi: antimatterAbi,
-    functionName: 'symbol',
-    query: { enabled: !!antimatterAddress },
-  });
-  const antimatterSymbol = (antimatterSymbolRaw as string | undefined) ?? ANTIMATTER_FALLBACK_SYMBOL;
+  /**
+   * The accrual token is called **Antimatter** on screen, everywhere, and the
+   * ERC20's own `symbol()` is deliberately not read for this: it returns the
+   * ticker `AM`, which reads as an abbreviation of nothing to a user meeting
+   * the surface for the first time and discards the annihilation metaphor the
+   * whole tab is built on.
+   */
+  const antimatterSymbol = ANTIMATTER_DISPLAY_NAME;
 
   const { data: walletAntimatterRaw, refetch: refetchWalletAntimatter } = useReadContract({
     address: antimatterAddress,
@@ -619,7 +649,6 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
       walletBalance: r.walletBalance,
       stakedBalance: r.stakedBalance,
       pendingAntimatter: r.pendingAntimatter,
-      unclaimedAntimatter: r.unclaimedAntimatter,
       ratePerSecond: r.ratePerSecond,
       matchedStable: r.matchedStable,
       surplusAntimatter: r.surplusAntimatter,
@@ -816,7 +845,7 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
     }
     const tokenAddress = ensureReady(cfg);
     if (!tokenAddress) return;
-    if (readsById[id].pendingAntimatter <= 0 && readsById[id].unclaimedAntimatter <= 0) {
+    if (readsById[id].pendingAntimatter <= 0) {
       addToast({ type: 'info', title: 'Nothing to Claim', description: `No pending ${antimatterSymbol} in the ${cfg.symbol} pool.` });
       return;
     }
@@ -852,7 +881,10 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
     }
     const tokenAddress = ensureReady(cfg);
     if (!tokenAddress) return;
-    if (r.matchedStable <= 0) {
+    // `require(netWanted > 0 || excess > 0)` on the contract: a user whose
+    // accrual has outrun their entire stake has nothing left to match but a
+    // real surplus to be paid, and the call still succeeds for them.
+    if (r.matchedStable <= 0 && r.surplusAntimatter <= 0) {
       addToast({ type: 'info', title: 'Nothing To Annihilate', description: `Stake ${cfg.symbol} to accrue ${antimatterSymbol} first.` });
       return;
     }

@@ -112,7 +112,14 @@ const USDC_TOKEN = '0x0000000000000000000000000000000000000101';
  */
 const toStableAmountImpl = (args: unknown[]) => {
   const [token, amount] = args as [string, bigint];
-  return token.toLowerCase() === USDC_TOKEN ? amount / 10n ** 12n : amount;
+  const scale = token.toLowerCase() === USDC_TOKEN ? 10n ** 12n : 1n;
+  // The contract REVERTS on an amount finer than one stable unit rather than
+  // rounding it away, and a reverted read surfaces to the hook as `undefined`.
+  // Modelled faithfully because that revert is what silently zeroed the whole
+  // annihilation preview: a live accrual is essentially never an exact
+  // multiple of 1e12, so every unfloored call failed.
+  if (amount % scale !== 0n) return undefined;
+  return amount / scale;
 };
 
 /**
@@ -127,13 +134,14 @@ const healthyChain = (): Record<string, unknown> => ({
   // antimatterPerSecond, accAntimatterPerShare, lastRewardTime, totalStaked
   poolInfo: [RATE_FOR_100_PER_YEAR, 0n, 0n, 1_000_000_000n],
   userInfo: [100_000_000n, 0n], // 100 USDC (6dp)
-  pendingReward: 10n * 10n ** 18n, // 10 AM (18dp)
-  unclaimedReward: 0n,
+  // `claimableReward`, not `pendingReward`: the staker banks a position's
+  // outstanding projection into `unclaimedReward` on every stake and withdraw,
+  // so `pendingReward` alone reads as zero right after a user stakes.
+  claimableReward: 10n * 10n ** 18n, // 10 Antimatter (18dp)
   withdrawDisabled: false,
   autoAnnihilateAvailable: true,
   paused: false,
   claimEnabled: true,
-  symbol: 'AM',
   balanceOf: 500_000_000n,
   allowance: 0n,
   toStableAmount: toStableAmountImpl,
@@ -189,10 +197,10 @@ describe('useStableStakerPools — the annihilate price gate', () => {
 });
 
 describe('useStableStakerPools — reads', () => {
-  it('renders three pools and reads the Antimatter symbol off the chain', () => {
+  it('renders three pools and calls the accrual token Antimatter, not the AM ticker', () => {
     render(<Harness />);
     expect(usdcRow().dataset.poolCount).toBe('3');
-    expect(usdcRow().dataset.symbol).toBe('AM');
+    expect(usdcRow().dataset.symbol).toBe('Antimatter');
   });
 
   it('scales staked balance by the token decimals and Antimatter by 18', () => {
@@ -202,10 +210,30 @@ describe('useStableStakerPools — reads', () => {
   });
 
   it('caps the matched amount at the staked principal using toStableAmount', () => {
-    // 5000 AM converts to 5000 USDC, far above the 100 staked.
-    chain.pendingReward = 5_000n * 10n ** 18n;
+    // 5000 Antimatter converts to 5000 USDC, far above the 100 staked.
+    chain.claimableReward = 5_000n * 10n ** 18n;
     render(<Harness />);
     expect(usdcRow().dataset.matched).toBe('100');
+  });
+
+  it('matches a sub-unit accrual by flooring it, never by handing toStableAmount an amount it reverts on', () => {
+    // A real accrual: 2.5 Antimatter plus a remainder finer than one USDC unit.
+    // The unfloored call reverts, and the preview that trusted it read zero.
+    chain.claimableReward = 2_500_000_123_456_789_012n;
+    render(<Harness />);
+    expect(usdcRow().dataset.matched).toBe('2.5');
+  });
+
+  it('counts the banked backlog, so a user who has just staked is not told they have nothing', () => {
+    // `stake()` settles the projection into `unclaimedReward` and resets
+    // `rewardDebt`, which leaves `pendingReward` at zero and the backlog full.
+    // Reading `pendingReward` here is what disabled the annihilate button with
+    // "Stake USDC to accrue Antimatter" for a user who had just staked.
+    chain.pendingReward = 0n;
+    chain.claimableReward = 9n * 10n ** 18n;
+    render(<Harness />);
+    expect(usdcRow().dataset.pending).toBe('9');
+    expect(usdcRow().dataset.matched).toBe('9');
   });
 
   it('reduces the APY to the ordinary yield at phUSD = $1', () => {

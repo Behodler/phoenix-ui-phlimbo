@@ -18,7 +18,7 @@ import phUSDIcon from '../../../assets/phUSD-nobackground.png';
  * the expanded stake / withdraw / annihilate panel, backed by `StableStakerV2`.
  *
  * Every figure passed in comes from a chain read via `useStableStakerPools` —
- * `poolInfo`, `userInfo`, `pendingReward`, `unclaimedReward`, the ERC20
+ * `poolInfo`, `userInfo`, `claimableReward`, the ERC20
  * balances and the contract's own `toStableAmount` conversion. Nothing here is
  * simulated; the design preview this surface grew out of (stories 079/080) was
  * wired to contracts by story 082.
@@ -42,15 +42,17 @@ export interface AntimatterAccordionRowProps {
    */
   apy: number | null;
   staked: number;
-  /** Antimatter accrued as of the last chain read — the counter's baseline. */
+  /** Total Antimatter accrued as of the last chain read — the counter's baseline. */
   pendingBase: number;
   /** Antimatter accruing per second, from `poolInfo.antimatterPerSecond`. */
   ratePerSecond: number;
-  /** Antimatter accrued as of the last read, for the panel's plain figures. */
+  /**
+   * Total Antimatter accrued as of the last read, for the panel's plain
+   * figures. This is `claimableReward` — the banked backlog plus the live
+   * projection — which is what annihilating and claiming both consume.
+   */
   pending: number;
-  /** Antimatter already banked on the contract by a claim-gated accrual. */
-  unclaimed: number;
-  /** Stake-token amount the pending Antimatter matches against (capped). */
+  /** Stake-token amount the accrued Antimatter matches against (capped). */
   matchedStable: number;
   /** Antimatter above the staked principal, paid out as an ordinary claim. */
   surplusAntimatter: number;
@@ -293,7 +295,6 @@ export default function AntimatterAccordionRow({
   pendingBase,
   ratePerSecond,
   pending,
-  unclaimed,
   matchedStable,
   surplusAntimatter,
   antimatterSymbol,
@@ -350,14 +351,20 @@ export default function AntimatterAccordionRow({
   // contract still pays withdrawals that fit entirely inside it.
   const withinBuffer = !withdrawDisabled || wdParsed <= withdrawBuffer;
   const canWd = !disabled && !busy && wdParsed > 0 && wdParsed <= staked && withinBuffer;
-  const canAnn = !disabled && !busy && annihilateDisabledReason === null && matched > 0;
-  const canClaim = !disabled && !busy && claimEnabled && pending + unclaimed > 0;
+  // The contract accepts the call when EITHER side has something in it:
+  // `require(netWanted > 0 || excess > 0)`. A user whose accrual has outrun
+  // their whole stake has `matched == 0` and a real surplus to be paid.
+  const canAnn =
+    !disabled && !busy && annihilateDisabledReason === null && (matched > 0 || leftover > 0);
+  const canClaim = !disabled && !busy && claimEnabled && pending > 0;
 
   const annLabel = inactive
     ? 'Not live on this network yet'
-    : matched <= 0
+    : matched <= 0 && leftover <= 0
       ? `Stake ${symbol} to accrue ${antimatterSymbol}`
-      : capped
+      : matched <= 0
+        ? `Claim ${fmtAmount(leftover, 4)} ${antimatterSymbol} — your accrual has outrun your stake`
+        : capped
         ? `Annihilate ${fmtAmount(matched, 4)} ${antimatterSymbol} with ${fmtAmount(matched, 4)} staked ${symbol} → receive ${fmtAmount(receive, 4)} phUSD + ${fmtAmount(leftover, 4)} ${antimatterSymbol}`
         : `Annihilate ${fmtAmount(matched, 4)} ${antimatterSymbol} with ${fmtAmount(matched, 4)} staked ${symbol} → receive ${fmtAmount(receive, 4)} phUSD`;
 
@@ -451,20 +458,6 @@ export default function AntimatterAccordionRow({
             </div>
           )}
 
-          {!inactive && !claimEnabled && (
-            <div
-              className="mb-4 rounded-xl border p-3.5 text-[12.5px] leading-[1.5] text-muted-foreground"
-              style={{ borderColor: 'rgba(255,217,61,.3)', background: 'rgba(255,217,61,.06)' }}
-            >
-              <span className="font-semibold" style={{ color: '#FFD93D' }}>
-                Claiming is not open yet.
-              </span>{' '}
-              {antimatterSymbol} is accruing normally, but the contract&apos;s claim gate is closed,
-              so it banks on the staker rather than paying out. Annihilating it against your stake is
-              unaffected.
-            </div>
-          )}
-
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <SegmentedControl<AntimatterSubTab>
               ariaLabel={`${symbol} pool action`}
@@ -546,7 +539,7 @@ export default function AntimatterAccordionRow({
                 >
                   {pendingAction === 'claim'
                     ? 'Claiming…'
-                    : `Claim ${fmtAmount(pending + unclaimed, 4)} ${antimatterSymbol}`}
+                    : `Claim ${fmtAmount(pending, 4)} ${antimatterSymbol}`}
                 </button>
               )}
             </div>
