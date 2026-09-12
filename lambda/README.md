@@ -61,7 +61,7 @@ aws lambda update-function-code \
 |-----------------------|----------|----------------------------------------------------------------|
 | `BUCKET`              | yes      | Target bucket, e.g. `phusd.behodler.io`                        |
 | `OBJECT_KEY`          | no       | Object key (default `faq-data.json`)                          |
-| `ALLOWED_ORIGIN`      | no       | CORS origin to reflect, e.g. `https://phusd.behodler.io` (default `*`) |
+| `ALLOWED_ORIGIN`      | no       | CORS origin to reflect, e.g. `https://phoenixdefi.app` (default `*`) |
 | `FAQ_EDITOR_PASSWORD` | one of   | Shared password (simplest)                                    |
 | `FAQ_SECRET_ARN`      | one of   | Secrets Manager ARN holding the password (preferred)          |
 | `DISTRIBUTION_ID`     | no       | CloudFront distribution to invalidate (`E1R43V3HMD4UVM`). Omit to skip. |

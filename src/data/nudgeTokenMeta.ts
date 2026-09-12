@@ -61,7 +61,7 @@ export const NUDGE_TOKEN_META: Readonly<Record<string, NudgeTokenMeta>> = {
   PHUSD: {
     display: 'phUSD',
     logo: phUsdLogo,
-    url: 'https://phoenix.behodler.io',
+    url: 'https://landing.phoenixdefi.app',
     priceSource: 'phusd',
   },
   KENDU: {

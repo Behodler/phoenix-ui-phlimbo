@@ -17,7 +17,7 @@ export default defineConfig({
       // origin also means an admin editing locally sees — and republishes —
       // the authoritative document rather than a stale local copy.
       '/faq-data.json': {
-        target: 'https://phusd.behodler.io',
+        target: 'https://phoenixdefi.app',
         changeOrigin: true,
       },
     },

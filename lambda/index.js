@@ -20,7 +20,7 @@
  * Required env vars:
  *   BUCKET             - target S3 bucket (e.g. phusd.behodler.io)
  *   OBJECT_KEY         - object key (default: faq-data.json)
- *   ALLOWED_ORIGIN     - CORS origin to reflect (e.g. https://phusd.behodler.io); default '*'
+ *   ALLOWED_ORIGIN     - CORS origin to reflect (e.g. https://phoenixdefi.app); default '*'
  * Auth (one of):
  *   FAQ_EDITOR_PASSWORD - shared password, OR
  *   FAQ_SECRET_ARN      - Secrets Manager ARN holding the password (plaintext or {"password":"…"})

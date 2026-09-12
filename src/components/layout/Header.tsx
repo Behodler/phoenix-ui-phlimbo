@@ -9,7 +9,7 @@ export default function Header() {
       <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <a
-            href="https://phoenix.behodler.io/"
+            href="https://landing.phoenixdefi.app/"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Open Phoenix marketing site in a new tab"

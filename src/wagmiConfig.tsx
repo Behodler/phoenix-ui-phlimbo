@@ -58,7 +58,7 @@ export const wagmiConfig = createConfig({
     [arbitrum.id]: http(),
     [mainnet.id]: fallback([
       // Free public endpoints, tried in order. All verified to send
-      // Access-Control-Allow-Origin for https://phusd.behodler.io — an endpoint
+      // Access-Control-Allow-Origin for https://phoenixdefi.app — an endpoint
       // without it surfaces every outage as an opaque CORS error in the console.
       // retryCount is lowered from viem's default of 3 because `fallback` only
       // advances to the next transport once the current one exhausts its

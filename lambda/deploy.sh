@@ -18,7 +18,7 @@ set -euo pipefail
 REGION="${REGION:-us-east-1}"                 # bucket is in us-east-1
 BUCKET="${BUCKET:-phusd.behodler.io}"
 DISTRIBUTION_ID="${DISTRIBUTION_ID:-E1R43V3HMD4UVM}"
-ALLOWED_ORIGIN="${ALLOWED_ORIGIN:-https://phusd.behodler.io}"
+ALLOWED_ORIGIN="${ALLOWED_ORIGIN:-https://phoenixdefi.app}"
 OBJECT_KEY="${OBJECT_KEY:-faq-data.json}"
 FUNCTION_NAME="${FUNCTION_NAME:-faq-write}"
 ROLE_NAME="${ROLE_NAME:-faq-write-lambda-role}"
