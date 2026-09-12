@@ -35,7 +35,11 @@ import phUSDIcon from '../../../assets/phUSD-nobackground.png';
 export interface AntimatterAccordionRowProps {
   symbol: string;
   icon: string;
-  /** `null` renders as an em dash — the Antimatter APY is story 083's subject. */
+  /**
+   * Net-yield APY in percent, or `null` for an unknown, which renders as an em
+   * dash. May legitimately be **negative** below phUSD $0.50, where
+   * annihilation destroys more principal value than the phUSD it returns.
+   */
   apy: number | null;
   staked: number;
   /** Antimatter accrued as of the last chain read — the counter's baseline. */

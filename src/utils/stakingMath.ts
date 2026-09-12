@@ -226,3 +226,160 @@ export function computeUserRatePerSec(
   const share = Number(userStaked) / Number(totalStaked);
   return globalRate * share;
 }
+
+/**
+ * phUSD spot price at or below which annihilation returns less value than it
+ * destroys, i.e. the point where `2p - 1` stops being positive.
+ *
+ * Duplicated deliberately from `useStableStakerPools.ts`'s
+ * `ANNIHILATE_PRICE_FLOOR`: this module is the pure-math layer and must not
+ * import a hook. The two must stay in step — the displayed APY turns negative
+ * at exactly the price the annihilate action is disabled at, so a user never
+ * sees a negative number beside a live annihilate button.
+ */
+export const ANNIHILATION_BREAK_EVEN_PRICE = 0.5;
+
+/**
+ * Net USD value of annihilating `antimatterAmount` units of Antimatter.
+ *
+ * Annihilation is NOT a claim. Each unit of Antimatter is destroyed together
+ * with one unit of the user's own staked stablecoin, and the pair mints phUSD
+ * worth both sides — `2A` phUSD for `A` Antimatter. So with stablecoins at $1
+ * and phUSD at `p`:
+ *
+ * ```
+ *   gross value = 2 × A × p     (the phUSD minted, at market)
+ *   cost        = A             (the annihilated principal, at $1/unit)
+ *   net yield   = 2 × A × p − A = A × (2p − 1)
+ * ```
+ *
+ * Worked examples (the human's own, preserved in the unit tests):
+ * `A = 2, p = 0.8` → `2 × (1.6 − 1) = 1.2`; `A = 10, p = 0.9` → `10 × 0.8 = 8`.
+ *
+ * ⚠️ The sign flips below `p = 0.5` ({@link ANNIHILATION_BREAK_EVEN_PRICE}):
+ * the phUSD received is then worth less than the principal destroyed, so the
+ * net yield — and any APY derived from it — is genuinely **negative**. That is
+ * reported honestly rather than clamped to zero; the annihilate action is
+ * separately disabled at `p <= 0.5` so the honest number cannot be acted on.
+ *
+ * Both arguments are already-descaled human units, so this is plain float math.
+ */
+export function computeAnnihilationNetYieldUSD(
+  antimatterAmount: number,
+  phUsdPrice: number,
+): number {
+  return antimatterAmount * (2 * phUsdPrice - 1);
+}
+
+/** Inputs for {@link computeAntimatterApy}. */
+export interface AntimatterApyInputs {
+  /**
+   * Pool-wide Antimatter emission rate, per second, 18 decimals
+   * (`poolInfo(token).antimatterPerSecond`). `null` means **not yet known**
+   * (the read has not resolved) and yields a `null` APY; `0n` is a real zero
+   * emission rate and yields `0`.
+   */
+  antimatterPerSecond: bigint | null;
+  /**
+   * `antimatterAbi.toStableAmount(token, antimatterPerSecond × SECONDS_PER_YEAR)`
+   * — the annual emission already expressed in the stake token's own decimals,
+   * by the contract that owns that conversion.
+   *
+   * Preferred over the off-chain fallback because it encodes the protocol's
+   * definition of "one Antimatter annihilates one unit of stable" instead of
+   * reimplementing it. When `undefined`, the amount is derived off-chain from
+   * `antimatterPerSecond` instead (both paths agree, since 1 Antimatter matches
+   * 1 whole stake token; the units only differ in scale).
+   */
+  annualAntimatterAsStableRaw?: bigint;
+  /** Pool principal, `poolInfo(token).totalStaked`, in `stableDecimals`. */
+  totalStaked: bigint;
+  /** Native decimals of the stake token (USDC 6, USDe/DOLA 18). */
+  stableDecimals: number;
+  /**
+   * phUSD spot price in USD, already descaled. `null` when unknown — which
+   * returns a `null` APY so the UI renders its em dash. Off mainnet the repo's
+   * convention substitutes `1.0`, which makes `(2p − 1) = 1` and reduces this
+   * to the ordinary `annualEmission / principal` yield.
+   */
+  phUsdPrice: number | null;
+  /**
+   * Connected wallet's unstaked balance of the stake token, human units. Only
+   * used for the empty-pool denominator.
+   */
+  walletBalance: number;
+}
+
+/**
+ * Net-yield APY (percent, e.g. `8` for 8%) for one Antimatter stable pool, or
+ * `null` when it is genuinely unknown.
+ *
+ * ```
+ *   APY% = min(A_annual, principal) / principal × (2p − 1) × 100
+ * ```
+ *
+ * where `A_annual` is the pool-wide annual Antimatter emission and `principal`
+ * is the pool's staked total — **both in the same stable units**, so the
+ * decimals cancel and no `1e12` USDC-vs-USDe error can creep in. See
+ * {@link computeAnnihilationNetYieldUSD} for the derivation of the `(2p − 1)`
+ * factor; the whole of this calculation is that one factor applied to an
+ * ordinary yield ratio. Sanity check: at `p = 1` it reduces to
+ * `A_annual / principal`, and the human's example
+ * `(10 / 100) × (2 × 0.9 − 1) × 100` gives `8`.
+ *
+ * ⚠️ **Negative below `p = 0.5`** and deliberately displayed that way — see
+ * {@link ANNIHILATION_BREAK_EVEN_PRICE}. Concealing a real loss from someone
+ * deciding whether to stake would be worse than showing it; the annihilate
+ * action is disabled in that regime.
+ *
+ * Three conventions, each mirroring one already in the repo:
+ *
+ * - **Unknown is `null`, never `0`.** An unresolved price or emission read
+ *   renders as an em dash. A `0` would read as a real zero yield.
+ * - **Empty pool** (`totalStaked == 0`) borrows the denominator
+ *   `useStableStakerPools` / `usePhUsdStakePool` already use: the user's own
+ *   wallet balance, or 100 when that is negligible. The denominator therefore
+ *   assumes the user's own stake dilutes the pool, so their deposit cannot make
+ *   the displayed number collapse — the conservative direction.
+ * - **The emission is clamped to the principal.** Antimatter beyond the staked
+ *   total has nothing to annihilate against (on-chain, the `excessMinted` leg
+ *   of `AutoAnnihilated`, whose realisable value is not the clean `2p − 1`), so
+ *   it is valued at zero. That floors the APY rather than inflating it —
+ *   rounding in favour of the protocol. In the normal regime, where emissions
+ *   are a small fraction of principal, the clamp never binds.
+ */
+export function computeAntimatterApy({
+  antimatterPerSecond,
+  annualAntimatterAsStableRaw,
+  totalStaked,
+  stableDecimals,
+  phUsdPrice,
+  walletBalance,
+}: AntimatterApyInputs): number | null {
+  if (phUsdPrice === null) return null;
+  if (antimatterPerSecond === null && annualAntimatterAsStableRaw === undefined) return null;
+
+  // Annual emission in whole stake-token units. The contract's own conversion
+  // wins when present; otherwise descale the 18-dec Antimatter rate directly,
+  // since one whole Antimatter matches one whole stake token.
+  const annualEmission =
+    annualAntimatterAsStableRaw !== undefined
+      ? Number(annualAntimatterAsStableRaw) / 10 ** stableDecimals
+      : (Number(antimatterPerSecond ?? 0n) / 1e18) * SECONDS_PER_YEAR;
+
+  const principal =
+    totalStaked > 0n
+      ? Number(totalStaked) / 10 ** stableDecimals
+      : walletBalance < 10
+        ? 100
+        : walletBalance;
+
+  if (!(principal > 0)) return null;
+
+  // Excess emissions cannot be annihilated against principal that is not there.
+  const matched = Math.min(annualEmission, principal);
+
+  const apy = (matched / principal) * (2 * phUsdPrice - 1) * 100;
+
+  return Number.isFinite(apy) ? apy : null;
+}

@@ -20,6 +20,7 @@ import { useTokenApproval } from './useContractInteractions';
 import { useBalancerPrice } from './useBalancerPrice';
 import { STABLE_POOLS, type StablePoolConfig, type StablePoolId } from '../data/stableStakerPools';
 import { ANTIMATTER_DECIMALS, ANTIMATTER_FALLBACK_SYMBOL } from '../data/antimatterData';
+import { computeAntimatterApy, SECONDS_PER_YEAR } from '../utils/stakingMath';
 import { log } from '../utils/logger';
 
 /**
@@ -76,11 +77,18 @@ export interface AntimatterStakeRow {
   surplusAntimatter: number;
 
   /**
-   * APY is **story 083's** subject: the Antimatter net-yield formula needs the
-   * phUSD spot price and careful decimal handling. Always `null` here, which
-   * this repo renders as an em dash — never a number and never `0`.
+   * Net-yield APY (percent), or `null` when genuinely unknown — which this repo
+   * renders as an em dash, never `0`.
+   *
+   * This is **not** an ordinary yield: Antimatter is annihilated against the
+   * user's own staked principal, so the figure is
+   * `min(A_annual, principal) / principal x (2p - 1) x 100` and turns
+   * **negative** below phUSD $0.50, where annihilation destroys more value than
+   * it returns. See `computeAntimatterApy` for the derivation. Negative is
+   * displayed honestly; `annihilateDisabledReason` closes the action off in
+   * exactly that regime.
    */
-  apy: null;
+  apy: number | null;
 
   /** Global pause — gates ALL actions for this pool. */
   disabled: boolean;
@@ -157,6 +165,19 @@ interface PoolReads {
   walletBalance: number;
   stakedBalance: number;
   stakedRaw: bigint;
+  /**
+   * Pool-wide Antimatter emission rate (18 dec, per second), or `undefined`
+   * while `poolInfo` is unresolved. The distinction matters: `0n` is a real
+   * zero emission, `undefined` is an unknown APY.
+   */
+  antimatterPerSecond: bigint | undefined;
+  /** Pool principal in the stake token's native decimals. */
+  totalStakedRaw: bigint;
+  /**
+   * The annual emission expressed in the stake token's decimals by
+   * `Antimatter.toStableAmount` — the APY numerator.
+   */
+  annualAntimatterAsStableRaw: bigint | undefined;
   pendingAntimatter: number;
   pendingRaw: bigint;
   unclaimedAntimatter: number;
@@ -266,6 +287,31 @@ function useStablePoolReads(
 
   const pendingRaw = (pending as bigint | undefined) ?? 0n;
 
+  // Derived ahead of the remaining reads because the annual-emission
+  // conversion below takes `antimatterPerSecond` as an argument.
+  //
+  // `antimatterPerSecond` stays `undefined` until `poolInfo` resolves, rather
+  // than defaulting to `0n`: a zero emission rate and an unresolved read mean
+  // different things to the APY helper (a real 0% versus an unknown em dash).
+  const pool = poolInfo as [bigint, bigint, bigint, bigint] | undefined;
+  const antimatterPerSecond = pool ? pool[0] : undefined;
+  const totalStaked = pool ? pool[3] : 0n;
+  const stakedRaw = userInfo ? (userInfo as [bigint, bigint])[0] : 0n;
+
+  // Annual pool-wide Antimatter emission, converted into this pool's native
+  // stable decimals by the contract that owns the conversion. This is the APY
+  // numerator, and the conversion is what keeps USDC's 6 decimals from being
+  // divided by an 18-decimal numerator (a 1e12 error).
+  const annualAntimatterRaw =
+    antimatterPerSecond !== undefined ? antimatterPerSecond * BigInt(SECONDS_PER_YEAR) : 0n;
+  const { data: annualAsStableRaw, refetch: refetchAnnualAsStable } = useReadContract({
+    address: antimatterAddress,
+    abi: antimatterAbi,
+    functionName: 'toStableAmount',
+    args: tokenAddress ? [tokenAddress, annualAntimatterRaw] : undefined,
+    query: { enabled: !!antimatterAddress && !!tokenAddress && annualAntimatterRaw > 0n },
+  });
+
   // The 18-dec Antimatter figure expressed in this pool's native stable
   // decimals. `toStableAmount` is the contract's own conversion — never
   // hand-roll the 18 → 6 scaling for USDC.
@@ -298,6 +344,7 @@ function useStablePoolReads(
     refetchBalance();
     refetchAllowance();
     refetchPendingAsStable();
+    refetchAnnualAsStable();
   };
 
   // 12s heartbeat, gated on tab-active + the global Live toggle.
@@ -307,11 +354,6 @@ function useStablePoolReads(
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, isPollingEnabled, enabled, enabledUser]);
-
-  const pool = poolInfo as [bigint, bigint, bigint, bigint] | undefined;
-  const antimatterPerSecond = pool ? pool[0] : 0n;
-  const totalStaked = pool ? pool[3] : 0n;
-  const stakedRaw = userInfo ? (userInfo as [bigint, bigint])[0] : 0n;
 
   const walletBalance = walletBalanceRaw ? Number(walletBalanceRaw) / 10 ** config.decimals : 0;
   const stakedBalance = stakedRaw ? Number(stakedRaw) / 10 ** config.decimals : 0;
@@ -324,7 +366,7 @@ function useStablePoolReads(
   // dimensionless; antimatterPerSecond is 18-dec Antimatter/s. Guard
   // totalStaked == 0. Hold the counter still when polling is paused (rate 0).
   const ratePerSecond =
-    isPollingEnabled && totalStaked > 0n && stakedRaw > 0n
+    isPollingEnabled && antimatterPerSecond !== undefined && totalStaked > 0n && stakedRaw > 0n
       ? (Number(antimatterPerSecond) / 10 ** ANTIMATTER_DECIMALS) *
         (Number(stakedRaw) / Number(totalStaked))
       : 0;
@@ -345,6 +387,9 @@ function useStablePoolReads(
     walletBalance,
     stakedBalance,
     stakedRaw,
+    antimatterPerSecond,
+    totalStakedRaw: totalStaked,
+    annualAntimatterAsStableRaw: annualAsStableRaw as bigint | undefined,
     pendingAntimatter,
     pendingRaw,
     unclaimedAntimatter,
@@ -375,8 +420,10 @@ function useStablePoolReads(
  * claimed at all — it is annihilated against the user's own staked principal,
  * destroying one unit of each and emitting phUSD worth both sides together.
  *
- * APY is deliberately absent (`apy: null`, rendered as an em dash): the
- * Antimatter net-yield formula is story 083's subject.
+ * `apy` is the Antimatter **net-yield** APY: annihilation destroys one unit of
+ * principal per unit of Antimatter, so the ordinary yield ratio carries a
+ * `(2 x phUSDprice - 1)` factor and goes negative below $0.50. `null` (an em
+ * dash, never `0`) whenever the price or the emission rate is unknown.
  *
  * The address resolves through `useContractAddresses()` (local server on dev,
  * `contracts.ts` on mainnet/sepolia). When it resolves to the zero address —
@@ -421,6 +468,26 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
   const phUsdRawPrice = isMainnet ? balancerPrice : null;
   /** Clamped price. Display math only — never the gate. */
   const phUsdDisplayPrice = phUsdRawPrice !== null && phUsdRawPrice > 0 ? phUsdRawPrice : 1.0;
+
+  /**
+   * Price fed to the APY calculation.
+   *
+   * Off mainnet there is no Balancer pool to read, so the repo's `1.0` fallback
+   * stands: `(2p - 1)` becomes 1 and the APY reduces to the ordinary
+   * `A_annual / principal` yield, which is the right number for an Anvil stack.
+   *
+   * On mainnet an absent or out-of-band price (the `> 0 && <= 2.0` sanity
+   * clamp) resolves to `null`, NOT to `phUsdDisplayPrice`'s `1.0`. The whole
+   * APY is the `(2p - 1)` factor, so substituting a fabricated price would
+   * publish a fabricated APY; `null` renders the em dash this repo uses for an
+   * unknown, and matches the annihilate gate, which is also shut whenever the
+   * price cannot be established.
+   */
+  const phUsdApyPrice: number | null = !isMainnet
+    ? 1.0
+    : phUsdRawPrice !== null && phUsdRawPrice > 0 && phUsdRawPrice <= 2.0
+      ? phUsdRawPrice
+      : null;
 
   const tokenAddressFor = (cfg: StablePoolConfig): `0x${string}` | undefined =>
     addresses ? (addresses[cfg.addressKey] as `0x${string}`) : undefined;
@@ -532,6 +599,18 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
 
   const pools: AntimatterStakeRow[] = STABLE_POOLS.map((cfg) => {
     const r = readsById[cfg.id];
+    // A pool with no live staker has no emission rate to read, so its APY is
+    // unknown rather than zero.
+    const apy = inactive
+      ? null
+      : computeAntimatterApy({
+          antimatterPerSecond: r.antimatterPerSecond ?? null,
+          annualAntimatterAsStableRaw: r.annualAntimatterAsStableRaw,
+          totalStaked: r.totalStakedRaw,
+          stableDecimals: cfg.decimals,
+          phUsdPrice: phUsdApyPrice,
+          walletBalance: r.walletBalance,
+        });
     return {
       id: cfg.id,
       symbol: cfg.symbol,
@@ -544,7 +623,7 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
       ratePerSecond: r.ratePerSecond,
       matchedStable: r.matchedStable,
       surplusAntimatter: r.surplusAntimatter,
-      apy: null,
+      apy,
       disabled: isPaused || inactive,
       withdrawDisabled: r.withdrawDisabled,
       withdrawBuffer: r.withdrawBuffer,

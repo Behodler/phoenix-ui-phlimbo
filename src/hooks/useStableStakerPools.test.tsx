@@ -30,15 +30,21 @@ let stakerAddress: string;
 vi.mock('wagmi', () => ({
   useAccount: () => ({ address: WALLET }),
   useChainId: () => chainId,
-  useReadContract: ({ functionName, address, query }: {
+  useReadContract: ({ functionName, address, args, query }: {
     functionName: string;
     address?: string;
+    args?: unknown[];
     query?: { enabled?: boolean };
   }) => {
     // Mirrors wagmi: a disabled query never resolves data. This is what the
     // zero-address guard relies on, so the mock must honour it.
     if (query?.enabled === false || !address) return { data: undefined, isLoading: false, refetch: vi.fn() };
-    return { data: chain[functionName], isLoading: false, refetch: vi.fn() };
+    // A chain entry may be a function of the call's args. `toStableAmount` is
+    // read twice per pool (pending reward, and the annual emission that feeds
+    // the APY), so dispatching on functionName alone is not enough.
+    const entry = chain[functionName];
+    const data = typeof entry === 'function' ? (entry as (a: unknown[]) => unknown)(args ?? []) : entry;
+    return { data, isLoading: false, refetch: vi.fn() };
   },
   useWriteContract: () => ({ data: undefined, writeContractAsync: vi.fn() }),
   useWaitForTransactionReceipt: () => ({ isSuccess: false }),
@@ -95,10 +101,31 @@ function Harness() {
 
 const usdcRow = () => screen.getByTestId('usdc');
 
-/** A funded, healthy USDC pool with 100 USDC staked and 10 AM accrued. */
+const USDC_TOKEN = '0x0000000000000000000000000000000000000101';
+
+/**
+ * `Antimatter.toStableAmount` as the contract implements it: an 18-dec
+ * Antimatter amount rescaled to the stake token's decimals (USDC 6, the rest
+ * 18). Stubbed faithfully rather than as a constant because the APY reads it
+ * with a different amount than the annihilation preview does — and because a
+ * broken 18→6 bridge is a 1e12 error, the one this conversion exists to avoid.
+ */
+const toStableAmountImpl = (args: unknown[]) => {
+  const [token, amount] = args as [string, bigint];
+  return token.toLowerCase() === USDC_TOKEN ? amount / 10n ** 12n : amount;
+};
+
+/**
+ * Antimatter/sec that emits ~100 whole units a year, so against the 1000 USDC
+ * pool total below the APY is a round 10% at phUSD = $1. Integer division
+ * against SECONDS_PER_YEAR makes it approximate, hence `toBeCloseTo`.
+ */
+const RATE_FOR_100_PER_YEAR = 3_170_979_198_376n;
+
+/** A funded, healthy USDC pool with 1000 USDC staked pool-wide, 100 staked by the user. */
 const healthyChain = (): Record<string, unknown> => ({
   // antimatterPerSecond, accAntimatterPerShare, lastRewardTime, totalStaked
-  poolInfo: [1_000_000_000_000_000n, 0n, 0n, 1_000_000_000n],
+  poolInfo: [RATE_FOR_100_PER_YEAR, 0n, 0n, 1_000_000_000n],
   userInfo: [100_000_000n, 0n], // 100 USDC (6dp)
   pendingReward: 10n * 10n ** 18n, // 10 AM (18dp)
   unclaimedReward: 0n,
@@ -109,8 +136,7 @@ const healthyChain = (): Record<string, unknown> => ({
   symbol: 'AM',
   balanceOf: 500_000_000n,
   allowance: 0n,
-  // 10 AM expressed in USDC units — the contract's own conversion.
-  toStableAmount: 10_000_000n,
+  toStableAmount: toStableAmountImpl,
 });
 
 beforeEach(() => {
@@ -178,12 +204,52 @@ describe('useStableStakerPools — reads', () => {
   it('caps the matched amount at the staked principal using toStableAmount', () => {
     // 5000 AM converts to 5000 USDC, far above the 100 staked.
     chain.pendingReward = 5_000n * 10n ** 18n;
-    chain.toStableAmount = 5_000_000_000n;
     render(<Harness />);
     expect(usdcRow().dataset.matched).toBe('100');
   });
 
-  it('reports APY as null — never 0 — because story 083 owns the formula', () => {
+  it('reduces the APY to the ordinary yield at phUSD = $1', () => {
+    // 100 AM/yr against 1000 USDC staked; (2p - 1) = 1 at p = 1.
+    render(<Harness />);
+    expect(Number(usdcRow().dataset.apy)).toBeCloseTo(10, 3);
+  });
+
+  it('applies the (2p - 1) net-yield factor above the break-even price', () => {
+    rawPrice = 0.75;
+    render(<Harness />);
+    // 10% x (1.5 - 1) = 5%
+    expect(Number(usdcRow().dataset.apy)).toBeCloseTo(5, 3);
+  });
+
+  it('bridges the 18-dec emission to 6-dec USDC — a 1e12 error would be obvious', () => {
+    render(<Harness />);
+    // The failure mode is 1e12-scale, so the useful assertion is the order of
+    // magnitude, not the decimals.
+    expect(Number(usdcRow().dataset.apy)).toBeLessThan(1_000);
+    expect(Number(usdcRow().dataset.apy)).toBeGreaterThan(0.001);
+  });
+
+  it('reports APY as null — never 0 — when the mainnet price is unknown', () => {
+    rawPrice = null;
+    render(<Harness />);
+    expect(usdcRow().dataset.apy).toBe('null');
+  });
+
+  it('reports APY as null when the mainnet price is out of the sanity band', () => {
+    rawPrice = 5.0;
+    render(<Harness />);
+    expect(usdcRow().dataset.apy).toBe('null');
+  });
+
+  it('falls back to p = 1 off mainnet, where there is no Balancer pool to read', () => {
+    chainId = 31337;
+    rawPrice = null;
+    render(<Harness />);
+    expect(Number(usdcRow().dataset.apy)).toBeCloseTo(10, 3);
+  });
+
+  it('reports APY as null when the pool has no live staker', () => {
+    stakerAddress = zeroAddress;
     render(<Harness />);
     expect(usdcRow().dataset.apy).toBe('null');
   });
@@ -217,5 +283,37 @@ describe('useStableStakerPools — the global pause', () => {
     chain.paused = true;
     render(<Harness />);
     expect(usdcRow().dataset.annihilateReason).toContain('paused');
+  });
+});
+
+describe('useStableStakerPools — the APY and the annihilate gate agree', () => {
+  // The whole point of the `<=` in the gate and of displaying a negative APY
+  // honestly: the user may see the loss, but must never be able to act on it.
+  it('never shows a negative APY beside an open annihilate action', () => {
+    for (const price of [0.05, 0.25, 0.4, 0.49, 0.5, 0.51, 0.8, 1.0, 1.5]) {
+      rawPrice = price;
+      const { unmount } = render(<Harness />);
+      const row = usdcRow();
+      const apy = Number(row.dataset.apy);
+      if (apy < 0) {
+        expect(row.dataset.annihilateReason).not.toBe('');
+      }
+      unmount();
+    }
+  });
+
+  it('shows the negative APY honestly rather than clamping it to zero', () => {
+    rawPrice = 0.4;
+    render(<Harness />);
+    // 10% x (0.8 - 1) = -2%
+    expect(Number(usdcRow().dataset.apy)).toBeCloseTo(-2, 3);
+    expect(usdcRow().dataset.annihilateReason).toContain('returns less value than it destroys');
+  });
+
+  it('is exactly zero at the break-even price, where the gate is already shut', () => {
+    rawPrice = ANNIHILATE_PRICE_FLOOR;
+    render(<Harness />);
+    expect(Number(usdcRow().dataset.apy)).toBe(0);
+    expect(usdcRow().dataset.annihilateReason).not.toBe('');
   });
 });

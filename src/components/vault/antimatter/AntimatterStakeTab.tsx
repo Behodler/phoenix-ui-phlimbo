@@ -50,9 +50,12 @@ const PROMO_ACCENT = 'text-pxusd-pink-400';
  * literals, no demo-speed multiplier. Every figure is a chain read on the 12 s
  * heartbeat that `useStableStakerPools` owns.
  *
- * APY for the stablecoin pools renders as an em dash, this repo's convention
- * for an unknown APY, until story 083 lands the Antimatter net-yield formula.
- * It is deliberately never shown as `0`.
+ * APY for the stablecoin pools is the Antimatter **net-yield** figure story 083
+ * added: annihilation destroys a unit of principal per unit of Antimatter, so
+ * the ordinary yield ratio carries a `(2 x phUSDprice - 1)` factor and goes
+ * negative below $0.50 — shown honestly, with the annihilate action disabled in
+ * exactly that regime. An unknown price or emission rate renders as an em dash,
+ * this repo's convention, and deliberately never as `0`.
  *
  * The tab id stays the literal `"Stake"` so `/staking` — DeFi Llama's outbound
  * deep-link target — keeps resolving here. See `src/lib/tabRoutes.ts`.
