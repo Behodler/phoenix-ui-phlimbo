@@ -1,10 +1,13 @@
-// "Stake" is the public farm, pointed at PhlimboV3. It is the only farm
-// surface: the incumbent V2 "Stake (admin only)" tab was removed once the
-// cutover was complete.
-// "Stake (mock)" is an admin-only, deliberately fake preview of the Antimatter
-// overhaul (story 079). It talks to no contract and has no route — see
-// src/components/vault/antimatterMock/.
-export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Stake (mock)" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
+// "Stake" is the public, contract-backed farm surface and the only farm tab.
+// It renders the phUSD farm (PhlimboV3) above the three Antimatter stablecoin
+// pools (StableStakerV2) — see src/components/vault/antimatter/. The earlier
+// admin-only "Stake (mock)" design preview was promoted into this tab by story
+// 082 and no longer exists as a separate surface.
+//
+// The literal "Stake" is load-bearing: /stake, /staking and /stake-v3 all map
+// to it in src/lib/tabRoutes.ts, and /staking is DeFi Llama's outbound
+// deep-link target. Do not rename it.
+export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
 
 export interface VaultFormData {
   amount: string;

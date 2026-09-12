@@ -184,25 +184,59 @@ that fixture. Its data comes from `useNudgePot`:
 _Historical note: this tab was mock-only very early in development. That has not been true
 since the minter/staking wiring landed — do not treat the tab as mock-only._
 
-## The "Stake (mock)" tab is deliberately fake — never wire it to contracts
+## The `Stake` tab is real, contract-backed and routed
 
-`Stake (mock)` (`src/components/vault/antimatterMock/`, literals in
-`src/data/antimatterMockData.ts`) is a design preview of the **Antimatter** overhaul of
-`stable-staker`, added in story 079 so the proposed surface can be contrasted side by side
-with the live `Stake` tab in the same app. It is admin-only, and every number on it is a
-literal advanced by a timer.
+`Stake` (`src/components/vault/antimatter/`) is the public staking surface. It is **not** a
+mock. Story 082 promoted the Antimatter design preview that stories 079 and 080 built into
+this tab and wired it to contracts; the old `StakeV3Tab`, the `Stake (mock)` tab, and
+`src/data/antimatterMockData.ts` were all deleted in the same story.
 
-This is the one surface in the repo where "it's a mock" is the permanent, intended state.
-Unlike `nftStakeMockData.ts` — which was a staging post on the way to real wiring — nothing
-here is waiting to be connected. Do **not** attach wagmi hooks, contract reads or writes to
-it. When Antimatter ships for real it gets its own surface; this one is a drawing, and
-connecting it would put an admin one click away from a page whose ticking figures look live
-but are not.
+_Historical note: this surface was a deliberately fake design preview until story 082, and an
+earlier revision of this file said it must never be wired to contracts. That was a placeholder
+held until the backend existed. The backend now exists — `stable-staker` V2, `antimatter`, and
+`@behodler/phase2-wagmi-hooks@0.15.0` — and the prohibition is withdrawn. Do not reinstate it._
 
-It also has **no route**, deliberately: `/stake`, `/staking` and `/stake-v3` must all keep
-resolving to the live `Stake` tab, because `/staking` is DeFi Llama's outbound deep-link
-target. The mock is reachable by clicking its tab and by nothing else — do not add it to
-`src/lib/tabRoutes.ts`.
+The tab has two legs:
+
+- **The phUSD farm**, `usePhlimboV3Pool` rendered through `StakeAccordionRow`. Reads
+  `PhlimboV3`, which is deployed on every network.
+- **Three stablecoin pools** (USDC / USDe / DOLA) on **`StableStakerV2`**, which accrues
+  **Antimatter**, not phUSD. `useStableStakerPools` owns every read and write.
+
+`src/data/antimatterData.ts` holds **STATIC CONFIG ONLY** — accent colours, copy, the sub-tab
+union, the Antimatter decimals. Every figure a user sees is a chain read on the hook's 12 s
+heartbeat.
+
+### Things that are easy to get wrong here
+
+- **Antimatter is annihilated, not claimed.** `autoAnnihilate(token)` matches accrued
+  Antimatter against the user's own staked principal, destroys both sides and mints phUSD worth
+  their sum. Use `antimatterAbi.toStableAmount(stable, amount)` to bridge 18-dec Antimatter to
+  6-dec USDC — never hand-roll that scaling.
+- **`claimEnabled()` is false by default.** Accrued Antimatter banks rather than pays until an
+  owner opens the gate. Read the flag and say so; a claim button that ignores it lies.
+- **Annihilation is gated on the phUSD price.** Net value per unit is `2p − 1`, so the action is
+  disabled at `p <= 0.50` and when the price is genuinely unknown on mainnet. Use the **raw**
+  `useBalancerPrice()` result for that decision — the repo's `?? 1.0` display clamp would turn a
+  feed failure into an open gate. `stake` and `withdraw` are never gated this way: a user must
+  always be able to exit.
+- **APY is story 083's.** The stablecoin rows render `apy: null` as an em dash. Never `0`.
+- **Iterate the static `STABLE_POOLS` config, not `getStakedTokens()`.** One
+  `useStablePoolReads` call per fixed entry is what satisfies the rules of hooks.
+- **Zero-address guard.** `StableStakerV2` / `Antimatter` carry the zero address on mainnet
+  until the deploy cutover. The hook resolves those to `undefined`, which disables every
+  dependent read, and the rows report `inactive`. Acceptance is judged on Anvil via `yarn dev`.
+- **Tailwind opacity modifiers on `pxusd-*` tokens emit no CSS.** The tokens are full hex behind
+  a `var()`, so `border-pxusd-purple-300/45` compiles to the invalid `rgb(#C4AEEA / .45)` and the
+  whole declaration is dropped. Use inline literal `rgba(...)`.
+
+### `/staking` is DeFi Llama's deep-link target
+
+The tab id is the literal string `"Stake"`, and `src/lib/tabRoutes.ts` maps `/stake`, `/staking`
+and `/stake-v3` to it. **`/staking` is DeFi Llama's outbound deep-link target** — keeping the tab
+id is what preserves it. Do not rename the tab, and do not add a new route.
+`src/components/vault/stakeMock/` is a different thing entirely: the admin-only **NFT** staking
+preview reached from `NFTListTab`, which merely shares the word "mock".
 
 ## Questions?
 

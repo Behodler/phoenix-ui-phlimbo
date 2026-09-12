@@ -4,12 +4,17 @@ import sDOLA from '../assets/sDOLA.png';
 import type { ContractAddresses } from '../types/contracts';
 
 /**
- * Static configuration for the three StableStaker pools (story 069).
+ * Static configuration for the three StableStakerV2 pools.
  *
- * The pool *list* is fixed (USDC / USDe / DOLA → earn phUSD); all per-pool
- * on-chain state (staked, pending, APY, TVL, paused, withdrawDisabled) is read
- * live by `useStableStakerPools`. `addressKey` indexes the resolved
+ * The pool *list* is fixed (USDC / USDe / DOLA → accrue **Antimatter**); all
+ * per-pool on-chain state (staked, pending, TVL, paused, withdrawDisabled,
+ * claimEnabled, autoAnnihilateAvailable) is read live by
+ * `useStableStakerPools`. `addressKey` indexes the resolved
  * `ContractAddresses` so the token address is never hardcoded here.
+ *
+ * This list — never `getStakedTokens()` — is what the hook iterates: one
+ * `useStablePoolReads` call per static entry is what keeps the rules of hooks
+ * satisfied. `getStakedTokens()` is a cross-check, not an iteration source.
  */
 export type StablePoolId = 'usdc' | 'usde' | 'dola';
 
@@ -42,7 +47,7 @@ export const STABLE_POOLS: StablePoolConfig[] = [
     addressKey: 'USDC',
     decimals: 6,
     stakeIcon: USDC,
-    tagline: 'Stake USDC into the yield-bearing TVL pool, earn a phUSD stream.',
+    tagline: 'Stake USDC into the yield-bearing TVL pool, accrue Antimatter.',
   },
   {
     id: 'usde',
@@ -50,7 +55,7 @@ export const STABLE_POOLS: StablePoolConfig[] = [
     addressKey: 'USDe',
     decimals: 18,
     stakeIcon: USDe,
-    tagline: 'Stake USDe, earn a phUSD stream.',
+    tagline: 'Stake USDe, accrue Antimatter.',
     marketStrategyKey: 'YieldStrategyUSDe',
   },
   {
@@ -59,6 +64,6 @@ export const STABLE_POOLS: StablePoolConfig[] = [
     addressKey: 'Dola',
     decimals: 18,
     stakeIcon: sDOLA,
-    tagline: 'Stake DOLA, earn a phUSD stream.',
+    tagline: 'Stake DOLA, accrue Antimatter.',
   },
 ];

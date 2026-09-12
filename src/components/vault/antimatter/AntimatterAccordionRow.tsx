@@ -3,23 +3,25 @@ import LiveYieldCounter from '../staking/LiveYieldCounter';
 import { fmtAPY, fmtAmount, fmtUSD } from '../stake/formatStake';
 import {
   ANTIMATTER_ACCENT,
-  ANTIMATTER_EXPLAINER_EVOCATIVE,
   ANTIMATTER_IRREVERSIBLE_NOTE,
   PHUSD_ACCENT,
   PHUSD_ARROW_ACCENT,
+  antimatterExplainerEvocative,
   antimatterSplit,
-} from '../../../data/antimatterMockData';
-import type { AntimatterSubTab } from '../../../data/antimatterMockData';
+} from '../../../data/antimatterData';
+import type { AntimatterSubTab } from '../../../data/antimatterData';
 import antimatterIcon from '../../../assets/antimatter.png';
 import phUSDIcon from '../../../assets/phUSD-nobackground.png';
 
 /**
- * A stable pool row on the **mock** Antimatter tab: the collapsed header plus
- * the expanded stake / withdraw / annihilate panel.
+ * A stablecoin pool row on the **real** Stake tab: the collapsed header plus
+ * the expanded stake / withdraw / annihilate panel, backed by `StableStakerV2`.
  *
- * Every figure passed in is simulated — see `src/data/antimatterMockData.ts`.
- * Nothing here touches a contract, a wagmi hook or an approval; the buttons
- * call back into the container's single `useState` and nothing else.
+ * Every figure passed in comes from a chain read via `useStableStakerPools` —
+ * `poolInfo`, `userInfo`, `pendingReward`, `unclaimedReward`, the ERC20
+ * balances and the contract's own `toStableAmount` conversion. Nothing here is
+ * simulated; the design preview this surface grew out of (stories 079/080) was
+ * wired to contracts by story 082.
  *
  * **No hooks live in this component.** It is rendered inside a `.map()` over
  * the pools, so all state — including which sub-tab each pool is showing and
@@ -27,22 +29,27 @@ import phUSDIcon from '../../../assets/phUSD-nobackground.png';
  * `StakeAccordionRow` does it.
  *
  * `StakeAccordionRow`'s `AmountField` would have been the natural thing to
- * reuse, but it is module-private and this story may not edit files outside
- * `antimatterMock/`, so the field is reproduced here as `MockAmountField`
- * (minus the contract-shaped `estimateTip` / `InfoTip` machinery, which a mock
- * has no use for).
+ * reuse, but it is module-private, so the field is reproduced here as
+ * `AmountField` with the Antimatter-specific conversion-cost note.
  */
 export interface AntimatterAccordionRowProps {
   symbol: string;
   icon: string;
-  apy: number;
+  /** `null` renders as an em dash — the Antimatter APY is story 083's subject. */
+  apy: number | null;
   staked: number;
-  /** Antimatter accrued as of the last rebase — the counter's baseline. */
+  /** Antimatter accrued as of the last chain read — the counter's baseline. */
   pendingBase: number;
-  /** Antimatter accrued per second, demo multiplier already applied. */
+  /** Antimatter accruing per second, from `poolInfo.antimatterPerSecond`. */
   ratePerSecond: number;
-  /** Antimatter accrued *right now*, recomputed by the container each tick. */
+  /** Antimatter accrued as of the last read, for the panel's plain figures. */
   pending: number;
+  /** Antimatter already banked on the contract by a claim-gated accrual. */
+  unclaimed: number;
+  /** Stake-token amount the pending Antimatter matches against (capped). */
+  matchedStable: number;
+  /** Antimatter above the staked principal, paid out as an ordinary claim. */
+  surplusAntimatter: number;
   antimatterSymbol: string;
   expanded: boolean;
   onToggle: () => void;
@@ -52,12 +59,33 @@ export interface AntimatterAccordionRowProps {
   tab: AntimatterSubTab;
   onTabChange: (tab: AntimatterSubTab) => void;
 
-  /** Mock wallet balance of this pool's stablecoin. */
+  /** Wallet balance of this pool's stablecoin. */
   walletBalance: number;
-  /** Mock wallet phUSD balance, for the before/after summary. */
+  /** Wallet phUSD balance, for the before/after summary. */
   walletPhusd: number;
-  /** Mock wallet Antimatter balance, for the surplus row of the summary. */
+  /** Wallet Antimatter balance, for the surplus row of the summary. */
   walletAntimatter: number;
+  /** phUSD spot used for the value line. Display math only. */
+  phUsdDisplayPrice: number;
+
+  /** Global pause — gates every action on this pool. */
+  disabled: boolean;
+  /** `StableStakerV2` is not deployed on this network. */
+  inactive: boolean;
+  /** Per-pool underwater flag — gates ONLY withdraw. */
+  withdrawDisabled: boolean;
+  /** Stake tokens held directly on the staker; withdrawals up to this still pay. */
+  withdrawBuffer: number;
+  /** `claimEnabled()` — false means accrual banks rather than pays. */
+  claimEnabled: boolean;
+  /** Why annihilation is unavailable, or `null` when it is available. */
+  annihilateDisabledReason: string | null;
+  /** Max slippage (bps) of an AMM-routed yield strategy, when the pool has one. */
+  conversionBps?: number;
+  /** Which action, if any, is awaiting a wallet confirmation on this pool. */
+  pendingAction: 'stake' | 'withdraw' | 'claim' | 'approve' | 'annihilate' | null;
+  /** True when the typed stake amount still needs an ERC20 approval. */
+  needsApproval: (amount: string) => boolean;
 
   stakeAmt: string;
   wdAmt: string;
@@ -66,6 +94,8 @@ export interface AntimatterAccordionRowProps {
   onStake: () => void;
   onWithdraw: () => void;
   onAnnihilate: () => void;
+  onClaim: () => void;
+  onApprove: () => void;
 }
 
 /** Chevron matching the live Stake tab's, rotated when the row is open. */
@@ -86,15 +116,14 @@ function Chevron({ expanded }: { expanded: boolean }) {
 /**
  * Amount input with a clickable balance, a MAX button and a token glyph.
  *
- * `pr-28` is load-bearing: it is the repo's equivalent of the mock's
- * `padding-right:112px`, and without it a long typed number runs underneath
- * the MAX button and the glyph.
+ * `pr-28` is load-bearing: without it a long typed number runs underneath the
+ * MAX button and the glyph.
  *
  * MAX floors to 4 decimals rather than passing the raw float — the label only
  * ever displays 4 decimals, and rounding a user-facing credit upward is never
  * the right direction.
  */
-function MockAmountField({
+function AmountField({
   label,
   balanceLabel,
   balance,
@@ -102,6 +131,7 @@ function MockAmountField({
   onChange,
   tokenSymbol,
   tokenIcon,
+  note,
 }: {
   label: string;
   balanceLabel: string;
@@ -110,6 +140,7 @@ function MockAmountField({
   onChange: (v: string) => void;
   tokenSymbol: string;
   tokenIcon: string;
+  note?: string;
 }) {
   const parsed = parseFloat(value) || 0;
   const overBalance = parsed > balance + 1e-7;
@@ -155,13 +186,14 @@ function MockAmountField({
         </div>
       </div>
       <div className="mt-1.5 flex items-center justify-between gap-3 text-[12px] text-muted-foreground">
-        {/* Every pool here is a stablecoin, so 1 unit ≈ $1 and no price feed
-            is needed (nor available — this surface is entirely fake). */}
+        {/* Every pool here is a stablecoin, so 1 unit ≈ $1 and no price feed is
+            needed for the entry/exit amount itself. */}
         <span>
           ≈ <span className={`font-mono ${parsed > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{fmtUSD(parsed)}</span>
         </span>
         {overBalance && <span className="text-pxusd-pink-400">Insufficient balance</span>}
       </div>
+      {note && <div className="mt-1.5 text-[11.5px] leading-[1.5] text-muted-foreground">{note}</div>}
     </div>
   );
 }
@@ -257,6 +289,9 @@ export default function AntimatterAccordionRow({
   pendingBase,
   ratePerSecond,
   pending,
+  unclaimed,
+  matchedStable,
+  surplusAntimatter,
   antimatterSymbol,
   expanded,
   onToggle,
@@ -266,6 +301,16 @@ export default function AntimatterAccordionRow({
   walletBalance,
   walletPhusd,
   walletAntimatter,
+  phUsdDisplayPrice,
+  disabled,
+  inactive,
+  withdrawDisabled,
+  withdrawBuffer,
+  claimEnabled,
+  annihilateDisabledReason,
+  conversionBps,
+  pendingAction,
+  needsApproval,
   stakeAmt,
   wdAmt,
   onStakeAmtChange,
@@ -273,15 +318,19 @@ export default function AntimatterAccordionRow({
   onStake,
   onWithdraw,
   onAnnihilate,
+  onClaim,
+  onApprove,
 }: AntimatterAccordionRowProps) {
   // ---- derived annihilation figures -------------------------------------
-  const matched = Math.min(pending, staked);
+  // `matchedStable` is the contract's own conversion, already capped by the
+  // staked balance. phUSD paid out is worth both sides of the pair together,
+  // which in stake-token units is twice the matched amount.
+  const matched = matchedStable;
   const receive = matched * 2;
-  const leftover = pending - matched;
+  const leftover = surplusAntimatter;
   // The epsilon matters: accrual makes exact equality unreachable, so a bare
-  // `pending > staked` produces a phantom surplus line the instant the two
-  // sides cross.
-  const capped = pending > staked + 1e-9;
+  // `> 0` produces a phantom surplus line the instant the two sides cross.
+  const capped = leftover > 1e-9;
 
   const [pendingHead, pendingTail] = antimatterSplit(pending, 6);
   const [matchHead, matchTail] = antimatterSplit(matched, 6);
@@ -289,17 +338,30 @@ export default function AntimatterAccordionRow({
 
   const stakeParsed = parseFloat(stakeAmt) || 0;
   const wdParsed = parseFloat(wdAmt) || 0;
-  const canStake = stakeParsed > 0 && stakeParsed <= walletBalance;
-  const canWd = wdParsed > 0 && wdParsed <= staked;
-  const canAnn = matched > 0;
+  const busy = pendingAction !== null;
+  const wantsApproval = needsApproval(stakeAmt);
 
-  const annLabel = !canAnn
-    ? `Stake ${symbol} to accrue ${antimatterSymbol}`
-    : capped
-      ? `Annihilate ${fmtAmount(matched, 4)} ${antimatterSymbol} with ${fmtAmount(matched, 4)} staked ${symbol} → receive ${fmtAmount(receive, 4)} phUSD + ${fmtAmount(leftover, 4)} ${antimatterSymbol}`
-      : `Annihilate ${fmtAmount(matched, 4)} ${antimatterSymbol} with ${fmtAmount(matched, 4)} staked ${symbol} → receive ${fmtAmount(receive, 4)} phUSD`;
+  const canStake = !disabled && !busy && stakeParsed > 0 && stakeParsed <= walletBalance;
+  // The set-aside buffer is why `withdrawDisabled` is not a flat block: the
+  // contract still pays withdrawals that fit entirely inside it.
+  const withinBuffer = !withdrawDisabled || wdParsed <= withdrawBuffer;
+  const canWd = !disabled && !busy && wdParsed > 0 && wdParsed <= staked && withinBuffer;
+  const canAnn = !disabled && !busy && annihilateDisabledReason === null && matched > 0;
+  const canClaim = !disabled && !busy && claimEnabled && pending + unclaimed > 0;
+
+  const annLabel = inactive
+    ? 'Not live on this network yet'
+    : matched <= 0
+      ? `Stake ${symbol} to accrue ${antimatterSymbol}`
+      : capped
+        ? `Annihilate ${fmtAmount(matched, 4)} ${antimatterSymbol} with ${fmtAmount(matched, 4)} staked ${symbol} → receive ${fmtAmount(receive, 4)} phUSD + ${fmtAmount(leftover, 4)} ${antimatterSymbol}`
+        : `Annihilate ${fmtAmount(matched, 4)} ${antimatterSymbol} with ${fmtAmount(matched, 4)} staked ${symbol} → receive ${fmtAmount(receive, 4)} phUSD`;
 
   const disabledCls = 'opacity-40 cursor-not-allowed';
+  const conversionNote =
+    conversionBps !== undefined
+      ? `Deposits into this pool route through an AMM and pay a fixed ${(conversionBps / 100).toFixed(2)}% conversion cost; withdrawals pay between zero and that, depending on the strategy's buffer.`
+      : undefined;
 
   return (
     <div
@@ -331,7 +393,9 @@ export default function AntimatterAccordionRow({
               {/* The APY column is dropped below sm, so re-surface it inline. */}
               <span className="flex items-center gap-1.5 whitespace-nowrap sm:hidden">
                 ·
-                <span className="font-mono font-semibold text-pxusd-purple-300">{fmtAPY(apy)} APY</span>
+                <span className="font-mono font-semibold text-pxusd-purple-300">
+                  {apy === null ? '—' : `${fmtAPY(apy)} APY`}
+                </span>
               </span>
             </span>
           </div>
@@ -339,7 +403,9 @@ export default function AntimatterAccordionRow({
 
         <div className="hidden flex-col gap-0.5 sm:flex">
           <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground">APY</span>
-          <span className="font-mono text-[18px] font-bold text-pxusd-purple-300">{fmtAPY(apy)}</span>
+          <span className="font-mono text-[18px] font-bold text-pxusd-purple-300">
+            {apy === null ? <span className="text-muted-foreground">—</span> : fmtAPY(apy)}
+          </span>
         </div>
 
         <div className="hidden flex-col gap-0.5 sm:flex">
@@ -370,6 +436,31 @@ export default function AntimatterAccordionRow({
 
       {expanded && (
         <div className="border-t border-border px-5 pb-5 pt-4">
+          {inactive && (
+            <div
+              className="mb-4 rounded-xl border p-3.5 text-[12.5px] leading-[1.5] text-muted-foreground"
+              style={{ borderColor: 'rgba(196,174,234,.3)', background: 'rgba(196,174,234,.06)' }}
+            >
+              <span className="font-semibold text-pxusd-purple-300">Not live on this network.</span>{' '}
+              The Antimatter staker has not been deployed here yet, so this pool is inactive and no
+              contract reads are being issued.
+            </div>
+          )}
+
+          {!inactive && !claimEnabled && (
+            <div
+              className="mb-4 rounded-xl border p-3.5 text-[12.5px] leading-[1.5] text-muted-foreground"
+              style={{ borderColor: 'rgba(255,217,61,.3)', background: 'rgba(255,217,61,.06)' }}
+            >
+              <span className="font-semibold" style={{ color: '#FFD93D' }}>
+                Claiming is not open yet.
+              </span>{' '}
+              {antimatterSymbol} is accruing normally, but the contract&apos;s claim gate is closed,
+              so it banks on the staker rather than paying out. Annihilating it against your stake is
+              unaffected.
+            </div>
+          )}
+
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <SegmentedControl<AntimatterSubTab>
               ariaLabel={`${symbol} pool action`}
@@ -386,7 +477,7 @@ export default function AntimatterAccordionRow({
 
           {tab === 'stake' && (
             <div>
-              <MockAmountField
+              <AmountField
                 label="Stake amount"
                 balanceLabel="Wallet"
                 balance={walletBalance}
@@ -394,21 +485,33 @@ export default function AntimatterAccordionRow({
                 onChange={onStakeAmtChange}
                 tokenSymbol={symbol}
                 tokenIcon={icon}
+                note={conversionNote}
               />
-              <button
-                type="button"
-                onClick={onStake}
-                disabled={!canStake}
-                className={`phoenix-btn-primary w-full ${canStake ? '' : disabledCls}`}
-              >
-                Stake {symbol} → Earn {antimatterSymbol}
-              </button>
+              {wantsApproval ? (
+                <button
+                  type="button"
+                  onClick={onApprove}
+                  disabled={disabled || busy}
+                  className={`phoenix-btn-primary w-full ${disabled || busy ? disabledCls : ''}`}
+                >
+                  {pendingAction === 'approve' ? 'Approving…' : `Approve ${symbol}`}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onStake}
+                  disabled={!canStake}
+                  className={`phoenix-btn-primary w-full ${canStake ? '' : disabledCls}`}
+                >
+                  {pendingAction === 'stake' ? 'Staking…' : `Stake ${symbol} → Earn ${antimatterSymbol}`}
+                </button>
+              )}
             </div>
           )}
 
           {tab === 'withdraw' && (
             <div>
-              <MockAmountField
+              <AmountField
                 label="Withdraw amount"
                 balanceLabel="Staked"
                 balance={staked}
@@ -416,6 +519,11 @@ export default function AntimatterAccordionRow({
                 onChange={onWdAmtChange}
                 tokenSymbol={symbol}
                 tokenIcon={icon}
+                note={
+                  withdrawDisabled
+                    ? `This pool's yield strategy is rebalancing, so withdrawals are limited to the set-aside buffer of ${fmtAmount(withdrawBuffer, 2)} ${symbol} for now. Staking and annihilating are unaffected.`
+                    : conversionNote
+                }
               />
               <button
                 type="button"
@@ -423,8 +531,20 @@ export default function AntimatterAccordionRow({
                 disabled={!canWd}
                 className={`phoenix-btn-ghost w-full ${canWd ? '' : disabledCls}`}
               >
-                Withdraw {symbol}
+                {pendingAction === 'withdraw' ? 'Withdrawing…' : `Withdraw ${symbol}`}
               </button>
+              {claimEnabled && (
+                <button
+                  type="button"
+                  onClick={onClaim}
+                  disabled={!canClaim}
+                  className={`phoenix-btn-ghost mt-2.5 w-full ${canClaim ? '' : disabledCls}`}
+                >
+                  {pendingAction === 'claim'
+                    ? 'Claiming…'
+                    : `Claim ${fmtAmount(pending + unclaimed, 4)} ${antimatterSymbol}`}
+                </button>
+              )}
             </div>
           )}
 
@@ -486,7 +606,7 @@ export default function AntimatterAccordionRow({
                 </div>
 
                 <p className="mt-3.5 text-[12.5px] leading-[1.55] text-muted-foreground">
-                  {ANTIMATTER_EXPLAINER_EVOCATIVE}
+                  {antimatterExplainerEvocative(antimatterSymbol)}
                 </p>
 
                 <div
@@ -496,7 +616,7 @@ export default function AntimatterAccordionRow({
                   <SummaryLine
                     label={`Your ${symbol} stake after`}
                     before={fmtAmount(staked, 4)}
-                    after={fmtAmount(staked - matched, 4)}
+                    after={fmtAmount(Math.max(staked - matched, 0), 4)}
                     afterColor="#C4AEEA"
                   />
                   <SummaryLine
@@ -519,7 +639,14 @@ export default function AntimatterAccordionRow({
                       afterColor="#C4AEEA"
                     />
                   )}
-                  <SummaryLine label="Net value received" before={fmtUSD(receive - matched)} />
+                  {/* Net value uses the phUSD spot: the pair is worth `2p - 1`
+                      per matched unit, so at p = 1 it is exactly the matched
+                      amount. Display math only — the annihilate gate reads the
+                      RAW, unclamped price. */}
+                  <SummaryLine
+                    label="Net value received"
+                    before={fmtUSD(receive * phUsdDisplayPrice - matched)}
+                  />
                 </div>
 
                 {capped && (
@@ -532,9 +659,9 @@ export default function AntimatterAccordionRow({
                     </span>{' '}
                     You hold more {antimatterSymbol} than staked {symbol}, so{' '}
                     <span className="font-mono text-pxusd-white">
-                      {fmtAmount(matched, 6)} {antimatterSymbol}
+                      {fmtAmount(matched, 6)} {symbol}
                     </span>{' '}
-                    annihilates against your principal and the surplus{' '}
+                    of principal annihilates and the surplus{' '}
                     <span className="font-mono text-pxusd-white">
                       {fmtAmount(leftover, 6)} {antimatterSymbol}
                     </span>{' '}
@@ -543,18 +670,31 @@ export default function AntimatterAccordionRow({
                 )}
               </div>
 
-              {/* Standard Phoenix orange, not the mock's lavender gradient:
-                  Antimatter's identity is carried by the accent on figures,
-                  borders and the token pill, never by restyling buttons. The
-                  label is long by design — it states the whole trade — so it
-                  wraps rather than truncating on narrow screens. */}
+              {/* The gate must never be a silently dead button: when
+                  annihilation is unavailable the reason is rendered above it. */}
+              {annihilateDisabledReason !== null && (
+                <div
+                  data-testid={`annihilate-blocked-${symbol}`}
+                  className="mb-3 rounded-xl border p-3.5 text-[12.5px] leading-[1.5] text-muted-foreground"
+                  style={{ borderColor: 'rgba(255,77,109,.35)', background: 'rgba(255,77,109,.07)' }}
+                >
+                  <span className="font-semibold text-pxusd-pink-400">Annihilation disabled.</span>{' '}
+                  {annihilateDisabledReason}
+                </div>
+              )}
+
+              {/* Standard Phoenix orange, not a lavender gradient: Antimatter's
+                  identity is carried by the accent on figures, borders and the
+                  token pill, never by restyling buttons. The label is long by
+                  design — it states the whole trade — so it wraps rather than
+                  truncating on narrow screens. */}
               <button
                 type="button"
                 onClick={onAnnihilate}
                 disabled={!canAnn}
                 className={`phoenix-btn-primary w-full whitespace-normal text-left sm:text-center ${canAnn ? '' : disabledCls}`}
               >
-                {annLabel}
+                {pendingAction === 'annihilate' ? 'Annihilating…' : annLabel}
               </button>
               <div className="mt-2.5 text-center text-[11.5px] text-muted-foreground">
                 {ANTIMATTER_IRREVERSIBLE_NOTE(symbol)}
