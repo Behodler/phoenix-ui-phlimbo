@@ -83,7 +83,10 @@ When implementing or testing contract interaction features:
 For testing:
 - Use `yarn dev` for local development with Anvil
 - For deployed Lambda functions (if any), test via remote invocation only
-- Contract ABIs are generated in `/src/generated/wagmi.ts` via wagmi codegen
+- Contract ABIs come from the pinned `@behodler/phase2-wagmi-hooks` npm package
+  (`node_modules/@behodler/phase2-wagmi-hooks/generated.ts`), published from the phStaging2
+  repo. There is NO local codegen: `src/generated/` does not exist, there is no `generate`
+  script, and `wagmi.config.ts` is dead. Never run `wagmi generate`.
 
 ## Configuration
 
@@ -110,9 +113,12 @@ The `ContractAddressContext` provides contract addresses throughout the app.
 ### Wagmi Integration
 
 Uses wagmi v2 for Web3 interactions:
-- Contract hooks auto-generated from ABIs
-- Configuration in `wagmi.config.ts`
-- Generated code in `/src/generated/wagmi.ts`
+- ABIs are `as const` exports from `@behodler/phase2-wagmi-hooks` (pinned exactly in
+  `package.json`). The package emits **ABIs only** — no `useRead…`/`useWrite…` hooks — so the
+  app always calls `useReadContract({ address, abi, functionName })` itself.
+- Addresses resolve dynamically through `addressFetcher` / `ViewRouter` into
+  `ContractAddresses` (`src/types/contracts.ts`); never hardcode an address.
+- `wagmi.config.ts` is a dead artifact of an abandoned local-codegen path. Do not run it.
 
 ## Common Pitfalls
 
@@ -129,7 +135,7 @@ Uses wagmi v2 for Web3 interactions:
 - `/src/lib/addressFetcher.ts` - Dynamic address loading logic
 - `/src/contexts/ContractAddressContext.tsx` - React context for contract addresses
 - `/src/hooks/useContractInteractions.ts` - Custom contract interaction hooks
-- `/src/generated/wagmi.ts` - Auto-generated wagmi hooks (DO NOT EDIT)
+- `/src/types/contracts.ts` - The local `ContractAddresses` interface (address-key source of truth)
 
 ## Story Execution
 

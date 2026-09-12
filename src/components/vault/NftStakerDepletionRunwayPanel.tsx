@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
-import { nftStakerDepletionAbi } from '@behodler/phase2-wagmi-hooks';
+import { nftStakerDepletionV2Abi } from '@behodler/phase2-wagmi-hooks';
 import StakerTopUpForm from './StakerTopUpForm';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -56,77 +56,77 @@ export default function NftStakerDepletionRunwayPanel({
 
   const { data: runwaySeconds, refetch: refetchRunwaySeconds } = useReadContract({
     address: stakerAddress,
-    abi: nftStakerDepletionAbi,
+    abi: nftStakerDepletionV2Abi,
     functionName: 'runwaySeconds',
     query: statQuery,
   });
 
   const { data: rewardRate, refetch: refetchRewardRate } = useReadContract({
     address: stakerAddress,
-    abi: nftStakerDepletionAbi,
+    abi: nftStakerDepletionV2Abi,
     functionName: 'currentRewardRate',
     query: statQuery,
   });
 
   const { data: rewardBudget, refetch: refetchRewardBudget } = useReadContract({
     address: stakerAddress,
-    abi: nftStakerDepletionAbi,
+    abi: nftStakerDepletionV2Abi,
     functionName: 'rewardBudget',
     query: statQuery,
   });
 
   const { data: committedDebt, refetch: refetchCommittedDebt } = useReadContract({
     address: stakerAddress,
-    abi: nftStakerDepletionAbi,
+    abi: nftStakerDepletionV2Abi,
     functionName: 'committedDebt',
     query: statQuery,
   });
 
   const { data: totalBudget, refetch: refetchTotalBudget } = useReadContract({
     address: stakerAddress,
-    abi: nftStakerDepletionAbi,
+    abi: nftStakerDepletionV2Abi,
     functionName: 'totalBudget',
     query: statQuery,
   });
 
   const { data: totalDebt, refetch: refetchTotalDebt } = useReadContract({
     address: stakerAddress,
-    abi: nftStakerDepletionAbi,
+    abi: nftStakerDepletionV2Abi,
     functionName: 'totalDebt',
     query: statQuery,
   });
 
   const { data: totalStaked, refetch: refetchTotalStaked } = useReadContract({
     address: stakerAddress,
-    abi: nftStakerDepletionAbi,
+    abi: nftStakerDepletionV2Abi,
     functionName: 'totalStaked',
     query: statQuery,
   });
 
   const { data: windowMonths, refetch: refetchWindowMonths } = useReadContract({
     address: stakerAddress,
-    abi: nftStakerDepletionAbi,
+    abi: nftStakerDepletionV2Abi,
     functionName: 'depletionWindowMonths',
     query: statQuery,
   });
 
   const { data: windowEnd, refetch: refetchWindowEnd } = useReadContract({
     address: stakerAddress,
-    abi: nftStakerDepletionAbi,
+    abi: nftStakerDepletionV2Abi,
     functionName: 'windowEnd',
     query: statQuery,
   });
 
   const { data: poolState, refetch: refetchPoolState } = useReadContract({
     address: stakerAddress,
-    abi: nftStakerDepletionAbi,
+    abi: nftStakerDepletionV2Abi,
     functionName: 'poolState',
     query: statQuery,
   });
 
   const { data: owner } = useReadContract({
     address: stakerAddress,
-    abi: nftStakerDepletionAbi,
+    abi: nftStakerDepletionV2Abi,
     functionName: 'owner',
     query: statQuery,
   });
@@ -266,7 +266,7 @@ export default function NftStakerDepletionRunwayPanel({
 
           <StakerTopUpForm
             stakerAddress={stakerAddress}
-            stakerAbi={nftStakerDepletionAbi}
+            stakerAbi={nftStakerDepletionV2Abi}
             rewardTokenAddress={phUsdAddress}
             stakerLabel={stakerLabel}
             idPrefix={idPrefix}

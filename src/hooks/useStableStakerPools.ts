@@ -7,7 +7,7 @@ import {
   useWaitForTransactionReceipt,
 } from 'wagmi';
 import { parseUnits, maxUint256, erc20Abi, zeroAddress } from 'viem';
-import { stableStakerAbi, erc4626MarketYieldStrategyAbi } from '@behodler/phase2-wagmi-hooks';
+import { stableStakerV2Abi, erc4626MarketYieldStrategyAbi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { useToast } from '../components/ui/ToastProvider';
 import { useWalletBalances } from '../contexts/WalletBalancesContext';
@@ -112,7 +112,7 @@ function useStablePoolReads(
 
   const { data: poolInfo, isLoading: poolInfoLoading, refetch: refetchPoolInfo } = useReadContract({
     address: stableStaker,
-    abi: stableStakerAbi,
+    abi: stableStakerV2Abi,
     functionName: 'poolInfo',
     args: tokenAddress ? [tokenAddress] : undefined,
     query: { enabled },
@@ -120,7 +120,7 @@ function useStablePoolReads(
 
   const { data: userInfo, isLoading: userInfoLoading, refetch: refetchUserInfo } = useReadContract({
     address: stableStaker,
-    abi: stableStakerAbi,
+    abi: stableStakerV2Abi,
     functionName: 'userInfo',
     args: tokenAddress && walletAddress ? [tokenAddress, walletAddress] : undefined,
     query: { enabled: enabledUser },
@@ -128,7 +128,7 @@ function useStablePoolReads(
 
   const { data: pending, isLoading: pendingLoading, refetch: refetchPending } = useReadContract({
     address: stableStaker,
-    abi: stableStakerAbi,
+    abi: stableStakerV2Abi,
     functionName: 'pendingReward',
     args: tokenAddress && walletAddress ? [tokenAddress, walletAddress] : undefined,
     query: { enabled: enabledUser },
@@ -136,7 +136,7 @@ function useStablePoolReads(
 
   const { data: withdrawDisabledRaw, refetch: refetchWithdrawDisabled } = useReadContract({
     address: stableStaker,
-    abi: stableStakerAbi,
+    abi: stableStakerV2Abi,
     functionName: 'withdrawDisabled',
     args: tokenAddress ? [tokenAddress] : undefined,
     query: { enabled },
@@ -198,7 +198,7 @@ function useStablePoolReads(
   }, [isActive, isPollingEnabled, enabled, enabledUser]);
 
   const pool = poolInfo as [bigint, bigint, bigint, bigint] | undefined;
-  const phusdPerSecond = pool ? pool[0] : 0n;
+  const antimatterPerSecond = pool ? pool[0] : 0n;
   const totalStaked = pool ? pool[3] : 0n;
   const userAmount = userInfo ? (userInfo as [bigint, bigint])[0] : 0n;
   const pendingRaw = (pending as bigint | undefined) ?? 0n;
@@ -207,17 +207,22 @@ function useStablePoolReads(
   const stakedBalance = userAmount ? Number(userAmount) / 10 ** config.decimals : 0;
   const pendingRewards = pendingRaw ? Number(pendingRaw) / 1e18 : 0;
 
-  // User's phUSD/s share of emissions = phusdPerSecond * userAmount / totalStaked.
+  // User's Antimatter/s share of emissions = antimatterPerSecond * userAmount / totalStaked.
   // Both userAmount and totalStaked are in token decimals, so the ratio is
-  // dimensionless; phusdPerSecond is 18-dec phUSD/s. Guard totalStaked == 0.
+  // dimensionless; antimatterPerSecond is 18-dec Antimatter/s. Guard totalStaked == 0.
   // Hold the counter still when polling is paused (rate 0).
   const ratePerSecond =
     isPollingEnabled && totalStaked > 0n && userAmount > 0n
-      ? (Number(phusdPerSecond) / 1e18) * (Number(userAmount) / Number(totalStaked))
+      ? (Number(antimatterPerSecond) / 1e18) * (Number(userAmount) / Number(totalStaked))
       : 0;
 
-  // APY = annualized phUSD emission (in USD) / deposit USD * 100. Stables valued
-  // at $1.00, phUSD at phUsdPriceUSD.
+  // APY = annualized reward emission (in USD) / deposit USD * 100. Stables valued
+  // at $1.00.
+  //
+  // KNOWN-WRONG VALUATION (story 081, fixed by story 083): StableStakerV2 emits
+  // Antimatter, not phUSD, but the numerator below still values the emission at
+  // phUsdPriceUSD. Retargeting the rate onto antimatterPerSecond was needed to
+  // compile; the correct net-yield valuation is story 083's subject.
   //
   // When the pool already has staked deposits (totalStaked > 0) we report the
   // real, current APY off the actual total. When the pool is empty there is no
@@ -227,7 +232,7 @@ function useStablePoolReads(
   // 10 (or a disconnected wallet → 0), we assume a placeholder of 100 tokens so
   // the figure stays representative instead of spiking arbitrarily high.
   const apy = (() => {
-    const annualPhUsd = (Number(phusdPerSecond) / 1e18) * SECONDS_PER_YEAR;
+    const annualPhUsd = (Number(antimatterPerSecond) / 1e18) * SECONDS_PER_YEAR;
     const annualUsd = annualPhUsd * phUsdPriceUSD;
 
     // Effective deposit (in tokens) that anchors the APY denominator.
@@ -284,7 +289,7 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
   const { isPollingEnabled } = usePolling();
   const { price: balancerPrice } = useBalancerPrice();
 
-  const stableStaker = addresses?.StableStaker as `0x${string}` | undefined;
+  const stableStaker = addresses?.StableStakerV2 as `0x${string}` | undefined;
   const phUsdMarketPrice = isMainnet ? balancerPrice : null;
   const phUsdPriceUSD = phUsdMarketPrice !== null && phUsdMarketPrice > 0 ? phUsdMarketPrice : 1.0;
 
@@ -303,7 +308,7 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
   // ---- Global pause (gates all actions for all pools) ---------------------
   const { data: isPausedRaw } = useReadContract({
     address: stableStaker,
-    abi: stableStakerAbi,
+    abi: stableStakerV2Abi,
     functionName: 'paused',
     query: { enabled: !!stableStaker },
   });
@@ -450,7 +455,7 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
       setStakeCtx({ id, amount });
       addToast({ type: 'info', title: 'Confirm Transaction', description: `Please confirm the ${cfg.symbol} stake in your wallet.`, duration: 30000 });
       const amountWei = parseUnits(amount, cfg.decimals);
-      const hash = await writeStake({ address: stableStaker!, abi: stableStakerAbi, functionName: 'stake', args: [tokenAddress, amountWei] });
+      const hash = await writeStake({ address: stableStaker!, abi: stableStakerV2Abi, functionName: 'stake', args: [tokenAddress, amountWei] });
       addToast({ type: 'info', title: 'Transaction Submitted', description: 'Waiting for blockchain confirmation...', duration: 30000, action: { label: 'View on Etherscan', onClick: () => window.open(explorerUrl(hash), '_blank') } });
     } catch (error) {
       handleTxError(error, 'Stake Failed');
@@ -500,7 +505,7 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
       setWithdrawCtx({ id, amount });
       addToast({ type: 'info', title: 'Confirm Transaction', description: `Please confirm the ${cfg.symbol} withdrawal in your wallet.`, duration: 30000 });
       const amountWei = parseUnits(amount, cfg.decimals);
-      const hash = await writeWithdraw({ address: stableStaker!, abi: stableStakerAbi, functionName: 'withdraw', args: [tokenAddress, amountWei] });
+      const hash = await writeWithdraw({ address: stableStaker!, abi: stableStakerV2Abi, functionName: 'withdraw', args: [tokenAddress, amountWei] });
       addToast({ type: 'info', title: 'Transaction Submitted', description: 'Waiting for blockchain confirmation...', duration: 30000, action: { label: 'View on Etherscan', onClick: () => window.open(explorerUrl(hash), '_blank') } });
     } catch (error) {
       handleTxError(error, 'Withdrawal Failed');
@@ -525,7 +530,7 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
       setPendingAction({ id, action: 'claim' });
       setClaimCtx({ id });
       addToast({ type: 'info', title: 'Confirm Transaction', description: `Please confirm the ${cfg.symbol} pool claim in your wallet.`, duration: 30000 });
-      const hash = await writeClaim({ address: stableStaker!, abi: stableStakerAbi, functionName: 'claim', args: [tokenAddress] });
+      const hash = await writeClaim({ address: stableStaker!, abi: stableStakerV2Abi, functionName: 'claim', args: [tokenAddress] });
       addToast({ type: 'info', title: 'Transaction Submitted', description: 'Waiting for blockchain confirmation...', duration: 30000, action: { label: 'View on Etherscan', onClick: () => window.open(explorerUrl(hash), '_blank') } });
     } catch (error) {
       handleTxError(error, 'Claim Failed');

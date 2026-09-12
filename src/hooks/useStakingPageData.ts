@@ -8,7 +8,7 @@ import {
 } from 'wagmi';
 import { formatUnits } from 'viem';
 import type { Address, Hash } from 'viem';
-import { nftStakerAbi, nftStakerDepletionAbi } from '@behodler/phase2-wagmi-hooks';
+import { nftStakerAbi, nftStakerDepletionV2Abi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { useMinterPageView } from './useMinterPageView';
 import { useBalancerPrice } from './useBalancerPrice';
@@ -244,12 +244,12 @@ export function useStakingPageData(
       ? [
           {
             address: stakerAddress as Address,
-            abi: nftStakerDepletionAbi,
+            abi: nftStakerDepletionV2Abi,
             functionName: 'totalBudget',
           },
           {
             address: stakerAddress as Address,
-            abi: nftStakerDepletionAbi,
+            abi: nftStakerDepletionV2Abi,
             functionName: 'depletionWindowMonths',
           },
         ]

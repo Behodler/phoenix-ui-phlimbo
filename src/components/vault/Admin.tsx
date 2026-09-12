@@ -4,13 +4,12 @@ import { readContract } from '@wagmi/core';
 import { wagmiConfig } from '../../wagmiConfig';
 import { erc20Abi, formatUnits, parseUnits, zeroAddress } from 'viem';
 import {
-  phlimboV2Abi,
   phlimboV3Abi,
   phusdStableMinterAbi,
   erc4626YieldStrategyAbi,
   stableYieldAccumulatorAbi,
   balancerPoolerV2Abi,
-  stableStakerAbi,
+  stableStakerV2Abi,
   multiPoolerAbi,
 } from '@behodler/phase2-wagmi-hooks';
 import { pauserAbi } from '../../lib/pauserAbi';
@@ -125,14 +124,9 @@ const getContractConfigs = (): ContractConfig[] => [
     addressKey: 'PhusdStableMinter',
     abi: phusdStableMinterAbi as Abi,
   },
-  {
-    name: 'PhlimboEA',
-    addressKey: 'PhlimboEA',
-    abi: phlimboV2Abi as Abi,
-  },
-  // The successor farm. The PhlimboEA key deliberately still names V2 (mainnet
-  // parity), so V3 gets its own entry rather than replacing it — both are
-  // driveable while the cutover is being rehearsed.
+  // The live farm. The retired V2 entry (PhlimboEA) was dropped when
+  // @behodler/phase2-wagmi-hooks 0.15.0 removed phlimboV2Abi and the
+  // PhlimboEA address key.
   {
     name: 'PhlimboV3',
     addressKey: 'PhlimboV3',
@@ -226,7 +220,7 @@ function useStableStakerPoolStats(
 
   const { data: poolInfo, refetch: refetchPoolInfo, isLoading: poolInfoLoading } = useReadContract({
     address: stableStaker,
-    abi: stableStakerAbi,
+    abi: stableStakerV2Abi,
     functionName: 'poolInfo',
     args: tokenAddress ? [tokenAddress] : undefined,
     query: { enabled },
@@ -234,7 +228,7 @@ function useStableStakerPoolStats(
 
   const { data: withdrawDisabled, refetch: refetchWithdrawDisabled, isLoading: withdrawDisabledLoading } = useReadContract({
     address: stableStaker,
-    abi: stableStakerAbi,
+    abi: stableStakerV2Abi,
     functionName: 'withdrawDisabled',
     args: tokenAddress ? [tokenAddress] : undefined,
     query: { enabled },
@@ -337,13 +331,13 @@ export default function Admin() {
   const [isCalling, setIsCalling] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
 
-  // Fetch the owner address from the PhlimboEA contract (new Phase 2 architecture)
+  // Fetch the owner address from the PhlimboV3 contract (new Phase 2 architecture)
   const { data: ownerAddress } = useReadContract({
-    address: addresses?.PhlimboEA as `0x${string}` | undefined,
-    abi: phlimboV2Abi,
+    address: addresses?.PhlimboV3 as `0x${string}` | undefined,
+    abi: phlimboV3Abi,
     functionName: 'owner',
     query: {
-      enabled: !!addresses?.PhlimboEA,
+      enabled: !!addresses?.PhlimboV3,
     },
   });
 
@@ -429,8 +423,8 @@ export default function Admin() {
 
   // ========== PHLIMBO STATISTICS SECTION ==========
   // These stats describe the LIVE farm, which is PhlimboV3. PhlimboEA (V2) is
-  // wound down and mint-revoked; it stays reachable through the generic contract
-  // interaction panel above, but no longer drives this dashboard.
+  // wound down and mint-revoked, and is no longer reachable from this panel at all
+  // (wagmi-hooks 0.15.0 removed its ABI and address key).
   const phlimboV3Address = addresses?.PhlimboV3 as `0x${string}` | undefined;
   const isPhlimboV3Deployed = !!phlimboV3Address && phlimboV3Address !== ZERO_ADDRESS;
 
@@ -590,7 +584,7 @@ export default function Admin() {
   });
 
   // ========== STABLE STAKER SECTION ==========
-  const stableStakerAddress = addresses?.StableStaker as `0x${string}` | undefined;
+  const stableStakerAddress = addresses?.StableStakerV2 as `0x${string}` | undefined;
   const isStableStakerDeployed = !!stableStakerAddress && stableStakerAddress !== ZERO_ADDRESS;
   const stableStakerUsdc = useStableStakerPoolStats(stableStakerAddress, addresses?.USDC as `0x${string}` | undefined);
   const stableStakerUsde = useStableStakerPoolStats(stableStakerAddress, addresses?.USDe as `0x${string}` | undefined);
@@ -2091,7 +2085,7 @@ export default function Admin() {
       <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4 mb-6">
         <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-foreground">PhlimboEA Owner:</span>
+            <span className="text-sm text-foreground">PhlimboV3 Owner:</span>
             <span className="text-xs font-mono text-accent">
               {ownerAddress ? `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)}` : 'Loading...'}
             </span>
@@ -2422,8 +2416,8 @@ export default function Admin() {
         </div>
         <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
           <strong>Note:</strong> These figures come from <strong>PhlimboV3</strong>, the live farm.
-          The retired V2 farm (PhlimboEA) is wound down and mint-revoked; read it through the
-          PhlimboEA entry in the contract interaction panel above if you need its residual numbers.
+          The retired V2 farm (PhlimboEA) is wound down, mint-revoked and no longer reachable from
+          this panel: wagmi-hooks 0.15.0 removed both its ABI and its address key.
           <span className="block mt-1">
             phUSDPerSecond is the current phUSD emission rate. rewardPerSecond is the current USDC
             reward distribution rate (stored with 1e18 precision in the contract), recalculated when
@@ -3099,7 +3093,7 @@ export default function Admin() {
       <div className="mt-6 p-4 bg-card border border-border rounded-lg">
         <p className="text-xs text-muted-foreground">
           <strong>Phase 2 Contracts:</strong> This admin panel manages the new Phoenix Phase 2 protocol contracts
-          including PhUSD, Pauser, YieldStrategies (Dola, USDT, USDS), PhusdStableMinter, and PhlimboEA.
+          including PhUSD, Pauser, YieldStrategies (Dola, USDT, USDS), PhusdStableMinter, and PhlimboV3.
         </p>
         <p className="text-xs text-muted-foreground mt-2">
           <strong>Dynamic ABI Loading:</strong> ABIs are statically imported from <code className="px-1 py-0.5 bg-background rounded">@behodler/phase2-wagmi-hooks</code>.
