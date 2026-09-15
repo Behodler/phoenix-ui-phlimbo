@@ -55,9 +55,8 @@ export type AntimatterSubTab = 'stake' | 'withdraw' | 'annihilate';
  * the evocative one is the one on screen and the plain one is kept beside it so
  * swapping is a one-word change rather than a rewrite.
  */
-export const antimatterExplainerEvocative = (symbol: string) =>
-  `Matter meets antimatter: each ${symbol} pairs with one unit of your staked ` +
-  'principal and both cease to exist, emitting phUSD worth the sum of the pair.';
+export const antimatterExplainerEvocative = (symbol: string, stableSymbol: string) =>
+  `Each unit of ${symbol} produces two units of phUSD. E.g. 10 ${symbol} + 10 ${stableSymbol} = 20 phUSD`;
 
 /** The plain-spoken alternative to `antimatterExplainerEvocative`. */
 export const antimatterExplainerPlain = (symbol: string) =>

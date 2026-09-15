@@ -1,17 +1,10 @@
 import SegmentedControl from '../../ui/SegmentedControl';
 import LiveYieldCounter from '../staking/LiveYieldCounter';
+import AnnihilatePanel from './AnnihilatePanel';
 import { fmtAPY, fmtAmount, fmtUSD } from '../stake/formatStake';
-import {
-  ANTIMATTER_ACCENT,
-  ANTIMATTER_IRREVERSIBLE_NOTE,
-  PHUSD_ACCENT,
-  PHUSD_ARROW_ACCENT,
-  antimatterExplainerEvocative,
-  antimatterSplit,
-} from '../../../data/antimatterData';
+import { ANTIMATTER_ACCENT } from '../../../data/antimatterData';
 import type { AntimatterSubTab } from '../../../data/antimatterData';
 import antimatterIcon from '../../../assets/antimatter.png';
-import phUSDIcon from '../../../assets/phUSD-nobackground.png';
 
 /**
  * A stablecoin pool row on the **real** Stake tab: the collapsed header plus
@@ -56,6 +49,14 @@ export interface AntimatterAccordionRowProps {
   matchedStable: number;
   /** Antimatter above the staked principal, paid out as an ordinary claim. */
   surplusAntimatter: number;
+  /**
+   * How many annihilations on this pool have been confirmed on chain. The
+   * burst animation is keyed on it rather than driven by a timer: a changed
+   * number remounts the burst elements and restarts their keyframes, and an
+   * unchanged one leaves them alone, which is what keeps this component
+   * hook-free. `0` plays nothing.
+   */
+  annihilationCount: number;
   antimatterSymbol: string;
   expanded: boolean;
   onToggle: () => void;
@@ -204,89 +205,6 @@ function AmountField({
   );
 }
 
-/** One operand of the annihilation preview. */
-function PreviewCell({
-  eyebrow,
-  eyebrowColor,
-  icon,
-  iconAlt,
-  head,
-  tail,
-  tailColor,
-  caption,
-  emphasised,
-}: {
-  eyebrow: string;
-  eyebrowColor: string;
-  icon: string;
-  iconAlt: string;
-  head: string;
-  tail: string;
-  tailColor: string;
-  caption: string;
-  emphasised?: boolean;
-}) {
-  return (
-    <div
-      className="rounded-xl border p-3"
-      // Tinted surfaces are literal rgba throughout this file: a Tailwind
-      // opacity modifier on a full-hex `pxusd-*` token compiles to the invalid
-      // `rgb(#RRGGBB / a)` and the declaration is silently dropped.
-      style={
-        emphasised
-          ? { borderColor: 'rgba(255,140,66,.35)', background: 'rgba(255,140,66,.08)' }
-          : { borderColor: 'rgba(255,255,255,.1)', background: 'rgba(255,255,255,.03)' }
-      }
-    >
-      <div className="mb-1.5 flex items-center gap-2">
-        <img src={icon} alt={iconAlt} className="h-5 w-5 rounded-full" />
-        <span
-          className="text-[11px] font-bold uppercase tracking-[0.08em]"
-          style={{ color: eyebrowColor }}
-        >
-          {eyebrow}
-        </span>
-      </div>
-      <div
-        className="font-mono text-[20px] font-semibold tabular-nums tracking-[-0.02em] text-pxusd-white"
-        style={{ overflowWrap: 'anywhere' }}
-      >
-        {head}
-        <span style={{ color: tailColor }}>{tail}</span>
-      </div>
-      <div className="mt-1 text-[11.5px] text-muted-foreground">{caption}</div>
-    </div>
-  );
-}
-
-/** One `label → value` line of the before/after summary. */
-function SummaryLine({
-  label,
-  before,
-  after,
-  afterColor,
-}: {
-  label: string;
-  before: string;
-  after?: string;
-  afterColor?: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2.5">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-mono text-pxusd-white" style={{ overflowWrap: 'anywhere' }}>
-        {after === undefined ? (
-          before
-        ) : (
-          <>
-            {before} → <span style={{ color: afterColor }}>{after}</span>
-          </>
-        )}
-      </span>
-    </div>
-  );
-}
-
 export default function AntimatterAccordionRow({
   symbol,
   icon,
@@ -297,6 +215,7 @@ export default function AntimatterAccordionRow({
   pending,
   matchedStable,
   surplusAntimatter,
+  annihilationCount,
   antimatterSymbol,
   expanded,
   onToggle,
@@ -326,21 +245,9 @@ export default function AntimatterAccordionRow({
   onClaim,
   onApprove,
 }: AntimatterAccordionRowProps) {
-  // ---- derived annihilation figures -------------------------------------
-  // `matchedStable` is the contract's own conversion, already capped by the
-  // staked balance. phUSD paid out is worth both sides of the pair together,
-  // which in stake-token units is twice the matched amount.
-  const matched = matchedStable;
-  const receive = matched * 2;
-  const leftover = surplusAntimatter;
-  // The epsilon matters: accrual makes exact equality unreachable, so a bare
-  // `> 0` produces a phantom surplus line the instant the two sides cross.
-  const capped = leftover > 1e-9;
-
-  const [pendingHead, pendingTail] = antimatterSplit(pending, 6);
-  const [matchHead, matchTail] = antimatterSplit(matched, 6);
-  const [receiveHead, receiveTail] = antimatterSplit(receive, 6);
-
+  // The annihilation figures are derived inside `AnnihilatePanel`, which ticks
+  // them forward between chain reads and therefore needs hooks this row is not
+  // allowed to have.
   const stakeParsed = parseFloat(stakeAmt) || 0;
   const wdParsed = parseFloat(wdAmt) || 0;
   const busy = pendingAction !== null;
@@ -351,22 +258,7 @@ export default function AntimatterAccordionRow({
   // contract still pays withdrawals that fit entirely inside it.
   const withinBuffer = !withdrawDisabled || wdParsed <= withdrawBuffer;
   const canWd = !disabled && !busy && wdParsed > 0 && wdParsed <= staked && withinBuffer;
-  // The contract accepts the call when EITHER side has something in it:
-  // `require(netWanted > 0 || excess > 0)`. A user whose accrual has outrun
-  // their whole stake has `matched == 0` and a real surplus to be paid.
-  const canAnn =
-    !disabled && !busy && annihilateDisabledReason === null && (matched > 0 || leftover > 0);
   const canClaim = !disabled && !busy && claimEnabled && pending > 0;
-
-  const annLabel = inactive
-    ? 'Not live on this network yet'
-    : matched <= 0 && leftover <= 0
-      ? `Stake ${symbol} to accrue ${antimatterSymbol}`
-      : matched <= 0
-        ? `Claim ${fmtAmount(leftover, 4)} ${antimatterSymbol} — your accrual has outrun your stake`
-        : capped
-        ? `Annihilate ${fmtAmount(matched, 4)} ${antimatterSymbol} with ${fmtAmount(matched, 4)} staked ${symbol} → receive ${fmtAmount(receive, 4)} phUSD + ${fmtAmount(leftover, 4)} ${antimatterSymbol}`
-        : `Annihilate ${fmtAmount(matched, 4)} ${antimatterSymbol} with ${fmtAmount(matched, 4)} staked ${symbol} → receive ${fmtAmount(receive, 4)} phUSD`;
 
   const disabledCls = 'opacity-40 cursor-not-allowed';
   const conversionNote =
@@ -546,157 +438,25 @@ export default function AntimatterAccordionRow({
           )}
 
           {tab === 'annihilate' && (
-            <div>
-              <div
-                className="mb-3.5 rounded-[14px] border p-4"
-                style={{
-                  borderColor: 'rgba(196,174,234,.28)',
-                  background: 'linear-gradient(180deg, rgba(196,174,234,.09), rgba(10,28,40,0) 85%)',
-                }}
-              >
-                <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-pxusd-purple-300">
-                  Annihilation preview
-                </div>
-
-                {/* Five columns cannot fit at 375px, and every operand here is
-                    load-bearing, so the row stacks below `sm` with the `+` and
-                    `=` glyphs kept as full-width separators rather than
-                    dropping cells the way the app's tables do. */}
-                <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr]">
-                  <PreviewCell
-                    eyebrow={`${antimatterSymbol} accrued`}
-                    eyebrowColor="#C4AEEA"
-                    icon={antimatterIcon}
-                    iconAlt="Antimatter"
-                    head={pendingHead}
-                    tail={pendingTail}
-                    tailColor={ANTIMATTER_ACCENT}
-                    caption="accruing every second"
-                  />
-                  <div aria-hidden="true" className="text-center text-[22px] text-muted-foreground">
-                    +
-                  </div>
-                  <PreviewCell
-                    eyebrow={`${symbol} from your stake`}
-                    eyebrowColor="rgba(240,245,248,.72)"
-                    icon={icon}
-                    iconAlt={symbol}
-                    head={matchHead}
-                    tail={matchTail}
-                    tailColor={ANTIMATTER_ACCENT}
-                    caption="matched 1:1, then destroyed"
-                  />
-                  <div aria-hidden="true" className="text-center text-[22px] text-muted-foreground">
-                    =
-                  </div>
-                  <PreviewCell
-                    eyebrow="phUSD to you"
-                    eyebrowColor={PHUSD_ARROW_ACCENT}
-                    icon={phUSDIcon}
-                    iconAlt="phUSD"
-                    head={receiveHead}
-                    tail={receiveTail}
-                    tailColor={PHUSD_ACCENT}
-                    caption="the sum of both sides"
-                    emphasised
-                  />
-                </div>
-
-                <p className="mt-3.5 text-[12.5px] leading-[1.55] text-muted-foreground">
-                  {antimatterExplainerEvocative(antimatterSymbol)}
-                </p>
-
-                <div
-                  className="mt-3.5 grid grid-cols-1 gap-y-2.5 border-t pt-3 text-[12.5px] sm:grid-cols-2 sm:gap-x-6"
-                  style={{ borderColor: 'rgba(255,255,255,.1)' }}
-                >
-                  <SummaryLine
-                    label={`Your ${symbol} stake after`}
-                    before={fmtAmount(staked, 4)}
-                    after={fmtAmount(Math.max(staked - matched, 0), 4)}
-                    afterColor="#C4AEEA"
-                  />
-                  <SummaryLine
-                    label={`Your ${antimatterSymbol} after`}
-                    before={fmtAmount(pending, 4)}
-                    after="0"
-                    afterColor="#C4AEEA"
-                  />
-                  <SummaryLine
-                    label="Your phUSD wallet balance"
-                    before={fmtAmount(walletPhusd, 2)}
-                    after={fmtAmount(walletPhusd + receive, 2)}
-                    afterColor={PHUSD_ARROW_ACCENT}
-                  />
-                  {capped && (
-                    <SummaryLine
-                      label={`Your ${antimatterSymbol} wallet balance`}
-                      before={fmtAmount(walletAntimatter, 4)}
-                      after={fmtAmount(walletAntimatter + leftover, 4)}
-                      afterColor="#C4AEEA"
-                    />
-                  )}
-                  {/* Net value uses the phUSD spot: the pair is worth `2p - 1`
-                      per matched unit, so at p = 1 it is exactly the matched
-                      amount. Display math only — the annihilate gate reads the
-                      RAW, unclamped price. */}
-                  <SummaryLine
-                    label="Net value received"
-                    before={fmtUSD(receive * phUsdDisplayPrice - matched)}
-                  />
-                </div>
-
-                {capped && (
-                  <div
-                    className="mt-3 rounded-xl border p-3 text-[12.5px] leading-[1.5] text-muted-foreground"
-                    style={{ borderColor: 'rgba(255,217,61,.3)', background: 'rgba(255,217,61,.06)' }}
-                  >
-                    <span className="font-semibold" style={{ color: '#FFD93D' }}>
-                      Surplus {antimatterSymbol}.
-                    </span>{' '}
-                    You hold more {antimatterSymbol} than staked {symbol}, so{' '}
-                    <span className="font-mono text-pxusd-white">
-                      {fmtAmount(matched, 6)} {symbol}
-                    </span>{' '}
-                    of principal annihilates and the surplus{' '}
-                    <span className="font-mono text-pxusd-white">
-                      {fmtAmount(leftover, 6)} {antimatterSymbol}
-                    </span>{' '}
-                    is paid straight to your wallet as an ordinary claim.
-                  </div>
-                )}
-              </div>
-
-              {/* The gate must never be a silently dead button: when
-                  annihilation is unavailable the reason is rendered above it. */}
-              {annihilateDisabledReason !== null && (
-                <div
-                  data-testid={`annihilate-blocked-${symbol}`}
-                  className="mb-3 rounded-xl border p-3.5 text-[12.5px] leading-[1.5] text-muted-foreground"
-                  style={{ borderColor: 'rgba(255,77,109,.35)', background: 'rgba(255,77,109,.07)' }}
-                >
-                  <span className="font-semibold text-pxusd-pink-400">Annihilation disabled.</span>{' '}
-                  {annihilateDisabledReason}
-                </div>
-              )}
-
-              {/* Standard Phoenix orange, not a lavender gradient: Antimatter's
-                  identity is carried by the accent on figures, borders and the
-                  token pill, never by restyling buttons. The label is long by
-                  design — it states the whole trade — so it wraps rather than
-                  truncating on narrow screens. */}
-              <button
-                type="button"
-                onClick={onAnnihilate}
-                disabled={!canAnn}
-                className={`phoenix-btn-primary w-full whitespace-normal text-left sm:text-center ${canAnn ? '' : disabledCls}`}
-              >
-                {pendingAction === 'annihilate' ? 'Annihilating…' : annLabel}
-              </button>
-              <div className="mt-2.5 text-center text-[11.5px] text-muted-foreground">
-                {ANTIMATTER_IRREVERSIBLE_NOTE(symbol)}
-              </div>
-            </div>
+            <AnnihilatePanel
+              symbol={symbol}
+              icon={icon}
+              antimatterSymbol={antimatterSymbol}
+              staked={staked}
+              pending={pending}
+              ratePerSecond={ratePerSecond}
+              matchedStable={matchedStable}
+              surplusAntimatter={surplusAntimatter}
+              walletPhusd={walletPhusd}
+              walletAntimatter={walletAntimatter}
+              phUsdDisplayPrice={phUsdDisplayPrice}
+              annihilationCount={annihilationCount}
+              disabled={disabled}
+              inactive={inactive}
+              annihilateDisabledReason={annihilateDisabledReason}
+              pendingAction={pendingAction}
+              onAnnihilate={onAnnihilate}
+            />
           )}
         </div>
       )}

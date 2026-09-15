@@ -86,6 +86,15 @@ export interface AntimatterStakeRow {
   surplusAntimatter: number;
 
   /**
+   * Increments once each time an annihilation on THIS pool is confirmed on
+   * chain. It carries no value of its own: the row keys its burst animation on
+   * it, so a change restarts the CSS keyframes and a steady number leaves them
+   * alone. Starts at `0`, which is the "nothing has happened yet" state and
+   * plays nothing.
+   */
+  annihilationCount: number;
+
+  /**
    * Net-yield APY (percent), or `null` when genuinely unknown — which this repo
    * renders as an em dash, never `0`.
    *
@@ -157,6 +166,12 @@ export interface UseStableStakerPools {
    * abbreviation throws it away.
    */
   antimatterSymbol: string;
+  /**
+   * `claimEnabled()` on the staker, which is one global flag rather than a
+   * per-pool one. Exposed at the top level as well as on each row because the
+   * tab's header strip is global and has to gate on it.
+   */
+  claimEnabled: boolean;
   /** Antimatter held loose in the connected wallet (human units). */
   walletAntimatter: number;
   /** phUSD held in the connected wallet (human units). */
@@ -627,6 +642,14 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
     return null;
   };
 
+  /**
+   * Confirmed annihilations per pool, the trigger for the row's burst
+   * animation. Held here rather than in the row because the row is hook-free
+   * by design, and because the event that should start the animation is the
+   * transaction receipt, which only this hook sees.
+   */
+  const [annihilationCounts, setAnnihilationCounts] = useState<Record<string, number>>({});
+
   const pools: AntimatterStakeRow[] = STABLE_POOLS.map((cfg) => {
     const r = readsById[cfg.id];
     // A pool with no live staker has no emission rate to read, so its APY is
@@ -652,6 +675,7 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
       ratePerSecond: r.ratePerSecond,
       matchedStable: r.matchedStable,
       surplusAntimatter: r.surplusAntimatter,
+      annihilationCount: annihilationCounts[cfg.id] ?? 0,
       apy,
       disabled: isPaused || inactive,
       withdrawDisabled: r.withdrawDisabled,
@@ -944,6 +968,9 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
     if (isAnnihilateSuccess && annihilateHash && annihilateCtx) {
       const cfg = configById(annihilateCtx.id);
       addToast({ type: 'success', title: 'Annihilation Confirmed', description: `${antimatterSymbol} annihilated against your staked ${cfg.symbol}; phUSD has been minted to your wallet.`, duration: 30000, action: { label: 'View Transaction', onClick: () => window.open(explorerUrl(annihilateHash), '_blank') } });
+      // Before the refresh, so the burst starts in the same commit that the
+      // figures begin falling to zero rather than a beat after it.
+      setAnnihilationCounts((cur) => ({ ...cur, [annihilateCtx.id]: (cur[annihilateCtx.id] ?? 0) + 1 }));
       readsById[annihilateCtx.id].refresh();
       refetchWalletAntimatter();
       refetchWalletPhUsd();
@@ -977,6 +1004,7 @@ export function useStableStakerPools(isActive: boolean): UseStableStakerPools {
     claim,
     annihilate,
     approve: approveAction,
+    claimEnabled,
     antimatterSymbol,
     walletAntimatter,
     walletPhUSD,

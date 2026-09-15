@@ -274,14 +274,20 @@ export default function AntimatterStakeTab() {
         className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border px-3.5 py-3"
         style={{ borderColor: 'rgba(196,174,234,.28)', background: 'rgba(196,174,234,0.05)' }}
       >
-        <span className="flex flex-col gap-0.5">
-          <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-            {stable.antimatterSymbol} in wallet
+        {/* Loose Antimatter in the wallet only exists once claiming is open:
+            while the gate is shut every unit accrues on the staker, so the
+            figure is a constant zero that invites the reader to wonder what
+            they did wrong. The column and its header go together. */}
+        {stable.claimEnabled && (
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+              {stable.antimatterSymbol} in wallet
+            </span>
+            <span className="font-mono text-[14px] font-semibold text-pxusd-white">
+              {fmtAmount(stable.walletAntimatter, 4)}
+            </span>
           </span>
-          <span className="font-mono text-[14px] font-semibold text-pxusd-white">
-            {fmtAmount(stable.walletAntimatter, 4)}
-          </span>
-        </span>
+        )}
         <span className="flex flex-col gap-0.5">
           <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
             {stable.antimatterSymbol} accruing
@@ -316,6 +322,7 @@ export default function AntimatterStakeTab() {
             pending={p.pendingAntimatter}
             matchedStable={p.matchedStable}
             surplusAntimatter={p.surplusAntimatter}
+            annihilationCount={p.annihilationCount}
             antimatterSymbol={stable.antimatterSymbol}
             expanded={expandedId === p.id}
             onToggle={() => toggle(p.id)}

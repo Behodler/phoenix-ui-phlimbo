@@ -234,6 +234,19 @@ heartbeat.
   feed failure into an open gate. `stake` and `withdraw` are never gated this way: a user must
   always be able to exit.
 - **APY is story 083's.** The stablecoin rows render `apy: null` as an em dash. Never `0`.
+- **The annihilate sub-tab is its own component, `AnnihilatePanel`.** Every figure on it is
+  extrapolated forward from `ratePerSecond` on one `requestAnimationFrame` loop, so the preview
+  ticks continuously instead of stepping on the 12 s heartbeat. That extrapolation is free — the
+  rate is already read for the row header — but it is **display only**: the button's
+  enabled/disabled decision is taken on the block-attested `matchedStable` / `surplusAntimatter`,
+  the same rule `minRewards` follows in the whale-mint flow. `AntimatterAccordionRow` stays
+  hook-free because the hooks live in the panel, which mounts at most once.
+- **The confirmation burst is CSS keyed on a counter, never a timer.**
+  `AntimatterStakeRow.annihilationCount` increments when an annihilation receipt lands; the
+  preview cells key their burst elements on it, so React remounts them and the keyframes restart.
+  The white detonation on the two destroyed operands and the phUSD-orange bloom that follows are
+  sequenced by a 300 ms `animation-delay` on the second, which is what lets
+  `AntimatterAccordionRow` stay hook-free. Dropped under `prefers-reduced-motion`.
 - **The reward token is called "Antimatter" on screen, never "AM".** `Antimatter.symbol()` returns
   the `AM` ticker and is deliberately not read for the label; `ANTIMATTER_DISPLAY_NAME` in
   `src/data/antimatterData.ts` is the single source.
