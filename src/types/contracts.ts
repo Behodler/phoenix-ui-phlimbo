@@ -22,6 +22,8 @@ export interface ContractAddresses {
   WBTC: string;
   Pauser: string;
   AutoDOLA: string;
+  YieldStrategyDolaLegacy: string;
+  SDOLA: string;
   YieldStrategyDola: string;
   AutoUSDC: string;
   YieldStrategyUSDC: string;
@@ -64,6 +66,7 @@ export interface ContractAddresses {
   StableStakerV2: string;
   ViewRouter: string;
 }
+
 
 /**
  * Response structure from local development address server

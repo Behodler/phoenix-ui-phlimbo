@@ -28,7 +28,12 @@ export const mainnetAddresses: ContractAddresses = {
   // ResumeStableStakerMigration run, all receipts 0x1). DOLA/USDC are plain
   // ERC4626YieldStrategy; USDe is ERC4626MarketYieldStrategy @ 30 bps (sUSDe cooldown
   // blocks plain redeem). Old strategies (0xE7aE…, 0x8b4A…, 0xFc62…) drained + retired.
-  YieldStrategyDola: "0x1760E05356Ec1FBBA159C730781dCfB9920524e2",
+  // Story 092: YieldStrategyDola is the sDOLA ERC4626YieldStrategy deployed by the StableStaker V2 cutover
+  // (Phase 3b) - V2's DOLA pool, the PhusdStableMinter's DOLA collateral and SYA all use it.
+  YieldStrategyDola: "0x981c7BE1460c7C8Cb40B8EB5908B29510Ae0B7EE",
+  // Story 092: the autoDOLA strategy, RETIRED by the cutover (no clients, SYA removed, pauser OWNER,
+  // unregistered from the Pauser, paused). Kept for history; nothing should route through it.
+  YieldStrategyDolaLegacy: "0x1760E05356Ec1FBBA159C730781dCfB9920524e2",
   YieldStrategyUSDe: "0xaC2e5936Eca286eC364d4D5Bcca33145fBe57f95",
   YieldStrategyUSDC: "0xaFDf8DeA96a0F37Aae4869f813901bf73a3eAB83",
   // USDe<->sUSDe CurveAMMAdapter (Router NG, via crvUSD) backing YieldStrategyUSDe.
@@ -40,6 +45,9 @@ export const mainnetAddresses: ContractAddresses = {
   USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
   Dola: "0x865377367054516e17014CcdED1e7d814EDC9ce4",
   AutoDOLA: "0x79eB84B5E30Ef2481c8f00fD0Aa7aAd6Ac0AA54d",
+  // Inverse sDOLA (ERC4626 over DOLA). Real external address, safe to set now: asset() ==
+  // 0x865377367054516e17014CcdED1e7d814EDC9ce4 (DOLA) verified on mainnet in story 089.
+  SDOLA: "0xb45ad160634c528Cc3D2926d9807104FA3157305",
   AutoUSDC: "0xa7569A44f348d3D70d8ad5889e50F78E33d80D35",
 
   // External tokens
@@ -117,12 +125,13 @@ export const mainnetAddresses: ContractAddresses = {
   // needs V1's address hardcodes it rather than looking it up here
   // (scripts/gather-migration-inputs.js, and the archived migration scripts).
   //
-  // Neither StableStakerV2 nor Antimatter is deployed on mainnet yet; both are zero placeholders
-  // so this file still satisfies the ContractAddresses interface, whose key-set is the only drift
-  // guard between the generated interface and this hand-maintained file.
-  StableStakerV2: "0x0000000000000000000000000000000000000000",
+  // Story 082: StableStakerV2 and Antimatter deployed by the V1 -> V2 cutover and patched
+  // from progress.stable-staker-v2-cutover.1.json. V1 is drained (every pool Migrating,
+  // phUSD mint revoked) and retired: paused, and unregistered from the Pauser (story 083);
+  // the transient CrossVersionMigrator deliberately has no key.
+  StableStakerV2: "0xA6d3fc83C91B8319D219cEB12B46e3dfF064B58F",
   // The Antimatter reward token StableStakerV2 pays instead of phUSD.
-  Antimatter: "0x0000000000000000000000000000000000000000",
+  Antimatter: "0x9CA92B527012DfC6Fdca7B7493C722D5901FF151",
   // NudgeRatchet dispatcher + its mint-debt hook — not yet deployed on mainnet (story 068).
   // Zero placeholders so this file still satisfies the ContractAddresses interface once the
   // local deploy added these fields. Patch by hand when they ship to mainnet.

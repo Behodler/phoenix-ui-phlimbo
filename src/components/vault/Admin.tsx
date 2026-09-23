@@ -1221,9 +1221,13 @@ export default function Admin() {
   const usdeTotalBalance = usdeYieldStrategyTotalBalance !== undefined ? usdeYieldStrategyTotalBalance : 0n;
   const usdeYield = usdeTotalBalance > usdePrincipal ? usdeTotalBalance - usdePrincipal : 0n;
 
-  // Format a raw token amount for display, scaling by the token's decimals.
-  const fmtAmount = (value: bigint, decimals: number): string =>
-    Number(formatUnits(value, decimals)).toFixed(2);
+  // Format a raw token amount for display at the token's full precision. Exact
+  // bigint formatting (no Number round-trip, no rounding) so single-wei changes
+  // are visible; the fraction is zero-padded so columns keep a stable width.
+  const fmtAmount = (value: bigint, decimals: number): string => {
+    const [whole, frac = ''] = formatUnits(value, decimals).split('.');
+    return decimals > 0 ? `${whole}.${frac.padEnd(decimals, '0')}` : whole;
+  };
 
   // Format a raw LP (UniV2 pair, 18 decimals) balance for display. LP amounts
   // span a wide magnitude range, so show up to 6 significant fractional digits
