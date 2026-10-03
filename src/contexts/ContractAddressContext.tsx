@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 import { useChainId } from 'wagmi'
 import type { ContractAddresses } from '../types/contracts'
 import { NetworkType } from '../types/contracts'
-import { getNetworkType, isMainnet, isLocalAnvil } from '../lib/networkDetection'
-import { mainnetAddresses } from '../lib/contracts'
+import { getNetworkType, isMainnet, isSepolia, isLocalAnvil } from '../lib/networkDetection'
+import { mainnetAddresses, sepoliaAddresses } from '../lib/contracts'
 import { fetchLocalAddresses } from '../lib/addressFetcher'
 import { log } from '../utils/logger'
 
@@ -87,6 +87,10 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
           // Use hardcoded mainnet addresses
           log.debug('📍 Using mainnet addresses')
           setAddresses(mainnetAddresses)
+        } else if (isSepolia(chainId)) {
+          // Use hardcoded Sepolia testnet addresses
+          log.debug('📍 Using Sepolia testnet addresses')
+          setAddresses(sepoliaAddresses)
         } else if (isLocalAnvil(chainId)) {
           // Fetch addresses from local development server
           log.debug('🔧 Detected Anvil (chainId 31337) - fetching addresses from http://localhost:3001/contracts')
@@ -95,7 +99,7 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
           setAddresses(localAddresses)
         } else {
           // Unsupported network
-          const errorMsg = `Unsupported network (Chain ID: ${chainId}). Please connect to Mainnet or Local Anvil.`
+          const errorMsg = `Unsupported network (Chain ID: ${chainId}). Please connect to Mainnet, Sepolia, or Local Anvil.`
           log.error('❌', errorMsg)
           setError(errorMsg)
           setAddresses(null)
