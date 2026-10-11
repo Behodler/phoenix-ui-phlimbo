@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import type { Tab, TokenInfo } from '../types/vault';
 import { PATH_TO_TAB, TAB_TO_PATH, DEFAULT_PATH } from '../lib/tabRoutes';
+import { getVaultTabs } from '../lib/vaultTabs';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { parseUnits, maxUint256 } from 'viem';
@@ -18,6 +19,7 @@ import TestnetFaucet from '../components/vault/TestnetFaucet';
 import EmergencyPauseFooter from '../components/vault/EmergencyPauseFooter';
 import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketTab from '../components/vault/MarketTab';
+import MarketUniTab from '../components/vault/marketUni/MarketUniTab';
 import NFTListTab, { type NFTSubTab } from '../components/vault/NFTListTab';
 import AntimatterStakeTab from '../components/vault/antimatter/AntimatterStakeTab';
 import Admin from '../components/vault/Admin';
@@ -214,32 +216,10 @@ export default function VaultPage() {
   // - Show Stake tab for phUSD + stablecoin staking
   // - Show Yield Funnel tab for claiming accumulated yield at a discount
   // - Safety/Emergency Pause is handled by the fixed footer, not a tab
-  const tabs: readonly Tab[] = (() => {
-    // "Stake" is the public farm (PhlimboV3) and now the only farm surface —
-    // the incumbent V2 "Stake (admin only)" tab was removed after the cutover.
-    if (!isMounted) {
-      return ["Mint", "Stake", "Yield Funnel"];
-    }
-
-    const tabList: Tab[] = ["Mint", "Stake", "Yield Funnel"];
-
-    if (!isMainnet) {
-      tabList.push("Testnet Faucet");
-    }
-
-    // Market tab is only available on mainnet
-    if (isMainnet) {
-      tabList.push("Market");
-    }
-
-    tabList.push("NFT");
-
-    if (hasAdminAccess) {
-      tabList.push("Admin");
-    }
-
-    return tabList;
-  })();
+  // "Stake" is the public farm (PhlimboV3) and now the only farm surface —
+  // the incumbent V2 "Stake (admin only)" tab was removed after the cutover.
+  // "Market (uni)" is the mocked Uniswap V2 market preview (story 084).
+  const tabs: readonly Tab[] = getVaultTabs({ isMounted, isMainnet, hasAdminAccess });
 
   // FAQ state - tracks which FAQ context to display
   // Initialize to "MintTab" to match the default activeTab ("Mint")
@@ -765,7 +745,7 @@ export default function VaultPage() {
               onTabChange={(tab) => {
                 setActiveTab(tab);
                 // Clear FAQ when switching to a tab that has no FAQ data
-                if (!["Mint", "Yield Funnel", "Market", "NFT"].includes(tab)) {
+                if (!["Mint", "Yield Funnel", "Market", "Market (uni)", "NFT"].includes(tab)) {
                   setFaqComponent(undefined);
                 }
                 // Sync URL with the active tab when it maps to a friendly
@@ -819,6 +799,10 @@ export default function VaultPage() {
                   isLoading={isMarketPriceLoading}
                   isError={isMarketPriceError}
                 />
+              </ErrorBoundary>
+            ) : activeTab === "Market (uni)" ? (
+              <ErrorBoundary>
+                <MarketUniTab />
               </ErrorBoundary>
             ) : activeTab === "NFT" ? (
               <ErrorBoundary>
