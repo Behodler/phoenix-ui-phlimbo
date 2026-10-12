@@ -1,12 +1,13 @@
 /**
  * Pure Uniswap V2 maths + formatting for the mocked "Market (uni)" tab
- * (story 084). A faithful port of `swapCalc` / `addCalc` from the design
- * mockup's script block.
+ * (stories 084, 085). A faithful port of `swapCalc` / `addCalc` (V1 mockup)
+ * and `posCalc` / `rmCalc` (V2 mockup) from the design mockups' script blocks.
  *
  * Display-only floats — no bigint, no wei. When the live-wiring story arrives
  * these quotes will be redone in on-chain units against real reserves.
  */
 import {
+  LP_SYMBOL,
   MAX_PRICE_IMPACT,
   METHODS,
   PH_BAL,
@@ -19,8 +20,10 @@ import {
   WRAP_VENUE,
   approvalKey,
   type AddTokenSymbol,
+  type ApprovableSymbol,
   type MarketSymbol,
   type MockToken,
+  type RemoveOutSymbol,
   type RouteHop,
   type SpenderKey,
   type SwapTokenSymbol,
@@ -363,6 +366,149 @@ export function addQuote(s: AddInput): AddQuote {
   };
 }
 
+// ---------------------------------------------------------------------------
+// LP position + remove liquidity (story 085)
+// ---------------------------------------------------------------------------
+
+/**
+ * LP token supply implied by the static reserves (√(rS·rPh)). Reserves never
+ * move in the mock, so this is also the denominator for position share.
+ */
+function lpSupply(): number {
+  return Math.sqrt(POOL.rS * POOL.rPh);
+}
+
+export interface PositionView {
+  /** UNI-V2 held. */
+  lp: number;
+  /** Fraction of the pool (lp / supply). */
+  share: number;
+  /** Underlying sUSDS. */
+  s: number;
+  /** Underlying phUSD. */
+  ph: number;
+  /** USD value of the underlying. */
+  value: number;
+}
+
+/** Underlying amounts and value of an LP balance (mockup `posCalc`). */
+export function positionView(lp: number): PositionView {
+  const { rS, rPh } = POOL;
+  const TS = lpSupply();
+  const price = phPrice(rS, rPh);
+  const s = (lp / TS) * rS;
+  const ph = (lp / TS) * rPh;
+  return { lp, share: lp / TS, s, ph, value: s * SPX + ph * price };
+}
+
+export interface RemoveInput {
+  /** Raw burn amount (UNI-V2) from the input. */
+  rLp: string;
+  /** Current LP balance. */
+  lp: number;
+  out: RemoveOutSymbol;
+  /** Slippage tolerance in percent (0.5 = 0.5%). */
+  slip: number;
+  approvals: Readonly<Record<string, boolean>>;
+}
+
+export interface RemoveQuote {
+  /** UNI-V2 to burn. */
+  burn: number;
+  lp: number;
+  /** True when the sUSDS side is paid out as USDS via the liquidity zap. */
+  usds: boolean;
+  valid: boolean;
+  /** Burn exceeds the LP balance. */
+  over: boolean;
+  spender: SpenderKey;
+  needApprove: boolean;
+  method: string;
+  /** sUSDS share of the burn, before any redemption. */
+  sAmt: number;
+  phAmt: number;
+  outSym: RemoveOutSymbol;
+  /** Amount of `outSym` received. */
+  outAmt: number;
+  outDp: number;
+  value: number;
+  stats: Stat[];
+}
+
+/** Remove-liquidity quote (mockup `rmCalc`). */
+export function removeQuote(s: RemoveInput): RemoveQuote {
+  const { rS, rPh } = POOL;
+  const TS = lpSupply();
+  const price = phPrice(rS, rPh);
+  const usds = s.out === 'USDS';
+  const burn = num(s.rLp);
+  const slip = s.slip / 100;
+  const valid = burn > 0;
+  const over = burn > s.lp + 1e-9;
+  // USDS out goes through the liquidity zap (same contract and UNI-V2
+  // allowance target as zap.addLiquidityWithUSDS); sUSDS out uses the router.
+  const spender: SpenderKey = usds ? 'zap' : 'router';
+  const needApprove = !s.approvals[approvalKey(LP_SYMBOL, spender)];
+  const sAmt = (burn / TS) * rS;
+  const phAmt = (burn / TS) * rPh;
+  const outSym: RemoveOutSymbol = usds ? 'USDS' : 'sUSDS';
+  const outAmt = usds ? sAmt * SPX : sAmt;
+  const outDp = usds ? 2 : 4;
+  const value = sAmt * SPX + phAmt * price;
+
+  const stats: Stat[] = [];
+  if (valid) {
+    const left = Math.max(0, s.lp - burn);
+    stats.push({ label: 'Pool price', value: `1 phUSD = ${fmt(rS / rPh, 4)} sUSDS ($${fmt(price, 4)})`, tone: 'default' });
+    stats.push({
+      label: 'LP tokens burned',
+      value: `${fmt(burn, 4)} ${LP_SYMBOL} (${pct(s.lp > 0 ? burn / s.lp : 0)} of position)`,
+      tone: 'default',
+    });
+    if (usds) stats.push({ label: 'sUSDS redeemed to USDS', value: `${fmt(sAmt, 4)} sUSDS × ${fmt(SPX, 4)}`, tone: 'default' });
+    stats.push({
+      label: `Min. received (${s.slip}% slippage)`,
+      value: `${fmt(outAmt * (1 - slip), outDp)} ${outSym} + ${fmt(phAmt * (1 - slip), 2)} phUSD`,
+      tone: 'default',
+    });
+    stats.push({ label: 'Remaining position', value: `${fmt(left, 4)} ${LP_SYMBOL} · ${pct(left / TS)} of pool`, tone: 'default' });
+    stats.push({ label: 'Withdrawal value', value: usd(value), tone: 'default' });
+    stats.push({
+      label: 'Allowance',
+      value: needApprove ? `Approve ${LP_SYMBOL} for ${usds ? 'zap' : 'router'} first` : `${LP_SYMBOL} approved`,
+      tone: needApprove ? 'approve' : 'default',
+    });
+  }
+
+  return {
+    burn, lp: s.lp, usds, valid, over, spender, needApprove,
+    method: usds ? METHODS.zapRemoveLiquidityToUSDS : METHODS.routerRemoveLiquidity,
+    sAmt, phAmt, outSym, outAmt, outDp, value, stats,
+  };
+}
+
+/** Burn-input string for a quick-pick fraction of the position (Max = the exact balance). */
+export function removePctInput(lp: number, p: number): string {
+  return p === 1 ? String(lp) : raw(lp * p, 6);
+}
+
+/** A quick-pick chip is selected when the burn equals that fraction of a non-empty position. */
+export function removePctSelected(lp: number, burn: number, p: number): boolean {
+  return lp > 0 && Math.abs(burn - lp * p) < 1e-6;
+}
+
+/** "25%" … "75%", or "Max" for the whole position. */
+export function removePctLabel(p: number): string {
+  return p === 1 ? 'Max' : `${p * 100}%`;
+}
+
+/** Stats labels the review modal drops from the remove-liquidity list. */
+const REMOVE_MODAL_HIDDEN = new Set(['Pool price', 'Allowance']);
+
+export function removeModalStats(q: RemoveQuote): Stat[] {
+  return q.stats.filter((x) => !REMOVE_MODAL_HIDDEN.has(x.label));
+}
+
 /** Stats labels the review modal drops from the add-liquidity list. */
 const ADD_MODAL_HIDDEN = new Set(['Pool price', 'sUSDS price', 'Deposit value']);
 
@@ -383,8 +529,8 @@ export function addModalStats(q: AddQuote): Stat[] {
 
 export interface ReviewStep {
   kind: 'approve' | 'action';
-  /** Token being approved (approve steps only). */
-  sym?: MarketSymbol;
+  /** Token being approved (approve steps only) — a market token or UNI-V2. */
+  sym?: ApprovableSymbol;
   /** Approval map key this step satisfies (approve steps only). */
   approvalKey?: string;
   label: string;
@@ -392,7 +538,7 @@ export interface ReviewStep {
   sub: string;
 }
 
-function approveStep(sym: MarketSymbol, spender: SpenderKey): ReviewStep {
+function approveStep(sym: ApprovableSymbol, spender: SpenderKey): ReviewStep {
   return {
     kind: 'approve',
     sym,
@@ -425,6 +571,17 @@ export function addSteps(q: AddQuote): ReviewStep[] {
   return steps;
 }
 
+export function removeSteps(q: RemoveQuote): ReviewStep[] {
+  const steps: ReviewStep[] = [];
+  if (q.needApprove) steps.push(approveStep(LP_SYMBOL, q.spender));
+  steps.push({
+    kind: 'action',
+    label: q.usds ? 'Remove liquidity & redeem sUSDS → USDS' : 'Remove liquidity',
+    sub: q.method,
+  });
+  return steps;
+}
+
 export interface Cta {
   label: string;
   enabled: boolean;
@@ -442,6 +599,13 @@ export function addCta(q: AddQuote): Cta {
   if (!q.valid) return { label: 'Enter an amount', enabled: false };
   if (q.insufficient) return { label: `Insufficient ${q.insufficient} balance`, enabled: false };
   return { label: 'Review supply', enabled: true };
+}
+
+export function removeCta(q: RemoveQuote): Cta {
+  if (q.lp <= 0) return { label: 'No liquidity to remove', enabled: false };
+  if (!q.valid) return { label: 'Enter an amount', enabled: false };
+  if (q.over) return { label: `Insufficient ${LP_SYMBOL} balance`, enabled: false };
+  return { label: 'Review removal', enabled: true };
 }
 
 /** "Direct · 1 hop" or "N hops · 1 transaction". */

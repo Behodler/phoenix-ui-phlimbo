@@ -1,14 +1,14 @@
 /**
  * useUniMarketMock — the single seam behind the mocked "Market (uni)" tab
- * (story 084).
+ * (stories 084, 085).
  *
  * Owns all tab state (mode, direction, token, inputs, slippage, popovers,
- * review modal, step machine, approvals) and exposes derived quotes plus
- * actions. The components under src/components/vault/marketUni/ hold no maths
+ * review modal, step machine, approvals, LP position) and exposes derived
+ * quotes plus actions. The components under src/components/vault/marketUni/ hold no maths
  * and no mock constants; they render whatever this hook returns.
  *
- * NOTHING HERE TOUCHES A CHAIN. Approve / swap / supply steps resolve on a
- * timer. The live-wiring story replaces this hook (and
+ * NOTHING HERE TOUCHES A CHAIN. Approve / swap / supply / remove steps
+ * resolve on a timer, and the LP balance is plain React state. The live-wiring story replaces this hook (and
  * src/data/uniMarketMockData.ts) with real reads and writes behind the same
  * return shape.
  */
@@ -17,19 +17,25 @@ import {
   ADD_TOKENS,
   DEADLINE_MINUTES,
   DEFAULT_ADD_TOKEN,
+  DEFAULT_REMOVE_OUT,
   DEFAULT_SLIPPAGE,
   ETHERSCAN_URL,
   ETH_GAS_RESERVE,
   INITIAL_APPROVALS,
+  LP_BAL,
+  LP_SYMBOL,
   MOCK_STEP_MS,
   ORDER,
   PH_BAL,
   POOL,
+  REMOVE_OUT_TOKENS,
+  REMOVE_PCTS,
   SLIPPAGE_OPTIONS,
   TOKENS,
   UNISWAP_TRADE_URL,
   type AddTokenSymbol,
   type MarketSymbol,
+  type RemoveOutSymbol,
   type SwapTokenSymbol,
 } from '../data/uniMarketMockData';
 import {
@@ -41,8 +47,17 @@ import {
   clean,
   dpOf,
   fmt,
+  pct,
   phPrice,
+  positionView,
   raw,
+  removeCta,
+  removeModalStats,
+  removePctInput,
+  removePctLabel,
+  removePctSelected,
+  removeQuote,
+  removeSteps,
   routeHint,
   routeSummary,
   short,
@@ -57,10 +72,31 @@ import {
   type ReviewStep,
 } from '../lib/uniV2MockMath';
 
-export type MarketMode = 'swap' | 'add';
+export type MarketMode = 'swap' | 'add' | 'remove';
+/** The two liquidity sub-modes behind the Add / Remove toggle. */
+export type LiquidityAction = 'add' | 'remove';
+/** The top Swap / Liquidity control. */
+export type TopMode = 'swap' | 'liquidity';
 
 export interface ReviewLeg {
   caption: string;
+  sym: MarketSymbol;
+  amount: string;
+}
+
+export interface PctOptionView {
+  /** Fraction of the position (1 = Max). */
+  p: number;
+  label: string;
+  selected: boolean;
+}
+
+export interface OutOptionView {
+  sym: RemoveOutSymbol;
+  selected: boolean;
+}
+
+export interface ReceiveRowView {
   sym: MarketSymbol;
   amount: string;
 }
@@ -95,6 +131,17 @@ interface UniMarketState {
   success: boolean;
   exactApprove: boolean;
   approvals: Record<string, boolean>;
+  /** UNI-V2 held (mock; moves when an add or removal completes). */
+  lp: number;
+  /** Raw burn input on the Remove panel. */
+  rLp: string;
+  out: RemoveOutSymbol;
+  /** Liquidity sub-mode to return to from Swap. */
+  lastLiq: LiquidityAction;
+  /** LP balance frozen when the review modal opened (removal stats read it). */
+  modalLp: number;
+  /** LP change applied when the frozen review steps complete. */
+  modalLpDelta: number;
 }
 
 const INITIAL_STATE: UniMarketState = {
@@ -119,7 +166,15 @@ const INITIAL_STATE: UniMarketState = {
   success: false,
   exactApprove: false,
   approvals: { ...INITIAL_APPROVALS },
+  lp: LP_BAL,
+  rLp: '',
+  out: DEFAULT_REMOVE_OUT,
+  lastLiq: 'add',
+  modalLp: LP_BAL,
+  modalLpDelta: 0,
 };
+
+const CLOSE_POPOVERS = { pickerOpen: false, settingsOpen: false, addPickerOpen: false } as const;
 
 export function useUniMarketMock() {
   const [state, setState] = useState<UniMarketState>(INITIAL_STATE);
@@ -148,15 +203,27 @@ export function useUniMarketMock() {
     [state.addSym, state.aTok, state.aPh, state.aEdited, state.slip, state.approvals],
   );
 
+  // While a removal is under review, quote against the LP balance frozen at
+  // open, so the modal's "% of position" / "Remaining position" rows do not
+  // jump when the completed removal decrements the balance.
+  const quoteLp = state.modal === 'remove' ? state.modalLp : state.lp;
+  const remove = useMemo(
+    () => removeQuote({ rLp: state.rLp, lp: quoteLp, out: state.out, slip: state.slip, approvals: state.approvals }),
+    [state.rLp, quoteLp, state.out, state.slip, state.approvals],
+  );
+  const position = positionView(state.lp);
+
   const isSwap = state.mode === 'swap';
-  const cta = isSwap ? swapCta(swap) : addCta(add);
+  const isRemove = state.mode === 'remove';
+  const cta = isSwap ? swapCta(swap) : isRemove ? removeCta(remove) : addCta(add);
   const steps = state.steps ?? [];
   const currentStep: ReviewStep | undefined = steps[state.stepIdx] ?? steps[steps.length - 1];
 
   // Amount the "approve exact amount" checkbox refers to.
   let exactAmount = 0;
   if (currentStep?.kind === 'approve') {
-    if (isSwap) exactAmount = swap.inA;
+    if (state.modal === 'swap') exactAmount = swap.inA;
+    else if (state.modal === 'remove') exactAmount = remove.burn;
     else exactAmount = currentStep.sym === 'phUSD' ? add.b : add.a;
   }
 
@@ -167,7 +234,22 @@ export function useUniMarketMock() {
   const aPhStr = state.aEdited === 'tok' ? raw(add.b, 2) : state.aPh;
 
   // ---- actions
-  const setMode = useCallback((mode: MarketMode) => patch({ mode, pickerOpen: false, settingsOpen: false, addPickerOpen: false }), [patch]);
+  const toSwap = useCallback(() => setState((p) => ({
+    ...p,
+    ...CLOSE_POPOVERS,
+    mode: 'swap',
+    lastLiq: p.mode === 'swap' ? p.lastLiq : p.mode,
+  })), []);
+  const toLiquidity = useCallback(() => setState((p) => ({
+    ...p,
+    ...CLOSE_POPOVERS,
+    mode: p.mode === 'swap' ? p.lastLiq : p.mode,
+  })), []);
+  const setTopMode = useCallback((v: TopMode) => (v === 'swap' ? toSwap() : toLiquidity()), [toSwap, toLiquidity]);
+  const setLiqAction = useCallback((a: LiquidityAction) => patch({ ...CLOSE_POPOVERS, mode: a, lastLiq: a }), [patch]);
+  const setRemoveLp = useCallback((v: string) => patch({ rLp: clean(v) }), [patch]);
+  const pickRemovePct = useCallback((p: number) => patch({ rLp: removePctInput(state.lp, p) }), [patch, state.lp]);
+  const setRemoveOut = useCallback((out: RemoveOutSymbol) => patch({ out }), [patch]);
   const toggleSettings = useCallback(() => setState((p) => ({ ...p, settingsOpen: !p.settingsOpen, pickerOpen: false, addPickerOpen: false })), []);
   const setSlippage = useCallback((slip: number) => patch({ slip }), [patch]);
   const openPicker = useCallback(() => patch({ pickerOpen: true, settingsOpen: false }), [patch]);
@@ -196,16 +278,19 @@ export function useUniMarketMock() {
 
   const startReview = useCallback(() => {
     if (!cta.enabled) return;
+    const mode = state.mode;
     patch({
-      modal: state.mode,
-      steps: state.mode === 'swap' ? swapSteps(swap) : addSteps(add),
+      modal: mode,
+      steps: mode === 'swap' ? swapSteps(swap) : mode === 'remove' ? removeSteps(remove) : addSteps(add),
+      modalLp: state.lp,
+      modalLpDelta: mode === 'add' ? add.lp : mode === 'remove' ? -remove.burn : 0,
       stepIdx: 0,
       success: false,
       pending: false,
       settingsOpen: false,
       addPickerOpen: false,
     });
-  }, [patch, cta.enabled, state.mode, swap, add]);
+  }, [patch, cta.enabled, state.mode, state.lp, swap, add, remove]);
 
   const advanceStep = useCallback(() => {
     if (state.pending || !state.steps || state.success) return;
@@ -220,7 +305,9 @@ export function useUniMarketMock() {
           ? { ...prev.approvals, [step.approvalKey]: true }
           : prev.approvals;
         if (prev.stepIdx >= frozen.length - 1) {
-          return { ...prev, pending: false, success: true, approvals };
+          // The frozen delta was quoted when the modal opened; floor at 0.
+          const lp = Math.max(0, prev.lp + prev.modalLpDelta);
+          return { ...prev, pending: false, success: true, approvals, lp, modalLpDelta: 0 };
         }
         return { ...prev, pending: false, stepIdx: prev.stepIdx + 1, approvals };
       });
@@ -229,12 +316,12 @@ export function useUniMarketMock() {
 
   const cancel = useCallback(() => {
     clearTimer();
-    patch({ modal: null, steps: null, stepIdx: 0, pending: false, success: false });
+    patch({ modal: null, steps: null, stepIdx: 0, pending: false, success: false, modalLpDelta: 0 });
   }, [patch, clearTimer]);
 
   const done = useCallback(() => {
     clearTimer();
-    patch({ modal: null, steps: null, stepIdx: 0, pending: false, success: false, pay: '', recv: '', aTok: '', aPh: '' });
+    patch({ modal: null, steps: null, stepIdx: 0, pending: false, success: false, pay: '', recv: '', aTok: '', aPh: '', rLp: '' });
   }, [patch, clearTimer]);
 
   const toggleExactApprove = useCallback(() => setState((p) => ({ ...p, exactApprove: !p.exactApprove })), []);
@@ -242,7 +329,14 @@ export function useUniMarketMock() {
   // ---- display strings (formatting lives here so components stay dumb)
   const price = phPrice(POOL.rS, POOL.rPh);
   const isAddModal = state.modal === 'add';
-  const legs: [ReviewLeg, ReviewLeg] = isAddModal
+  const isRemoveModal = state.modal === 'remove';
+  const removeLegs: [ReviewLeg, ReviewLeg] = [
+    { caption: 'You receive (estimated)', sym: remove.outSym, amount: fmt(remove.outAmt, remove.outDp) },
+    { caption: 'You receive (estimated)', sym: 'phUSD', amount: fmt(remove.phAmt, 2) },
+  ];
+  const legs: [ReviewLeg, ReviewLeg] = isRemoveModal
+    ? removeLegs
+    : isAddModal
     ? [
         { caption: 'Deposit', sym: add.depositSym, amount: fmt(add.a, dpOf(add.depositSym)) },
         { caption: 'Deposit', sym: 'phUSD', amount: fmt(add.b, 2) },
@@ -252,20 +346,32 @@ export function useUniMarketMock() {
         { caption: swap.exactIn ? 'You receive (estimated)' : 'You receive (exact)', sym: swap.outSym, amount: fmt(swap.outA, dpOf(swap.outSym)) },
       ];
   const exactSym = currentStep?.kind === 'approve' ? currentStep.sym : undefined;
+  const exactDp = exactSym === LP_SYMBOL ? 4 : exactSym ? dpOf(exactSym) : 0;
   const exactLabel = exactSym
-    ? `Approve exact amount only (${fmt(exactAmount, dpOf(exactSym))} ${exactSym}) instead of unlimited`
+    ? `Approve exact amount only (${fmt(exactAmount, exactDp)} ${exactSym}) instead of unlimited`
     : '';
   const modalTitle = state.success
-    ? (isAddModal ? 'Liquidity added' : 'Swap complete')
-    : (isAddModal ? 'Review supply' : 'Review swap');
+    ? (isRemoveModal ? 'Liquidity removed' : isAddModal ? 'Liquidity added' : 'Swap complete')
+    : (isRemoveModal ? 'Review removal' : isAddModal ? 'Review supply' : 'Review swap');
   const modalActionLabel = state.pending
     ? 'Confirm in wallet…'
     : currentStep?.kind === 'approve'
       ? `Approve ${currentStep.sym}`
-      : isAddModal ? 'Confirm supply' : 'Confirm swap';
-  const successText = isAddModal
-    ? `Supplied liquidity · ${fmt(add.lp, 4)} UNI-V2 received`
+      : isRemoveModal ? 'Confirm removal' : isAddModal ? 'Confirm supply' : 'Confirm swap';
+  const successText = isRemoveModal
+    ? `Burned ${fmt(remove.burn, 4)} ${LP_SYMBOL} · received ${fmt(remove.outAmt, remove.outDp)} ${remove.outSym} + ${fmt(remove.phAmt, 2)} phUSD`
+    : isAddModal
+    ? `Supplied liquidity · ${fmt(add.lp, 4)} ${LP_SYMBOL} received`
     : `Swapped ${fmt(swap.inA, dpOf(swap.inSym))} ${swap.inSym} for ${fmt(swap.outA, dpOf(swap.outSym))} ${swap.outSym}`;
+  const pctOptions: PctOptionView[] = REMOVE_PCTS.map((p) => ({
+    p,
+    label: removePctLabel(p),
+    selected: removePctSelected(state.lp, remove.burn, p),
+  }));
+  const outOptions: OutOptionView[] = REMOVE_OUT_TOKENS.map((sym) => ({ sym, selected: sym === remove.outSym }));
+  const modalStats = state.modal === 'remove'
+    ? removeModalStats(remove)
+    : state.modal === 'add' ? addModalStats(add) : swapModalStats(swap);
   const tokenRows: TokenRowView[] = ORDER.map((sym) => ({
     sym,
     name: TOKENS[sym].name,
@@ -288,6 +394,7 @@ export function useUniMarketMock() {
 
     // shared state
     mode: state.mode,
+    topMode: (isSwap ? 'swap' : 'liquidity') as TopMode,
     slip: state.slip,
     settingsOpen: state.settingsOpen,
 
@@ -317,6 +424,25 @@ export function useUniMarketMock() {
     aPhUsd: add.b > 0 ? usd(add.bUsd) : '',
     addPickerOpen: state.addPickerOpen,
 
+    // LP position (Liquidity mode)
+    lpSymbol: LP_SYMBOL,
+    hasPosition: state.lp > 1e-9,
+    positionLp: fmt(position.lp, 4),
+    positionShare: pct(position.share),
+    positionS: fmt(position.s, 4),
+    positionPh: fmt(position.ph, 2),
+    positionValue: usd(position.value),
+
+    // remove liquidity
+    remove,
+    rLpStr: state.rLp,
+    lpBalText: fmt(state.lp, 4),
+    pctOptions,
+    outOptions,
+    receiveRows: removeLegs.map(({ sym, amount }): ReceiveRowView => ({ sym, amount })),
+    removeNote: remove.usds ? 'sUSDS redeemed to USDS in the same transaction' : 'Paid out at the pool ratio',
+    removeUsd: remove.valid ? usd(remove.value) : '',
+
     // CTA
     cta,
 
@@ -333,10 +459,16 @@ export function useUniMarketMock() {
     modalTitle,
     modalActionLabel,
     successText,
-    modalStats: state.modal === 'add' ? addModalStats(add) : swapModalStats(swap),
+    modalStats,
 
     // actions
-    setMode,
+    setTopMode,
+    toSwap,
+    toLiquidity,
+    setLiqAction,
+    setRemoveLp,
+    pickRemovePct,
+    setRemoveOut,
     toggleSettings,
     setSlippage,
     openPicker,

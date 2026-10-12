@@ -69,7 +69,7 @@ export default function ReviewModal({ m }: { m: UniMarketMock }) {
                 <div key={i} className="flex flex-col gap-1.5">
                   {i === 1 && (
                     <span aria-hidden="true" className="text-xl leading-none text-center text-pxusd-orange-300">
-                      {m.modal === 'add' ? '+' : '↓'}
+                      {m.modal === 'swap' ? '↓' : '+'}
                     </span>
                   )}
                   <span className="text-xs text-muted-foreground">{leg.caption}</span>

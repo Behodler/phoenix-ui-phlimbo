@@ -8,7 +8,8 @@
  *
  * Every reserve, balance, price and approval below is a static placeholder
  * copied from the design mockup
- * (product-owner scratchpad: planning-docs/phoenix/phlimbo-ui/MarketPostUniCutoverMock/Main.dc.html).
+ * (product-owner scratchpad: planning-docs/phoenix/phlimbo-ui/MarketPostUniCutoverMock/Main.dc.html;
+ * the LP position and Remove liquidity from MarketPostUniCutoverMockV2/Main.dc.html, story 085).
  * Nothing is read from or sent to a chain. The contract / method names in
  * SPENDERS and METHODS are design placeholders too: the live-wiring story will
  * replace this file and `useUniMarketMock` with real contract reads/writes and
@@ -109,7 +110,14 @@ export const SPENDERS = {
 } as const;
 export type SpenderKey = keyof typeof SPENDERS;
 
-export const approvalKey = (sym: MarketSymbol, spender: SpenderKey): string => `${sym}@${spender}`;
+/** Symbol of the phUSD/sUSDS Uniswap V2 pair's LP token. */
+export const LP_SYMBOL = 'UNI-V2';
+export type LpSymbol = typeof LP_SYMBOL;
+
+/** Anything that can be approved: a market token or the pair's LP token. */
+export type ApprovableSymbol = MarketSymbol | LpSymbol;
+
+export const approvalKey = (sym: ApprovableSymbol, spender: SpenderKey): string => `${sym}@${spender}`;
 
 /** Contract call labels shown under each review step (placeholders). */
 export const METHODS = {
@@ -121,11 +129,28 @@ export const METHODS = {
   zapSwapPhUSDToETH: 'zap.swapPhUSDToETH',
   routerAddLiquidity: 'router.addLiquidity',
   zapAddLiquidityWithUSDS: 'zap.addLiquidityWithUSDS',
+  routerRemoveLiquidity: 'router.removeLiquidity',
+  zapRemoveLiquidityToUSDS: 'zap.removeLiquidityToUSDS',
 } as const;
+
+/** Mock connected-wallet UNI-V2 (LP) balance at load. */
+export const LP_BAL = 1200;
+
+/** Quick-pick fractions of the LP position on the Remove panel (1 = Max). */
+export const REMOVE_PCTS = [0.25, 0.5, 0.75, 1] as const;
+
+/**
+ * Token the sUSDS side of a removal is paid out in. sUSDS comes straight from
+ * the router; USDS goes through the liquidity zap, which redeems sUSDS → USDS.
+ */
+export const REMOVE_OUT_TOKENS = ['sUSDS', 'USDS'] as const;
+export type RemoveOutSymbol = (typeof REMOVE_OUT_TOKENS)[number];
+export const DEFAULT_REMOVE_OUT: RemoveOutSymbol = 'sUSDS';
 
 /**
  * Approvals at load. DOLA and ETH start approved (as in the mockup); everything
- * else — including USDS on both the router and the liquidity zap — does not.
+ * else — including USDS on both the router and the liquidity zap, and UNI-V2
+ * on both the router and the liquidity zap — does not.
  */
 export const INITIAL_APPROVALS: Readonly<Record<string, boolean>> = {
   [approvalKey('DOLA', 'swapZap')]: true,

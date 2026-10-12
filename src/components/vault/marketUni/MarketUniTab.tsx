@@ -1,8 +1,11 @@
-import { useUniMarketMock, type MarketMode } from '../../../hooks/useUniMarketMock';
+import { useUniMarketMock, type LiquidityAction, type TopMode } from '../../../hooks/useUniMarketMock';
 import SegmentedControl from '../../ui/SegmentedControl';
 import UniswapLogo from '../../ui/UniswapLogo';
 import AddLiquidityPanel from './AddLiquidityPanel';
+import LiquidityPositionCard from './LiquidityPositionCard';
+import PressedToggle from './PressedToggle';
 import QuoteStats from './QuoteStats';
+import RemoveLiquidityPanel from './RemoveLiquidityPanel';
 import ReviewModal from './ReviewModal';
 import RouteView from './RouteView';
 import SettingsPopover from './SettingsPopover';
@@ -10,14 +13,15 @@ import SwapPanel from './SwapPanel';
 import TokenPickerPanel from './TokenPickerPanel';
 import { FOCUS_RING, GHOST_ICON_BTN, INSET } from './styles';
 
-const MODE_OPTIONS: { value: MarketMode; label: string }[] = [
+const MODE_OPTIONS: { value: TopMode; label: string }[] = [
   { value: 'swap', label: 'Swap' },
-  { value: 'add', label: 'Add liquidity' },
+  { value: 'liquidity', label: 'Liquidity' },
 ];
 
 /**
  * "Market (uni)" — MOCKED preview of the Uniswap V2 phUSD/sUSDS market
- * (story 084). Every number, balance and transaction is simulated by
+ * (stories 084, 085: swap, plus a Liquidity mode with the LP position and
+ * Add / Remove). Every number, balance and transaction is simulated by
  * `useUniMarketMock`; nothing is read from or sent to a chain. Takes no props:
  * it deliberately does not consume the Balancer price that feeds the live
  * Market tab.
@@ -25,8 +29,10 @@ const MODE_OPTIONS: { value: MarketMode; label: string }[] = [
 export default function MarketUniTab() {
   const m = useUniMarketMock();
   const isSwap = m.mode === 'swap';
-  const hasStats = isSwap ? m.swap.valid : m.add.valid;
-  const stats = isSwap ? m.swap.stats : m.add.stats;
+  const isRemove = m.mode === 'remove';
+  const quote = isSwap ? m.swap : isRemove ? m.remove : m.add;
+  const hasStats = quote.valid;
+  const stats = quote.stats;
 
   return (
     <div className="p-6 flex flex-col gap-5 tabular-nums">
@@ -74,10 +80,10 @@ export default function MarketUniTab() {
         className="relative w-full max-w-[560px] mx-auto bg-pxusd-teal-800 border border-pxusd-teal-600 rounded-[18px] p-4 flex flex-col gap-3.5"
       >
         <div className="flex items-center justify-between gap-3">
-          <SegmentedControl<MarketMode>
+          <SegmentedControl<TopMode>
             options={MODE_OPTIONS}
-            value={m.mode}
-            onChange={m.setMode}
+            value={m.topMode}
+            onChange={m.setTopMode}
             ariaLabel="Mode"
           />
           <button
@@ -104,7 +110,28 @@ export default function MarketUniTab() {
           />
         )}
 
-        {isSwap ? <SwapPanel m={m} /> : <AddLiquidityPanel m={m} />}
+        {isSwap ? (
+          <SwapPanel m={m} />
+        ) : (
+          <>
+            <div className="flex flex-col gap-3">
+              <LiquidityPositionCard m={m} />
+              <PressedToggle<LiquidityAction>
+                ariaLabel="Liquidity action"
+                options={[
+                  { value: 'add', content: 'Add', selected: !isRemove },
+                  { value: 'remove', content: 'Remove', selected: isRemove },
+                ]}
+                onSelect={m.setLiqAction}
+                groupClassName="grid grid-cols-2 gap-1 rounded-xl border border-pxusd-teal-600 bg-pxusd-teal-950 p-1"
+                buttonClassName="h-10 rounded-[9px] border-none text-sm"
+                onClassName="bg-pxusd-teal-600 text-pxusd-orange-300 font-bold"
+                offClassName="bg-transparent text-[rgba(240,245,248,0.65)] font-semibold hover:text-foreground"
+              />
+            </div>
+            {isRemove ? <RemoveLiquidityPanel m={m} /> : <AddLiquidityPanel m={m} />}
+          </>
+        )}
 
         {hasStats && <QuoteStats stats={stats} className={`${INSET} px-3.5 py-3`} />}
 
