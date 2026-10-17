@@ -1,4 +1,5 @@
-import { createConfig, http, fallback } from 'wagmi'
+import { createConfig, http, fallback, unstable_connector } from 'wagmi'
+import { injected } from 'wagmi/connectors'
 import { mainnet, arbitrum, sepolia } from 'wagmi/chains'
 import { defineChain } from 'viem'
 import { connectorsForWallets } from '@rainbow-me/rainbowkit'
@@ -57,6 +58,11 @@ export const wagmiConfig = createConfig({
     [sepolia.id]: http(),
     [arbitrum.id]: http(),
     [mainnet.id]: fallback([
+      // The connected injected wallet's own RPC (Rabby, MetaMask extension).
+      // Throws when no injected wallet is connected or it sits on another
+      // chain, so `fallback` moves on to the public endpoints below — which
+      // still carry every visitor who has not connected.
+      unstable_connector(injected),
       // Free public endpoints, tried in order. All verified to send
       // Access-Control-Allow-Origin for https://phoenixdefi.app — an endpoint
       // without it surfaces every outage as an opaque CORS error in the console.
@@ -66,8 +72,6 @@ export const wagmiConfig = createConfig({
       // backed-off attempts before reaching the paid fallback below.
       http('https://eth.drpc.org', { retryCount: 1 }),
       http('https://mainnet.gateway.tenderly.co', { retryCount: 1 }),
-      http('https://cloudflare-eth.com', { retryCount: 1 }),
-      http('https://rpc.ankr.com/eth', { retryCount: 1 }),
       // Paid last resort (VITE_MAINNET_FALLBACK_RPC_URL). Deliberately last so
       // normal traffic never reaches it; it only carries load when every public
       // endpoint above is down. Note this URL is inlined into the client bundle
