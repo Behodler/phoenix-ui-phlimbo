@@ -19,10 +19,12 @@ const MODE_OPTIONS: { value: TopMode; label: string }[] = [
 ];
 
 /**
- * "Market (uni)" — MOCKED preview of the Uniswap V2 phUSD/sUSDS market
- * (stories 084, 085: swap, plus a Liquidity mode with the LP position and
- * Add / Remove). Every number, balance and transaction is simulated by
- * `useUniMarket`; nothing is read from or sent to a chain. Takes no props:
+ * "Market (uni)" — the Uniswap V2 phUSD/sUSDS market (stories 084, 085:
+ * swap, plus a Liquidity mode with the LP position and Add / Remove; wired
+ * live in story 087). Quotes, reserves, balances and allowances are read
+ * on-chain, and approvals plus UniswapHelper calls are sent, by
+ * `useUniMarket`; while the helper or pair address is missing it disables
+ * every read and write. Takes no props:
  * it deliberately does not consume the Balancer price that feeds the live
  * Market tab.
  */
