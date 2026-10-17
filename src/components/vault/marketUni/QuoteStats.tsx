@@ -1,4 +1,4 @@
-import type { Stat, StatTone } from '../../../lib/uniV2MockMath';
+import type { Stat, StatTone } from '../../../lib/uniV2Math';
 
 const TONE_CLASS: Record<StatTone, string> = {
   default: 'text-foreground',

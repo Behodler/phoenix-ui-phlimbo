@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { UniMarketMock } from '../../../hooks/useUniMarketMock';
+import type { UniMarket } from '../../../hooks/useUniMarket';
 import QuoteStats from './QuoteStats';
 import TokenIcon from './TokenIcon';
 import { FOCUS_RING, GHOST_ICON_BTN, INSET } from './styles';
@@ -23,11 +23,11 @@ function Check({ size, strokeWidth }: { size: number; strokeWidth: number }) {
 
 const PRIMARY_BTN = `h-[50px] rounded-[14px] border-none text-pxusd-white text-[15px] font-bold inline-flex items-center justify-center gap-2 ${FOCUS_RING}`;
 
-/** Review → approve/confirm step machine → success. Fully simulated. */
-export default function ReviewModal({ m }: { m: UniMarketMock }) {
+/** Review → approve/confirm step machine → success. Each step is a real transaction. */
+export default function ReviewModal({ m }: { m: UniMarket }) {
   const { pending, cancel } = m;
 
-  // Escape closes, except while a (mock) wallet confirmation is pending.
+  // Escape closes, except while a wallet confirmation is pending.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !pending) cancel();
@@ -153,17 +153,19 @@ export default function ReviewModal({ m }: { m: UniMarketMock }) {
               <Check size={30} strokeWidth={2.5} />
             </span>
             <span className="text-base font-semibold">{m.successText}</span>
-            <a
-              href={m.etherscanUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`text-sm inline-flex items-center gap-1.5 min-h-[32px] text-pxusd-orange-300 hover:brightness-110 rounded ${FOCUS_RING}`}
-            >
-              View on Etherscan
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-              </svg>
-            </a>
+            {m.etherscanUrl && (
+              <a
+                href={m.etherscanUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`text-sm inline-flex items-center gap-1.5 min-h-[32px] text-pxusd-orange-300 hover:brightness-110 rounded ${FOCUS_RING}`}
+              >
+                View on Etherscan
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                </svg>
+              </a>
+            )}
             <button type="button" onClick={m.done} className={`${PRIMARY_BTN} phoenix-btn-primary w-full !p-0 text-base`}>
               Done
             </button>

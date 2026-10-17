@@ -1,5 +1,5 @@
-import type { UniMarketMock } from '../../../hooks/useUniMarketMock';
-import type { RemoveOutSymbol } from '../../../data/uniMarketMockData';
+import type { UniMarket } from '../../../hooks/useUniMarket';
+import type { RemoveOutSymbol } from '../../../data/uniMarketConfig';
 import LpPairIcon from './LpPairIcon';
 import PressedToggle from './PressedToggle';
 import TokenIcon from './TokenIcon';
@@ -7,10 +7,10 @@ import { BOX, FOCUS_RING, PCT_CHIP_ON_STYLE } from './styles';
 
 /**
  * Remove-liquidity mode: burn UNI-V2 (typed or 25/50/75/Max of the position)
- * and receive phUSD plus the sUSDS side, either as sUSDS (router) or redeemed
- * to USDS (liquidity zap).
+ * and receive phUSD plus the sUSDS side, either as sUSDS (UniswapHelper.removeLiquiditySUSDS) or redeemed
+ * to USDS (UniswapHelper.removeLiquidityUSDS).
  */
-export default function RemoveLiquidityPanel({ m }: { m: UniMarketMock }) {
+export default function RemoveLiquidityPanel({ m }: { m: UniMarket }) {
   return (
     <div className="flex flex-col">
       <div className={BOX}>

@@ -6,6 +6,7 @@ import { PATH_TO_TAB, TAB_TO_PATH, DEFAULT_PATH } from '../lib/tabRoutes';
 import { getVaultTabs } from '../lib/vaultTabs';
 import { useToast } from '../components/ui/ToastProvider';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
+import { NetworkType } from '../types/contracts';
 import { parseUnits, maxUint256 } from 'viem';
 import { phlimboV3Abi, phusdStableMinterAbi } from '@behodler/phase2-wagmi-hooks';
 import { useTokenBalance, useTokenAllowance, useTokenApproval, useBalancerPrice, usePriceInterpolation } from '../hooks';
@@ -218,8 +219,10 @@ export default function VaultPage() {
   // - Safety/Emergency Pause is handled by the fixed footer, not a tab
   // "Stake" is the public farm (PhlimboV3) and now the only farm surface —
   // the incumbent V2 "Stake (admin only)" tab was removed after the cutover.
-  // "Market (uni)" is the mocked Uniswap V2 market preview (story 084).
-  const tabs: readonly Tab[] = getVaultTabs({ isMounted, isMainnet, hasAdminAccess });
+  // "Market (uni)" is the Uniswap V2 market (stories 084, 087): admin-only on
+  // public chains, open to everyone on local Anvil until public launch.
+  const isLocal = networkType === NetworkType.LOCAL;
+  const tabs: readonly Tab[] = getVaultTabs({ isMounted, isMainnet, isLocal, hasAdminAccess });
 
   // FAQ state - tracks which FAQ context to display
   // Initialize to "MintTab" to match the default activeTab ("Mint")

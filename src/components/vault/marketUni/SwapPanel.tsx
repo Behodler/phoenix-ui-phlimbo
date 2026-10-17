@@ -1,10 +1,10 @@
-import type { UniMarketMock } from '../../../hooks/useUniMarketMock';
+import type { UniMarket } from '../../../hooks/useUniMarket';
 import TokenAmountBox from './TokenAmountBox';
 import { PhUSDChip, TokenPickerButton } from './TokenChips';
 import { FOCUS_RING } from './styles';
 
-/** Swap mode: You pay / flip / You receive. */
-export default function SwapPanel({ m }: { m: UniMarketMock }) {
+/** Swap mode: You pay / flip / You receive (read-only: UniswapHelper quotes are exact-in only). */
+export default function SwapPanel({ m }: { m: UniMarket }) {
   const q = m.swap;
   const picker = (sym: typeof q.inSym, role: 'pay with' | 'receive') => (
     <TokenPickerButton
@@ -46,7 +46,7 @@ export default function SwapPanel({ m }: { m: UniMarketMock }) {
         id="mku-recv"
         label="You receive"
         value={m.recvStr}
-        onChange={m.setRecv}
+        readOnly
         balanceText={m.recvBalText}
         usdText={m.recvUsd}
         token={q.buy ? <PhUSDChip /> : picker(q.outSym, 'receive')}

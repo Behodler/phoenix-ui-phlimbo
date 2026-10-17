@@ -1,4 +1,4 @@
-import type { UniMarketMock } from '../../../hooks/useUniMarketMock';
+import type { UniMarket } from '../../../hooks/useUniMarket';
 import TokenAmountBox from './TokenAmountBox';
 import TokenIcon from './TokenIcon';
 import { PhUSDChip, TokenPickerButton } from './TokenChips';
@@ -6,9 +6,9 @@ import { FOCUS_RING } from './styles';
 
 /**
  * Add-liquidity mode: chosen deposit token (USDS default, or sUSDS) + phUSD,
- * linked at the pool ratio. USDS is wrapped to sUSDS by the liquidity zap.
+ * linked at the pool ratio. USDS is wrapped to sUSDS by UniswapHelper.addLiquidityUSDS.
  */
-export default function AddLiquidityPanel({ m }: { m: UniMarketMock }) {
+export default function AddLiquidityPanel({ m }: { m: UniMarket }) {
   const depositSelector = (
     <div className="relative flex-shrink-0">
       <TokenPickerButton

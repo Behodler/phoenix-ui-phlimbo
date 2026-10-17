@@ -1,226 +1,360 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import { parseUnits } from 'viem';
 import MarketUniTab from './MarketUniTab';
-import { MOCK_STEP_MS, POOL } from '../../../data/uniMarketMockData';
+import type { UniMarket } from '../../../hooks/useUniMarket';
 import { mainnetAddresses } from '../../../lib/contracts';
+import {
+  addQuote,
+  addSteps,
+  positionView,
+  removeQuote,
+  swapQuote,
+  swapSteps,
+  type PoolState,
+} from '../../../lib/uniV2Math';
+import { SLIPPAGE_OPTIONS, UNISWAP_TRADE_URL } from '../../../data/uniMarketConfig';
 
-// No wagmi / context mocks: the tab is fully self-contained mock state.
+// ---------------------------------------------------------------------------
+// The tab is a pure renderer of `useUniMarket()`. The hook's chain logic is
+// covered in useUniMarket.test.tsx and uniV2Math.test.ts; here it is replaced
+// by a fully populated fixture so these tests assert rendering, mode switching,
+// the picker, CTA states and the review modal.
+// ---------------------------------------------------------------------------
 
-const payInput = () => screen.getByLabelText('You pay') as HTMLInputElement;
-const recvInput = () => screen.getByLabelText('You receive') as HTMLInputElement;
+const e18 = (n: string) => parseUnits(n, 18);
+const POOL: PoolState = { rPh: e18('2000'), rS: e18('1850'), totalSupply: e18('1900'), spx: e18('1.0735') };
+
+let market: UniMarket;
+vi.mock('../../../hooks/useUniMarket', () => ({ useUniMarket: () => market }));
+
+const swap = swapQuote({
+  tok: 'USDC', dir: 'buy', inWei: parseUnits('100', 6), quoteOut: e18('93.5'), quoteLoading: false, quoteError: false,
+  slip: 0.5, pool: POOL, inBal: parseUnits('10000', 6), allowance: 0n, ethUsd: 0,
+});
+const add = addQuote({
+  depositSym: 'USDS', edited: 'tok', tokWei: e18('100'), phWei: 0n, previewShares: e18('93'), slip: 0.5, pool: POOL,
+  tokBal: e18('10000'), phBal: e18('10000'), tokAllowance: 0n, phAllowance: 0n,
+});
+const remove = removeQuote({ burnWei: e18('5'), lpBal: e18('10'), out: 'sUSDS', previewUsds: undefined, slip: 0.5, pool: POOL, allowance: 0n });
+
+function makeMarket(over: Partial<UniMarket> = {}): UniMarket {
+  const fn = () => vi.fn();
+  const base = {
+    tickerPair: 'phUSD/sUSDS pool · 2.0k phUSD / 1.9k sUSDS',
+    tickerPrice: '$0.992987',
+    priceAtOrAboveDollar: false,
+    uniswapUrl: UNISWAP_TRADE_URL,
+    etherscanUrl: '',
+    available: true,
+    connected: true,
+    slippageOptions: SLIPPAGE_OPTIONS,
+    deadlineMinutes: 20,
+    mode: 'swap',
+    topMode: 'swap',
+    slip: 0.5,
+    settingsOpen: false,
+    dir: 'buy',
+    token: 'USDC',
+    swap,
+    payStr: '100',
+    recvStr: '93.5',
+    payBalText: '10,000.00',
+    recvBalText: '10,000.00',
+    payUsd: '≈ $100.00',
+    recvUsd: '≈ $92.84',
+    routeSummary: '3 hops · 1 transaction',
+    pickerOpen: false,
+    tokenRows: [
+      { sym: 'DOLA', name: 'Dola USD Stablecoin', hint: 'via USDC → USDS → sUSDS', balText: '0.00', selected: false },
+      { sym: 'USDC', name: 'USD Coin', hint: 'via USDS → sUSDS', balText: '10,000.00', selected: true },
+      { sym: 'sUSDS', name: 'Savings USDS', hint: 'direct pair', balText: '10,000.00', selected: false },
+    ],
+    addSym: 'USDS',
+    add,
+    addTokens: ['USDS', 'sUSDS'],
+    aTokStr: '100',
+    aPhStr: '100.54',
+    addTokBalText: '10,000.00',
+    phBalText: '10,000.00',
+    aTokUsd: '≈ $100.00',
+    aPhUsd: '≈ $99.83',
+    addPickerOpen: false,
+    lpSymbol: 'UNI-V2',
+    hasPosition: true,
+    positionLp: '10.0000',
+    positionShare: '0.53%',
+    positionS: '9.7368',
+    positionPh: '10.52',
+    positionValue: '≈ $20.89',
+    remove,
+    rLpStr: '5',
+    lpBalText: '10.0000',
+    pctOptions: [
+      { p: 0.25, label: '25%', selected: false },
+      { p: 0.5, label: '50%', selected: true },
+      { p: 0.75, label: '75%', selected: false },
+      { p: 1, label: 'Max', selected: false },
+    ],
+    outOptions: [
+      { sym: 'sUSDS', selected: true },
+      { sym: 'USDS', selected: false },
+    ],
+    receiveRows: [
+      { sym: 'sUSDS', amount: '4.8684' },
+      { sym: 'phUSD', amount: '5.26' },
+    ],
+    removeNote: 'Paid out at the pool ratio',
+    removeUsd: '≈ $10.45',
+    cta: { label: 'Review swap', enabled: true },
+    modal: null,
+    steps: [],
+    stepIdx: 0,
+    currentStep: undefined,
+    pending: false,
+    success: false,
+    exactApprove: false,
+    exactLabel: '',
+    legs: [
+      { caption: 'You pay', sym: 'USDC', amount: '100.00' },
+      { caption: 'You receive (estimated)', sym: 'phUSD', amount: '93.50' },
+    ],
+    modalTitle: 'Review swap',
+    modalActionLabel: 'Approve USDC',
+    successText: 'Swapped 100.00 USDC for 93.50 phUSD',
+    modalStats: [],
+    setTopMode: fn(),
+    toSwap: fn(),
+    toLiquidity: fn(),
+    setLiqAction: fn(),
+    setRemoveLp: fn(),
+    pickRemovePct: fn(),
+    setRemoveOut: fn(),
+    toggleSettings: fn(),
+    setSlippage: fn(),
+    openPicker: fn(),
+    closePicker: fn(),
+    selectToken: fn(),
+    setPay: fn(),
+    payMax: fn(),
+    flip: fn(),
+    toggleAddPicker: fn(),
+    selectAddToken: fn(),
+    setAddTok: fn(),
+    setAddPh: fn(),
+    addTokMax: fn(),
+    addPhMax: fn(),
+    startReview: fn(),
+    advanceStep: fn(),
+    cancel: fn(),
+    done: fn(),
+    toggleExactApprove: fn(),
+  } as unknown as UniMarket;
+  return { ...base, ...over } as UniMarket;
+}
+
 const cta = () => within(screen.getByRole('region', { name: 'Trade panel' })).getAllByRole('button').at(-1) as HTMLButtonElement;
-const type = (el: HTMLElement, value: string) => fireEvent.change(el, { target: { value } });
 const stepSubs = () =>
   within(screen.getByRole('list', { name: 'Steps' })).getAllByRole('listitem').map((li) => li.textContent ?? '');
 
-/** Click the modal's primary action and let the mocked wallet confirm. */
-const confirmStep = (label: string | RegExp) => {
-  fireEvent.click(within(screen.getByRole('dialog', { name: /review|complete|added|removed/i })).getByRole('button', { name: label }));
-  act(() => {
-    vi.advanceTimersByTime(MOCK_STEP_MS);
-  });
-};
-
-afterEach(() => {
-  vi.useRealTimers();
+beforeEach(() => {
+  market = makeMarket();
 });
 
-describe('MarketUniTab (story 084, mocked)', () => {
-  it('renders the mock banner', () => {
+describe('MarketUniTab (story 087, live hook mocked)', () => {
+  it('no longer renders the mock-preview banner', () => {
     render(<MarketUniTab />);
-    expect(screen.getByRole('status')).toHaveTextContent(/Mock preview — balances, prices and transactions are simulated; nothing is sent on-chain/);
+    expect(screen.queryByText(/Mock preview/)).toBeNull();
+    expect(screen.queryByText(/balances, prices and transactions are simulated; nothing is sent on-chain/)).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
-  it('renders the restored official Uniswap logo in the info card', () => {
+  it('renders the official Uniswap logo in the info card', () => {
     render(<MarketUniTab />);
-    const logo = screen.getByRole('img', { name: 'Uniswap logo' });
-    const svg = logo.querySelector('svg');
-    expect(svg).not.toBeNull();
+    const svg = screen.getByRole('img', { name: 'Uniswap logo' }).querySelector('svg');
     expect(svg?.getAttribute('viewBox')).toBe('0 0 168.3 193.8');
-    expect(svg?.querySelectorAll('path')).toHaveLength(9);
     expect(screen.getByText('phUSD trades on Uniswap')).toBeInTheDocument();
   });
 
-  it('shows the price ticker (mock price $0.9919 < $1 renders pink, not green)', () => {
+  it('shows the live ticker; below $1 renders pink, at/above $1 green', () => {
+    const { unmount } = render(<MarketUniTab />);
+    expect(screen.getByText('phUSD/sUSDS pool · 2.0k phUSD / 1.9k sUSDS')).toBeInTheDocument();
+    expect(screen.getByTestId('mku-ticker-price').className).toContain('text-pxusd-pink-400');
+    unmount();
+    market = makeMarket({ tickerPrice: '$1.000100', priceAtOrAboveDollar: true });
     render(<MarketUniTab />);
-    expect(screen.getByText('phUSD/sUSDS pool · 400.0k phUSD / 369.6k sUSDS')).toBeInTheDocument();
-    const price = screen.getByTestId('mku-ticker-price');
-    expect(price.textContent).toBe('$0.991914');
-    expect(price.className).toContain('text-pxusd-pink-400');
+    expect(screen.getByTestId('mku-ticker-price').className).toContain('text-green-400');
   });
 
-  it('defaults to swap/buy/USDC with an empty amount', () => {
+  it('swap: pay input is editable, receive input is read-only (exact-in only)', () => {
     render(<MarketUniTab />);
-    expect(screen.getByRole('tab', { name: 'Swap' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('button', { name: 'Select token to pay with, currently USDC' })).toBeInTheDocument();
-    expect(cta()).toHaveTextContent('Enter an amount');
-    expect(cta()).toBeDisabled();
+    const pay = screen.getByLabelText('You pay') as HTMLInputElement;
+    const recv = screen.getByLabelText('You receive') as HTMLInputElement;
+    expect(pay.readOnly).toBe(false);
+    expect(recv.readOnly).toBe(true);
+    expect(recv.value).toBe('93.5');
+    fireEvent.change(pay, { target: { value: '5' } });
+    expect(market.setPay).toHaveBeenCalledWith('5');
+    expect(screen.queryByText(/Maximum sold/)).toBeNull();
   });
 
-  it('quotes a USDC buy with stats and a 3-hop route', () => {
+  it('swap stats and the real route labels render', () => {
     render(<MarketUniTab />);
-    type(payInput(), '1000');
-    expect(recvInput().value).not.toBe('');
-    expect(screen.getByText('Rate')).toBeInTheDocument();
     expect(screen.getByText('Price impact')).toBeInTheDocument();
-    expect(screen.getByText('Allowance')).toBeInTheDocument();
+    expect(screen.getByText('Minimum received (0.5% slippage)')).toBeInTheDocument();
     expect(screen.getByText('Approve USDC first')).toBeInTheDocument();
-    expect(screen.getByText('3 hops · 1 transaction')).toBeInTheDocument();
     const route = screen.getByRole('list', { name: 'Swap route' });
     expect(within(route).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      'USDCSky PSM 1:1',
-      'USDSSky savings deposit',
+      'USDCSky PSM',
+      'USDSsUSDS deposit',
       'sUSDSUniswap V2 · 0.30%',
       'phUSD',
     ]);
+    expect(screen.getByText('3 hops · 1 transaction')).toBeInTheDocument();
+  });
+
+  it('CTA: enabled starts the review; disabled states render their label', () => {
+    const { unmount } = render(<MarketUniTab />);
     expect(cta()).toHaveTextContent('Review swap');
-    expect(cta()).toBeEnabled();
+    fireEvent.click(cta());
+    expect(market.startReview).toHaveBeenCalled();
+    unmount();
+
+    market = makeMarket({ available: false, cta: { label: 'Not available on this network', enabled: false } });
+    render(<MarketUniTab />);
+    expect(cta()).toHaveTextContent('Not available on this network');
+    expect(cta()).toBeDisabled();
   });
 
-  it('sanitises input (commas → dots, one dot)', () => {
+  it('flip and MAX call through to the hook', () => {
     render(<MarketUniTab />);
-    type(payInput(), '1,5.2x');
-    expect(payInput().value).toBe('1.52');
+    fireEvent.click(screen.getByRole('button', { name: 'Flip direction: currently buying phUSD' }));
+    expect(market.flip).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'MAX' }));
+    expect(market.payMax).toHaveBeenCalled();
   });
 
-  it('token picker selects sUSDS → direct pair', () => {
+  it('token picker lists rows and selects', () => {
+    market = makeMarket({ pickerOpen: true });
     render(<MarketUniTab />);
-    fireEvent.click(screen.getByRole('button', { name: /Select token to pay with/ }));
     const picker = screen.getByRole('dialog', { name: 'Select a token' });
     expect(within(picker).getByRole('button', { name: /^USDC/ })).toHaveAttribute('aria-pressed', 'true');
     expect(within(picker).getByText(/USD Coin · via USDS → sUSDS/)).toBeInTheDocument();
     fireEvent.click(within(picker).getByRole('button', { name: /^sUSDS/ }));
-    expect(screen.queryByRole('dialog', { name: 'Select a token' })).toBeNull();
-    type(payInput(), '100');
-    expect(screen.getByText('Direct · 1 hop')).toBeInTheDocument();
+    expect(market.selectToken).toHaveBeenCalledWith('sUSDS');
   });
 
-  it('flip switches to selling phUSD and carries the output amount over', () => {
+  it('settings popover selects slippage', () => {
+    market = makeMarket({ settingsOpen: true });
     render(<MarketUniTab />);
-    type(payInput(), '1000');
-    const out = recvInput().value;
-    fireEvent.click(screen.getByRole('button', { name: 'Flip direction: currently buying phUSD' }));
-    expect(screen.getByRole('button', { name: 'Flip direction: currently selling phUSD' })).toBeInTheDocument();
-    expect(payInput().value).toBe(out);
-    expect(screen.getByRole('button', { name: 'Select token to receive, currently USDC' })).toBeInTheDocument();
-  });
-
-  it('exact-out editing back-computes the pay side', () => {
-    render(<MarketUniTab />);
-    type(recvInput(), '100');
-    expect(payInput().value).not.toBe('');
-    expect(screen.getByText('Maximum sold (0.5% slippage)')).toBeInTheDocument();
-  });
-
-  it('CTA reports insufficient balance above the USDC balance', () => {
-    render(<MarketUniTab />);
-    type(payInput(), '1200.01');
-    expect(cta()).toHaveTextContent('Insufficient USDC balance');
-    expect(cta()).toBeDisabled();
-  });
-
-  it('settings popover toggles and selects slippage', () => {
-    render(<MarketUniTab />);
-    const gear = screen.getByRole('button', { name: 'Transaction settings' });
-    expect(gear).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.click(gear);
-    expect(gear).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('20 min')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '0.5%' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: '1%' }));
-    type(payInput(), '100');
-    expect(screen.getByText('Minimum received (1% slippage)')).toBeInTheDocument();
+    expect(market.setSlippage).toHaveBeenCalledWith(1);
   });
 
-  it('Liquidity opens on Add, which defaults to USDS and links amounts by the pool ratio', () => {
+  it('mode switch: Liquidity tab calls setTopMode', () => {
     render(<MarketUniTab />);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Swap', 'Liquidity']);
     fireEvent.click(screen.getByRole('tab', { name: 'Liquidity' }));
+    expect(market.setTopMode).toHaveBeenCalledWith('liquidity');
+  });
+
+  it('add liquidity: position card, deposit boxes, "up to" deposit and wrap stats', () => {
+    market = makeMarket({ mode: 'add', topMode: 'liquidity', cta: { label: 'Review supply', enabled: true } });
+    render(<MarketUniTab />);
+    const card = screen.getByRole('region', { name: 'Your position' });
+    expect(within(card).getByText('0.53% of pool')).toBeInTheDocument();
+    expect(screen.getByTestId('mku-pos-lp').textContent).toBe('10.0000');
     expect(screen.getByRole('button', { name: 'Select deposit token, currently USDS' })).toBeInTheDocument();
-    const [tok, ph] = screen.getAllByLabelText('Deposit') as HTMLInputElement[];
-    type(tok, '107.35'); // = 100 sUSDS → 100 × 400000 / 369600 phUSD
-    expect(ph.value).toBe('108.23');
+    expect(screen.getByText('Deposited (up to)')).toBeInTheDocument();
     expect(screen.getByText('Wrapped to sUSDS')).toBeInTheDocument();
-    expect(screen.getByText('100.0000 sUSDS via Sky savings deposit')).toBeInTheDocument();
-    type(ph, '400');
-    expect(tok.value).toBe(String(parseFloat((369.6 * 1.0735).toFixed(6))));
+    const [tok, ph] = screen.getAllByLabelText('Deposit') as HTMLInputElement[];
+    fireEvent.change(tok, { target: { value: '7' } });
+    expect(market.setAddTok).toHaveBeenCalledWith('7');
+    fireEvent.change(ph, { target: { value: '8' } });
+    expect(market.setAddPh).toHaveBeenCalledWith('8');
     expect(cta()).toHaveTextContent('Review supply');
   });
 
-  it('USDS path shows zap steps; switching to sUSDS changes the action to router.addLiquidity', () => {
+  it('no position: dashed empty card', () => {
+    market = makeMarket({ mode: 'add', topMode: 'liquidity', hasPosition: false });
     render(<MarketUniTab />);
-    fireEvent.click(screen.getByRole('tab', { name: 'Liquidity' }));
-    type(screen.getAllByLabelText('Deposit')[0], '100');
-    fireEvent.click(cta());
-    let subs = stepSubs();
-    expect(subs[0]).toContain('USDS.approve([LIQUIDITY_ZAP])');
-    expect(subs[1]).toContain('phUSD.approve([LIQUIDITY_ZAP])');
-    expect(subs[2]).toContain('Supply USDS + phUSD (wraps to sUSDS)');
-    expect(subs[2]).toContain('zap.addLiquidityWithUSDS');
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Select deposit token, currently USDS' }));
-    fireEvent.click(within(screen.getByRole('group', { name: 'Deposit token' })).getByRole('button', { name: /sUSDS/ }));
-    expect(screen.queryByText('Wrapped to sUSDS')).toBeNull();
-    fireEvent.click(cta());
-    subs = stepSubs();
-    expect(subs[0]).toContain('sUSDS.approve(UniswapV2Router02)');
-    expect(subs[1]).toContain('phUSD.approve(UniswapV2Router02)');
-    expect(subs[2]).toContain('router.addLiquidity');
+    expect(screen.queryByRole('region', { name: 'Your position' })).toBeNull();
+    expect(screen.getByText('No liquidity in this pool yet')).toBeInTheDocument();
   });
 
-  it('review → approve → confirm reaches success; a second swap skips the approve step', () => {
-    vi.useFakeTimers();
+  it('remove liquidity: chips, receive toggle, rows and burn input', () => {
+    market = makeMarket({ mode: 'remove', topMode: 'liquidity', cta: { label: 'Review removal', enabled: true } });
     render(<MarketUniTab />);
-    type(payInput(), '100');
-    fireEvent.click(cta());
+    expect(screen.getByText('Balance: 10.0000 UNI-V2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '50%' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Max' }));
+    expect(market.pickRemovePct).toHaveBeenCalledWith(1);
+    const rows = within(screen.getByRole('list', { name: 'You receive' })).getAllByRole('listitem').map((li) => li.textContent);
+    expect(rows).toEqual(['4.8684sUSDS', '5.26phUSD']);
+    fireEvent.click(within(screen.getByRole('group', { name: 'Receive the sUSDS side as' })).getByRole('button', { name: 'USDS' }));
+    expect(market.setRemoveOut).toHaveBeenCalledWith('USDS');
+    fireEvent.change(screen.getByLabelText('Burn LP tokens'), { target: { value: '3' } });
+    expect(market.setRemoveLp).toHaveBeenCalledWith('3');
+    expect(screen.getByText('Approve UNI-V2 first')).toBeInTheDocument();
+  });
 
+  it('review modal: real helper method names, exact-approve checkbox, advance + cancel', () => {
+    const steps = swapSteps(swap);
+    market = makeMarket({
+      modal: 'swap', steps, currentStep: steps[0],
+      exactLabel: 'Approve exact amount only (100.00 USDC) instead of unlimited',
+    });
+    render(<MarketUniTab />);
     const dialog = screen.getByRole('dialog', { name: 'Review swap' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(within(dialog).getByText('Route')).toBeInTheDocument();
-    expect(within(dialog).queryByText('Allowance')).toBeNull();
-    expect(within(dialog).getByText(/Approve exact amount only \(100\.00 USDC\) instead of unlimited/)).toBeInTheDocument();
-    expect(stepSubs()[0]).toContain('USDC.approve([ZAP_ROUTER])');
-
-    // Pending state: spinner label + Cancel disabled
+    expect(stepSubs()[0]).toContain('USDC.approve(UniswapHelper)');
+    expect(stepSubs()[1]).toContain('UniswapHelper.swapToPhUSD');
+    expect(stepSubs().join(' ')).not.toMatch(/zap\.|router\./);
+    fireEvent.click(within(dialog).getByRole('checkbox'));
+    expect(market.toggleExactApprove).toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Approve USDC' }));
+    expect(market.advanceStep).toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(market.cancel).toHaveBeenCalled();
+  });
+
+  it('review modal pending: action and cancel disabled', () => {
+    const steps = addSteps(add);
+    market = makeMarket({
+      modal: 'add', mode: 'add', topMode: 'liquidity', steps, currentStep: steps[0], pending: true,
+      modalTitle: 'Review supply', modalActionLabel: 'Confirm in wallet…',
+    });
+    render(<MarketUniTab />);
+    const dialog = screen.getByRole('dialog', { name: 'Review supply' });
     expect(within(dialog).getByRole('button', { name: /Confirm in wallet/ })).toBeDisabled();
     expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
-    act(() => {
-      vi.advanceTimersByTime(MOCK_STEP_MS);
-    });
-
-    confirmStep('Confirm swap');
-    const done = screen.getByRole('dialog', { name: 'Swap complete' });
-    expect(within(done).getByText(/^Swapped 100\.00 USDC for .* phUSD$/)).toBeInTheDocument();
-    const etherscan = within(done).getByRole('link', { name: /View on Etherscan/ });
-    expect(etherscan).toHaveAttribute('target', '_blank');
-    fireEvent.click(within(done).getByRole('button', { name: 'Done' }));
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(payInput().value).toBe('');
-
-    // Approval persisted for the session: only the action step remains.
-    type(payInput(), '50');
-    expect(screen.getByText('USDC approved')).toBeInTheDocument();
-    fireEvent.click(cta());
-    expect(stepSubs()).toHaveLength(1);
-    expect(stepSubs()[0]).toContain('zap.swapToPhUSD');
+    expect(stepSubs()[2]).toContain('UniswapHelper.addLiquidityUSDS');
   });
 
-  it('clears the step timer on unmount', () => {
-    vi.useFakeTimers();
+  it('success: explorer link hidden on Anvil (empty URL), shown with a per-tx URL elsewhere', () => {
     const { unmount } = render(<MarketUniTab />);
-    type(payInput(), '100');
-    fireEvent.click(cta());
-    fireEvent.click(screen.getByRole('button', { name: 'Approve USDC' }));
-    expect(vi.getTimerCount()).toBe(1);
     unmount();
-    expect(vi.getTimerCount()).toBe(0);
+    market = makeMarket({ modal: 'swap', success: true, modalTitle: 'Swap complete', etherscanUrl: '' });
+    const r = render(<MarketUniTab />);
+    const done = screen.getByRole('dialog', { name: 'Swap complete' });
+    expect(within(done).getByText('Swapped 100.00 USDC for 93.50 phUSD')).toBeInTheDocument();
+    expect(within(done).queryByRole('link', { name: /View on Etherscan/ })).toBeNull();
+    fireEvent.click(within(done).getByRole('button', { name: 'Done' }));
+    expect(market.done).toHaveBeenCalled();
+    r.unmount();
+
+    market = makeMarket({ modal: 'swap', success: true, modalTitle: 'Swap complete', etherscanUrl: 'https://etherscan.io/tx/0xabc' });
+    render(<MarketUniTab />);
+    const link = screen.getByRole('link', { name: /View on Etherscan/ });
+    expect(link).toHaveAttribute('href', 'https://etherscan.io/tx/0xabc');
+    expect(link).toHaveAttribute('target', '_blank');
   });
 
-  it('renders the "Or trade directly on Uniswap" link with safe target/rel and real mainnet addresses', () => {
+  it('renders the "Or trade directly on Uniswap" link with real mainnet addresses', () => {
     render(<MarketUniTab />);
     const link = screen.getByRole('link', { name: /Or trade directly on Uniswap/ });
-    expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     expect(link).toHaveAttribute(
       'href',
@@ -228,231 +362,8 @@ describe('MarketUniTab (story 084, mocked)', () => {
     );
   });
 
-  // ---------------------------------------------------------------------------
-  // Story 085 — Liquidity: position card, Add / Remove, remove liquidity
-  // ---------------------------------------------------------------------------
-
-  const TS = Math.sqrt(POOL.rS * POOL.rPh);
-  const f = (n: number, d: number) => n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
-  const toLiquidity = () => fireEvent.click(screen.getByRole('tab', { name: 'Liquidity' }));
-  const liqToggle = () => screen.getByRole('group', { name: 'Liquidity action' });
-  const toRemove = () => fireEvent.click(within(liqToggle()).getByRole('button', { name: 'Remove' }));
-  const burnInput = () => screen.getByLabelText('Burn LP tokens') as HTMLInputElement;
-  const outToggle = () => screen.getByRole('group', { name: 'Receive the sUSDS side as' });
-  const pctChip = (name: string) => screen.getByRole('button', { name });
-  const positionLp = () => screen.getByTestId('mku-pos-lp').textContent;
-
-  /** Review → (approve) → confirm → Done for whatever is currently quoted. */
-  const runFlow = (approveLabel: string | null, confirmLabel: string) => {
-    fireEvent.click(cta());
-    if (approveLabel) confirmStep(approveLabel);
-    confirmStep(confirmLabel);
-  };
-
-  it('top control reads Swap / Liquidity; Liquidity shows the position card and an Add/Remove pressed toggle', () => {
-    render(<MarketUniTab />);
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Swap', 'Liquidity']);
-    toLiquidity();
-    expect(screen.getByRole('tab', { name: 'Liquidity' })).toHaveAttribute('aria-selected', 'true');
-
-    const card = screen.getByRole('region', { name: 'Your position' });
-    expect(within(card).getByText(`${f(1200 / TS * 100, 2)}% of pool`)).toBeInTheDocument();
-    expect(positionLp()).toBe('1,200.0000');
-    expect(within(card).getByText('UNI-V2')).toBeInTheDocument();
-    expect(within(card).getByText(f((1200 / TS) * POOL.rS, 4))).toBeInTheDocument();
-    expect(within(card).getByText(f((1200 / TS) * POOL.rPh, 2))).toBeInTheDocument();
-    expect(within(card).getByText(/^≈ \$/)).toBeInTheDocument();
-
-    expect(within(liqToggle()).getByRole('button', { name: 'Add' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(liqToggle()).getByRole('button', { name: 'Remove' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: 'Select deposit token, currently USDS' })).toBeInTheDocument();
-
-    toRemove();
-    expect(within(liqToggle()).getByRole('button', { name: 'Remove' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.queryByRole('button', { name: /Select deposit token/ })).toBeNull();
-    expect(screen.getByText('Balance: 1,200.0000 UNI-V2')).toBeInTheDocument();
-  });
-
-  it('Remove: % chips fill the burn amount and show as pressed', () => {
-    render(<MarketUniTab />);
-    toLiquidity();
-    toRemove();
-    expect(['25%', '50%', '75%', 'Max'].map((n) => pctChip(n).getAttribute('aria-pressed'))).toEqual(['false', 'false', 'false', 'false']);
-    fireEvent.click(pctChip('50%'));
-    expect(burnInput().value).toBe('600');
-    expect(pctChip('50%')).toHaveAttribute('aria-pressed', 'true');
-    expect(pctChip('25%')).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(pctChip('25%'));
-    expect(burnInput().value).toBe('300');
-    fireEvent.click(pctChip('Max'));
-    expect(burnInput().value).toBe('1200');
-    expect(pctChip('Max')).toHaveAttribute('aria-pressed', 'true');
-    // typing an arbitrary amount deselects every chip
-    type(burnInput(), '123');
-    expect(screen.queryAllByRole('button', { pressed: true }).map((b) => b.textContent)).not.toContain('Max');
-  });
-
-  it('Remove: receive toggle switches sUSDS ↔ USDS, rows, note and stats', () => {
-    render(<MarketUniTab />);
-    toLiquidity();
-    toRemove();
-    type(burnInput(), '600');
-    const sAmt = (600 / TS) * POOL.rS;
-    const phAmt = (600 / TS) * POOL.rPh;
-
-    expect(within(outToggle()).getByRole('button', { name: 'sUSDS' })).toHaveAttribute('aria-pressed', 'true');
-    const rows = () => within(screen.getByRole('list', { name: 'You receive' })).getAllByRole('listitem').map((li) => li.textContent);
-    expect(rows()).toEqual([`${f(sAmt, 4)}sUSDS`, `${f(phAmt, 2)}phUSD`]);
-    expect(screen.getByText('Paid out at the pool ratio')).toBeInTheDocument();
-    expect(screen.getByText('LP tokens burned')).toBeInTheDocument();
-    expect(screen.getByText('600.0000 UNI-V2 (50.00% of position)')).toBeInTheDocument();
-    expect(screen.queryByText('sUSDS redeemed to USDS')).toBeNull();
-    expect(screen.getByText('Approve UNI-V2 for router first')).toBeInTheDocument();
-    expect(cta()).toHaveTextContent('Review removal');
-
-    fireEvent.click(within(outToggle()).getByRole('button', { name: 'USDS' }));
-    expect(within(outToggle()).getByRole('button', { name: 'USDS' })).toHaveAttribute('aria-pressed', 'true');
-    expect(rows()).toEqual([`${f(sAmt * 1.0735, 2)}USDS`, `${f(phAmt, 2)}phUSD`]);
-    expect(screen.getByText('sUSDS redeemed to USDS in the same transaction')).toBeInTheDocument();
-    expect(screen.getByText('sUSDS redeemed to USDS')).toBeInTheDocument();
-    expect(screen.getByText('Approve UNI-V2 for zap first')).toBeInTheDocument();
-  });
-
-  it('Remove CTA states: enter amount → insufficient balance → review', () => {
-    render(<MarketUniTab />);
-    toLiquidity();
-    toRemove();
-    expect(cta()).toHaveTextContent('Enter an amount');
-    expect(cta()).toBeDisabled();
-    type(burnInput(), '1200.01');
-    expect(cta()).toHaveTextContent('Insufficient UNI-V2 balance');
-    expect(cta()).toBeDisabled();
-    type(burnInput(), '1200');
-    expect(cta()).toHaveTextContent('Review removal');
-    expect(cta()).toBeEnabled();
-  });
-
-  it('removal to sUSDS: approve UNI-V2 for the router, confirm, LP balance drops and the burn input clears', () => {
-    vi.useFakeTimers();
-    render(<MarketUniTab />);
-    toLiquidity();
-    toRemove();
-    fireEvent.click(pctChip('50%'));
-    fireEvent.click(cta());
-
-    const dialog = screen.getByRole('dialog', { name: 'Review removal' });
-    expect(stepSubs()).toEqual([
-      expect.stringContaining('UNI-V2.approve(UniswapV2Router02)'),
-      expect.stringContaining('router.removeLiquidity'),
-    ]);
-    expect(stepSubs()[1]).toContain('Remove liquidity');
-    expect(within(dialog).getAllByText('You receive (estimated)')).toHaveLength(2);
-    expect(within(dialog).getByText('+')).toBeInTheDocument();
-    expect(within(dialog).queryByText('Allowance')).toBeNull();
-    expect(within(dialog).queryByText('Pool price')).toBeNull();
-    expect(within(dialog).getByText('Remaining position')).toBeInTheDocument();
-    expect(within(dialog).getByText(/Approve exact amount only \(600\.0000 UNI-V2\) instead of unlimited/)).toBeInTheDocument();
-
-    confirmStep('Approve UNI-V2');
-    confirmStep('Confirm removal');
-    const done = screen.getByRole('dialog', { name: 'Liquidity removed' });
-    const sAmt = (600 / TS) * POOL.rS;
-    const phAmt = (600 / TS) * POOL.rPh;
-    expect(within(done).getByText(`Burned 600.0000 UNI-V2 · received ${f(sAmt, 4)} sUSDS + ${f(phAmt, 2)} phUSD`)).toBeInTheDocument();
-    fireEvent.click(within(done).getByRole('button', { name: 'Done' }));
-
-    expect(positionLp()).toBe('600.0000');
-    expect(burnInput().value).toBe('');
-    expect(screen.getByText('Balance: 600.0000 UNI-V2')).toBeInTheDocument();
-
-    // Router allowance persisted: the next sUSDS removal skips approval…
-    type(burnInput(), '100');
-    expect(screen.getByText('UNI-V2 approved')).toBeInTheDocument();
-    // …but the zap is a separate spender, still unapproved.
-    fireEvent.click(within(outToggle()).getByRole('button', { name: 'USDS' }));
-    expect(screen.getByText('Approve UNI-V2 for zap first')).toBeInTheDocument();
-  });
-
-  it('removal to USDS: approve UNI-V2 for the liquidity zap, then zap.removeLiquidityToUSDS', () => {
-    vi.useFakeTimers();
-    render(<MarketUniTab />);
-    toLiquidity();
-    toRemove();
-    fireEvent.click(within(outToggle()).getByRole('button', { name: 'USDS' }));
-    type(burnInput(), '300');
-    fireEvent.click(cta());
-    const subs = stepSubs();
-    expect(subs[0]).toContain('UNI-V2.approve([LIQUIDITY_ZAP])');
-    expect(subs[1]).toContain('Remove liquidity & redeem sUSDS → USDS');
-    expect(subs[1]).toContain('zap.removeLiquidityToUSDS');
-    expect(within(screen.getByRole('dialog')).getByText('sUSDS redeemed to USDS')).toBeInTheDocument();
-    confirmStep('Approve UNI-V2');
-    confirmStep('Confirm removal');
-    expect(screen.getByText(/^Burned 300\.0000 UNI-V2 · received .* USDS \+ .* phUSD$/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    expect(positionLp()).toBe('900.0000');
-  });
-
-  it('removing Max empties the position: dashed empty card and "No liquidity to remove"', () => {
-    vi.useFakeTimers();
-    render(<MarketUniTab />);
-    toLiquidity();
-    toRemove();
-    fireEvent.click(pctChip('Max'));
-    runFlow('Approve UNI-V2', 'Confirm removal');
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-
-    expect(screen.queryByRole('region', { name: 'Your position' })).toBeNull();
-    expect(screen.getByText('No liquidity in this pool yet')).toBeInTheDocument();
-    expect(screen.getByText(/Add sUSDS and phUSD at the pool ratio to earn 0\.30% of every trade\. Your position will show here\./)).toBeInTheDocument();
-    expect(cta()).toHaveTextContent('No liquidity to remove');
-    expect(cta()).toBeDisabled();
-    type(burnInput(), '5');
-    expect(cta()).toHaveTextContent('No liquidity to remove');
-    expect(['25%', '50%', '75%', 'Max'].every((n) => pctChip(n).getAttribute('aria-pressed') === 'false')).toBe(true);
-  });
-
-  it('a completed add increments the LP balance by the quoted LP', () => {
-    vi.useFakeTimers();
-    render(<MarketUniTab />);
-    toLiquidity();
-    fireEvent.click(screen.getByRole('button', { name: 'Select deposit token, currently USDS' }));
-    fireEvent.click(within(screen.getByRole('group', { name: 'Deposit token' })).getByRole('button', { name: /sUSDS/ }));
-    type(screen.getAllByLabelText('Deposit')[0], '100');
-    runFlow('Approve sUSDS', 'Approve phUSD');
-    confirmStep('Confirm supply');
-    expect(screen.getByRole('dialog', { name: 'Liquidity added' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    expect(positionLp()).toBe(f(1200 + (100 * TS) / POOL.rS, 4));
-  });
-
-  it('cancelling a review leaves the LP balance alone', () => {
-    vi.useFakeTimers();
-    render(<MarketUniTab />);
-    toLiquidity();
-    toRemove();
-    fireEvent.click(pctChip('50%'));
-    fireEvent.click(cta());
-    confirmStep('Approve UNI-V2');
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(positionLp()).toBe('1,200.0000');
-    expect(burnInput().value).toBe('600');
-  });
-
-  it('Swap → Liquidity returns to the last-used liquidity action', () => {
-    render(<MarketUniTab />);
-    toLiquidity();
-    toRemove();
-    fireEvent.click(screen.getByRole('tab', { name: 'Swap' }));
-    expect(screen.queryByRole('group', { name: 'Liquidity action' })).toBeNull();
-    expect(screen.getByLabelText('You pay')).toBeInTheDocument();
-    toLiquidity();
-    expect(within(liqToggle()).getByRole('button', { name: 'Remove' })).toHaveAttribute('aria-pressed', 'true');
-    expect(burnInput()).toBeInTheDocument();
-
-    fireEvent.click(within(liqToggle()).getByRole('button', { name: 'Add' }));
-    fireEvent.click(screen.getByRole('tab', { name: 'Swap' }));
-    toLiquidity();
-    expect(within(liqToggle()).getByRole('button', { name: 'Add' })).toHaveAttribute('aria-pressed', 'true');
+  it('fixture sanity: position maths come from the real totalSupply', () => {
+    const p = positionView(e18('10'), POOL);
+    expect(p.s).toBe((e18('10') * POOL.rS) / POOL.totalSupply);
   });
 });

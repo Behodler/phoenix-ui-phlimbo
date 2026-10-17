@@ -3,6 +3,8 @@ import type { Tab } from '../types/vault';
 export interface VaultTabFlags {
   isMounted: boolean;
   isMainnet: boolean;
+  /** Local Anvil (chain id 31337). */
+  isLocal: boolean;
   hasAdminAccess: boolean;
 }
 
@@ -12,12 +14,12 @@ export interface VaultTabFlags {
  * - Before mount: a fixed, network-agnostic list (prevents flicker).
  * - Testnet Faucet: non-mainnet only.
  * - Market (Balancer): mainnet only.
- * - Market (uni) (story 084, mocked preview): every non-mainnet chain for
- *   everyone; on mainnet only for admins, so the public never sees fake
- *   balances or swaps. Sits immediately after Market.
+ * - Market (uni) (stories 084, 087): until public launch, admin-only (owner or
+ *   allowlisted admin) on public chains — mainnet, Sepolia, any non-local
+ *   chain — and open to everyone on local Anvil. Sits immediately after Market.
  * - Admin: owner or allowlisted admin.
  */
-export function getVaultTabs({ isMounted, isMainnet, hasAdminAccess }: VaultTabFlags): Tab[] {
+export function getVaultTabs({ isMounted, isMainnet, isLocal, hasAdminAccess }: VaultTabFlags): Tab[] {
   if (!isMounted) {
     return ["Mint", "Stake", "Yield Funnel"];
   }
@@ -33,7 +35,7 @@ export function getVaultTabs({ isMounted, isMainnet, hasAdminAccess }: VaultTabF
     tabList.push("Market");
   }
 
-  if (!isMainnet || hasAdminAccess) {
+  if (isLocal || hasAdminAccess) {
     tabList.push("Market (uni)");
   }
 

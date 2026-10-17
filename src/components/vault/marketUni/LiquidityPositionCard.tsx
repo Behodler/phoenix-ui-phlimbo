@@ -1,4 +1,4 @@
-import type { UniMarketMock } from '../../../hooks/useUniMarketMock';
+import type { UniMarket } from '../../../hooks/useUniMarket';
 import LpPairIcon from './LpPairIcon';
 import TokenIcon from './TokenIcon';
 import { SHARE_PILL_STYLE } from './styles';
@@ -9,7 +9,7 @@ const CARD = 'bg-pxusd-teal-700 rounded-[14px] px-4 py-3.5 flex flex-col';
  * The connected wallet's UNI-V2 position (share, LP amount, USD value and the
  * underlying sUSDS / phUSD), or a dashed empty card when it holds none.
  */
-export default function LiquidityPositionCard({ m }: { m: UniMarketMock }) {
+export default function LiquidityPositionCard({ m }: { m: UniMarket }) {
   if (!m.hasPosition) {
     return (
       <div className={`${CARD} gap-1 border border-dashed border-pxusd-teal-400`}>

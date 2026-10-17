@@ -1,4 +1,4 @@
-import type { MarketSymbol } from '../../../data/uniMarketMockData';
+import type { MarketSymbol } from '../../../data/uniMarketConfig';
 import TokenIcon from './TokenIcon';
 import { INSET } from './styles';
 

@@ -51,6 +51,20 @@ const ERROR_MESSAGES: Record<string, (args: readonly unknown[]) => string> = {
   NudgeStreamer__ZeroReceived: () =>
     'The token transferred nothing on receipt — it may be a fee-on-transfer or rebasing token.',
 
+  // --- UniswapHelper (Market (uni) tab, story 087) --------------------------
+  InsufficientOutput: (args) =>
+    `The price moved past your slippage tolerance (would receive ${String(args[0] ?? '?')}, minimum ${String(args[1] ?? '?')}). Raise the slippage or try a smaller amount.`,
+  Expired: (args) =>
+    `The transaction deadline passed before it was mined (deadline ${String(args[0] ?? '?')}, block time ${String(args[1] ?? '?')}). Review and submit again.`,
+  PairNotFound: () => 'The phUSD/sUSDS Uniswap pool does not exist on this network yet.',
+  UnsupportedToken: (args) => `Token ${String(args[0] ?? '')} cannot be routed through the Uniswap market.`,
+  ZeroAmount: () => 'The amount must be greater than zero.',
+  ZeroAddress: () => 'A recipient address is required.',
+  ETHTransferFailed: () => 'Sending ETH to your wallet failed. Check that the receiving address can accept ETH.',
+  ETHNotAccepted: (args) => `The helper does not accept direct ETH transfers from ${String(args[0] ?? 'this sender')}.`,
+  CurveCoinMismatch: () =>
+    'A Curve pool on the route is misconfigured. This is a deployment issue, not something you can retry.',
+
   // --- shared --------------------------------------------------------------
   EnforcedPause: () =>
     'The contract is paused right now. If a promotion is flushing, it will unpause once the flush completes.',

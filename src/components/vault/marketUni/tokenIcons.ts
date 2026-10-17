@@ -3,7 +3,7 @@
  * prices or addresses. DOLA follows the app-wide convention of the sDOLA art;
  * ETH has no asset in the repo, so it renders as a "Ξ" monogram chip.
  */
-import type { MarketSymbol } from '../../../data/uniMarketMockData';
+import type { MarketSymbol } from '../../../data/uniMarketConfig';
 import phUSDIcon from '../../../assets/phUSD-nobackground.png';
 import usdcIcon from '../../../assets/usdc-logo.svg';
 import usdeIcon from '../../../assets/USDe.png';

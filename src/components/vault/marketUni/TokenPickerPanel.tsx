@@ -1,5 +1,5 @@
-import type { SwapTokenSymbol } from '../../../data/uniMarketMockData';
-import type { TokenRowView } from '../../../hooks/useUniMarketMock';
+import type { SwapTokenSymbol } from '../../../data/uniMarketConfig';
+import type { TokenRowView } from '../../../hooks/useUniMarket';
 import TokenIcon from './TokenIcon';
 import { FOCUS_RING, GHOST_ICON_BTN } from './styles';
 

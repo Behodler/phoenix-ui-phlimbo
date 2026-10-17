@@ -1,4 +1,4 @@
-import { useUniMarketMock, type LiquidityAction, type TopMode } from '../../../hooks/useUniMarketMock';
+import { useUniMarket, type LiquidityAction, type TopMode } from '../../../hooks/useUniMarket';
 import SegmentedControl from '../../ui/SegmentedControl';
 import UniswapLogo from '../../ui/UniswapLogo';
 import AddLiquidityPanel from './AddLiquidityPanel';
@@ -22,12 +22,12 @@ const MODE_OPTIONS: { value: TopMode; label: string }[] = [
  * "Market (uni)" — MOCKED preview of the Uniswap V2 phUSD/sUSDS market
  * (stories 084, 085: swap, plus a Liquidity mode with the LP position and
  * Add / Remove). Every number, balance and transaction is simulated by
- * `useUniMarketMock`; nothing is read from or sent to a chain. Takes no props:
+ * `useUniMarket`; nothing is read from or sent to a chain. Takes no props:
  * it deliberately does not consume the Balancer price that feeds the live
  * Market tab.
  */
 export default function MarketUniTab() {
-  const m = useUniMarketMock();
+  const m = useUniMarket();
   const isSwap = m.mode === 'swap';
   const isRemove = m.mode === 'remove';
   const quote = isSwap ? m.swap : isRemove ? m.remove : m.add;
@@ -36,14 +36,6 @@ export default function MarketUniTab() {
 
   return (
     <div className="p-6 flex flex-col gap-5 tabular-nums">
-      <div
-        role="status"
-        className="rounded-lg border px-4 py-3 text-sm text-pxusd-yellow-400"
-        style={{ background: 'rgba(255,217,61,0.08)', borderColor: 'rgba(255,217,61,0.35)' }}
-      >
-        <strong className="font-semibold">Mock preview</strong> — balances, prices and transactions are simulated; nothing is sent on-chain.
-      </div>
-
       <div className="flex flex-col gap-1.5">
         <h2 className="text-2xl font-bold text-foreground m-0">Market</h2>
         <p className="text-sm text-muted-foreground m-0">Trade phUSD or provide liquidity to earn fees.</p>

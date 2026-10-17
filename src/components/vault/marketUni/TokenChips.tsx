@@ -1,4 +1,4 @@
-import type { MarketSymbol } from '../../../data/uniMarketMockData';
+import type { MarketSymbol } from '../../../data/uniMarketConfig';
 import TokenIcon from './TokenIcon';
 import { FOCUS_RING, PHUSD_CHIP_STYLE } from './styles';
 
