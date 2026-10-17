@@ -77,9 +77,14 @@ export const mainnetAddresses: ContractAddresses = {
   // stack (dispatchers + hooks + stakers) below. These are NOT yet deployed on mainnet —
   // zero-address placeholders keep this hand-maintained file's key-set equal to the regenerated
   // interface (tsc drift guard). Patch by hand when they ship.
-  // (The raw UniV2 stack that backs Uniboost — WETH9/factory/router/pools — is intentionally
-  //  NOT surfaced here: it is anvil-only, the UI never touches UniV2 directly, and mainnet would
-  //  reuse the live UniV2 deployment. It is filtered out of extraction in extract-addresses.js.)
+  // (The raw UniV2 stack that backs Uniboost — WETH9/factory/pools — is still not surfaced here.
+  //  Since phStaging2 story 102 the router and the phUSD/sUSDS pair ARE surfaced, as
+  //  `UniswapV2Router` and `PhusdSusdsPair` below, because the Market (uni) tab reads them.)
+  // external: canonical Uniswap V2 Router02
+  UniswapV2Router: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+  // phUSD/sUSDS UniV2 pair (phStaging2 story 103) — not yet deployed on mainnet — zero
+  // placeholder, patch by hand at cutover.
+  PhusdSusdsPair: "0x0000000000000000000000000000000000000000",
   /*
   BurnerEYE: "0x13fb51bcb3c5ae9e7115730bc1a58ec676ceeef2",
   BurnerSCX: "0xa833603fd82674aec51f8a57c6a27b91bc1725b2",
@@ -105,6 +110,11 @@ export const mainnetAddresses: ContractAddresses = {
   // Verified on-chain 2026-06-11: NFTMinter.configs(4).dispatcher == this address; it holds
   // the pending sUSDS leg (418.63 sUSDS). The prior pooler 0x26f8…b38a is retired (0 balance).
   BalancerPooler: "0x7f6874332c4629429d70D15f685A8230323F11F1",
+  // UniPoolerV2 index-4 dispatcher (phStaging2 story 102) and the UniswapHelper swap/liquidity
+  // periphery (phStaging2 story 110) — not yet deployed on mainnet — zero placeholders, patch by
+  // hand at cutover.
+  UniPooler: "0x0000000000000000000000000000000000000000",
+  UniswapHelper: "0x0000000000000000000000000000000000000000",
   GatherWBTC: "0xfd3775f2ccfb94b532b34b2b683e210ba4449880",
   MultiPooler: "0xd1E5774159381915f5579dFd68507E2614f67b51",
   // View contracts
@@ -177,6 +187,8 @@ export const sepoliaAddresses: ContractAddresses = {
   BurnRecorder: "0x50337fEb1fA16EE9A9f15c1e5Cb52E84783041dC",
   BalancerRouter: "0x1bddE640973F291D466e76C91a846240103aDF23",
   NFTMinter: "0x69FaD9391eb95761B444B9b651f61453B294990a",
+  // external: Uniswap V2 Router02 (official Sepolia deployment)
+  UniswapV2Router: "0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3",
   UniboostEYE: "0xD49c5F968544D6BE74a374708aBBC10D477fFd95",
   UniboostSCX: "0x739b3C2ae0C7983F6c69CC2652924875d90eA5cC",
   UniboostFLX: "0xc25CC1B22A9Dc983B1e990D230DCA2d81584bd23",
@@ -205,4 +217,8 @@ export const sepoliaAddresses: ContractAddresses = {
   Antimatter: "0xf9801f60945bBe5e01376D5F8445f380A0F701F1",
   StableStakerV2: "0x3996F77f54f4Aa8d26146054c526A4e62967b1C0",
   ViewRouter: "0x8F16599BF6BC5fdE3581bD49DCB94586b98F8ED7",
+  // Not yet deployed on Sepolia — zero placeholders.
+  UniPooler: "0x0000000000000000000000000000000000000000",
+  PhusdSusdsPair: "0x0000000000000000000000000000000000000000",
+  UniswapHelper: "0x0000000000000000000000000000000000000000",
 };
