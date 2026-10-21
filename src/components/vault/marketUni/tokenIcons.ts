@@ -1,7 +1,6 @@
 /**
  * Token artwork for the "Market (uni)" tab. Presentation only — no balances,
- * prices or addresses. DOLA follows the app-wide convention of the sDOLA art;
- * ETH has no asset in the repo, so it renders as a "Ξ" monogram chip.
+ * prices or addresses. DOLA follows the app-wide convention of the sDOLA art.
  */
 import type { MarketSymbol } from '../../../data/uniMarketConfig';
 import phUSDIcon from '../../../assets/phUSD-nobackground.png';
@@ -10,6 +9,7 @@ import usdeIcon from '../../../assets/USDe.png';
 import usdsIcon from '../../../assets/USDS.png';
 import susdsIcon from '../../../assets/sUSDS.png';
 import dolaIcon from '../../../assets/sDOLA.png';
+import ethIcon from '../../../assets/Ethereum.png';
 
 export const TOKEN_ICONS: Partial<Record<MarketSymbol, string>> = {
   phUSD: phUSDIcon,
@@ -18,9 +18,8 @@ export const TOKEN_ICONS: Partial<Record<MarketSymbol, string>> = {
   USDS: usdsIcon,
   sUSDS: susdsIcon,
   DOLA: dolaIcon,
+  ETH: ethIcon,
 };
 
 /** Monogram fallbacks for tokens without artwork. */
-export const TOKEN_MONOGRAMS: Partial<Record<MarketSymbol, { mono: string; bg: string }>> = {
-  ETH: { mono: 'Ξ', bg: '#5A6FD8' },
-};
+export const TOKEN_MONOGRAMS: Partial<Record<MarketSymbol, { mono: string; bg: string }>> = {};
