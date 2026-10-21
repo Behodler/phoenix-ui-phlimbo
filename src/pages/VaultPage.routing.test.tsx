@@ -182,9 +182,9 @@ describe('VaultPage routing (Story 066)', () => {
 });
 
 describe('Market (uni) tab visibility and routing (Stories 084, 087)', () => {
-  const ANVIL = { isMounted: true, isMainnet: false, isLocal: true } as const;
-  const SEPOLIA = { isMounted: true, isMainnet: false, isLocal: false } as const;
-  const MAINNET = { isMounted: true, isMainnet: true, isLocal: false } as const;
+  const ANVIL = { isMounted: true, isMainnet: false, isLocal: true, isSepolia: false } as const;
+  const SEPOLIA = { isMounted: true, isMainnet: false, isLocal: false, isSepolia: true } as const;
+  const MAINNET = { isMounted: true, isMainnet: true, isLocal: false, isSepolia: false } as const;
 
   it('is shown on Anvil for non-admins, right after where Market would sit', () => {
     const tabs = getVaultTabs({ ...ANVIL, hasAdminAccess: false });
@@ -193,9 +193,9 @@ describe('Market (uni) tab visibility and routing (Stories 084, 087)', () => {
     expect(tabs.indexOf('Market (uni)')).toBe(tabs.indexOf('NFT') - 1);
   });
 
-  it('is hidden on Sepolia for non-admins', () => {
+  it('is shown on Sepolia for non-admins', () => {
     const tabs = getVaultTabs({ ...SEPOLIA, hasAdminAccess: false });
-    expect(tabs).not.toContain('Market (uni)');
+    expect(tabs.indexOf('Market (uni)')).toBe(tabs.indexOf('NFT') - 1);
     expect(tabs).toContain('Testnet Faucet');
   });
 
@@ -217,7 +217,7 @@ describe('Market (uni) tab visibility and routing (Stories 084, 087)', () => {
   });
 
   it('is excluded from the pre-mount tab list', () => {
-    expect(getVaultTabs({ isMounted: false, isMainnet: false, isLocal: true, hasAdminAccess: true })).toEqual(['Mint', 'Stake', 'Yield Funnel']);
+    expect(getVaultTabs({ isMounted: false, isMainnet: false, isLocal: true, isSepolia: false, hasAdminAccess: true })).toEqual(['Mint', 'Stake', 'Yield Funnel']);
   });
 
   it('has no URL route of its own (falls back to /)', () => {

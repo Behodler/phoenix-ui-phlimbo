@@ -5,6 +5,8 @@ export interface VaultTabFlags {
   isMainnet: boolean;
   /** Local Anvil (chain id 31337). */
   isLocal: boolean;
+  /** Sepolia testnet (chain id 11155111). */
+  isSepolia: boolean;
   hasAdminAccess: boolean;
 }
 
@@ -15,11 +17,11 @@ export interface VaultTabFlags {
  * - Testnet Faucet: non-mainnet only.
  * - Market (Balancer): mainnet only.
  * - Market (uni) (stories 084, 087): until public launch, admin-only (owner or
- *   allowlisted admin) on public chains — mainnet, Sepolia, any non-local
- *   chain — and open to everyone on local Anvil. Sits immediately after Market.
+ *   allowlisted admin) on mainnet and any other public chain, and open to
+ *   everyone on local Anvil and Sepolia. Sits immediately after Market.
  * - Admin: owner or allowlisted admin.
  */
-export function getVaultTabs({ isMounted, isMainnet, isLocal, hasAdminAccess }: VaultTabFlags): Tab[] {
+export function getVaultTabs({ isMounted, isMainnet, isLocal, isSepolia, hasAdminAccess }: VaultTabFlags): Tab[] {
   if (!isMounted) {
     return ["Mint", "Stake", "Yield Funnel"];
   }
@@ -35,7 +37,7 @@ export function getVaultTabs({ isMounted, isMainnet, isLocal, hasAdminAccess }: 
     tabList.push("Market");
   }
 
-  if (isLocal || hasAdminAccess) {
+  if (isLocal || isSepolia || hasAdminAccess) {
     tabList.push("Market (uni)");
   }
 

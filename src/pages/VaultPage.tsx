@@ -220,9 +220,10 @@ export default function VaultPage() {
   // "Stake" is the public farm (PhlimboV3) and now the only farm surface —
   // the incumbent V2 "Stake (admin only)" tab was removed after the cutover.
   // "Market (uni)" is the Uniswap V2 market (stories 084, 087): admin-only on
-  // public chains, open to everyone on local Anvil until public launch.
+  // mainnet, open to everyone on local Anvil and Sepolia until public launch.
   const isLocal = networkType === NetworkType.LOCAL;
-  const tabs: readonly Tab[] = getVaultTabs({ isMounted, isMainnet, isLocal, hasAdminAccess });
+  const isSepolia = networkType === NetworkType.SEPOLIA;
+  const tabs: readonly Tab[] = getVaultTabs({ isMounted, isMainnet, isLocal, isSepolia, hasAdminAccess });
 
   // FAQ state - tracks which FAQ context to display
   // Initialize to "MintTab" to match the default activeTab ("Mint")
