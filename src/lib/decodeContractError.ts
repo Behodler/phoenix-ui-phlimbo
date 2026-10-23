@@ -51,7 +51,7 @@ const ERROR_MESSAGES: Record<string, (args: readonly unknown[]) => string> = {
   NudgeStreamer__ZeroReceived: () =>
     'The token transferred nothing on receipt — it may be a fee-on-transfer or rebasing token.',
 
-  // --- UniswapHelper (Market (uni) tab, story 087) --------------------------
+  // --- UniswapHelper (Market tab, story 087) --------------------------
   InsufficientOutput: (args) =>
     `The price moved past your slippage tolerance (would receive ${String(args[0] ?? '?')}, minimum ${String(args[1] ?? '?')}). Raise the slippage or try a smaller amount.`,
   Expired: (args) =>

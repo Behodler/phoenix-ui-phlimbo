@@ -1,5 +1,5 @@
 /**
- * Static configuration for the "Market (uni)" tab (stories 084, 085, 087).
+ * Static configuration for the "Market" tab (stories 084, 085, 087).
  *
  * Nothing here is a balance, price or reserve: those are read live by
  * `useUniMarket` from the UniswapHelper, the phUSD/sUSDS Uniswap V2 pair and

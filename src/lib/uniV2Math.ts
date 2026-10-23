@@ -1,5 +1,5 @@
 /**
- * Uniswap V2 maths, formatting and stat-row builders for the "Market (uni)"
+ * Uniswap V2 maths, formatting and stat-row builders for the "Market"
  * tab (stories 084, 085, 087).
  *
  * Everything that reaches a contract is bigint in on-chain units. The quote

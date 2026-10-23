@@ -1,5 +1,5 @@
 /**
- * Token artwork for the "Market (uni)" tab. Presentation only — no balances,
+ * Token artwork for the "Market" tab. Presentation only — no balances,
  * prices or addresses. DOLA follows the app-wide convention of the sDOLA art.
  */
 import type { MarketSymbol } from '../../../data/uniMarketConfig';

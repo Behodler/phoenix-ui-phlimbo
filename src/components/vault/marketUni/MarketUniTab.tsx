@@ -19,7 +19,7 @@ const MODE_OPTIONS: { value: TopMode; label: string }[] = [
 ];
 
 /**
- * "Market (uni)" — the Uniswap V2 phUSD/sUSDS market (stories 084, 085:
+ * "Market" — the Uniswap V2 phUSD/sUSDS market (stories 084, 085:
  * swap, plus a Liquidity mode with the LP position and Add / Remove; wired
  * live in story 087). Quotes, reserves, balances and allowances are read
  * on-chain, and approvals plus UniswapHelper calls are sent, by

@@ -9,7 +9,7 @@ import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { NetworkType } from '../types/contracts';
 import { parseUnits, maxUint256 } from 'viem';
 import { phlimboV3Abi, phusdStableMinterAbi } from '@behodler/phase2-wagmi-hooks';
-import { useTokenBalance, useTokenAllowance, useTokenApproval, useBalancerPrice, usePriceInterpolation } from '../hooks';
+import { useTokenBalance, useTokenAllowance, useTokenApproval } from '../hooks';
 import { useWalletBalances } from '../contexts/WalletBalancesContext';
 import { useApprovalTransaction } from '../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../utils/transactionErrors';
@@ -19,7 +19,6 @@ import MintForm from '../components/vault/MintForm';
 import TestnetFaucet from '../components/vault/TestnetFaucet';
 import EmergencyPauseFooter from '../components/vault/EmergencyPauseFooter';
 import YieldFunnelTab from '../components/vault/YieldFunnelTab';
-import MarketTab from '../components/vault/MarketTab';
 import MarketUniTab from '../components/vault/marketUni/MarketUniTab';
 import NFTListTab, { type NFTSubTab } from '../components/vault/NFTListTab';
 import AntimatterStakeTab from '../components/vault/antimatter/AntimatterStakeTab';
@@ -193,16 +192,6 @@ export default function VaultPage() {
 
   const [nftSubTab, setNftSubTab] = useState<NFTSubTab>('mint');
 
-  // ========== BALANCER PRICE FOR MARKET TAB ==========
-  // Fetch phUSD market price from Balancer 50/50 balanced pool (Market tab).
-  const {
-    price: phUsdMarketPrice,
-    isLoading: isMarketPriceLoading,
-    isError: isMarketPriceError,
-  } = useBalancerPrice();
-  const { displayPrice: phUsdDisplayPrice } = usePriceInterpolation(phUsdMarketPrice);
-  // ========== END BALANCER PRICE FOR MARKET TAB ==========
-
   // NOTE (story 069): the legacy Deposit/Withdraw tabs were removed. Their
   // phUSD stake/withdraw/claim functionality now lives on the Stake tab's
   // phUSD panel (usePhUsdStakePool), which owns its own DepositView polling.
@@ -212,15 +201,13 @@ export default function VaultPage() {
   // Determine tabs based on network and owner status
   // - Show Admin tab if user is the owner
   // - Show Testnet Faucet if not on mainnet
-  // - Show Market tab only on mainnet
+  // - Show Market tab (Uniswap V2 phUSD/sUSDS) on every network
   // - Show Mint tab for 1:1 DOLA to phUSD minting
   // - Show Stake tab for phUSD + stablecoin staking
   // - Show Yield Funnel tab for claiming accumulated yield at a discount
   // - Safety/Emergency Pause is handled by the fixed footer, not a tab
   // "Stake" is the public farm (PhlimboV3) and now the only farm surface —
   // the incumbent V2 "Stake (admin only)" tab was removed after the cutover.
-  // "Market (uni)" is the Uniswap V2 market (stories 084, 087): admin-only on
-  // mainnet, open to everyone on local Anvil and Sepolia until public launch.
   const isLocal = networkType === NetworkType.LOCAL;
   const isSepolia = networkType === NetworkType.SEPOLIA;
   const tabs: readonly Tab[] = getVaultTabs({ isMounted, isMainnet, isLocal, isSepolia, hasAdminAccess });
@@ -749,7 +736,7 @@ export default function VaultPage() {
               onTabChange={(tab) => {
                 setActiveTab(tab);
                 // Clear FAQ when switching to a tab that has no FAQ data
-                if (!["Mint", "Yield Funnel", "Market", "Market (uni)", "NFT"].includes(tab)) {
+                if (!["Mint", "Yield Funnel", "Market", "NFT"].includes(tab)) {
                   setFaqComponent(undefined);
                 }
                 // Sync URL with the active tab when it maps to a friendly
@@ -796,15 +783,6 @@ export default function VaultPage() {
                 <YieldFunnelTab isPaused={isPaused === true} />
               </ErrorBoundary>
             ) : activeTab === "Market" ? (
-              <ErrorBoundary>
-                <MarketTab
-                  price={phUsdMarketPrice}
-                  displayPrice={phUsdDisplayPrice}
-                  isLoading={isMarketPriceLoading}
-                  isError={isMarketPriceError}
-                />
-              </ErrorBoundary>
-            ) : activeTab === "Market (uni)" ? (
               <ErrorBoundary>
                 <MarketUniTab />
               </ErrorBoundary>

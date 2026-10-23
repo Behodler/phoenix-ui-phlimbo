@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSimulateContract } from 'wagmi';
+import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { readContract } from '@wagmi/core';
 import { wagmiConfig } from '../../wagmiConfig';
-import { erc20Abi, formatUnits, parseUnits, zeroAddress } from 'viem';
+import { erc20Abi, formatUnits, parseUnits } from 'viem';
 import {
   phlimboV3Abi,
   phusdStableMinterAbi,
   erc4626YieldStrategyAbi,
   stableYieldAccumulatorAbi,
-  balancerPoolerV2Abi,
+  uniPoolerV2Abi,
   stableStakerV2Abi,
   multiPoolerAbi,
 } from '@behodler/phase2-wagmi-hooks';
@@ -844,120 +844,115 @@ export default function Admin() {
   const flxStakerAddress = addresses?.UniboostStakerFLX as `0x${string}` | undefined;
   // ========== END NFT STAKER RUNWAY SECTION ==========
 
-  // ========== BALANCER POOLER V2 DISPATCH SECTION ==========
-  const balancerPoolerV2Address = addresses?.BalancerPooler as `0x${string}` | undefined;
+  // ========== UNIPOOLER V2 DISPATCH SECTION ==========
+  // UniPoolerV2 is the live index-4 dispatcher (phStaging2 story 103). Each mint's
+  // USDS is wrapped to sUSDS at dispatch time, net of the batchDonationSize% PSM
+  // donation, so unlike the retired BalancerPoolerV2 nothing is set aside at pool
+  // time: pool() zaps exactly the sUSDSIn it is given into the phUSD/sUSDS V2 pair
+  // and keeps the LP on the dispatcher.
+  const uniPoolerAddress = addresses?.UniPooler as `0x${string}` | undefined;
   const sUsdsAddress = addresses?.SUSDS as `0x${string}` | undefined;
-  const isBalancerPoolerV2Deployed = !!balancerPoolerV2Address &&
-    balancerPoolerV2Address.toLowerCase() !== ZERO_ADDRESS;
+  const usdsAddress = addresses?.USDS as `0x${string}` | undefined;
+  const isUniPoolerDeployed = !!uniPoolerAddress &&
+    uniPoolerAddress.toLowerCase() !== ZERO_ADDRESS;
 
   const { data: dispatcherSusdsBalance, refetch: refetchDispatcherSusdsBalance } = useReadContract({
     address: sUsdsAddress,
     abi: erc20Abi,
     functionName: 'balanceOf',
-    args: balancerPoolerV2Address ? [balancerPoolerV2Address] : undefined,
-    query: { enabled: isBalancerPoolerV2Deployed && !!sUsdsAddress },
+    args: uniPoolerAddress ? [uniPoolerAddress] : undefined,
+    query: { enabled: isUniPoolerDeployed && !!sUsdsAddress },
+  });
+
+  // Raw USDS parked on the dispatcher by a skipped PSM donation (DonationSkipped).
+  // The next dispatch re-sweeps it, so it is informational only.
+  const { data: dispatcherParkedUsds, refetch: refetchDispatcherParkedUsds } = useReadContract({
+    address: usdsAddress,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: uniPoolerAddress ? [uniPoolerAddress] : undefined,
+    query: { enabled: isUniPoolerDeployed && !!usdsAddress },
   });
 
   const { data: dispatcherAuthVersion, refetch: refetchAuthVersion } = useReadContract({
-    address: balancerPoolerV2Address,
-    abi: balancerPoolerV2Abi,
+    address: uniPoolerAddress,
+    abi: uniPoolerV2Abi,
     functionName: 'authVersion',
-    query: { enabled: isBalancerPoolerV2Deployed },
+    query: { enabled: isUniPoolerDeployed },
   });
 
   const { data: dispatcherPoolerAuthVersion, refetch: refetchPoolerAuthVersion } = useReadContract({
-    address: balancerPoolerV2Address,
-    abi: balancerPoolerV2Abi,
+    address: uniPoolerAddress,
+    abi: uniPoolerV2Abi,
     functionName: 'poolerAuthVersion',
     args: walletAddress ? [walletAddress as `0x${string}`] : undefined,
-    query: { enabled: isBalancerPoolerV2Deployed && !!walletAddress },
+    query: { enabled: isUniPoolerDeployed && !!walletAddress },
   });
 
   const { data: dispatcherPaused, refetch: refetchDispatcherPaused } = useReadContract({
-    address: balancerPoolerV2Address,
-    abi: balancerPoolerV2Abi,
+    address: uniPoolerAddress,
+    abi: uniPoolerV2Abi,
     functionName: 'paused',
-    query: { enabled: isBalancerPoolerV2Deployed },
+    query: { enabled: isUniPoolerDeployed },
   });
 
-  // Donation percent (0–100). Contract computes setAside = balance * pct / 100
-  // at execution time. Configured via setBatchDonationSize. A zero value is a
-  // supported "donations off" state — the contract skips the donation phase
-  // entirely. Still read here because the set-aside reduces the BPT actually
-  // minted, which feeds the minBPT slippage estimate below.
+  // Donation percent (0–100), applied at dispatch time. Display only here.
   const { data: batchDonationSize, refetch: refetchBatchDonationSize } = useReadContract({
-    address: balancerPoolerV2Address,
-    abi: balancerPoolerV2Abi,
+    address: uniPoolerAddress,
+    abi: uniPoolerV2Abi,
     functionName: 'batchDonationSize',
-    query: { enabled: isBalancerPoolerV2Deployed },
+    query: { enabled: isUniPoolerDeployed },
   });
 
-  // Mirror the contract's compute exactly: (balance * pct) / 100. Both inputs
-  // are bigints, so the division floors — same as Solidity.
-  const setAsideSusds = useMemo<bigint | null>(() => {
-    if (typeof dispatcherSusdsBalance !== 'bigint') return null;
-    if (typeof batchDonationSize !== 'bigint') return null;
-    if (batchDonationSize === 0n || dispatcherSusdsBalance === 0n) return 0n;
-    return (dispatcherSusdsBalance * batchDonationSize) / 100n;
-  }, [dispatcherSusdsBalance, batchDonationSize]);
-
-  // Resolve the Balancer V3 pool address from the dispatcher's `pool()` view.
-  // In Balancer V3 the pool contract IS the BPT ERC20 token, so we then read
-  // the dispatcher's ERC20 balance on that address to get its accumulated BPT.
-  const { data: balancerPoolAddress } = useReadContract({
-    address: balancerPoolerV2Address,
-    abi: balancerPoolerV2Abi,
-    functionName: 'pool',
-    query: { enabled: isBalancerPoolerV2Deployed },
+  // The dispatcher's own pair() is authoritative for where its LP lives.
+  const { data: uniPoolerPairAddress } = useReadContract({
+    address: uniPoolerAddress,
+    abi: uniPoolerV2Abi,
+    functionName: 'pair',
+    query: { enabled: isUniPoolerDeployed },
   });
 
-  const isPoolAddressValid = typeof balancerPoolAddress === 'string'
-    && (balancerPoolAddress as string).toLowerCase() !== ZERO_ADDRESS;
+  const isPairAddressValid = typeof uniPoolerPairAddress === 'string'
+    && uniPoolerPairAddress.toLowerCase() !== ZERO_ADDRESS;
 
-  const { data: dispatcherBptBalance, refetch: refetchDispatcherBptBalance } = useReadContract({
-    address: balancerPoolAddress as `0x${string}` | undefined,
+  const { data: dispatcherLpBalance, refetch: refetchDispatcherLpBalance } = useReadContract({
+    address: uniPoolerPairAddress as `0x${string}` | undefined,
     abi: erc20Abi,
     functionName: 'balanceOf',
-    args: balancerPoolerV2Address ? [balancerPoolerV2Address] : undefined,
+    args: uniPoolerAddress ? [uniPoolerAddress] : undefined,
     query: {
-      enabled: isBalancerPoolerV2Deployed
-        && isPoolAddressValid
-        && !!balancerPoolerV2Address,
+      enabled: isUniPoolerDeployed
+        && isPairAddressValid
+        && !!uniPoolerAddress,
     },
   });
 
-  // getIdealBPT is non-view (writes Balancer router transient state during the
-  // simulation), so eth_call still returns a clean value but useReadContract
-  // will reject the ABI annotation. Use useSimulateContract — same eth_call
-  // underneath. Only run the simulation when there is an sUSDS balance to pool;
-  // otherwise the call reverts and we'd surface a misleading error.
-  //
-  // account: zeroAddress is required for the real Balancer V3 router. It detects
-  // static-call mode via `tx.origin == address(0)` (EVMCallModeHelpers) and
-  // reverts query paths with NotStaticCall() when called with a non-zero `from`.
-  // Wagmi defaults `from` to the connected wallet, which trips this check on
-  // mainnet/staging; the local mock router doesn't enforce it.
-  const idealBptSimEnabled = isBalancerPoolerV2Deployed &&
+  // quotePool(sUSDSIn) is a plain view that sizes the zap from the pair's live
+  // token balances — exactly the reserves pool() syncs to before sizing. Quote the
+  // full balance, since "Pool All" passes the full balance as sUSDSIn. It reverts
+  // on a zero amount, so only run it once there is something to pool.
+  const quotePoolEnabled = isUniPoolerDeployed &&
     typeof dispatcherSusdsBalance === 'bigint' &&
     dispatcherSusdsBalance > 0n;
 
   const {
-    data: idealBptSim,
-    refetch: refetchIdealBpt,
-    error: idealBptError,
-  } = useSimulateContract({
-    address: balancerPoolerV2Address,
-    abi: balancerPoolerV2Abi,
-    functionName: 'getIdealBPT',
-    account: zeroAddress,
-    query: { enabled: idealBptSimEnabled },
+    data: poolQuote,
+    refetch: refetchPoolQuote,
+    error: poolQuoteError,
+  } = useReadContract({
+    address: uniPoolerAddress,
+    abi: uniPoolerV2Abi,
+    functionName: 'quotePool',
+    args: typeof dispatcherSusdsBalance === 'bigint' ? [dispatcherSusdsBalance] : undefined,
+    query: { enabled: quotePoolEnabled },
   });
 
-  const idealBpt = useMemo<bigint | null>(() => {
-    if (!idealBptSim) return null;
-    const result = idealBptSim.result;
-    return typeof result === 'bigint' ? result : null;
-  }, [idealBptSim]);
+  // [swapIn, phusdOut, expectedLP], or null while there is no quote.
+  const quotedPool = useMemo<{ swapIn: bigint; phusdOut: bigint; expectedLP: bigint } | null>(() => {
+    if (!poolQuote) return null;
+    const [swapIn, phusdOut, expectedLP] = poolQuote;
+    return { swapIn, phusdOut, expectedLP };
+  }, [poolQuote]);
 
   const isAuthorisedPooler = useMemo(() => {
     if (typeof dispatcherAuthVersion !== 'bigint') return false;
@@ -965,45 +960,36 @@ export default function Admin() {
     return dispatcherPoolerAuthVersion === dispatcherAuthVersion;
   }, [dispatcherAuthVersion, dispatcherPoolerAuthVersion]);
 
-  // Editable input for minBPT, displayed as decimal but stored raw.
-  const [minBptInput, setMinBptInput] = useState<string>('');
-  // Tracks whether the user has manually edited the minBPT input. Once true,
-  // we stop auto-overwriting from idealBpt updates so we don't clobber edits.
-  const [userEditedMinBpt, setUserEditedMinBpt] = useState(false);
+  // Editable floors for pool(), displayed as decimal but submitted raw. Both phUSD
+  // and the V2 LP are 18 decimals.
+  const [minPhusdOutInput, setMinPhusdOutInput] = useState<string>('');
+  const [minLpInput, setMinLpInput] = useState<string>('');
+  // Once the user edits either floor we stop auto-overwriting both from quote
+  // updates, so a refresh never clobbers a manual value.
+  const [userEditedPoolFloors, setUserEditedPoolFloors] = useState(false);
 
-  // Auto-populate minBPT to (expected BPT) * 99 / 100 (1% slippage) whenever
-  // idealBpt changes, unless the user has manually edited the field. Never
-  // default to 0.
-  //
-  // getIdealBPT() takes no args and simulates against the dispatcher's full
-  // sUSDS balance, but the contract sets aside batchDonationSize% of that
-  // balance for the donation/nudge swap before pooling. So the BPT actually
-  // minted is roughly idealBpt * (balance - setAside) / balance. Scale before
-  // applying the 1% tolerance — otherwise pool() reverts on the slippage guard
-  // whenever donations are enabled.
+  // Auto-populate both floors to 1% below quotePool(balance). Never default to 0.
   useEffect(() => {
-    if (userEditedMinBpt) return;
-    if (idealBpt === null || idealBpt === 0n) return;
-    if (typeof dispatcherSusdsBalance !== 'bigint' || dispatcherSusdsBalance === 0n) return;
-    if (setAsideSusds === null) return;
-    const pooled = dispatcherSusdsBalance - setAsideSusds;
-    if (pooled <= 0n) return;
-    const expected = (idealBpt * pooled) / dispatcherSusdsBalance;
-    const tolerated = (expected * 99n) / 100n;
-    if (tolerated === 0n) return;
-    setMinBptInput(formatUnits(tolerated, 18));
-  }, [idealBpt, userEditedMinBpt, dispatcherSusdsBalance, setAsideSusds]);
+    if (userEditedPoolFloors) return;
+    if (quotedPool === null) return;
+    const minPhusd = (quotedPool.phusdOut * 99n) / 100n;
+    const minLp = (quotedPool.expectedLP * 99n) / 100n;
+    if (minPhusd === 0n || minLp === 0n) return;
+    setMinPhusdOutInput(formatUnits(minPhusd, 18));
+    setMinLpInput(formatUnits(minLp, 18));
+  }, [quotedPool, userEditedPoolFloors]);
 
-  const parsedMinBpt = useMemo<bigint | null>(() => {
-    const trimmed = minBptInput.trim();
+  const parseFloor = (input: string): bigint | null => {
+    const trimmed = input.trim();
     if (!trimmed) return null;
     try {
-      const value = parseUnits(trimmed, 18);
-      return value;
+      return parseUnits(trimmed, 18);
     } catch {
       return null;
     }
-  }, [minBptInput]);
+  };
+  const parsedMinPhusdOut = useMemo(() => parseFloor(minPhusdOutInput), [minPhusdOutInput]);
+  const parsedMinLp = useMemo(() => parseFloor(minLpInput), [minLpInput]);
 
   const [poolTxHash, setPoolTxHash] = useState<`0x${string}` | undefined>();
   const [isPoolExecuting, setIsPoolExecuting] = useState(false);
@@ -1014,11 +1000,12 @@ export default function Admin() {
 
   const refetchDispatcherStats = () => {
     refetchDispatcherSusdsBalance();
+    refetchDispatcherParkedUsds();
     refetchAuthVersion();
     refetchPoolerAuthVersion();
     refetchDispatcherPaused();
-    refetchIdealBpt();
-    refetchDispatcherBptBalance();
+    refetchPoolQuote();
+    refetchDispatcherLpBalance();
     refetchBatchDonationSize();
   };
 
@@ -1026,30 +1013,29 @@ export default function Admin() {
     if (poolConfirmed && poolTxHash) {
       setIsPoolExecuting(false);
       setPoolTxHash(undefined);
-      // After a successful pool, sUSDS balance drops to 0 and the next
-      // getIdealBPT() simulation will revert (require sUSDSAmount > 0). The
-      // refetch call still triggers the read; the gating in `idealBptSimEnabled`
-      // suppresses it once balance hits 0.
+      // After a successful pool the sUSDS balance drops to 0 and `quotePoolEnabled`
+      // suppresses the quote until the next dispatch refills it.
       refetchDispatcherStats();
       // Clear the manual-edit flag so the next non-zero balance auto-populates.
-      setUserEditedMinBpt(false);
-      setMinBptInput('');
+      setUserEditedPoolFloors(false);
+      setMinPhusdOutInput('');
+      setMinLpInput('');
       addToast({
         type: 'success',
         title: 'Pool Confirmed',
-        description: 'sUSDS has been pooled into the Balancer V3 pool.',
+        description: 'sUSDS has been pooled into the phUSD/sUSDS Uniswap V2 pair.',
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poolConfirmed, poolTxHash]);
-  // ========== END BALANCER POOLER V2 DISPATCH SECTION ==========
+  // ========== END UNIPOOLER V2 DISPATCH SECTION ==========
 
   // ========== UNIBOOST MULTIPOOLER SECTION ==========
   const multiPoolerAddress = addresses?.MultiPooler as `0x${string}` | undefined;
   const isMultiPoolerDeployed = !!multiPoolerAddress &&
     multiPoolerAddress.toLowerCase() !== ZERO_ADDRESS;
 
-  // Authorisation mirrors BalancerPoolerV2: the connected wallet must be the
+  // Authorisation mirrors UniPoolerV2: the connected wallet must be the
   // MultiPooler's single authorised pooler (setPooler) or its owner.
   const { data: multiPoolerPooler, refetch: refetchMultiPoolerPooler } = useReadContract({
     address: multiPoolerAddress,
@@ -1075,7 +1061,7 @@ export default function Admin() {
 
   const [multiPoolRows, setMultiPoolRows] = useState<Record<UniboostLabel, PoolRowInput>>(emptyPoolRows);
 
-  // MEV-safe auto-fill. Unlike BalancerPoolerV2 (getIdealBPT on-chain quote), the
+  // MEV-safe auto-fill. Unlike UniPoolerV2 (quotePool on-chain quote), the
   // Uniboost dispatcher exposes no quote, so each row's floors are reconstructed
   // off-chain from the dispatcher's prime balance + UniV2 quotes/reserves at 1%
   // slippage — see useUniboostAutofill. One hook per dispatcher, unrolled (never
@@ -1090,7 +1076,7 @@ export default function Admin() {
   };
 
   // Once the user edits any field of a row we stop auto-overwriting it (mirrors
-  // BalancerPoolerV2's userEditedMinBpt guard). Cleared after a successful pool
+  // UniPoolerV2's userEditedPoolFloors guard). Cleared after a successful pool
   // and by the per-row "auto" reset.
   const [userEditedRows, setUserEditedRows] = useState<Record<UniboostLabel, boolean>>({
     EYE: false,
@@ -1133,7 +1119,7 @@ export default function Admin() {
   // Validate all rows in one pass for the button gating. A row is "included"
   // once amountIn parses to > 0; mins must each be > 0 on an included row (a 0
   // slippage floor on a public mempool invites an MEV sandwich, same rationale
-  // as the BalancerPoolerV2 minBPT guard).
+  // as the UniPoolerV2 slippage-floor guard).
   const multiPoolValidation = useMemo(() => {
     let validCount = 0;
     let anyMinInvalid = false;
@@ -1799,7 +1785,7 @@ export default function Admin() {
   };
 
   /**
-   * Handle BalancerPoolerV2 pool dispatch
+   * Handle UniPoolerV2 pool dispatch: zap the dispatcher's full sUSDS balance.
    */
   const handleDispatcherPool = async () => {
     if (!isConnected || !walletAddress) {
@@ -1810,31 +1796,39 @@ export default function Admin() {
       });
       return;
     }
-    if (!balancerPoolerV2Address) {
+    if (!uniPoolerAddress) {
       addToast({
         type: 'error',
         title: 'Contract Not Available',
-        description: 'BalancerPoolerV2 address missing.',
+        description: 'UniPoolerV2 address missing.',
       });
       return;
     }
-    // Hard-block submission of 0 — see story §4 MEV note. minBPT = 0 on a public
-    // mempool invites a sandwich that can drain the entire single-sided deposit.
-    if (parsedMinBpt === null || parsedMinBpt <= 0n) {
+    if (typeof dispatcherSusdsBalance !== 'bigint' || dispatcherSusdsBalance === 0n) {
       addToast({
         type: 'error',
-        title: 'Invalid minBPT',
-        description: 'minBPT must be > 0 — submitting 0 invites MEV sandwich attacks that can drain the deposit.',
+        title: 'Nothing to Pool',
+        description: 'The dispatcher holds no sUSDS.',
+      });
+      return;
+    }
+    // Hard-block 0 floors. The contract reverts on them anyway (ZeroMinimum), and
+    // a 0 floor on a public mempool invites a sandwich on the swap leg.
+    if (parsedMinPhusdOut === null || parsedMinPhusdOut <= 0n || parsedMinLp === null || parsedMinLp <= 0n) {
+      addToast({
+        type: 'error',
+        title: 'Invalid Slippage Floors',
+        description: 'minPhusdOut and minLP must both be > 0 — submitting 0 invites MEV sandwich attacks.',
       });
       return;
     }
     setIsPoolExecuting(true);
     try {
       const hash = await writeContractAsync({
-        address: balancerPoolerV2Address,
-        abi: balancerPoolerV2Abi,
+        address: uniPoolerAddress,
+        abi: uniPoolerV2Abi,
         functionName: 'pool',
-        args: [parsedMinBpt],
+        args: [dispatcherSusdsBalance, parsedMinPhusdOut, parsedMinLp],
       });
       setPoolTxHash(hash);
       addToast({
@@ -2589,16 +2583,16 @@ export default function Admin() {
         />
       </div>
 
-      {/* BalancerPoolerV2 — Pending Dispatch Panel */}
+      {/* UniPoolerV2 — Pending Dispatch Panel */}
       <div className="bg-card border border-border rounded-lg p-4 mb-6">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-sm font-semibold text-foreground">
-            BalancerPoolerV2 — Pending Dispatch
+            UniPoolerV2 — Pending Dispatch
           </h3>
         </div>
-        {!isBalancerPoolerV2Deployed ? (
+        {!isUniPoolerDeployed ? (
           <p className="text-sm text-muted-foreground">
-            BalancerPoolerV2 not deployed on this chain.
+            UniPoolerV2 not deployed on this chain.
           </p>
         ) : (
           <>
@@ -2612,28 +2606,44 @@ export default function Admin() {
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">BPT held by dispatcher:</span>
+                <span className="text-sm text-muted-foreground">V2 LP held by dispatcher:</span>
                 <span className="text-sm font-mono text-foreground">
-                  {typeof dispatcherBptBalance === 'bigint'
-                    ? `${(Number(dispatcherBptBalance) / 1e18).toFixed(2)} BPT`
-                    : '0.00 BPT'}
+                  {typeof dispatcherLpBalance === 'bigint'
+                    ? `${fmtLp(dispatcherLpBalance)} LP`
+                    : '0 LP'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">sUSDS set aside for Nudge:</span>
+                <span className="text-sm text-muted-foreground">Nudge donation (at dispatch):</span>
                 <span className="text-sm font-mono text-foreground">
-                  {setAsideSusds === null || typeof batchDonationSize !== 'bigint'
+                  {typeof batchDonationSize !== 'bigint'
                     ? '—'
                     : batchDonationSize === 0n
-                      ? '0.00 sUSDS (donations disabled)'
-                      : `${(Number(setAsideSusds) / 1e18).toFixed(2)} sUSDS (${batchDonationSize.toString()}%)`}
+                      ? 'disabled'
+                      : `${batchDonationSize.toString()}%`}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Estimated BPT out (idealBPT):</span>
+                <span className="text-sm text-muted-foreground">USDS parked (skipped donation):</span>
                 <span className="text-sm font-mono text-foreground">
-                  {idealBpt !== null
-                    ? `${formatUnits(idealBpt, 18)} BPT`
+                  {typeof dispatcherParkedUsds === 'bigint'
+                    ? `${(Number(dispatcherParkedUsds) / 1e18).toFixed(2)} USDS`
+                    : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Quoted swap leg (sUSDS → phUSD):</span>
+                <span className="text-sm font-mono text-foreground">
+                  {quotedPool !== null
+                    ? `${(Number(quotedPool.swapIn) / 1e18).toFixed(2)} → ${(Number(quotedPool.phusdOut) / 1e18).toFixed(2)}`
+                    : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Estimated LP out (quotePool):</span>
+                <span className="text-sm font-mono text-foreground">
+                  {quotedPool !== null
+                    ? `${formatUnits(quotedPool.expectedLP, 18)} LP`
                     : '—'}
                 </span>
               </div>
@@ -2655,72 +2665,86 @@ export default function Admin() {
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-border">
-              <label
-                htmlFor="dispatcher-min-bpt"
-                className="block text-sm font-medium text-foreground mb-2"
-              >
-                minBPT (slippage floor — defaults to 1% below idealBPT)
-              </label>
-              <input
-                id="dispatcher-min-bpt"
-                type="text"
-                inputMode="decimal"
-                value={minBptInput}
-                onChange={(e) => {
-                  setMinBptInput(e.target.value);
-                  setUserEditedMinBpt(true);
-                }}
-                placeholder={idealBpt === null ? 'No idealBPT — enter manually' : 'BPT amount'}
-                disabled={isPoolExecuting}
-                className={
-                  'w-full px-3 py-2 bg-background border rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ' +
-                  ((parsedMinBpt === null || parsedMinBpt <= 0n) && minBptInput !== ''
-                    ? 'border-red-500'
-                    : 'border-border')
-                }
-              />
-              {idealBpt === null && idealBptError && (
-                <div className="mt-1 space-y-1">
+            <div className="mt-4 pt-4 border-t border-border space-y-3">
+              {([
+                {
+                  id: 'dispatcher-min-phusd-out',
+                  label: 'minPhusdOut (swap floor — defaults to 1% below quoted phUSD out)',
+                  value: minPhusdOutInput,
+                  setValue: setMinPhusdOutInput,
+                  parsed: parsedMinPhusdOut,
+                  placeholder: 'phUSD amount',
+                },
+                {
+                  id: 'dispatcher-min-lp',
+                  label: 'minLP (LP floor — defaults to 1% below quoted LP out)',
+                  value: minLpInput,
+                  setValue: setMinLpInput,
+                  parsed: parsedMinLp,
+                  placeholder: 'LP amount',
+                },
+              ] as const).map((field) => (
+                <div key={field.id}>
+                  <label
+                    htmlFor={field.id}
+                    className="block text-sm font-medium text-foreground mb-2"
+                  >
+                    {field.label}
+                  </label>
+                  <input
+                    id={field.id}
+                    type="text"
+                    inputMode="decimal"
+                    value={field.value}
+                    onChange={(e) => {
+                      field.setValue(e.target.value);
+                      setUserEditedPoolFloors(true);
+                    }}
+                    placeholder={quotedPool === null ? 'No quote — enter manually' : field.placeholder}
+                    disabled={isPoolExecuting}
+                    className={
+                      'w-full px-3 py-2 bg-background border rounded-lg text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ' +
+                      ((field.parsed === null || field.parsed <= 0n) && field.value !== ''
+                        ? 'border-red-500'
+                        : 'border-border')
+                    }
+                  />
+                  {field.value !== '' && (field.parsed === null || field.parsed <= 0n) && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Must be &gt; 0 — submitting 0 invites MEV sandwich attacks.
+                    </p>
+                  )}
+                </div>
+              ))}
+              {quotedPool === null && poolQuoteError && (
+                <div className="space-y-1">
                   <p className="text-xs text-red-500">
-                    Could not estimate BPT — refresh, or enter a value manually.
+                    Could not quote the pool — refresh, or enter the floors manually.
                   </p>
                   <pre className="text-[10px] text-red-400 whitespace-pre-wrap break-all bg-red-950/30 border border-red-900/50 rounded p-2 font-mono">
-                    {(idealBptError as { shortMessage?: string }).shortMessage ?? idealBptError.message}
-                    {(idealBptError as { metaMessages?: string[] }).metaMessages?.length
-                      ? '\n\n' + (idealBptError as { metaMessages?: string[] }).metaMessages!.join('\n')
-                      : ''}
-                    {(idealBptError as { cause?: { shortMessage?: string; message?: string } }).cause
-                      ? '\n\nCause: ' + ((idealBptError as { cause?: { shortMessage?: string; message?: string } }).cause!.shortMessage
-                          ?? (idealBptError as { cause?: { shortMessage?: string; message?: string } }).cause!.message
-                          ?? '')
-                      : ''}
+                    {(poolQuoteError as { shortMessage?: string }).shortMessage ?? poolQuoteError.message}
                   </pre>
                 </div>
-              )}
-              {minBptInput !== '' && (parsedMinBpt === null || parsedMinBpt <= 0n) && (
-                <p className="text-xs text-red-500 mt-1">
-                  minBPT must be &gt; 0 — submitting 0 invites MEV sandwich attacks that can drain the deposit.
-                </p>
               )}
 
               {(() => {
                 const susdsZero = typeof dispatcherSusdsBalance !== 'bigint' || dispatcherSusdsBalance === 0n;
-                const minBptInvalid = parsedMinBpt === null || parsedMinBpt <= 0n;
+                const floorsInvalid = parsedMinPhusdOut === null || parsedMinPhusdOut <= 0n
+                  || parsedMinLp === null || parsedMinLp <= 0n;
                 let tooltip: string | undefined;
                 if (susdsZero) tooltip = 'Nothing to pool';
                 else if (dispatcherPaused) tooltip = 'Dispatcher is paused';
                 else if (!isAuthorisedPooler) tooltip = 'Wallet not authorised. Contract owner must call setAuthorizedPooler(<your-address>, true).';
-                else if (minBptInvalid) tooltip = 'minBPT must be > 0 (MEV sandwich risk)';
+                else if (floorsInvalid) tooltip = 'minPhusdOut and minLP must be > 0 (MEV sandwich risk)';
 
                 const disabled = susdsZero
                   || !!dispatcherPaused
                   || !isAuthorisedPooler
-                  || minBptInvalid
+                  || floorsInvalid
                   || isPoolExecuting;
 
                 return (
-                  <div className="mt-3" title={tooltip}>
+                  <div title={tooltip}>
                     <ActionButton
                       disabled={disabled}
                       onAction={handleDispatcherPool}
@@ -2742,16 +2766,13 @@ export default function Admin() {
               </button>
             </div>
             <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-              <strong>Note:</strong> Pool All single-side-deposits the dispatcher's sUSDS
-              balance into the sUSDS/phUSD Balancer V3 pool, after first setting aside
-              <code> batchDonationSize</code>% of the balance and swapping it to USDC for the
-              BatchMinter / Nudge accumulator. <code>minBPT</code> auto-populates to 1% below
-              <code> getIdealBPT()</code> scaled by the pooled fraction
-              <code> (balance − setAside) / balance</code> — <code>getIdealBPT()</code> simulates
-              against the full balance, so the raw value overshoots actual minted BPT when
-              donations are enabled. <code>minBPT</code> must be &gt; 0; when
-              <code> batchDonationSize == 0</code> the donation phase is skipped entirely. The
-              connected wallet must have been authorised by the contract owner via
+              <strong>Note:</strong> Pool All zaps the dispatcher's whole sUSDS balance into the
+              phUSD/sUSDS Uniswap V2 pair: it swaps the optimal share to phUSD, adds both sides as
+              liquidity, and keeps the LP on the dispatcher (the owner withdraws it with
+              <code> rescueERC20</code>). The <code>batchDonationSize</code>% Nudge donation is
+              taken when each mint is dispatched, not here, so the balance shown is all poolable.
+              Both floors auto-populate to 1% below <code>quotePool(balance)</code> and must be
+              &gt; 0. The connected wallet must have been authorised by the contract owner via
               <code> setAuthorizedPooler</code>.
             </p>
           </>

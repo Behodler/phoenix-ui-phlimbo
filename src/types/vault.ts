@@ -8,10 +8,10 @@
 // to it in src/lib/tabRoutes.ts, and /staking is DeFi Llama's outbound
 // deep-link target. Do not rename it.
 //
-// "Market (uni)" is a MOCKED preview (story 084) of the Uniswap V2 phUSD/sUSDS
-// market that will replace the Balancer "Market" tab. Every balance, price and
-// transaction on it is simulated; it has no route of its own (lives at "/").
-export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Testnet Faucet" | "Market" | "Market (uni)" | "NFT" | "Admin";
+// "Market" is the Uniswap V2 phUSD/sUSDS market (src/components/vault/marketUni/).
+// It replaced the Balancer market tab at the Balancer wind-down; it has no route
+// of its own (lives at "/").
+export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
 
 export interface VaultFormData {
   amount: string;

@@ -9,7 +9,6 @@ export default function TabNavigation({ tabs, activeTab, onTabChange, onTriggerF
       case "Mint": return "MintTab";
       case "Yield Funnel": return "YieldFunnelTab";
       case "Market": return "MarketTab";
-      case "Market (uni)": return "MarketTab";
       case "NFT": return "NFTTab";
       default: return null;
     }

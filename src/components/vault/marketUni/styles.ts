@@ -1,5 +1,5 @@
 /**
- * Shared class strings for the "Market (uni)" tab.
+ * Shared class strings for the "Market" tab.
  *
  * Translucent fills use literal rgba(...) (inline style or arbitrary values):
  * `pxusd-*` tokens are hex behind var(), so Tailwind opacity modifiers on them

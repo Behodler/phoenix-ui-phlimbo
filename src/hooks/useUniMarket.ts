@@ -1,5 +1,5 @@
 /**
- * useUniMarket — the single seam behind the "Market (uni)" tab (story 087,
+ * useUniMarket — the single seam behind the "Market" tab (story 087,
  * replacing story 084/085's mock hook behind the same return shape).
  *
  * Reads:

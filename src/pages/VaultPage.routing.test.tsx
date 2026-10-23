@@ -28,9 +28,6 @@ const TAB_HEADING: Record<Tab, string> = {
   Stake: 'Stake Tab',
   'Testnet Faucet': 'Faucet Tab',
   Market: 'Market Tab',
-  // The Uniswap tab renders the same "Market" <h2> as the Balancer tab; the
-  // stub heading only needs to be distinct for routing assertions.
-  'Market (uni)': 'Market (uni) Tab',
   NFT: 'NFT Tab',
   Admin: 'Admin Tab',
 };
@@ -181,39 +178,22 @@ describe('VaultPage routing (Story 066)', () => {
   });
 });
 
-describe('Market (uni) tab visibility and routing (Stories 084, 087)', () => {
+describe('Market tab visibility and routing (Uniswap V2 market)', () => {
   const ANVIL = { isMounted: true, isMainnet: false, isLocal: true, isSepolia: false } as const;
   const SEPOLIA = { isMounted: true, isMainnet: false, isLocal: false, isSepolia: true } as const;
   const MAINNET = { isMounted: true, isMainnet: true, isLocal: false, isSepolia: false } as const;
 
-  it('is shown on Anvil for non-admins, right after where Market would sit', () => {
-    const tabs = getVaultTabs({ ...ANVIL, hasAdminAccess: false });
-    expect(tabs).toContain('Market (uni)');
-    expect(tabs).not.toContain('Market');
-    expect(tabs.indexOf('Market (uni)')).toBe(tabs.indexOf('NFT') - 1);
-  });
-
-  it('is shown on Sepolia for non-admins', () => {
-    const tabs = getVaultTabs({ ...SEPOLIA, hasAdminAccess: false });
-    expect(tabs.indexOf('Market (uni)')).toBe(tabs.indexOf('NFT') - 1);
-    expect(tabs).toContain('Testnet Faucet');
-  });
-
-  it('is shown on Sepolia for admins', () => {
-    const tabs = getVaultTabs({ ...SEPOLIA, hasAdminAccess: true });
-    expect(tabs.indexOf('Market (uni)')).toBe(tabs.indexOf('NFT') - 1);
-  });
-
-  it('is hidden on mainnet for non-admins', () => {
-    const tabs = getVaultTabs({ ...MAINNET, hasAdminAccess: false });
-    expect(tabs).not.toContain('Market (uni)');
-    expect(tabs).toContain('Market');
-  });
-
-  it('is shown on mainnet for admins, ordered Market, Market (uni), NFT', () => {
-    const tabs = getVaultTabs({ ...MAINNET, hasAdminAccess: true });
-    const i = tabs.indexOf('Market');
-    expect(tabs.slice(i, i + 3)).toEqual(['Market', 'Market (uni)', 'NFT']);
+  it.each([
+    ['Anvil', ANVIL, false],
+    ['Anvil', ANVIL, true],
+    ['Sepolia', SEPOLIA, false],
+    ['Sepolia', SEPOLIA, true],
+    ['mainnet', MAINNET, false],
+    ['mainnet', MAINNET, true],
+  ])('is shown once on %s (admin: %s), right before NFT', (_name, flags, hasAdminAccess) => {
+    const tabs = getVaultTabs({ ...flags, hasAdminAccess });
+    expect(tabs.filter((t) => t === 'Market')).toHaveLength(1);
+    expect(tabs.indexOf('Market')).toBe(tabs.indexOf('NFT') - 1);
   });
 
   it('is excluded from the pre-mount tab list', () => {
@@ -221,8 +201,8 @@ describe('Market (uni) tab visibility and routing (Stories 084, 087)', () => {
   });
 
   it('has no URL route of its own (falls back to /)', () => {
-    expect(TAB_TO_PATH['Market (uni)']).toBeUndefined();
-    expect(Object.values(PATH_TO_TAB)).not.toContain('Market (uni)');
-    expect(TAB_TO_PATH['Market (uni)'] ?? DEFAULT_PATH).toBe('/');
+    expect(TAB_TO_PATH['Market']).toBeUndefined();
+    expect(Object.values(PATH_TO_TAB)).not.toContain('Market');
+    expect(TAB_TO_PATH['Market'] ?? DEFAULT_PATH).toBe('/');
   });
 });

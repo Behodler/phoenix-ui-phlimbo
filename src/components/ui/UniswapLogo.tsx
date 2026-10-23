@@ -3,7 +3,7 @@
  *
  * Restored verbatim from `28b073f^:src/components/vault/MarketTab.tsx`, where it
  * lived until the Market tab migrated from Uniswap to Balancer (28b073f).
- * Re-introduced by story 084 for the "Market (uni)" tab.
+ * Re-introduced by story 084 for the Uniswap "Market" tab.
  */
 interface UniswapLogoProps {
   className?: string;

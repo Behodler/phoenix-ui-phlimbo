@@ -79,12 +79,11 @@ export const mainnetAddresses: ContractAddresses = {
   // interface (tsc drift guard). Patch by hand when they ship.
   // (The raw UniV2 stack that backs Uniboost — WETH9/factory/pools — is still not surfaced here.
   //  Since phStaging2 story 102 the router and the phUSD/sUSDS pair ARE surfaced, as
-  //  `UniswapV2Router` and `PhusdSusdsPair` below, because the Market (uni) tab reads them.)
+  //  `UniswapV2Router` and `PhusdSusdsPair` below, because the Market tab reads them.)
   // external: canonical Uniswap V2 Router02
   UniswapV2Router: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-  // phUSD/sUSDS UniV2 pair (phStaging2 story 103) — not yet deployed on mainnet — zero
-  // placeholder, patch by hand at cutover.
-  PhusdSusdsPair: "0x0000000000000000000000000000000000000000",
+  // phUSD/sUSDS UniV2 pair, seeded by the phStaging2 story 103 index-4 cutover (2026-10-23).
+  PhusdSusdsPair: "0x0b96b8ab66d40ba3C7501aa8C28Cdc37688F6F7f",
   /*
   BurnerEYE: "0x13fb51bcb3c5ae9e7115730bc1a58ec676ceeef2",
   BurnerSCX: "0xa833603fd82674aec51f8a57c6a27b91bc1725b2",
@@ -110,11 +109,12 @@ export const mainnetAddresses: ContractAddresses = {
   // Verified on-chain 2026-06-11: NFTMinter.configs(4).dispatcher == this address; it holds
   // the pending sUSDS leg (418.63 sUSDS). The prior pooler 0x26f8…b38a is retired (0 balance).
   BalancerPooler: "0x7f6874332c4629429d70D15f685A8230323F11F1",
-  // UniPoolerV2 index-4 dispatcher (phStaging2 story 102) and the UniswapHelper swap/liquidity
-  // periphery (phStaging2 story 110) — not yet deployed on mainnet — zero placeholders, patch by
-  // hand at cutover.
-  UniPooler: "0x0000000000000000000000000000000000000000",
-  UniswapHelper: "0x0000000000000000000000000000000000000000",
+  // UniPoolerV2: the live index-4 dispatcher since the phStaging2 story 103 cutover (2026-10-23).
+  // `BalancerPooler` above is the retired, paused and empty pooler.
+  UniPooler: "0x56997ea45091CBc01DB8a09E60DEDB8b3706a3D2",
+  // UniswapHelper swap/liquidity periphery (phStaging2 story 110), deployed to mainnet by
+  // story 111 (2026-10-23).
+  UniswapHelper: "0x564810D5d9D31754C8dbdb8F62Bb429D50Dfa5b3",
   GatherWBTC: "0xfd3775f2ccfb94b532b34b2b683e210ba4449880",
   MultiPooler: "0xd1E5774159381915f5579dFd68507E2614f67b51",
   // View contracts

@@ -15,13 +15,10 @@ export interface VaultTabFlags {
  *
  * - Before mount: a fixed, network-agnostic list (prevents flicker).
  * - Testnet Faucet: non-mainnet only.
- * - Market (Balancer): mainnet only.
- * - Market (uni) (stories 084, 087): until public launch, admin-only (owner or
- *   allowlisted admin) on mainnet and any other public chain, and open to
- *   everyone on local Anvil and Sepolia. Sits immediately after Market.
+ * - Market (Uniswap V2 phUSD/sUSDS): every network, immediately before NFT.
  * - Admin: owner or allowlisted admin.
  */
-export function getVaultTabs({ isMounted, isMainnet, isLocal, isSepolia, hasAdminAccess }: VaultTabFlags): Tab[] {
+export function getVaultTabs({ isMounted, isMainnet, hasAdminAccess }: VaultTabFlags): Tab[] {
   if (!isMounted) {
     return ["Mint", "Stake", "Yield Funnel"];
   }
@@ -32,14 +29,7 @@ export function getVaultTabs({ isMounted, isMainnet, isLocal, isSepolia, hasAdmi
     tabList.push("Testnet Faucet");
   }
 
-  // Market tab is only available on mainnet
-  if (isMainnet) {
-    tabList.push("Market");
-  }
-
-  if (isLocal || isSepolia || hasAdminAccess) {
-    tabList.push("Market (uni)");
-  }
+  tabList.push("Market");
 
   tabList.push("NFT");
 
