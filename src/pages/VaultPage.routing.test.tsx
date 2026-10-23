@@ -5,6 +5,7 @@ import { MemoryRouter, Routes, Route, Navigate, useLocation, useNavigate } from 
 import { useEffect, useState } from 'react';
 import type { Tab } from '../types/vault';
 import { PATH_TO_TAB, TAB_TO_PATH, DEFAULT_PATH } from '../lib/tabRoutes';
+import { getVaultTabs } from '../lib/vaultTabs';
 
 // ---------------------------------------------------------------------------
 // Mock VaultPage with a lightweight stand-in.
@@ -27,6 +28,9 @@ const TAB_HEADING: Record<Tab, string> = {
   Stake: 'Stake Tab',
   'Testnet Faucet': 'Faucet Tab',
   Market: 'Market Tab',
+  // The Uniswap tab renders the same "Market" <h2> as the Balancer tab; the
+  // stub heading only needs to be distinct for routing assertions.
+  'Market (uni)': 'Market (uni) Tab',
   NFT: 'NFT Tab',
   Admin: 'Admin Tab',
 };
@@ -174,5 +178,51 @@ describe('VaultPage routing (Story 066)', () => {
 
     expect(screen.getByRole('heading', { name: 'NFT Tab' })).toBeInTheDocument();
     expect(screen.getByTestId('current-pathname').textContent).toBe('/nft');
+  });
+});
+
+describe('Market (uni) tab visibility and routing (Stories 084, 087)', () => {
+  const ANVIL = { isMounted: true, isMainnet: false, isLocal: true, isSepolia: false } as const;
+  const SEPOLIA = { isMounted: true, isMainnet: false, isLocal: false, isSepolia: true } as const;
+  const MAINNET = { isMounted: true, isMainnet: true, isLocal: false, isSepolia: false } as const;
+
+  it('is shown on Anvil for non-admins, right after where Market would sit', () => {
+    const tabs = getVaultTabs({ ...ANVIL, hasAdminAccess: false });
+    expect(tabs).toContain('Market (uni)');
+    expect(tabs).not.toContain('Market');
+    expect(tabs.indexOf('Market (uni)')).toBe(tabs.indexOf('NFT') - 1);
+  });
+
+  it('is shown on Sepolia for non-admins', () => {
+    const tabs = getVaultTabs({ ...SEPOLIA, hasAdminAccess: false });
+    expect(tabs.indexOf('Market (uni)')).toBe(tabs.indexOf('NFT') - 1);
+    expect(tabs).toContain('Testnet Faucet');
+  });
+
+  it('is shown on Sepolia for admins', () => {
+    const tabs = getVaultTabs({ ...SEPOLIA, hasAdminAccess: true });
+    expect(tabs.indexOf('Market (uni)')).toBe(tabs.indexOf('NFT') - 1);
+  });
+
+  it('is hidden on mainnet for non-admins', () => {
+    const tabs = getVaultTabs({ ...MAINNET, hasAdminAccess: false });
+    expect(tabs).not.toContain('Market (uni)');
+    expect(tabs).toContain('Market');
+  });
+
+  it('is shown on mainnet for admins, ordered Market, Market (uni), NFT', () => {
+    const tabs = getVaultTabs({ ...MAINNET, hasAdminAccess: true });
+    const i = tabs.indexOf('Market');
+    expect(tabs.slice(i, i + 3)).toEqual(['Market', 'Market (uni)', 'NFT']);
+  });
+
+  it('is excluded from the pre-mount tab list', () => {
+    expect(getVaultTabs({ isMounted: false, isMainnet: false, isLocal: true, isSepolia: false, hasAdminAccess: true })).toEqual(['Mint', 'Stake', 'Yield Funnel']);
+  });
+
+  it('has no URL route of its own (falls back to /)', () => {
+    expect(TAB_TO_PATH['Market (uni)']).toBeUndefined();
+    expect(Object.values(PATH_TO_TAB)).not.toContain('Market (uni)');
+    expect(TAB_TO_PATH['Market (uni)'] ?? DEFAULT_PATH).toBe('/');
   });
 });

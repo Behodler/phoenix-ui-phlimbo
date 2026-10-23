@@ -57,6 +57,7 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       BalancerRouter: data.BalancerRouter || '0x0000000000000000000000000000000000000000',
       BurnRecorder: data.BurnRecorder || '0x0000000000000000000000000000000000000000',
       NFTMinter: data.NFTMinter || '0x0000000000000000000000000000000000000000',
+      UniswapV2Router: data.UniswapV2Router || '0x0000000000000000000000000000000000000000',
       MultiPooler: data.MultiPooler || '0x0000000000000000000000000000000000000000',
       UniboostEYE: data.UniboostEYE || '0x0000000000000000000000000000000000000000',
       UniboostFLX: data.UniboostFLX || '0x0000000000000000000000000000000000000000',
@@ -74,6 +75,9 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       GatherWBTC: data.GatherWBTC || '0x0000000000000000000000000000000000000000',
 
       ViewRouter: data.ViewRouter || '0x0000000000000000000000000000000000000000',
+      UniPooler: data.UniPooler || '0x0000000000000000000000000000000000000000',
+      PhusdSusdsPair: data.PhusdSusdsPair || '0x0000000000000000000000000000000000000000',
+      UniswapHelper: data.UniswapHelper || '0x0000000000000000000000000000000000000000',
       SUSDS: data.SUSDS || '0x0000000000000000000000000000000000000000',
 
       SUSDe: data.SUSDe || '0x0000000000000000000000000000000000000000',

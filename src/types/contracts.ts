@@ -37,6 +37,7 @@ export interface ContractAddresses {
   BurnRecorder: string;
   BalancerRouter: string;
   NFTMinter: string;
+  UniswapV2Router: string;
   UniboostEYE: string;
   UniboostSCX: string;
   UniboostFLX: string;
@@ -65,6 +66,9 @@ export interface ContractAddresses {
   Antimatter: string;
   StableStakerV2: string;
   ViewRouter: string;
+  UniPooler: string;
+  PhusdSusdsPair: string;
+  UniswapHelper: string;
 }
 
 
