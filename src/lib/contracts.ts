@@ -61,11 +61,6 @@ export const mainnetAddresses: ContractAddresses = {
   SUSDe: "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497",
   SUSDS: "0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD",
 
-  // Balancer V3 infrastructure
-  BalancerPool: "0x642BB6860b4776CC10b26B8f361Fd139E7f0db04",
-  BalancerVault: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
-  BalancerRouter: "0x5C6fb490BDFD3246EB0bB062c168DeCAF4bD9FDd",
-
   // NFT infrastructure — common
   BurnRecorder: "0x2A2c4186C906d3b347c86882ad4Bd1f2bE05579F",
 
@@ -105,12 +100,9 @@ export const mainnetAddresses: ContractAddresses = {
   EyeBatchNFTMinter: "0xbbe6c8d4b31e1507376b7c34b4a82c48158f2811",
   ScxBatchNFTMinter: "0x2a1a8fd7ba06a6d1b91385a3c56d2f2cd261e4d4",
   FlxBatchNFTMinter: "0x4695fd1067fb402dcd4551d5c87b84021bed0629",
-  // Story 056 (2026-06-04): index-4 dispatcher cut over to the Sky-PSM BalancerPoolerV2.
-  // Verified on-chain 2026-06-11: NFTMinter.configs(4).dispatcher == this address; it holds
-  // the pending sUSDS leg (418.63 sUSDS). The prior pooler 0x26f8…b38a is retired (0 balance).
-  BalancerPooler: "0x7f6874332c4629429d70D15f685A8230323F11F1",
   // UniPoolerV2: the live index-4 dispatcher since the phStaging2 story 103 cutover (2026-10-23).
-  // `BalancerPooler` above is the retired, paused and empty pooler.
+  // phStaging2 story 107 removed the Balancer keys (BalancerPool/Vault/Router and the retired,
+  // paused and empty BalancerPooler 0x7f6874332c4629429d70D15f685A8230323F11F1).
   UniPooler: "0x56997ea45091CBc01DB8a09E60DEDB8b3706a3D2",
   // UniswapHelper swap/liquidity periphery (phStaging2 story 110), deployed to mainnet by
   // story 111 (2026-10-23).
@@ -122,6 +114,8 @@ export const mainnetAddresses: ContractAddresses = {
   // `ViewRouter.pages(keccak256("<page>"))` — "deposit", "mint", … — not from this file.
   ViewRouter: "0xC17Ce1cE5ebB43fc0cfda9Fe8BbC849c0894631a",
   // NFT staking
+  // Still the live index-4 mint-debt hook: the story 103 cutover repointed it at UniPooler
+  // rather than deploying a new one, so the "Balancer" in the key name is historical.
   BalancerPoolerMintDebtHook: "0x4A26ad83306a2F17155799fDD9449f77eb3F8bD7",
   NFTStaker: "0xc8514f821a3d801fa8a8c435840a992a4365a13b",
   WaUSDC: "0xd4fa2d31b7968e448877f69a96de69f5de8cd23e",
@@ -182,17 +176,12 @@ export const sepoliaAddresses: ContractAddresses = {
   PhusdStableMinter: "0x45dBC280F7C88769E13a7279616D3cDFc3630EbA",
   PhlimboV3: "0x6AeCf8Af97e170627d3Ea0da766Ec8Fc8d19aDA1",
   StableYieldAccumulator: "0x3c884831e49E3Fef848300D2819905872fb1a70e",
-  // Balancer is retired on Sepolia (story 104) — zero placeholders.
-  BalancerPool: "0x0000000000000000000000000000000000000000",
-  BalancerVault: "0x0000000000000000000000000000000000000000",
   BurnRecorder: "0xfbf3Cd061674a12652B431FBa220975132c5Ea45",
-  BalancerRouter: "0x0000000000000000000000000000000000000000",
   NFTMinter: "0xea6f1f838D3676fde5D28fB57E2f69844DFf206F",
   UniswapV2Router: "0x1e61AD0282e6B34849292dF4419a922577bf2b14",
   UniboostEYE: "0x77f420f122A041Bc6b7a5B6bcb4FC73f741C00D6",
   UniboostSCX: "0xF28a02932939112d224301462a3A1B56c870b8D3",
   UniboostFLX: "0x2cf5D5Ff3cf213019849C54B521d5Cb5FbF9c726",
-  BalancerPooler: "0x0000000000000000000000000000000000000000",
   GatherWBTC: "0x3c4f40bbd5937AF11D3D668Cb868c442789D16fb",
   MultiPooler: "0xe5B2868b14969593a51Ecf088ef9f890f5761d4c",
   UniboostHookEYE: "0x6557b110C3fD36DE52AE0e9eD3a4E4e7D53BBe4f",

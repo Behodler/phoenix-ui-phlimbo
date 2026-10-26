@@ -52,9 +52,6 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       AutoDOLA: data.AutoDOLA || '0x0000000000000000000000000000000000000000',
       AutoUSDC: data.AutoUSDC || '0x0000000000000000000000000000000000000000',
       WBTC: data.WBTC || '0x0000000000000000000000000000000000000000',
-      BalancerPool: data.BalancerPool || '0x0000000000000000000000000000000000000000',
-      BalancerVault: data.BalancerVault || '0x0000000000000000000000000000000000000000',
-      BalancerRouter: data.BalancerRouter || '0x0000000000000000000000000000000000000000',
       BurnRecorder: data.BurnRecorder || '0x0000000000000000000000000000000000000000',
       NFTMinter: data.NFTMinter || '0x0000000000000000000000000000000000000000',
       UniswapV2Router: data.UniswapV2Router || '0x0000000000000000000000000000000000000000',
@@ -71,7 +68,6 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       UniboostStakerFLX: data.UniboostStakerFLX || '0x0000000000000000000000000000000000000000',
       UniboostStakerSCX: data.UniboostStakerSCX || '0x0000000000000000000000000000000000000000',
 
-      BalancerPooler: data.BalancerPooler || '0x0000000000000000000000000000000000000000',
       GatherWBTC: data.GatherWBTC || '0x0000000000000000000000000000000000000000',
 
       ViewRouter: data.ViewRouter || '0x0000000000000000000000000000000000000000',

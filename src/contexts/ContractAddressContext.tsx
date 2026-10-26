@@ -17,7 +17,6 @@ import { log } from '../utils/logger'
  */
 export interface NFTPrimaryView {
   NFTMinter: string
-  BalancerPooler: string
   GatherWBTC: string
 }
 
@@ -121,7 +120,6 @@ export function ContractAddressProvider({ children }: ContractAddressProviderPro
     if (!addresses) return null
     return {
       NFTMinter: addresses.NFTMinter,
-      BalancerPooler: addresses.BalancerPooler,
       GatherWBTC: addresses.GatherWBTC,
     }
   }, [addresses])

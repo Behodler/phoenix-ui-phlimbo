@@ -32,16 +32,12 @@ export interface ContractAddresses {
   PhusdStableMinter: string;
   PhlimboV3: string;
   StableYieldAccumulator: string;
-  BalancerPool: string;
-  BalancerVault: string;
   BurnRecorder: string;
-  BalancerRouter: string;
   NFTMinter: string;
   UniswapV2Router: string;
   UniboostEYE: string;
   UniboostSCX: string;
   UniboostFLX: string;
-  BalancerPooler: string;
   GatherWBTC: string;
   MultiPooler: string;
   UniboostHookEYE: string;
