@@ -47,6 +47,24 @@ export const FORGE_HARVEST_MIN_OUT_BPS = 9500; // minEthOut = ethOut × 95%
 export const FORGE_MOCK_NFT_HOLDINGS: Record<number, number> = { 6: 2, 1: 1, 5: 3, 2: 1, 3: 0, 4: 0 };
 export const FORGE_HARVEST_DEFAULT_NFT_ID = 6; // Reservoir Ratchet
 
-/** Keys of the Forge accordion rows. Story 090 extends this union. */
-export type ForgeToolKey = 'annihilate' | 'harvest';
+/**
+ * NFT Bonfire mock. Stands in for `NFTBonfire.burn(uint256 tokenId, uint256 minPayout) returns (uint256 payout)`:
+ * Antimatter accrues linearly at `ratePerDay`, capped at `maxPayout` (accrual above the cap is forfeited);
+ * burning one of the caller's own claim NFTs pays out the whole pot and resets it to zero.
+ *
+ * Units (human-readable; 18 dp on-chain):
+ *  - potInitial: Antimatter in the pot when the page loads
+ *  - ratePerDay: Antimatter added to the pot per day (mirrors NFTBonfire.ratePerDay)
+ *  - maxPayout:  pot cap in Antimatter (mirrors NFTBonfire.maxPayout)
+ */
+export const FORGE_BONFIRE_MOCK = {
+  potInitial: 18.4062, // Antimatter in the pot when the page loads
+  ratePerDay: 2.5, // mirrors NFTBonfire.ratePerDay (18 dp on-chain)
+  maxPayout: 50, // mirrors NFTBonfire.maxPayout; accrual above it is forfeited
+} as const;
+export const FORGE_BONFIRE_MIN_PAYOUT_BPS = 9800; // minPayout = pot × 98%
+export const FORGE_BONFIRE_DEFAULT_NFT_ID = 1; // EYE ignition
+
+/** Keys of the Forge accordion rows. */
+export type ForgeToolKey = 'annihilate' | 'harvest' | 'bonfire';
 export const FORGE_DEFAULT_OPEN: ForgeToolKey = 'harvest';

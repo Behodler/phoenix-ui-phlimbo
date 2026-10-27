@@ -1,15 +1,20 @@
-import { useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import ForgeAccordionRow from './ForgeAccordionRow';
 import ForgeStatusPill from './ForgeStatusPill';
 import AnnihilateTool from './AnnihilateTool';
 import HarvestTool from './HarvestTool';
-import { fmt2, fmtSigned4, harvestQuote, isAnnihilateGated } from './forgeFormat';
+import BonfireTool, { type BonfireMockCall } from './BonfireTool';
+import BonfireFlameIcon from './BonfireFlameIcon';
+import { createBonfirePotClock, prefersReducedMotion, useBonfirePot, type BonfirePotClock } from './bonfirePotClock';
+import { fmt2, fmtPot2, fmtSigned4, harvestQuote, isAnnihilateGated } from './forgeFormat';
 import {
+  FORGE_BONFIRE_MOCK,
   FORGE_DEFAULT_OPEN,
   FORGE_HARVEST_MIN_OUT_BPS,
   FORGE_HARVEST_MOCK,
   FORGE_HARVEST_SCENARIO,
   FORGE_MOCK_ANTIMATTER_BALANCE,
+  FORGE_MOCK_NFT_HOLDINGS,
   FORGE_MOCK_PHUSD_PRICE,
   type ForgeToolKey,
 } from '../../../data/forgeMockData';
@@ -46,6 +51,16 @@ export interface ForgeTabProps {
  */
 export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
   const [openKey, setOpenKey] = useState<string | null>(FORGE_DEFAULT_OPEN);
+  // Claim-NFT holdings are shared by Harvest and Bonfire, so a mock burn also
+  // updates the Harvest picker's count, and survive rows collapsing.
+  const [nftHoldings, setNftHoldings] = useState<Record<number, number>>(() => ({ ...FORGE_MOCK_NFT_HOLDINGS }));
+  // One pot ticker for the Bonfire header metric, panel and button.
+  const [bonfireClock] = useState(() =>
+    createBonfirePotClock(FORGE_BONFIRE_MOCK, { intervalMs: prefersReducedMotion() ? 1000 : 50 }),
+  );
+  const handleBonfireBurn = useCallback(({ tokenId }: BonfireMockCall) => {
+    setNftHoldings((h) => ({ ...h, [tokenId]: Math.max(0, (h[tokenId] ?? 0) - 1) }));
+  }, []);
 
   const annihilateGated = isAnnihilateGated(FORGE_MOCK_PHUSD_PRICE);
   const harvest = harvestQuote(FORGE_HARVEST_MOCK[FORGE_HARVEST_SCENARIO], FORGE_HARVEST_MIN_OUT_BPS);
@@ -81,7 +96,17 @@ export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
       ) : (
         <ForgeStatusPill tone="bad">Not profitable</ForgeStatusPill>
       ),
-      body: <HarvestTool />,
+      body: <HarvestTool nftHoldings={nftHoldings} />,
+    },
+    {
+      key: 'bonfire',
+      icon: <BonfireFlameIcon />,
+      title: 'NFT Bonfire',
+      tagline: 'Burn an NFT, take the Antimatter pot',
+      metric: <BonfirePotMetric clock={bonfireClock} />,
+      metricLabel: 'Pot · Antimatter',
+      pill: <ForgeStatusPill tone="fire">Burning</ForgeStatusPill>,
+      body: <BonfireTool clock={bonfireClock} nftHoldings={nftHoldings} onBurn={handleBonfireBurn} />,
     },
   ];
   const rows = rowsOverride ?? builtInRows;
@@ -111,5 +136,15 @@ export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
         ))}
       </div>
     </div>
+  );
+}
+
+/** Live Bonfire pot for the row header; reads the same clock as the row body. */
+function BonfirePotMetric({ clock }: { clock: BonfirePotClock }) {
+  const pot = useBonfirePot(clock);
+  return (
+    <span data-testid="bonfire-header-pot" style={{ color: '#FFD93D' }}>
+      {fmtPot2(pot)}
+    </span>
   );
 }

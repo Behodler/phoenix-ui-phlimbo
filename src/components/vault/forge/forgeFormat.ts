@@ -64,3 +64,26 @@ export const harvestQuote = ({ ethOut, gasEth }: HarvestQuoteInput, minOutBps: n
   const profitPct = profitable ? (profit / scale) * 100 : 0;
   return { profit, profitable, minEthOut, gasPct, profitPct };
 };
+
+/** Pot after `elapsedSeconds` of linear accrual from `start`, clamped at `maxPayout` (NFTBonfire semantics). */
+export const bonfirePotAt = (start: number, elapsedSeconds: number, ratePerDay: number, maxPayout: number) =>
+  Math.min(maxPayout, start + (Math.max(0, elapsedSeconds) * ratePerDay) / 86_400);
+
+/** `minPayout` for NFTBonfire.burn: pot × bps, floored to 2 dp so it never overstates the guarantee. */
+export const bonfireMinPayout = (pot: number, minPayoutBps: number) => floorTo((pot * minPayoutBps) / 10_000, 2);
+
+/**
+ * Id of the next NFT the wallet still holds, scanning `nfts` in order after `fromId` and wrapping
+ * (so `fromId` itself is checked last). Null when nothing is held.
+ */
+export const nextHeldNftId = (nfts: readonly ForgeNftOption[], fromId: number): number | null => {
+  const start = nfts.findIndex((n) => n.id === fromId);
+  for (let i = 1; i <= nfts.length; i++) {
+    const nft = nfts[(start + i + nfts.length) % nfts.length];
+    if (nft.held > 0) return nft.id;
+  }
+  return null;
+};
+
+/** Bonfire pot as shown to the user: floored to 2 dp (round in favour of the protocol), e.g. "18.40". */
+export const fmtPot2 = (pot: number) => fmt2(floorTo(pot, 2));
