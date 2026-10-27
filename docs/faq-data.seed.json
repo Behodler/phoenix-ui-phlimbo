@@ -224,5 +224,26 @@
         "body": "The staking dapp has a special emergency-unstake-when-paused feature precisely for this eventuality. It may be the case that you forfeit pending rewards but the principal will still be intact."
       }
     ]
+  },
+  "ForgeTab": {
+    "componentName": "ForgeTab",
+    "items": [
+      {
+        "title": "Why is the Harvest button disabled?",
+        "body": "It turns off when the estimated gas would cost more than the ETH the harvest pays. Yield keeps building up, so try again later."
+      },
+      {
+        "title": "What does annihilation do?",
+        "body": "Each unit of Antimatter, paired with one unit of a stablecoin, produces two units of phUSD. E.g. 10 Antimatter + 10 USDC = 20 phUSD."
+      },
+      {
+        "title": "Is the Bonfire pot shared?",
+        "body": "Yes. Anyone holding an NFT can burn it for the pot. The first burn takes everything, then the pot refills from zero."
+      },
+      {
+        "title": "Why does the Harvester need my NFT?",
+        "body": "The Yield Funnel currently burns one NFT per claim. The Harvester borrows yours for the claim and the Funnel burns it."
+      }
+    ]
   }
 }

@@ -29,6 +29,7 @@ const TAB_HEADING: Record<Tab, string> = {
   'Testnet Faucet': 'Faucet Tab',
   Market: 'Market Tab',
   NFT: 'NFT Tab',
+  Forge: 'Forge',
   Admin: 'Admin Tab',
 };
 
@@ -63,6 +64,7 @@ function VaultPageStub() {
         <button onClick={() => handleTabClick('Mint')}>Mint Nav</button>
         <button onClick={() => handleTabClick('Stake')}>Stake Nav</button>
         <button onClick={() => handleTabClick('NFT')}>NFT Nav</button>
+        <button onClick={() => handleTabClick('Forge')}>Forge Nav</button>
       </nav>
     </div>
   );
@@ -83,6 +85,7 @@ function AppRoutesSubtree() {
       <Route path="/stake" element={<VaultPageStub />} />
       <Route path="/staking" element={<VaultPageStub />} />
       <Route path="/nft" element={<VaultPageStub />} />
+      <Route path="/forge" element={<VaultPageStub />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -204,5 +207,63 @@ describe('Market tab visibility and routing (Uniswap V2 market)', () => {
     expect(TAB_TO_PATH['Market']).toBeUndefined();
     expect(Object.values(PATH_TO_TAB)).not.toContain('Market');
     expect(TAB_TO_PATH['Market'] ?? DEFAULT_PATH).toBe('/');
+  });
+});
+
+describe('Forge tab visibility and routing (story 088)', () => {
+  const ANVIL = { isMounted: true, isMainnet: false, isLocal: true, isSepolia: false } as const;
+  const SEPOLIA = { isMounted: true, isMainnet: false, isLocal: false, isSepolia: true } as const;
+  const MAINNET = { isMounted: true, isMainnet: true, isLocal: false, isSepolia: false } as const;
+
+  it('deep-links /forge to the Forge tab', () => {
+    render(
+      <MemoryRouter initialEntries={['/forge']}>
+        <AppRoutesSubtree />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('heading', { name: 'Forge' })).toBeInTheDocument();
+    expect(screen.getByTestId('current-pathname').textContent).toBe('/forge');
+  });
+
+  it('clicking the Forge tab navigates to /forge', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutesSubtree />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Forge Nav' }));
+
+    expect(screen.getByRole('heading', { name: 'Forge' })).toBeInTheDocument();
+    expect(screen.getByTestId('current-pathname').textContent).toBe('/forge');
+  });
+
+  it('maps /forge <-> Forge in both route tables', () => {
+    expect(PATH_TO_TAB['/forge']).toBe('Forge');
+    expect(TAB_TO_PATH['Forge']).toBe('/forge');
+  });
+
+  it.each([
+    ['Anvil', ANVIL, false],
+    ['Anvil', ANVIL, true],
+    ['Sepolia', SEPOLIA, false],
+    ['Sepolia', SEPOLIA, true],
+    ['mainnet', MAINNET, false],
+    ['mainnet', MAINNET, true],
+  ])('is shown once on %s (admin: %s), directly after NFT and before Admin', (_name, flags, hasAdminAccess) => {
+    const tabs = getVaultTabs({ ...flags, hasAdminAccess });
+    expect(tabs.filter((t) => t === 'Forge')).toHaveLength(1);
+    expect(tabs.indexOf('Forge')).toBe(tabs.indexOf('NFT') + 1);
+    if (hasAdminAccess) {
+      expect(tabs.indexOf('Forge')).toBe(tabs.indexOf('Admin') - 1);
+    } else {
+      expect(tabs).not.toContain('Admin');
+    }
+  });
+
+  it('is excluded from the pre-mount tab list', () => {
+    expect(getVaultTabs({ isMounted: false, isMainnet: false, isLocal: true, isSepolia: false, hasAdminAccess: true })).not.toContain('Forge');
   });
 });

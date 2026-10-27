@@ -16,6 +16,7 @@ export interface VaultTabFlags {
  * - Before mount: a fixed, network-agnostic list (prevents flicker).
  * - Testnet Faucet: non-mainnet only.
  * - Market (Uniswap V2 phUSD/sUSDS): every network, immediately before NFT.
+ * - Forge (one-transaction helper tools): every network, after NFT.
  * - Admin: owner or allowlisted admin.
  */
 export function getVaultTabs({ isMounted, isMainnet, hasAdminAccess }: VaultTabFlags): Tab[] {
@@ -32,6 +33,8 @@ export function getVaultTabs({ isMounted, isMainnet, hasAdminAccess }: VaultTabF
   tabList.push("Market");
 
   tabList.push("NFT");
+
+  tabList.push("Forge");
 
   if (hasAdminAccess) {
     tabList.push("Admin");

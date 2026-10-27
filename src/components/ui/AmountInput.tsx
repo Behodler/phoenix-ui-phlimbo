@@ -1,6 +1,6 @@
 import type { AmountInputProps } from '../../types/vault';
 
-export default function AmountInput({ amount, onAmountChange, onMaxClick }: AmountInputProps) {
+export default function AmountInput({ amount, onAmountChange, onMaxClick, isInvalid = false }: AmountInputProps) {
   return (
     <div className="flex gap-3 mb-5">
       <input
@@ -9,6 +9,8 @@ export default function AmountInput({ amount, onAmountChange, onMaxClick }: Amou
         value={amount}
         onChange={(e) => onAmountChange(e.target.value)}
         placeholder="ENTER AN AMOUNT"
+        aria-invalid={isInvalid || undefined}
+        style={isInvalid ? { borderColor: 'rgba(255,77,109,.6)' } : undefined}
         className="w-full rounded-xl border border-input bg-card px-4 py-3 text-card-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
       />
       <button

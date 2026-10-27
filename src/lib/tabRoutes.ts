@@ -12,6 +12,7 @@ export const PATH_TO_TAB: Record<string, Tab> = {
   // deep-link lands on the same surface it always did.
   '/stake-v3': 'Stake',
   '/nft': 'NFT',
+  '/forge': 'Forge',
 };
 
 export const TAB_TO_PATH: Partial<Record<Tab, string>> = {
@@ -20,6 +21,7 @@ export const TAB_TO_PATH: Partial<Record<Tab, string>> = {
   // /staking. /stake remains a working alias in PATH_TO_TAB above.
   Stake: '/staking',
   NFT: '/nft',
+  Forge: '/forge',
 };
 
 // Default path used when the active tab has no friendly URL.
