@@ -118,17 +118,42 @@ describe('AntimatterAccordionRow', () => {
     expect(screen.getByRole('button', { name: /Stake USDC/ })).toBeEnabled();
   });
 
-  it('hides the claim button entirely while the claim gate is closed', () => {
-    renderRow({ tab: 'withdraw', claimEnabled: false });
+  it('keeps claiming off the Withdraw sub-tab — it lives on its own Claim sub-tab', () => {
+    renderRow({ tab: 'withdraw', claimEnabled: true, pending: 12 });
     expect(screen.queryByRole('button', { name: /Claim/ })).not.toBeInTheDocument();
   });
 
-  it('offers a claim button once the gate is open', () => {
-    // `pending` is `claimableReward` — the banked backlog plus the live
-    // projection — so the button states the whole figure, with nothing added
-    // to it here.
-    renderRow({ tab: 'withdraw', claimEnabled: true, pending: 12 });
-    expect(screen.getByRole('button', { name: /Claim 12 Antimatter/ })).toBeEnabled();
+  it('offers no Claim sub-tab while the claim gate is closed', () => {
+    renderRow({ claimEnabled: false });
+    expect(screen.queryByRole('tab', { name: 'Claim' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Annihilate' })).toBeInTheDocument();
+  });
+
+  it('adds a Claim sub-tab once the gate is open, keeping the other three', () => {
+    renderRow({ claimEnabled: true });
+    for (const name of ['Stake', 'Withdraw', 'Annihilate', 'Claim']) {
+      expect(screen.getByRole('tab', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('claims the whole claimableReward from the Claim sub-tab', () => {
+    const onClaim = vi.fn();
+    renderRow({ tab: 'claim', claimEnabled: true, pending: 12, onClaim });
+    const button = screen.getByRole('button', { name: /Claim 12 Antimatter to wallet/ });
+    expect(button).toBeEnabled();
+    button.click();
+    expect(onClaim).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables the Claim sub-tab button when nothing has accrued', () => {
+    renderRow({ tab: 'claim', claimEnabled: true, pending: 0 });
+    expect(screen.getByRole('button', { name: 'Nothing to claim yet' })).toBeDisabled();
+  });
+
+  it('falls back to annihilate if the gate closes while Claim is selected', () => {
+    renderRow({ tab: 'claim', claimEnabled: false });
+    expect(screen.getByRole('tab', { name: 'Annihilate' })).toHaveAttribute('aria-selected', 'true');
+    expect(annihilateButton()).toBeInTheDocument();
   });
 
   it('asks for an approval before staking when the allowance is short', () => {

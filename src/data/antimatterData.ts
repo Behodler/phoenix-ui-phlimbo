@@ -48,7 +48,7 @@ export const PHUSD_ACCENT = 'rgba(255,217,61,.92)';
 export const PHUSD_ARROW_ACCENT = '#FFB566';
 
 /** Which form the expanded panel of a pool row is showing. */
-export type AntimatterSubTab = 'stake' | 'withdraw' | 'annihilate';
+export type AntimatterSubTab = 'stake' | 'withdraw' | 'annihilate' | 'claim';
 
 /**
  * The shipped explainer. Two tones were written when the surface was designed;
