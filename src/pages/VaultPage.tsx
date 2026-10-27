@@ -22,6 +22,7 @@ import YieldFunnelTab from '../components/vault/YieldFunnelTab';
 import MarketUniTab from '../components/vault/marketUni/MarketUniTab';
 import NFTListTab, { type NFTSubTab } from '../components/vault/NFTListTab';
 import AntimatterStakeTab from '../components/vault/antimatter/AntimatterStakeTab';
+import ForgeTab from '../components/vault/forge/ForgeTab';
 import Admin from '../components/vault/Admin';
 import FAQ from '../components/vault/FAQ';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
@@ -736,7 +737,7 @@ export default function VaultPage() {
               onTabChange={(tab) => {
                 setActiveTab(tab);
                 // Clear FAQ when switching to a tab that has no FAQ data
-                if (!["Mint", "Yield Funnel", "Market", "NFT"].includes(tab)) {
+                if (!["Mint", "Yield Funnel", "Market", "NFT", "Forge"].includes(tab)) {
                   setFaqComponent(undefined);
                 }
                 // Sync URL with the active tab when it maps to a friendly
@@ -789,6 +790,10 @@ export default function VaultPage() {
             ) : activeTab === "NFT" ? (
               <ErrorBoundary>
                 <NFTListTab subTab={nftSubTab} onSubTabChange={setNftSubTab} />
+              </ErrorBoundary>
+            ) : activeTab === "Forge" ? (
+              <ErrorBoundary>
+                <ForgeTab />
               </ErrorBoundary>
             ) : null}
           </div>

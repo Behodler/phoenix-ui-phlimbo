@@ -11,7 +11,10 @@
 // "Market" is the Uniswap V2 phUSD/sUSDS market (src/components/vault/marketUni/).
 // It replaced the Balancer market tab at the Balancer wind-down; it has no route
 // of its own (lives at "/").
-export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Testnet Faucet" | "Market" | "NFT" | "Admin";
+//
+// "Forge" (src/components/vault/forge/) is a stack of one-transaction helper
+// tools, deep-linkable at /forge. It sits after NFT.
+export type Tab = "Mint" | "Yield Funnel" | "Stake" | "Testnet Faucet" | "Market" | "NFT" | "Forge" | "Admin";
 
 export interface VaultFormData {
   amount: string;
@@ -67,6 +70,8 @@ export interface AmountInputProps {
   amount: string;
   onAmountChange: (amount: string) => void;
   onMaxClick: () => void;
+  /** When true, the input border turns red (over-balance / invalid amount). */
+  isInvalid?: boolean;
 }
 
 export interface AutoStakeToggleProps {

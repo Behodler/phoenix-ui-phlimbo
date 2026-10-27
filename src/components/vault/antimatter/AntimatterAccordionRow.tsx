@@ -1,6 +1,7 @@
 import SegmentedControl from '../../ui/SegmentedControl';
 import LiveYieldCounter from '../staking/LiveYieldCounter';
 import AnnihilatePanel from './AnnihilatePanel';
+import ClaimPanel from './ClaimPanel';
 import { fmtAPY, fmtAmount, fmtUSD } from '../stake/formatStake';
 import { ANTIMATTER_ACCENT } from '../../../data/antimatterData';
 import type { AntimatterSubTab } from '../../../data/antimatterData';
@@ -8,7 +9,7 @@ import antimatterIcon from '../../../assets/antimatter.png';
 
 /**
  * A stablecoin pool row on the **real** Stake tab: the collapsed header plus
- * the expanded stake / withdraw / annihilate panel, backed by `StableStakerV2`.
+ * the expanded stake / withdraw / annihilate / claim panel, backed by `StableStakerV2`.
  *
  * Every figure passed in comes from a chain read via `useStableStakerPools` —
  * `poolInfo`, `userInfo`, `claimableReward`, the ERC20
@@ -258,7 +259,10 @@ export default function AntimatterAccordionRow({
   // contract still pays withdrawals that fit entirely inside it.
   const withinBuffer = !withdrawDisabled || wdParsed <= withdrawBuffer;
   const canWd = !disabled && !busy && wdParsed > 0 && wdParsed <= staked && withinBuffer;
-  const canClaim = !disabled && !busy && claimEnabled && pending > 0;
+  // The claim sub-tab only exists while the gate is open. If the gate shuts
+  // with it selected, show annihilate instead rather than an empty panel; the
+  // container's stored choice is left alone so it returns if the gate reopens.
+  const activeTab: AntimatterSubTab = tab === 'claim' && !claimEnabled ? 'annihilate' : tab;
 
   const disabledCls = 'opacity-40 cursor-not-allowed';
   const conversionNote =
@@ -353,18 +357,19 @@ export default function AntimatterAccordionRow({
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <SegmentedControl<AntimatterSubTab>
               ariaLabel={`${symbol} pool action`}
-              value={tab}
+              value={activeTab}
               onChange={onTabChange}
               options={[
                 { value: 'stake', label: 'Stake' },
                 { value: 'withdraw', label: 'Withdraw' },
                 { value: 'annihilate', label: 'Annihilate' },
+                ...(claimEnabled ? [{ value: 'claim' as const, label: 'Claim' }] : []),
               ]}
             />
             <span className="text-[12px] text-muted-foreground">{tagline}</span>
           </div>
 
-          {tab === 'stake' && (
+          {activeTab === 'stake' && (
             <div>
               <AmountField
                 label="Stake amount"
@@ -398,7 +403,7 @@ export default function AntimatterAccordionRow({
             </div>
           )}
 
-          {tab === 'withdraw' && (
+          {activeTab === 'withdraw' && (
             <div>
               <AmountField
                 label="Withdraw amount"
@@ -422,22 +427,10 @@ export default function AntimatterAccordionRow({
               >
                 {pendingAction === 'withdraw' ? 'Withdrawing…' : `Withdraw ${symbol}`}
               </button>
-              {claimEnabled && (
-                <button
-                  type="button"
-                  onClick={onClaim}
-                  disabled={!canClaim}
-                  className={`phoenix-btn-ghost mt-2.5 w-full ${canClaim ? '' : disabledCls}`}
-                >
-                  {pendingAction === 'claim'
-                    ? 'Claiming…'
-                    : `Claim ${fmtAmount(pending, 4)} ${antimatterSymbol}`}
-                </button>
-              )}
             </div>
           )}
 
-          {tab === 'annihilate' && (
+          {activeTab === 'annihilate' && (
             <AnnihilatePanel
               symbol={symbol}
               icon={icon}
@@ -456,6 +449,21 @@ export default function AntimatterAccordionRow({
               annihilateDisabledReason={annihilateDisabledReason}
               pendingAction={pendingAction}
               onAnnihilate={onAnnihilate}
+            />
+          )}
+
+          {activeTab === 'claim' && (
+            <ClaimPanel
+              symbol={symbol}
+              antimatterSymbol={antimatterSymbol}
+              staked={staked}
+              pending={pending}
+              ratePerSecond={ratePerSecond}
+              walletAntimatter={walletAntimatter}
+              disabled={disabled}
+              inactive={inactive}
+              pendingAction={pendingAction}
+              onClaim={onClaim}
             />
           )}
         </div>

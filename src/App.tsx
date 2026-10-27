@@ -26,6 +26,7 @@ export default function App() {
               Mint. "/stake-v3" is the pre-rename alias for the Stake tab. */}
           <Route path="/stake-v3" element={<VaultPage />} />
           <Route path="/nft" element={<VaultPage />} />
+          <Route path="/forge" element={<VaultPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </ToastProvider>

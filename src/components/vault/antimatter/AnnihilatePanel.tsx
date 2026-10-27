@@ -216,7 +216,7 @@ function fmtNetValue(n: number): string {
  * here — that principal is converted into phUSD, and the net-value footer is
  * where gain or loss is actually judged — so a red figure would misreport it.
  */
-function BalanceRow({
+export function BalanceRow({
   label,
   now,
   after,
