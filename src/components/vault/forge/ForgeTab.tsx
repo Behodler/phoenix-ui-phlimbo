@@ -2,14 +2,19 @@ import { useState, type ReactNode } from 'react';
 import ForgeAccordionRow from './ForgeAccordionRow';
 import ForgeStatusPill from './ForgeStatusPill';
 import AnnihilateTool from './AnnihilateTool';
-import { fmt2, isAnnihilateGated } from './forgeFormat';
+import HarvestTool from './HarvestTool';
+import { fmt2, fmtSigned4, harvestQuote, isAnnihilateGated } from './forgeFormat';
 import {
   FORGE_DEFAULT_OPEN,
+  FORGE_HARVEST_MIN_OUT_BPS,
+  FORGE_HARVEST_MOCK,
+  FORGE_HARVEST_SCENARIO,
   FORGE_MOCK_ANTIMATTER_BALANCE,
   FORGE_MOCK_PHUSD_PRICE,
   type ForgeToolKey,
 } from '../../../data/forgeMockData';
 import antimatterIcon from '../../../assets/antimatter.png';
+import ethereumIcon from '../../../assets/Ethereum.png';
 
 export interface ForgeRowDef {
   /** A ForgeToolKey in production; any unique string in tests. */
@@ -26,7 +31,7 @@ export interface ForgeRowDef {
 export interface ForgeTabProps {
   /**
    * Test seam: override the row list (e.g. to exercise single-open behaviour
-   * with several rows before 089/090 add theirs). Production renders the
+   * with several rows independent of the built-in set). Production renders the
    * built-in rows.
    */
   rows?: ForgeRowDef[];
@@ -43,6 +48,7 @@ export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
   const [openKey, setOpenKey] = useState<string | null>(FORGE_DEFAULT_OPEN);
 
   const annihilateGated = isAnnihilateGated(FORGE_MOCK_PHUSD_PRICE);
+  const harvest = harvestQuote(FORGE_HARVEST_MOCK[FORGE_HARVEST_SCENARIO], FORGE_HARVEST_MIN_OUT_BPS);
 
   const builtInRows: (ForgeRowDef & { key: ForgeToolKey })[] = [
     {
@@ -58,6 +64,24 @@ export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
         <ForgeStatusPill tone="antimatter">Ready</ForgeStatusPill>
       ),
       body: <AnnihilateTool />,
+    },
+    {
+      key: 'harvest',
+      icon: <img src={ethereumIcon} alt="" aria-hidden="true" className="h-9 w-9 rounded-full" />,
+      title: 'Harvest Yield',
+      tagline: 'Claim protocol yield, get paid in ETH',
+      metric: (
+        <span className={harvest.profitable ? 'text-green-400' : 'text-pxusd-pink-400'}>
+          {fmtSigned4(harvest.profit)}
+        </span>
+      ),
+      metricLabel: 'Est. profit · ETH',
+      pill: harvest.profitable ? (
+        <ForgeStatusPill tone="good">Profitable</ForgeStatusPill>
+      ) : (
+        <ForgeStatusPill tone="bad">Not profitable</ForgeStatusPill>
+      ),
+      body: <HarvestTool />,
     },
   ];
   const rows = rowsOverride ?? builtInRows;

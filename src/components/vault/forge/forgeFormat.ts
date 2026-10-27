@@ -27,3 +27,40 @@ export const toInputString = (n: number, dp = 4) => {
 
 /** Accepts '', digits, and at most one '.' with up to 4 decimals (Mint's limit). */
 export const AMOUNT_INPUT_PATTERN = /^\d*\.?\d{0,4}$/;
+
+/** One NFT as shown by ForgeNftPicker / ForgeNftPickerModal. `id` is the token ID (= dispatcher index). */
+export interface ForgeNftOption {
+  id: number;
+  name: string;
+  image: string;
+  held: number;
+}
+
+/** Joins static NFT config (names, images) with a tokenId → units-held map. */
+export const buildForgeNftOptions = (
+  config: readonly { id: number; name: string; image: string }[],
+  holdings: Record<number, number>,
+): ForgeNftOption[] => config.map(({ id, name, image }) => ({ id, name, image, held: holdings[id] ?? 0 }));
+
+/** Signed 4 dp with a real minus sign (U+2212), e.g. "+0.0395" / "−0.0007". */
+export const fmtSigned4 = (n: number) => {
+  const abs = Math.abs(n).toFixed(4);
+  return `${n < 0 && abs !== '0.0000' ? '−' : '+'}${abs}`;
+};
+
+export interface HarvestQuoteInput {
+  ethOut: number;
+  gasEth: number;
+}
+
+/** Derived numbers for the Harvest Yield row. Profitable iff ethOut > gasEth. */
+export const harvestQuote = ({ ethOut, gasEth }: HarvestQuoteInput, minOutBps: number) => {
+  const profit = ethOut - gasEth;
+  const profitable = ethOut > gasEth;
+  // Floor so the minimum never overstates what the caller is guaranteed.
+  const minEthOut = floorTo((ethOut * minOutBps) / 10_000, 4);
+  const scale = Math.max(ethOut, gasEth);
+  const gasPct = profitable ? (gasEth / scale) * 100 : 100;
+  const profitPct = profitable ? (profit / scale) * 100 : 0;
+  return { profit, profitable, minEthOut, gasPct, profitPct };
+};
