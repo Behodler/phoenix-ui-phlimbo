@@ -211,7 +211,7 @@ describe('ForgeTab', () => {
     }
   });
 
-  it('hides the Bonfire row from a wallet that is neither the harvester owner nor allowlisted', () => {
+  it('hides the Bonfire row from a wallet that is not the harvester owner', () => {
     wallet = STRANGER;
     render(<ForgeTab />);
     expect(screen.queryByRole('button', { name: BONFIRE })).not.toBeInTheDocument();
@@ -230,11 +230,11 @@ describe('ForgeTab', () => {
     expect(screen.getByRole('button', { name: BONFIRE })).toBeInTheDocument();
   });
 
-  it('shows the Bonfire row to an allowlisted admin wallet', () => {
+  it('hides the Bonfire row from an allowlisted admin wallet that is not the harvester owner', () => {
     wallet = ALLOWLISTED;
     chainId = 1;
     render(<ForgeTab />);
-    expect(screen.getByRole('button', { name: BONFIRE })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: BONFIRE })).not.toBeInTheDocument();
   });
 
   it('header pills reflect live state: Paused annihilation, Approve NFTs harvest', () => {

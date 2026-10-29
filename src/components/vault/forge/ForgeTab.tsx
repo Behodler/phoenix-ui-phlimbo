@@ -1,5 +1,5 @@
 import { useCallback, useState, type ReactNode } from 'react';
-import { useAccount, useChainId } from 'wagmi';
+import { useAccount } from 'wagmi';
 import ForgeAccordionRow from './ForgeAccordionRow';
 import ForgeStatusPill from './ForgeStatusPill';
 import AnnihilateTool from './AnnihilateTool';
@@ -16,7 +16,6 @@ import {
 } from '../../../data/forgeMockData';
 import { useForgeAnnihilate } from '../../../hooks/useForgeAnnihilate';
 import { useForgeHarvest } from '../../../hooks/useForgeHarvest';
-import { isAllowlistedAdmin } from '../../../lib/adminAllowlist';
 import antimatterIcon from '../../../assets/antimatter.png';
 import ethereumIcon from '../../../assets/Ethereum.png';
 
@@ -47,17 +46,15 @@ export interface ForgeTabProps {
  *
  * Annihilate and Harvest Yield are live (`useForgeAnnihilate`,
  * `useForgeHarvest`). NFT Bonfire is still a mock and renders only for the
- * SYAHarvester owner or an allowlisted admin wallet.
+ * SYAHarvester owner on the connected chain.
  */
 export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
   const [openKey, setOpenKey] = useState<string | null>(FORGE_DEFAULT_OPEN);
   const { address: wallet } = useAccount();
-  const chainId = useChainId();
   const annihilate = useForgeAnnihilate();
   const harvest = useForgeHarvest();
 
-  const isHarvesterOwner = !!wallet && !!harvest.owner && wallet.toLowerCase() === harvest.owner.toLowerCase();
-  const showBonfire = isHarvesterOwner || isAllowlistedAdmin(chainId, wallet);
+  const showBonfire = !!wallet && !!harvest.owner && wallet.toLowerCase() === harvest.owner.toLowerCase();
 
   // Bonfire is a mock with its own simulated holdings, kept apart from the
   // live claim-NFT balances Harvest reads.

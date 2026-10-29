@@ -20,7 +20,7 @@ const BLOCKER_LABEL = {
   inactive: 'Harvester not live on this network',
   disconnected: 'Connect your wallet',
   loading: 'Loading…',
-  'no-nft': 'You hold none of this claim NFT',
+  'no-nft': 'You do not hold this NFT',
 } as const;
 
 /**

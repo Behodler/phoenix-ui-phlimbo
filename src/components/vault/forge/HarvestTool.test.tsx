@@ -106,7 +106,7 @@ describe('HarvestTool', () => {
   it.each([
     ['inactive', 'Harvester not live on this network'],
     ['disconnected', 'Connect your wallet'],
-    ['no-nft', 'You hold none of this claim NFT'],
+    ['no-nft', 'You do not hold this NFT'],
   ] as const)('blocker %s disables the button', (blocker, label) => {
     render(<Harness blocker={blocker} quote={undefined} display={null} />);
     expect(screen.getByRole('button', { name: label })).toBeDisabled();

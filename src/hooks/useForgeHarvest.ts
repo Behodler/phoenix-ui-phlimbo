@@ -5,6 +5,7 @@ import { formatEther, formatUnits, zeroAddress } from 'viem';
 import { nftMinterV2Abi, stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { usePolling } from '../contexts/PollingContext';
+import { useMinterPageView } from './useMinterPageView';
 import { useToast } from '../components/ui/ToastProvider';
 import { useERC1155ApprovalForAll } from './useERC1155ApprovalForAll';
 import { syaHarvesterAbi } from '../lib/syaHarvesterAbi';
@@ -17,8 +18,6 @@ import { log } from '../utils/logger';
 const HARVEST_REFRESH_INTERVAL_MS = 12_000;
 /** Margin on the gas estimate used as the tx gas limit (harvest.sh default: 20%). */
 const GAS_LIMIT_MARGIN_BPS = 2_000n;
-
-const NFT_IDS = nftStaticConfig.map((n) => BigInt(n.id));
 
 /**
  * The simulated outcome of `harvest([], nftIndex, 0)`.
@@ -57,7 +56,10 @@ export interface ForgeHarvestState {
   owner: `0x${string}` | undefined;
   /** SYA still burns a claim NFT per claim (its `nftMinter()` is set). */
   requiresNft: boolean;
-  /** Wallet claim-NFT holdings, tokenId → units. */
+  /**
+   * Wallet claim-NFT holdings, keyed by `nftStaticConfig` id → units. That id is
+   * a display key only; the on-chain ERC1155 tokenId is the dispatcher index.
+   */
   nftHoldings: Record<number, number>;
   selectedNftId: number;
   setSelectedNftId: (id: number) => void;
@@ -144,21 +146,35 @@ export function useForgeHarvest(): ForgeHarvestState {
   });
   const yieldUsd = totalYieldRaw === undefined ? null : Number(formatUnits(totalYieldRaw as bigint, 18));
 
+  // NFTMinterV2 mints tokenId == dispatcher index, assigned in registration
+  // order (EYE 1, SCX 2, Flax 3, ...), which is NOT the nftStaticConfig id
+  // order. Read each NFT's index from MintPageView, as the mint flow does.
+  const { data: mintView, isLoading: mintViewLoading } = useMinterPageView();
+  const tokenIds = useMemo(() => {
+    const out: { configId: number; tokenId: bigint }[] = [];
+    if (!mintView) return out;
+    for (const n of nftStaticConfig) {
+      const index = mintView[n.tokenPrefix]?.dispatcherIndex;
+      if (index) out.push({ configId: n.id, tokenId: BigInt(index) });
+    }
+    return out;
+  }, [mintView]);
+
   const { data: balancesRaw, refetch: refetchHoldings } = useReadContract({
     address: nftMinter,
     abi: nftMinterV2Abi,
     functionName: 'balanceOfBatch',
-    args: wallet ? [NFT_IDS.map(() => wallet), NFT_IDS] : undefined,
-    query: { enabled: !!nftMinter && !!wallet, refetchInterval },
+    args: wallet ? [tokenIds.map(() => wallet), tokenIds.map((t) => t.tokenId)] : undefined,
+    query: { enabled: !!nftMinter && !!wallet && tokenIds.length > 0, refetchInterval },
   });
   const nftHoldings = useMemo(() => {
     const out: Record<number, number> = {};
     const balances = balancesRaw as readonly bigint[] | undefined;
-    NFT_IDS.forEach((id, i) => {
-      out[Number(id)] = balances ? Number(balances[i] ?? 0n) : 0;
+    tokenIds.forEach(({ configId }, i) => {
+      out[configId] = balances ? Number(balances[i] ?? 0n) : 0;
     });
     return out;
-  }, [balancesRaw]);
+  }, [balancesRaw, tokenIds]);
 
   const approval = useERC1155ApprovalForAll(wallet, harvester, nftMinter);
 
@@ -172,12 +188,13 @@ export function useForgeHarvest(): ForgeHarvestState {
   }, [nftHoldings]);
 
   const holdsSelected = (nftHoldings[selectedNftId] ?? 0) > 0;
-  const nftIndex = requiresNft ? BigInt(selectedNftId) : 0n;
+  const selectedTokenId = tokenIds.find((t) => t.configId === selectedNftId)?.tokenId;
+  const nftIndex = requiresNft ? selectedTokenId ?? 0n : 0n;
 
   let blocker: HarvestBlocker = null;
   if (!active) blocker = 'inactive';
   else if (!wallet) blocker = 'disconnected';
-  else if (!sya || nftMinterLoading) blocker = 'loading';
+  else if (!sya || nftMinterLoading || (requiresNft && (mintViewLoading || !mintView))) blocker = 'loading';
   else if (requiresNft && !holdsSelected) blocker = 'no-nft';
   else if (requiresNft && !approval.isApprovedForAll) blocker = 'needs-approval';
 

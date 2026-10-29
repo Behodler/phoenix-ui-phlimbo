@@ -285,7 +285,7 @@ so the row headers can share them.
   contract's `Unprofitable` check trivially. While SYA's `nftMinter()` is set, the quote also
   needs a held claim NFT plus `setApprovalForAll(harvester)`.
 - **NFT Bonfire** is still `src/data/forgeMockData.ts`. It renders only for
-  `SYAHarvester.owner()` or an `adminAllowlist` wallet, and its title carries
+  `SYAHarvester.owner()` on the connected chain (the admin allowlist does not apply), and its title carries
   "- only visible to admins" until it ships.
 
 ## Questions?
