@@ -65,6 +65,24 @@ const ERROR_MESSAGES: Record<string, (args: readonly unknown[]) => string> = {
   CurveCoinMismatch: () =>
     'A Curve pool on the route is misconfigured. This is a deployment issue, not something you can retry.',
 
+  // --- SYAHarvester (Forge tab) ---------------------------------------------
+  Unprofitable: (args) =>
+    `The harvest would pay ${String(args[0] ?? '?')} wei of ETH, which does not cover its ${String(args[1] ?? '?')} wei gas cost.`,
+  InsufficientEthOut: (args) =>
+    `The harvest paid ${String(args[0] ?? '?')} wei, below your minimum of ${String(args[1] ?? '?')} wei. Someone may have harvested first.`,
+  RouteNotConfigured: (args) =>
+    `No sell route is registered for yield token ${String(args[0] ?? '')}. The harvester owner has to add one.`,
+  EthPoolNotSet: () => 'The harvester has no ETH pool configured yet. This is a deployment issue.',
+  EthTransferFailed: () => 'Paying the ETH out to your wallet failed.',
+  ERC1155MissingApprovalForAll: () => 'Approve the Harvester to use your claim NFTs first.',
+  ERC1155InsufficientBalance: () => 'You no longer hold the selected claim NFT.',
+
+  // --- Antimatter (Forge tab) ---------------------------------------------
+  InsufficientPhUSDOut: (args) =>
+    `The phUSD exchange rate moved: the annihilation would pay ${String(args[1] ?? '?')}, below your minimum of ${String(args[0] ?? '?')}. Try again.`,
+  AmountNotRepresentable: () => 'That amount is finer than the stablecoin can express. Use fewer decimals.',
+  StablecoinNotRegistered: () => 'That stablecoin is not registered with the phUSD minter.',
+
   // --- shared --------------------------------------------------------------
   EnforcedPause: () =>
     'The contract is paused right now. If a promotion is flushing, it will unpause once the flush completes.',

@@ -1,24 +1,68 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AnnihilateTool from './AnnihilateTool';
+import type { AnnihilateStableSymbol, ForgeAnnihilateState } from '../../../hooks/useForgeAnnihilate';
 
-const { addToast } = vi.hoisted(() => ({ addToast: vi.fn() }));
+const approve = vi.fn(async () => {});
+const annihilate = vi.fn(async () => {});
 
-vi.mock('../../ui/ToastProvider', () => ({
-  useToast: () => ({ addToast }),
-}));
+type Overrides = Partial<Omit<ForgeAnnihilateState, 'amount' | 'setAmount' | 'stable' | 'setStable'>> & {
+  /** Stand-in for the minter quote: total phUSD as a function of the amount. Defaults to 2× (1:1 rate). */
+  quote?: ((amt: number) => number) | null;
+};
+
+/**
+ * AnnihilateTool is presentational; amount and stable selection live in
+ * `useForgeAnnihilate`. This harness owns that state so typing and picking
+ * behave as they do in the tab.
+ */
+function Harness({ quote = (a) => 2 * a, ...overrides }: Overrides) {
+  const [amount, setAmount] = useState('');
+  const [stable, setStable] = useState<AnnihilateStableSymbol>('USDC');
+  const amt = Number.parseFloat(amount) || 0;
+  const out = amt > 0 && quote ? quote(amt) : null;
+  const state: ForgeAnnihilateState = {
+    active: true,
+    paused: false,
+    walletAntimatter: 142.38,
+    stableBalances: { USDC: 1250, USDe: 80, DOLA: 410.25 },
+    price: 0.98,
+    gateReason: null,
+    priceGated: false,
+    stable,
+    setStable,
+    amount,
+    setAmount,
+    phusdOut: out,
+    minPhusdOut: out === null ? null : out * 0.995,
+    needsApproval: amt > 0,
+    pendingAction: null,
+    approve,
+    annihilate,
+    ...overrides,
+  };
+  return <AnnihilateTool state={state} />;
+}
+
+const priceGate = (price: number): Overrides => ({
+  price,
+  priceGated: true,
+  gateReason: 'Annihilation paused at phUSD ≤ $0.50',
+});
 
 const input = () => screen.getByPlaceholderText('ENTER AN AMOUNT') as HTMLInputElement;
 const cell = (label: string) => screen.getByTestId(`preview-cell-${label}`);
 
 describe('AnnihilateTool', () => {
   beforeEach(() => {
-    addToast.mockClear();
+    approve.mockClear();
+    annihilate.mockClear();
   });
 
   it('starts empty with a disabled "Enter Amount" button and 0.00 preview', () => {
-    render(<AnnihilateTool />);
+    render(<Harness />);
     expect(input().value).toBe('');
     expect(screen.getByRole('button', { name: 'Enter Amount' })).toBeDisabled();
     expect(within(cell('Antimatter')).getByText('0.00')).toBeInTheDocument();
@@ -26,14 +70,13 @@ describe('AnnihilateTool', () => {
   });
 
   it('shows Max as min(Antimatter, USDC) by default', () => {
-    render(<AnnihilateTool />);
-    // Antimatter 142.38 < USDC 1,250 → 142.38
+    render(<Harness />);
     expect(screen.getByRole('button', { name: 'Max: 142.38' })).toBeInTheDocument();
   });
 
   it('over balance → "Insufficient Balance" + insufficient message + red border', async () => {
     const user = userEvent.setup();
-    render(<AnnihilateTool />);
+    render(<Harness />);
     await user.type(input(), '200');
     expect(screen.getByRole('button', { name: 'Insufficient Balance' })).toBeDisabled();
     expect(screen.getByText('Insufficient Antimatter')).toBeInTheDocument();
@@ -42,7 +85,7 @@ describe('AnnihilateTool', () => {
 
   it('names the stablecoin when only the stable side is short', async () => {
     const user = userEvent.setup();
-    render(<AnnihilateTool antimatterBalance={500} />);
+    render(<Harness walletAntimatter={500} />);
     await user.click(screen.getByRole('button', { name: 'Pair with USDC' }));
     await user.click(screen.getByRole('button', { name: /USDe/ }));
     await user.type(input(), '100');
@@ -50,9 +93,9 @@ describe('AnnihilateTool', () => {
     expect(screen.getByRole('button', { name: 'Insufficient Balance' })).toBeDisabled();
   });
 
-  it('valid amount → Approve USDC → Annihilate → receive 200.00 phUSD, with preview and toasts', async () => {
+  it('valid amount: preview from the quote, Approve calls the hook', async () => {
     const user = userEvent.setup();
-    render(<AnnihilateTool />);
+    render(<Harness />);
     await user.type(input(), '100');
 
     expect(within(cell('Antimatter')).getByText('100.00')).toBeInTheDocument();
@@ -64,33 +107,29 @@ describe('AnnihilateTool', () => {
     expect(screen.getByText('199.00 phUSD')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Approve USDC' }));
-    expect(addToast).toHaveBeenCalledWith({
-      type: 'info',
-      title: 'Approved (preview)',
-      description: 'USDC approval simulated. Nothing was sent.',
-    });
-
-    const annihilate = screen.getByRole('button', { name: 'Annihilate → receive 200.00 phUSD' });
-    expect(annihilate).toBeEnabled();
-    await user.click(annihilate);
-    expect(addToast).toHaveBeenLastCalledWith({
-      type: 'info',
-      title: 'Preview only',
-      description: 'Annihilation is mocked on this page. Nothing was sent.',
-    });
-    expect(input().value).toBe('');
-    expect(screen.getByRole('button', { name: 'Enter Amount' })).toBeDisabled();
+    expect(approve).toHaveBeenCalledOnce();
   });
 
-  it('switching to USDe changes max to 80.00 and needs its own approval', async () => {
+  it('approved: the button annihilates for the quoted phUSD, not a hard-coded 2×', async () => {
     const user = userEvent.setup();
-    render(<AnnihilateTool />);
+    // The minter pays 0.98 phUSD per stable unit: 100 Antimatter + 98 = 198.
+    render(<Harness needsApproval={false} quote={(a) => a + a * 0.98} />);
+    await user.type(input(), '100');
+    expect(within(cell('phUSD')).getByText('198.00')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Annihilate → receive 198.00 phUSD' }));
+    expect(annihilate).toHaveBeenCalledOnce();
+  });
 
-    // Approve USDC first.
-    await user.type(input(), '50');
-    await user.click(screen.getByRole('button', { name: 'Approve USDC' }));
-    expect(screen.getByRole('button', { name: 'Annihilate → receive 100.00 phUSD' })).toBeEnabled();
+  it('waits for the minter quote before allowing the annihilation', async () => {
+    const user = userEvent.setup();
+    render(<Harness needsApproval={false} quote={null} />);
+    await user.type(input(), '10');
+    expect(screen.getByRole('button', { name: 'Fetching quote…' })).toBeDisabled();
+  });
 
+  it('lists the three stables in the selector and switches the max', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
     await user.click(screen.getByRole('button', { name: 'Pair with USDC' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Only stablecoins registered with the phUSD minter can be annihilated.')).toBeInTheDocument();
@@ -101,43 +140,47 @@ describe('AnnihilateTool', () => {
     await user.click(within(dialog).getByRole('button', { name: /USDe/ }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Max: 80.00' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Approve USDe' })).toBeEnabled();
-
     await user.click(screen.getByRole('button', { name: 'Max: 80.00' }));
     expect(input().value).toBe('80');
+    expect(screen.getByRole('button', { name: 'Approve USDe' })).toBeEnabled();
   });
 
   it('rejects more than 4 decimals, like Mint', async () => {
     const user = userEvent.setup();
-    render(<AnnihilateTool />);
+    render(<Harness />);
     await user.type(input(), '1.123456');
     expect(input().value).toBe('1.1234');
   });
 
   it('gated price shows the disabled callout and paused button', async () => {
     const user = userEvent.setup();
-    render(<AnnihilateTool price={0.5} />);
+    render(<Harness {...priceGate(0.5)} />);
     expect(screen.getByText('Annihilation disabled.')).toBeInTheDocument();
     expect(screen.getByText(/phUSD is at \$0\.50\. At \$0\.50 or less/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Annihilation paused at phUSD ≤ $0.50' })).toBeDisabled();
 
-    // Still paused with a valid amount, and net value is shown as a loss/zero.
     await user.type(input(), '10');
     expect(screen.getByRole('button', { name: 'Annihilation paused at phUSD ≤ $0.50' })).toBeDisabled();
-    expect(addToast).not.toHaveBeenCalled();
+    expect(annihilate).not.toHaveBeenCalled();
   });
 
   it('below the floor shows a negative net value with a real minus sign', async () => {
     const user = userEvent.setup();
-    render(<AnnihilateTool price={0.4} />);
+    render(<Harness {...priceGate(0.4)} />);
     await user.type(input(), '10');
     // 10 × (0.8 − 1) = −2.00
     expect(screen.getByText('−$2.00')).toBeInTheDocument();
   });
 
-  it('is not gated just above the floor', () => {
-    render(<AnnihilateTool price={0.51} />);
+  it('a non-price gate disables the button without the price callout', () => {
+    render(<Harness active={false} gateReason="Annihilation is not live on this network yet." />);
+    expect(screen.getByRole('button', { name: 'Annihilation is not live on this network yet.' })).toBeDisabled();
     expect(screen.queryByText('Annihilation disabled.')).not.toBeInTheDocument();
+  });
+
+  it('shows an em dash when the price is unknown', () => {
+    render(<Harness price={null} gateReason="The phUSD price is unavailable." />);
+    const row = screen.getByText('phUSD price').parentElement!;
+    expect(within(row).getByText('—')).toBeInTheDocument();
   });
 });

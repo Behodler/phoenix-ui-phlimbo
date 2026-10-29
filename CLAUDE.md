@@ -267,6 +267,27 @@ id is what preserves it. Do not rename the tab, and do not add a new route.
 `src/components/vault/stakeMock/` is a different thing entirely: the admin-only **NFT** staking
 preview reached from `NFTListTab`, which merely shares the word "mock".
 
+## The `Forge` tab: two live rows, one admin-only mock
+
+`src/components/vault/forge/`. Stories 088–090 built it as a mock; Annihilate and Harvest
+Yield are now wired. The row components are presentational, and `ForgeTab` owns the hooks
+so the row headers can share them.
+
+- **Annihilate** (`useForgeAnnihilate`) calls `Antimatter.annihilate(stable, recipient,
+  amount, minPhUSDOut)` on the wallet's *loose* Antimatter. That is a different path from the
+  Stake tab's `autoAnnihilate`. The stablecoin is pulled from the wallet, so it needs an ERC20
+  approval to **Antimatter**. `minPhUSDOut` = `(amount + PhusdStableMinter.calculateMintAmount)`
+  less 50 bps. Never assume 2×. It uses the same price gate as the Stake tab.
+- **Harvest Yield** (`useForgeHarvest`) targets `SYAHarvester`. The ABI is hand-written in
+  `src/lib/syaHarvesterAbi.ts` because the hooks package does not ship it. There is no view
+  quote: `ethOut` comes from `estimateContractGas` + `simulateContract` of
+  `harvest([], nftIndex, 0)` **with real fee fields**. A zero-gas-price simulation passes the
+  contract's `Unprofitable` check trivially. While SYA's `nftMinter()` is set, the quote also
+  needs a held claim NFT plus `setApprovalForAll(harvester)`.
+- **NFT Bonfire** is still `src/data/forgeMockData.ts`. It renders only for
+  `SYAHarvester.owner()` or an `adminAllowlist` wallet, and its title carries
+  "- only visible to admins" until it ships.
+
 ## Questions?
 
 If unclear about:

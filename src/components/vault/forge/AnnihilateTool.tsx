@@ -1,20 +1,18 @@
 import { useCallback, useState, type ReactNode } from 'react';
-import { useToast } from '../../ui/ToastProvider';
 import AmountInput from '../../ui/AmountInput';
 import ActionButton from '../../ui/ActionButton';
-import {
-  FORGE_ANNIHILATE_SLIPPAGE_BPS,
-  FORGE_MOCK_ANTIMATTER_BALANCE,
-  FORGE_MOCK_PHUSD_PRICE,
-  FORGE_MOCK_STABLE_BALANCES,
-} from '../../../data/forgeMockData';
 import ForgeTokenSelectorModal, { type ForgeTokenOption } from './ForgeTokenSelectorModal';
-import { AMOUNT_INPUT_PATTERN, floorTo, fmt2, isAnnihilateGated, toInputString } from './forgeFormat';
+import { AMOUNT_INPUT_PATTERN, floorTo, fmt2, toInputString } from './forgeFormat';
+import {
+  ANNIHILATE_STABLE_ORDER,
+  type AnnihilateStableSymbol,
+  type ForgeAnnihilateState,
+} from '../../../hooks/useForgeAnnihilate';
 import usdcIcon from '../../../assets/usdc-logo.svg';
 import usdeIcon from '../../../assets/USDe.png';
 import dolaIcon from '../../../assets/sDOLA.png';
 
-export type AnnihilateStableSymbol = keyof typeof FORGE_MOCK_STABLE_BALANCES;
+export type { AnnihilateStableSymbol };
 
 const ANTIMATTER_LAVENDER = '#C4AEEA';
 
@@ -23,40 +21,37 @@ const STABLE_META: Record<AnnihilateStableSymbol, { name: string; icon: string }
   USDe: { name: 'Ethena USDe', icon: usdeIcon },
   DOLA: { name: 'DOLA', icon: dolaIcon },
 };
-// Order shown in the selector; USDC is the default.
-const STABLE_ORDER: readonly AnnihilateStableSymbol[] = ['USDC', 'USDe', 'DOLA'];
 
 export interface AnnihilateToolProps {
-  /** phUSD price in USD. Injectable so tests can reach the gated state. */
-  price?: number;
-  antimatterBalance?: number;
-  stableBalances?: Record<AnnihilateStableSymbol, number>;
+  /** Live state from `useForgeAnnihilate`, owned by ForgeTab so the row header can share it. */
+  state: ForgeAnnihilateState;
 }
 
 /**
- * Body of the Forge "Annihilate Antimatter" row. MOCKED: no contract reads or
- * writes. Approve/annihilate step through their states locally and toast that
- * nothing was sent.
+ * Body of the Forge "Annihilate Antimatter" row. Presentational: every figure
+ * and action comes from `useForgeAnnihilate` (Antimatter.annihilate).
  */
-export default function AnnihilateTool({
-  price = FORGE_MOCK_PHUSD_PRICE,
-  antimatterBalance = FORGE_MOCK_ANTIMATTER_BALANCE,
-  stableBalances = FORGE_MOCK_STABLE_BALANCES,
-}: AnnihilateToolProps) {
-  const { addToast } = useToast();
-  const [amount, setAmount] = useState('');
-  const [stable, setStable] = useState<AnnihilateStableSymbol>('USDC');
+export default function AnnihilateTool({ state }: AnnihilateToolProps) {
+  const {
+    amount,
+    setAmount,
+    stable,
+    setStable,
+    walletAntimatter: antimatterBalance,
+    stableBalances,
+    price,
+    gateReason,
+    priceGated,
+    phusdOut: quotedOut,
+    minPhusdOut,
+    needsApproval,
+    pendingAction,
+  } = state;
   const [selectorOpen, setSelectorOpen] = useState(false);
-  // Mock allowance state, per token; every token starts unapproved.
-  const [approved, setApproved] = useState<Record<AnnihilateStableSymbol, boolean>>({
-    USDC: false,
-    USDe: false,
-    DOLA: false,
-  });
 
   const stableBalance = stableBalances[stable];
   const meta = STABLE_META[stable];
-  const gated = isAnnihilateGated(price);
+  const gated = gateReason !== null;
 
   const parsed = Number.parseFloat(amount);
   const amt = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
@@ -65,10 +60,11 @@ export default function AnnihilateTool({
   const overStable = amt > stableBalance;
   const over = overAntimatter || overStable;
 
-  const phusdOut = 2 * amt;
-  const netValue = amt * (2 * price - 1);
-  // Floor so the displayed minimum never overstates what the contract guarantees.
-  const minReceived = floorTo(phusdOut * (1 - FORGE_ANNIHILATE_SLIPPAGE_BPS / 10_000), 2);
+  // The minter's quote when it has landed; 2× is the 1:1-rate shape shown meanwhile.
+  const phusdOut = amt > 0 ? (quotedOut ?? 2 * amt) : 0;
+  const displayPrice = price ?? 1;
+  const netValue = amt * (2 * displayPrice - 1);
+  const minReceived = amt > 0 && minPhusdOut !== null ? floorTo(minPhusdOut, 2) : 0;
 
   const handleAmountChange = (value: string) => {
     const trimmed = value.trim();
@@ -77,44 +73,34 @@ export default function AnnihilateTool({
   const fillMax = () => setAmount(maxAmount > 0 ? toInputString(maxAmount) : '');
 
   const closeSelector = useCallback(() => setSelectorOpen(false), []);
-
-  const handleApprove = () => {
-    setApproved((prev) => ({ ...prev, [stable]: true }));
-    addToast({
-      type: 'info',
-      title: 'Approved (preview)',
-      description: `${stable} approval simulated. Nothing was sent.`,
-    });
-  };
-
-  const handleAnnihilate = () => {
-    addToast({
-      type: 'info',
-      title: 'Preview only',
-      description: 'Annihilation is mocked on this page. Nothing was sent.',
-    });
-    setAmount('');
-  };
+  const busy = pendingAction !== null;
 
   let button: { label: string; disabled: boolean; variant: 'primary' | 'approve'; onAction: () => void };
   if (gated) {
-    button = { label: 'Annihilation paused at phUSD ≤ $0.50', disabled: true, variant: 'primary', onAction: () => {} };
+    button = { label: gateReason, disabled: true, variant: 'primary', onAction: () => {} };
   } else if (amt <= 0) {
     button = { label: 'Enter Amount', disabled: true, variant: 'primary', onAction: () => {} };
   } else if (over) {
     button = { label: 'Insufficient Balance', disabled: true, variant: 'primary', onAction: () => {} };
-  } else if (!approved[stable]) {
-    button = { label: `Approve ${stable}`, disabled: false, variant: 'approve', onAction: handleApprove };
+  } else if (needsApproval) {
+    button = {
+      label: pendingAction === 'approve' ? `Approving ${stable}…` : `Approve ${stable}`,
+      disabled: busy,
+      variant: 'approve',
+      onAction: () => void state.approve(),
+    };
+  } else if (quotedOut === null) {
+    button = { label: 'Fetching quote…', disabled: true, variant: 'primary', onAction: () => {} };
   } else {
     button = {
-      label: `Annihilate → receive ${fmt2(phusdOut)} phUSD`,
-      disabled: false,
+      label: pendingAction === 'annihilate' ? 'Annihilating…' : `Annihilate → receive ${fmt2(phusdOut)} phUSD`,
+      disabled: busy,
       variant: 'primary',
-      onAction: handleAnnihilate,
+      onAction: () => void state.annihilate(),
     };
   }
 
-  const tokenOptions: ForgeTokenOption<AnnihilateStableSymbol>[] = STABLE_ORDER.map((symbol) => ({
+  const tokenOptions: ForgeTokenOption<AnnihilateStableSymbol>[] = ANNIHILATE_STABLE_ORDER.map((symbol) => ({
     symbol,
     name: STABLE_META[symbol].name,
     icon: STABLE_META[symbol].icon,
@@ -221,7 +207,9 @@ export default function AnnihilateTool({
 
           <div className="mt-4 space-y-2.5 text-sm">
             <PreviewRow label="phUSD price">
-              <span className={gated ? 'text-pxusd-pink-400' : undefined}>${fmt2(price)}</span>
+              <span className={priceGated ? 'text-pxusd-pink-400' : undefined}>
+                {price === null ? '—' : `$${fmt2(price)}`}
+              </span>
             </PreviewRow>
             <PreviewRow label="Net value change">
               <span className={netValue >= 0 ? 'text-green-400' : 'text-pxusd-pink-400'}>
@@ -233,13 +221,13 @@ export default function AnnihilateTool({
           </div>
         </div>
 
-        {gated && (
+        {priceGated && (
           <div
             role="alert"
             className="mt-4 rounded-xl border p-3.5 text-[12.5px] leading-[1.5] text-muted-foreground"
             style={{ borderColor: 'rgba(255,77,109,.35)', background: 'rgba(255,77,109,.07)' }}
           >
-            <strong className="text-pxusd-pink-400">Annihilation disabled.</strong> phUSD is at ${fmt2(price)}. At
+            <strong className="text-pxusd-pink-400">Annihilation disabled.</strong> phUSD is at ${fmt2(displayPrice)}. At
             $0.50 or less, the phUSD you receive is worth less than the {stable} you put in.
           </div>
         )}

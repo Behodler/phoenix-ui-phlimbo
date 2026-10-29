@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 
-export type ForgeStatusTone = 'good' | 'bad' | 'antimatter' | 'fire';
+export type ForgeStatusTone = 'good' | 'bad' | 'antimatter' | 'fire' | 'neutral';
 
 // Tints are literal rgba: Tailwind opacity modifiers on the bare-var `pxusd-*`
 // tokens emit no CSS (see repo CLAUDE.md, "Things that are easy to get wrong").
@@ -9,6 +9,7 @@ const TONE_STYLES: Record<ForgeStatusTone, CSSProperties> = {
   bad: { color: '#FF4D6D', borderColor: 'rgba(255,77,109,.35)', background: 'rgba(255,77,109,.07)' },
   antimatter: { color: '#C4AEEA', borderColor: 'rgba(196,174,234,.35)', background: 'rgba(196,174,234,.08)' },
   fire: { color: '#FFD93D', borderColor: 'rgba(255,217,61,.3)', background: 'rgba(255,217,61,.06)' },
+  neutral: { color: 'rgba(240,245,248,.72)', borderColor: 'rgba(255,255,255,.18)', background: 'rgba(255,255,255,.04)' },
 };
 
 export interface ForgeStatusPillProps {

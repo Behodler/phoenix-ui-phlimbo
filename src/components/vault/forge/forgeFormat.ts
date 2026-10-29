@@ -1,13 +1,6 @@
 // Pure helpers shared by the Forge rows (kept out of the component files so
 // they stay fast-refresh friendly).
 
-// Constant import only — issues no contract calls. Keeps one source of truth
-// for the annihilation price gate.
-import { ANNIHILATE_PRICE_FLOOR } from '../../../hooks/useStableStakerPools';
-
-/** True when annihilating would destroy value: net per unit is 2p − 1. Raw price, never clamped. */
-export const isAnnihilateGated = (price: number) => price <= ANNIHILATE_PRICE_FLOOR;
-
 /** 2 dp with thousands separators, e.g. 1250 → "1,250.00". */
 export const fmt2 = (n: number) =>
   (Number.isFinite(n) ? n : 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

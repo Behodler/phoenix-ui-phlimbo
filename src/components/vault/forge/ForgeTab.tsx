@@ -1,4 +1,5 @@
 import { useCallback, useState, type ReactNode } from 'react';
+import { useAccount, useChainId } from 'wagmi';
 import ForgeAccordionRow from './ForgeAccordionRow';
 import ForgeStatusPill from './ForgeStatusPill';
 import AnnihilateTool from './AnnihilateTool';
@@ -6,18 +7,16 @@ import HarvestTool from './HarvestTool';
 import BonfireTool, { type BonfireMockCall } from './BonfireTool';
 import BonfireFlameIcon from './BonfireFlameIcon';
 import { createBonfirePotClock, prefersReducedMotion, useBonfirePot, type BonfirePotClock } from './bonfirePotClock';
-import { fmt2, fmtPot2, fmtSigned4, harvestQuote, isAnnihilateGated } from './forgeFormat';
+import { fmt2, fmtPot2, fmtSigned4 } from './forgeFormat';
 import {
   FORGE_BONFIRE_MOCK,
   FORGE_DEFAULT_OPEN,
-  FORGE_HARVEST_MIN_OUT_BPS,
-  FORGE_HARVEST_MOCK,
-  FORGE_HARVEST_SCENARIO,
-  FORGE_MOCK_ANTIMATTER_BALANCE,
   FORGE_MOCK_NFT_HOLDINGS,
-  FORGE_MOCK_PHUSD_PRICE,
   type ForgeToolKey,
 } from '../../../data/forgeMockData';
+import { useForgeAnnihilate } from '../../../hooks/useForgeAnnihilate';
+import { useForgeHarvest } from '../../../hooks/useForgeHarvest';
+import { isAllowlistedAdmin } from '../../../lib/adminAllowlist';
 import antimatterIcon from '../../../assets/antimatter.png';
 import ethereumIcon from '../../../assets/Ethereum.png';
 
@@ -46,13 +45,22 @@ export interface ForgeTabProps {
  * Forge tab: a stack of unrelated one-transaction helpers, one accordion row
  * per tool, only one open at a time. Add a tool by appending to `rows`.
  *
- * MOCKED: every value comes from src/data/forgeMockData.ts; no Forge
- * component reads or writes the chain.
+ * Annihilate and Harvest Yield are live (`useForgeAnnihilate`,
+ * `useForgeHarvest`). NFT Bonfire is still a mock and renders only for the
+ * SYAHarvester owner or an allowlisted admin wallet.
  */
 export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
   const [openKey, setOpenKey] = useState<string | null>(FORGE_DEFAULT_OPEN);
-  // Claim-NFT holdings are shared by Harvest and Bonfire, so a mock burn also
-  // updates the Harvest picker's count, and survive rows collapsing.
+  const { address: wallet } = useAccount();
+  const chainId = useChainId();
+  const annihilate = useForgeAnnihilate();
+  const harvest = useForgeHarvest();
+
+  const isHarvesterOwner = !!wallet && !!harvest.owner && wallet.toLowerCase() === harvest.owner.toLowerCase();
+  const showBonfire = isHarvesterOwner || isAllowlistedAdmin(chainId, wallet);
+
+  // Bonfire is a mock with its own simulated holdings, kept apart from the
+  // live claim-NFT balances Harvest reads.
   const [nftHoldings, setNftHoldings] = useState<Record<number, number>>(() => ({ ...FORGE_MOCK_NFT_HOLDINGS }));
   // One pot ticker for the Bonfire header metric, panel and button.
   const [bonfireClock] = useState(() =>
@@ -62,8 +70,7 @@ export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
     setNftHoldings((h) => ({ ...h, [tokenId]: Math.max(0, (h[tokenId] ?? 0) - 1) }));
   }, []);
 
-  const annihilateGated = isAnnihilateGated(FORGE_MOCK_PHUSD_PRICE);
-  const harvest = harvestQuote(FORGE_HARVEST_MOCK[FORGE_HARVEST_SCENARIO], FORGE_HARVEST_MIN_OUT_BPS);
+  const harvestDisplay = harvest.display;
 
   const builtInRows: (ForgeRowDef & { key: ForgeToolKey })[] = [
     {
@@ -71,37 +78,46 @@ export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
       icon: <img src={antimatterIcon} alt="" aria-hidden="true" className="h-9 w-9 rounded-full" />,
       title: 'Annihilate Antimatter',
       tagline: 'Antimatter + a stablecoin → twice the phUSD',
-      metric: <span style={{ color: '#C4AEEA' }}>{fmt2(FORGE_MOCK_ANTIMATTER_BALANCE)}</span>,
+      metric: <span style={{ color: '#C4AEEA' }}>{fmt2(annihilate.walletAntimatter)}</span>,
       metricLabel: 'Your Antimatter',
-      pill: annihilateGated ? (
+      pill: !annihilate.active ? (
+        <ForgeStatusPill tone="neutral">Not live</ForgeStatusPill>
+      ) : annihilate.gateReason ? (
         <ForgeStatusPill tone="bad">Paused</ForgeStatusPill>
       ) : (
         <ForgeStatusPill tone="antimatter">Ready</ForgeStatusPill>
       ),
-      body: <AnnihilateTool />,
+      body: <AnnihilateTool state={annihilate} />,
     },
     {
       key: 'harvest',
       icon: <img src={ethereumIcon} alt="" aria-hidden="true" className="h-9 w-9 rounded-full" />,
       title: 'Harvest Yield',
       tagline: 'Claim protocol yield, get paid in ETH',
-      metric: (
-        <span className={harvest.profitable ? 'text-green-400' : 'text-pxusd-pink-400'}>
-          {fmtSigned4(harvest.profit)}
+      metric: harvestDisplay ? (
+        <span className={harvestDisplay.profitable ? 'text-green-400' : 'text-pxusd-pink-400'}>
+          {fmtSigned4(harvestDisplay.ethOut - harvestDisplay.gasEth)}
         </span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
       ),
       metricLabel: 'Est. profit · ETH',
-      pill: harvest.profitable ? (
+      pill: !harvest.active ? (
+        <ForgeStatusPill tone="neutral">Not live</ForgeStatusPill>
+      ) : !harvestDisplay ? (
+        <ForgeStatusPill tone="neutral">{harvest.blocker === 'needs-approval' ? 'Approve NFTs' : 'No quote'}</ForgeStatusPill>
+      ) : harvestDisplay.profitable ? (
         <ForgeStatusPill tone="good">Profitable</ForgeStatusPill>
       ) : (
         <ForgeStatusPill tone="bad">Not profitable</ForgeStatusPill>
       ),
-      body: <HarvestTool nftHoldings={nftHoldings} />,
+      body: <HarvestTool state={harvest} />,
     },
     {
       key: 'bonfire',
       icon: <BonfireFlameIcon />,
-      title: 'NFT Bonfire',
+      // Admin-only mock: drop the suffix once Bonfire is wired and public.
+      title: 'NFT Bonfire - only visible to admins',
       tagline: 'Burn an NFT, take the Antimatter pot',
       metric: <BonfirePotMetric clock={bonfireClock} />,
       metricLabel: 'Pot · Antimatter',
@@ -109,7 +125,7 @@ export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
       body: <BonfireTool clock={bonfireClock} nftHoldings={nftHoldings} onBurn={handleBonfireBurn} />,
     },
   ];
-  const rows = rowsOverride ?? builtInRows;
+  const rows = rowsOverride ?? builtInRows.filter((row) => row.key !== 'bonfire' || showBonfire);
 
   return (
     <div className="p-5">

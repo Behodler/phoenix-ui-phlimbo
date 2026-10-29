@@ -1,17 +1,7 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useToast } from '../../ui/ToastProvider';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import ActionButton from '../../ui/ActionButton';
-import {
-  FORGE_HARVEST_DEFAULT_NFT_ID,
-  FORGE_HARVEST_MIN_OUT_BPS,
-  FORGE_HARVEST_MOCK,
-  FORGE_HARVEST_REQUIRES_NFT,
-  FORGE_HARVEST_SCENARIO,
-  FORGE_MOCK_ETH_USD,
-  FORGE_MOCK_NFT_HOLDINGS,
-  type ForgeHarvestScenario,
-} from '../../../data/forgeMockData';
 import { nftStaticConfig } from '../../../data/nftMockData';
+import type { ForgeHarvestState } from '../../../hooks/useForgeHarvest';
 import ForgeNftPicker from './ForgeNftPicker';
 import ForgeNftPickerModal from './ForgeNftPickerModal';
 import { buildForgeNftOptions, fmt2, fmtSigned4, harvestQuote } from './forgeFormat';
@@ -20,85 +10,71 @@ const PINK = '#FF4D6D';
 const YELLOW = '#FFD93D';
 const PROFIT_GRADIENT = 'linear-gradient(90deg,#FF8C42,#FFD93D)';
 
-/** Arguments of `SYAHarvester.harvest`, in human units. The live-wiring story converts to wei. */
-export interface HarvestMockCall {
-  exemptStrategies: readonly `0x${string}`[];
-  nftIndex: number;
-  minEthOut: number;
+export interface HarvestToolProps {
+  /** Live state from `useForgeHarvest`, owned by ForgeTab so the row header can share it. */
+  state: ForgeHarvestState;
 }
 
-export interface HarvestToolProps {
-  /** Whether the harvester still burns a claim NFT. Defaults to FORGE_HARVEST_REQUIRES_NFT. */
-  requiresNft?: boolean;
-  /** Which mock quote to show. Defaults to FORGE_HARVEST_SCENARIO. */
-  scenario?: ForgeHarvestScenario;
-  /** Wallet NFT holdings, tokenId → units. Defaults to FORGE_MOCK_NFT_HOLDINGS. */
-  nftHoldings?: Record<number, number>;
-}
+/** What the button says when there is no quote, keyed by the reason. */
+const BLOCKER_LABEL = {
+  inactive: 'Harvester not live on this network',
+  disconnected: 'Connect your wallet',
+  loading: 'Loading…',
+  'no-nft': 'You hold none of this claim NFT',
+} as const;
 
 /**
- * Body of the Forge "Harvest Yield" row (SYA harvester). MOCKED: no contract
- * reads or writes. Approve/harvest step through their states locally and toast
- * that nothing was sent.
+ * Body of the Forge "Harvest Yield" row (SYAHarvester). Presentational: the
+ * quote is a fee-carrying simulation of `harvest()` taken by `useForgeHarvest`.
  */
-export default function HarvestTool({
-  requiresNft = FORGE_HARVEST_REQUIRES_NFT,
-  scenario = FORGE_HARVEST_SCENARIO,
-  nftHoldings = FORGE_MOCK_NFT_HOLDINGS,
-}: HarvestToolProps) {
-  const { addToast } = useToast();
-  const mock = FORGE_HARVEST_MOCK[scenario];
-  const { profit, profitable, minEthOut, gasPct, profitPct } = harvestQuote(mock, FORGE_HARVEST_MIN_OUT_BPS);
+export default function HarvestTool({ state }: HarvestToolProps) {
+  const { requiresNft, nftHoldings, selectedNftId, setSelectedNftId, nftApproved, blocker, quote, display, pendingAction } =
+    state;
 
   const nfts = useMemo(() => buildForgeNftOptions(nftStaticConfig, nftHoldings), [nftHoldings]);
-  const [selectedNftId, setSelectedNftId] = useState(FORGE_HARVEST_DEFAULT_NFT_ID);
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Mock setApprovalForAll(harvester, true) state.
-  const [approved, setApproved] = useState(false);
-  // Last mock harvest() arguments; the live-wiring story passes these to writeContract.
-  const lastCall = useRef<HarvestMockCall | null>(null);
-
   const selectedNft = nfts.find((n) => n.id === selectedNftId) ?? nfts[0];
   const closePicker = useCallback(() => setPickerOpen(false), []);
 
-  const profitColor = profitable ? 'text-green-400' : 'text-pxusd-pink-400';
-  const gasStr = mock.gasEth.toFixed(4);
-  const ethOutStr = mock.ethOut.toFixed(4);
-  const gasK = `${Math.round(mock.gasUnits / 1000)}k`;
-
-  const handleApprove = () => {
-    setApproved(true);
-    addToast({
-      type: 'info',
-      title: 'Approved (preview)',
-      description: 'Harvester NFT approval simulated. Nothing was sent.',
-    });
-  };
-
-  const handleHarvest = () => {
-    lastCall.current = {
-      exemptStrategies: [],
-      // Token ID = dispatcher index. Ignored by the contract once NFT gating is removed.
-      nftIndex: requiresNft ? selectedNft.id : 0,
-      minEthOut,
-    };
-    addToast({
-      type: 'info',
-      title: 'Preview only',
-      description: 'Harvesting is mocked on this page. Nothing was sent.',
-    });
-  };
+  const { profit, profitable, gasPct, profitPct } = display
+    ? { ...harvestQuote(display, 10_000), profitable: display.profitable }
+    : { profit: 0, profitable: false, gasPct: 0, profitPct: 0 };
+  const hasNumbers = display !== null;
+  const profitColor = !hasNumbers ? 'text-muted-foreground' : profitable ? 'text-green-400' : 'text-pxusd-pink-400';
+  const gasStr = display ? display.gasEth.toFixed(4) : '—';
+  const ethOutStr = display ? display.ethOut.toFixed(4) : '—';
+  const gasLabel = display
+    ? `Est. gas (${Math.round(display.gasUnits / 1000)}k @ ${display.gasGwei.toFixed(display.gasGwei < 1 ? 3 : 1)} gwei)`
+    : 'Est. gas';
+  const busy = pendingAction !== null;
 
   let button: { label: string; disabled: boolean; variant: 'primary' | 'approve'; onAction: () => void };
-  if (!profitable) {
+  if (blocker === 'needs-approval') {
+    button = {
+      label: pendingAction === 'approve' ? 'Approving…' : 'Approve NFTs for the Harvester',
+      disabled: busy,
+      variant: 'approve',
+      onAction: () => void state.approveNfts(),
+    };
+  } else if (blocker !== null) {
+    button = { label: BLOCKER_LABEL[blocker], disabled: true, variant: 'primary', onAction: () => {} };
+  } else if (!quote) {
+    button = { label: 'Fetching quote…', disabled: true, variant: 'primary', onAction: () => {} };
+  } else if (quote.kind === 'error') {
+    button = { label: 'Harvest unavailable', disabled: true, variant: 'primary', onAction: () => {} };
+  } else if (!profitable) {
     button = { label: 'Not profitable right now', disabled: true, variant: 'primary', onAction: () => {} };
-  } else if (requiresNft && !approved) {
-    button = { label: 'Approve NFTs for the Harvester', disabled: false, variant: 'approve', onAction: handleApprove };
   } else {
-    button = { label: `Harvest → receive ~${ethOutStr} ETH`, disabled: false, variant: 'primary', onAction: handleHarvest };
+    button = {
+      label: pendingAction === 'harvest' ? 'Harvesting…' : `Harvest → receive ~${ethOutStr} ETH`,
+      disabled: busy,
+      variant: 'primary',
+      onAction: () => void state.harvest(),
+    };
   }
 
-  const showSteps = requiresNft && profitable;
+  const showSteps = requiresNft && (blocker === 'needs-approval' || profitable);
+  const approved = nftApproved;
 
   return (
     <>
@@ -120,11 +96,9 @@ export default function HarvestTool({
                 data-testid="harvest-profit"
                 className={`font-mono text-[34px] font-light tracking-[-0.02em] tabular-nums ${profitColor}`}
               >
-                {fmtSigned4(profit)}
+                {hasNumbers ? fmtSigned4(profit) : '—'}
               </span>
-              <span className="text-sm text-muted-foreground">
-                ETH · ≈ ${fmt2(Math.abs(Number(profit.toFixed(4))) * FORGE_MOCK_ETH_USD)}
-              </span>
+              <span className="text-sm text-muted-foreground">ETH</span>
             </div>
           </div>
 
@@ -156,12 +130,14 @@ export default function HarvestTool({
           </div>
 
           <div className="flex flex-col gap-2 text-sm">
-            <StatRow label="Yield available">${fmt2(mock.yieldUsd)}</StatRow>
-            <StatRow label="ETH paid to you">{ethOutStr} ETH</StatRow>
-            <StatRow label={`Est. gas (${gasK} @ ${mock.gasGwei} gwei)`}>
-              <span className="text-pxusd-pink-400">−{gasStr} ETH</span>
+            <StatRow label="Yield available">{state.yieldUsd === null ? '—' : `$${fmt2(state.yieldUsd)}`}</StatRow>
+            <StatRow label="ETH paid to you">{display ? `${ethOutStr} ETH` : '—'}</StatRow>
+            <StatRow label={gasLabel}>
+              <span className="text-pxusd-pink-400">{display ? `−${gasStr} ETH` : '—'}</span>
             </StatRow>
-            <StatRow label="Minimum ETH out">{minEthOut.toFixed(4)} ETH</StatRow>
+            <StatRow label="Minimum ETH out">
+              {display?.profitable ? `${display.minEthOut.toFixed(4)} ETH` : '—'}
+            </StatRow>
           </div>
         </div>
 
@@ -188,7 +164,7 @@ export default function HarvestTool({
             harvest reverts, and you still pay gas. A private RPC such as Flashbots Protect reduces front-running.
           </div>
 
-          {!profitable && (
+          {hasNumbers && !profitable && (
             <div
               role="alert"
               className="rounded-xl border p-3.5 text-[12.5px] leading-[1.5] text-muted-foreground"
@@ -197,6 +173,23 @@ export default function HarvestTool({
               <strong className="text-pxusd-pink-400">Not profitable.</strong> Gas ({gasStr} ETH) would cost more
               than the harvest pays ({ethOutStr} ETH). Check back once more yield has built up.
             </div>
+          )}
+
+          {quote?.kind === 'error' && (
+            <div
+              role="alert"
+              className="rounded-xl border p-3.5 text-[12.5px] leading-[1.5] text-muted-foreground"
+              style={{ borderColor: 'rgba(255,77,109,.35)', background: 'rgba(255,77,109,.07)' }}
+            >
+              <strong className="text-pxusd-pink-400">Harvest would fail.</strong> {quote.message}
+            </div>
+          )}
+
+          {blocker === 'needs-approval' && (
+            <p className="text-[12px] text-muted-foreground">
+              The quote is a simulation of the real harvest, so it can only run once the Harvester may take your
+              claim NFT.
+            </p>
           )}
 
           {showSteps && (
