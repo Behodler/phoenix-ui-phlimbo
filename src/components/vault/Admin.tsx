@@ -312,7 +312,6 @@ export default function Admin() {
   const { addresses, networkType } = useContractAddresses();
   const chainId = useChainId();
   const { addToast, removeToast } = useToast();
-  const [isMinting, setIsMinting] = useState(false);
 
   // State for contract and function selection
   const [selectedContractKey, setSelectedContractKey] = useState<string>('');
@@ -1183,10 +1182,6 @@ export default function Admin() {
     },
   });
 
-  // Check if we should show mint yield button (hide on mainnet, chainID 1)
-  const isMainnet = chainId === 1;
-  const showMintYieldButton = !isMainnet;
-
   // Calculate yield vs principal breakdown
   // Total = phusdStableMinterTotalBalance (queries YieldStrategyDola.totalBalanceOf)
   // Principal = principal tracked for PhusdStableMinter deposits (queries YieldStrategyDola.principalOf)
@@ -1962,113 +1957,6 @@ export default function Admin() {
     }
   };
 
-  /**
-   * Handle mint yield button click
-   * Mints DOLA to the AutoDOLA underlying vault for testing
-   */
-  const handleMintYield = async () => {
-    if (!isConnected || !walletAddress) {
-      addToast({
-        type: 'error',
-        title: 'Wallet Not Connected',
-        description: 'Please connect your wallet to mint yield.',
-      });
-      return;
-    }
-
-    if (!addresses?.Dola || !addresses?.AutoDOLA) {
-      addToast({
-        type: 'error',
-        title: 'Contract Not Available',
-        description: 'Contract addresses not loaded. Please try again.',
-      });
-      return;
-    }
-
-    setIsMinting(true);
-
-    try {
-      // Mint a fixed amount for testing (1000 DOLA = 1000 * 1e18 wei)
-      const mintAmount = BigInt(1000) * BigInt(1e18);
-
-      // Show pending toast
-      const pendingToastId = addToast({
-        type: 'info',
-        title: 'Confirm Transaction',
-        description: 'Please confirm the mint yield transaction in your wallet.',
-        duration: 30000,
-      });
-
- 
-      // Call the mint function on the DOLA token contract, minting to AutoDOLA vault
-      const hash = await writeContractAsync({
-        address: addresses.Dola as `0x${string}`,
-        abi: mintableErc20Abi,
-        functionName: 'mint',
-        args: [addresses.AutoDOLA as `0x${string}`, mintAmount],
-      });
-
-      // Remove pending toast
-      removeToast(pendingToastId);
-
-      // Show confirming toast
-      addToast({
-        type: 'info',
-        title: 'Transaction Submitted',
-        description: 'Waiting for blockchain confirmation...',
-        duration: 30000,
-        action: {
-          label: 'View on Explorer',
-          onClick: () => {
-            const explorerUrl = networkType === 'mainnet'
-              ? `https://etherscan.io/tx/${hash}`
-              : networkType === 'local'
-              ? `http://localhost:8545`
-              : `https://sepolia.etherscan.io/tx/${hash}`;
-            window.open(explorerUrl, '_blank');
-          }
-        }
-      });
-
-      // Wait for confirmation and refetch balances
-      setTimeout(() => {
-        addToast({
-          type: 'success',
-          title: 'Yield Minted Successfully',
-          description: `Successfully minted 1000 DOLA to AutoDOLA vault!`,
-          duration: 30000,
-          action: {
-            label: 'View Transaction',
-            onClick: () => {
-              const explorerUrl = networkType === 'mainnet'
-                ? `https://etherscan.io/tx/${hash}`
-                : networkType === 'local'
-                ? `http://localhost:8545`
-                : `https://sepolia.etherscan.io/tx/${hash}`;
-              window.open(explorerUrl, '_blank');
-            }
-          }
-        });
-        // Refetch balance breakdown after minting yield
-        refetchPrincipal();
-        refetchTotalBalance();
-        setIsMinting(false);
-      }, 2000);
-
-    } catch (error) {
-      console.error('Mint yield failed:', error);
-
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      addToast({
-        type: 'error',
-        title: 'Mint Yield Failed',
-        description: errorMessage,
-        duration: 16000,
-      });
-      setIsMinting(false);
-    }
-  };
-
   return (
     <div className="p-6">
       {/* Admin Header */}
@@ -2096,22 +1984,6 @@ export default function Admin() {
           </div>
         </div>
       </div>
-
-      {/* Mint Yield Button - Hidden on mainnet (chainID 1) */}
-      {showMintYieldButton && (
-        <div className="mb-6">
-          <ActionButton
-            disabled={!isConnected || isMinting}
-            onAction={handleMintYield}
-            label={!isConnected ? "Connect Wallet" : "Mint Test Yield (1000 DOLA)"}
-            variant="primary"
-            isLoading={isMinting}
-          />
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            Mints 1000 DOLA to AutoDOLA vault for testing yield accumulation
-          </p>
-        </div>
-      )}
 
       {/* Yield Strategy Balance Breakdowns — split by client (StableMinter + StableStaker) with totals */}
       {yieldStrategyPanels.map((strategy) => {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseUnits } from 'viem';
+import { useAccount, usePublicClient, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { formatUnits, parseUnits } from 'viem';
+import { stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
 import { useToast } from '../ui/ToastProvider';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useTokenBalance } from '../../hooks/useContractInteractions';
@@ -21,6 +22,29 @@ const mintableErc20Abi = [
   },
 ] as const;
 
+// `addYield(amount)` on the mock ERC4626 vaults (MockSDOLA, MockSUSDe, and MockAutoDOLA reused as
+// autoUSDC). Permissionless: it mints `amount` of the underlying straight into the vault, raising the
+// share price, which is the surplus SYA sells as pending yield.
+const mockVaultAddYieldAbi = [
+  {
+    type: 'function',
+    inputs: [{ name: 'amount', internalType: 'uint256', type: 'uint256' }],
+    name: 'addYield',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+] as const;
+
+/**
+ * The vaults behind SYA's three strategies, and the yield each "Add Test Yield" click donates (the
+ * amounts the Sepolia deploy seeds). SYA only sees its strategy's share of each vault's surplus.
+ */
+const SYA_YIELD_VAULTS = [
+  { key: 'SDOLA', symbol: 'DOLA', amount: parseUnits('1000', 18) },
+  { key: 'SUSDe', symbol: 'USDe', amount: parseUnits('1000', 18) },
+  { key: 'AutoUSDC', symbol: 'USDC', amount: parseUnits('1000', 6) },
+] as const;
+
 /**
  * TestnetFaucet Component
  *
@@ -31,6 +55,7 @@ export default function TestnetFaucet() {
   const [isMinting, setIsMinting] = useState(false);
   const [isMintingEye, setIsMintingEye] = useState(false);
   const [isMintingUsdc, setIsMintingUsdc] = useState(false);
+  const [isAddingYield, setIsAddingYield] = useState(false);
   const { addToast, removeToast } = useToast();
   const { isConnected, address: walletAddress } = useAccount();
   const { addresses, networkType } = useContractAddresses();
@@ -59,6 +84,22 @@ export default function TestnetFaucet() {
     hash: hashUsdc,
     query: {
       enabled: !!hashUsdc,
+    },
+  });
+
+  // Add-yield writes are sequential, each awaited before the next, so they need their own client
+  const { writeContractAsync: writeContractAsyncYield } = useWriteContract();
+  const publicClient = usePublicClient();
+
+  // SYA's current claim amount (USDC, 6dp) with no exemptions, shown beside the add-yield button
+  const syaAddress = addresses?.StableYieldAccumulator as `0x${string}` | undefined;
+  const { data: syaClaimAmount, refetch: refetchSyaClaimAmount } = useReadContract({
+    address: syaAddress,
+    abi: stableYieldAccumulatorAbi,
+    functionName: 'calculateClaimAmount',
+    args: [[]],
+    query: {
+      enabled: !!syaAddress,
     },
   });
 
@@ -286,6 +327,71 @@ export default function TestnetFaucet() {
     }
   };
 
+  /**
+   * Handle add-yield button click
+   * Calls addYield on the sDOLA, sUSDe and autoUSDC mock vaults, one confirmed transaction at a time,
+   * so StableYieldAccumulator has pending DOLA, USDe and USDC yield to sell again
+   */
+  const handleAddYield = async () => {
+    if (!isConnected || !walletAddress) {
+      addToast({
+        type: 'error',
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet to use the faucet.',
+      });
+      return;
+    }
+
+    const vaults = SYA_YIELD_VAULTS.map((v) => ({ ...v, address: addresses?.[v.key] as `0x${string}` | undefined }));
+    if (!publicClient || vaults.some((v) => !v.address)) {
+      addToast({
+        type: 'error',
+        title: 'Contract Not Available',
+        description: 'Yield vault addresses not loaded. Please try again.',
+      });
+      return;
+    }
+
+    setIsAddingYield(true);
+    try {
+      for (const [i, vault] of vaults.entries()) {
+        const pendingToastId = addToast({
+          type: 'info',
+          title: `Confirm Transaction (${i + 1}/${vaults.length})`,
+          description: `Please confirm adding 1,000 ${vault.symbol} of yield in your wallet.`,
+          duration: 30000,
+        });
+        const txHash = await writeContractAsyncYield({
+          address: vault.address as `0x${string}`,
+          abi: mockVaultAddYieldAbi,
+          functionName: 'addYield',
+          args: [vault.amount],
+        }).finally(() => removeToast(pendingToastId));
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+      }
+
+      addToast({
+        type: 'success',
+        title: 'Yield Added',
+        description: 'Added 1,000 DOLA, USDe and USDC of yield to the SYA strategy vaults.',
+        duration: 30000,
+      });
+      await refetchSyaClaimAmount();
+    } catch (error) {
+      log.error('Add yield failed:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      addToast({
+        type: 'error',
+        title: 'Add Yield Failed',
+        description: errorMessage,
+        duration: 16000,
+      });
+    } finally {
+      setIsAddingYield(false);
+    }
+  };
+
   // Handle mint transaction success
   // Following the pattern from phoenix:031 for automatic balance refresh
   useEffect(() => {
@@ -437,6 +543,21 @@ export default function TestnetFaucet() {
           variant="primary"
           isLoading={isMintingUsdc || isConfirmingUsdc}
         />
+
+        <ActionButton
+          disabled={!isConnected || isAddingYield}
+          onAction={handleAddYield}
+          label={!isConnected ? "Connect Wallet" : "Add Test Yield (1000 DOLA / USDe / USDC)"}
+          variant="primary"
+          isLoading={isAddingYield}
+        />
+        <p className="text-xs text-muted-foreground text-center">
+          Donates yield to the sDOLA, sUSDe and autoUSDC vaults behind the StableYieldAccumulator
+          strategies (3 transactions). SYA pending claim:{' '}
+          <span className="font-mono text-accent">
+            {syaClaimAmount !== undefined ? `${Number(formatUnits(syaClaimAmount, 6)).toLocaleString()} USDC` : '…'}
+          </span>
+        </p>
       </div>
 
       {/* Faucet Notice */}
