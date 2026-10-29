@@ -10,6 +10,7 @@ import usdsIcon from '../../../assets/USDS.png';
 import susdsIcon from '../../../assets/sUSDS.png';
 import dolaIcon from '../../../assets/sDOLA.png';
 import ethIcon from '../../../assets/Ethereum.png';
+import antimatterIcon from '../../../assets/antimatter.png';
 
 export const TOKEN_ICONS: Partial<Record<MarketSymbol, string>> = {
   phUSD: phUSDIcon,
@@ -19,6 +20,7 @@ export const TOKEN_ICONS: Partial<Record<MarketSymbol, string>> = {
   sUSDS: susdsIcon,
   DOLA: dolaIcon,
   ETH: ethIcon,
+  AM: antimatterIcon,
 };
 
 /** Monogram fallbacks for tokens without artwork. */

@@ -147,7 +147,7 @@ export default function MarketUniTab() {
         </button>
 
         {m.pickerOpen && (
-          <TokenPickerPanel rows={m.tokenRows} onSelect={m.selectToken} onClose={m.closePicker} />
+          <TokenPickerPanel rows={m.tokenRows} note={m.pickerNote} onSelect={m.selectToken} onClose={m.closePicker} />
         )}
       </section>
 

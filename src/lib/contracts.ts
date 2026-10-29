@@ -107,6 +107,12 @@ export const mainnetAddresses: ContractAddresses = {
   // UniswapHelper swap/liquidity periphery (phStaging2 story 110), deployed to mainnet by
   // story 111 (2026-10-23).
   UniswapHelper: "0x564810D5d9D31754C8dbdb8F62Bb429D50Dfa5b3",
+  // phStaging2 story 114: the Antimatter/sUSDS pair and its seeder are not on mainnet yet, and
+  // the live UniswapHelper above predates story 120's AM routes. ZERO until the cutover.
+  AntimatterPoolSeeder: "0x0000000000000000000000000000000000000000",
+  AntimatterSusdsPair: "0x0000000000000000000000000000000000000000",
+  // phStaging2 story 116: not deployed on mainnet yet.
+  SYAHarvester: "0x0000000000000000000000000000000000000000",
   GatherWBTC: "0xfd3775f2ccfb94b532b34b2b683e210ba4449880",
   MultiPooler: "0xd1E5774159381915f5579dFd68507E2614f67b51",
   // View contracts
@@ -209,4 +215,7 @@ export const sepoliaAddresses: ContractAddresses = {
   UniPooler: "0x0747746009531f94989cb1Fa40239aec44db2AC1",
   PhusdSusdsPair: "0xF80dE933A8dd6059a5E99334A2121e335c853d16",
   UniswapHelper: "0xCA7a62943Fc95f47fde1c35A5FecD37a7483a93B",
+  AntimatterPoolSeeder: "0x0000000000000000000000000000000000000000",
+  AntimatterSusdsPair: "0x0000000000000000000000000000000000000000",
+  SYAHarvester: "0x0000000000000000000000000000000000000000",
 };

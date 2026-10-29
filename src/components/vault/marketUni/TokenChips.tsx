@@ -1,16 +1,16 @@
-import type { MarketSymbol } from '../../../data/uniMarketConfig';
+import type { MarketSymbol, TargetSymbol } from '../../../data/uniMarketConfig';
 import TokenIcon from './TokenIcon';
 import { FOCUS_RING, PHUSD_CHIP_STYLE } from './styles';
 
-/** The non-selectable phUSD side of a swap or deposit. */
-export function PhUSDChip() {
+/** The non-selectable target side of a swap or deposit (phUSD wherever AM is not deployed). */
+export function TargetChip({ sym = 'phUSD' }: { sym?: TargetSymbol }) {
   return (
     <span
       className="inline-flex items-center gap-2 h-11 pl-2 pr-3.5 rounded-full text-base font-semibold flex-shrink-0 text-foreground"
       style={PHUSD_CHIP_STYLE}
     >
-      <TokenIcon sym="phUSD" size={26} />
-      <span>phUSD</span>
+      <TokenIcon sym={sym} size={26} />
+      <span>{sym}</span>
     </span>
   );
 }

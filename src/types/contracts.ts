@@ -65,6 +65,10 @@ export interface ContractAddresses {
   UniPooler: string;
   PhusdSusdsPair: string;
   UniswapHelper: string;
+  AntimatterPoolSeeder: string;
+  /** UniV2 Antimatter/sUSDS pair (UniswapHelper `amPair()`); zero until it exists on a chain. */
+  AntimatterSusdsPair: string;
+  SYAHarvester: string;
 }
 
 

@@ -22,15 +22,18 @@ import {
   HELPER_LABEL,
   TOKENS,
   WRAP_VENUE,
+  isTarget,
   metaOf,
   methodLabel,
   type AddTokenSymbol,
   type ApprovableSymbol,
+  type CounterSymbol,
   type HelperMethod,
   type MarketSymbol,
   type RemoveOutSymbol,
-  type SwapTokenMeta,
   type SwapTokenSymbol,
+  type TargetSymbol,
+  type TokenMeta,
 } from '../data/uniMarketConfig';
 
 export const WAD = 10n ** 18n;
@@ -172,9 +175,15 @@ export function ceilDiv(a: bigint, b: bigint): bigint {
   return b === 0n ? 0n : (a + b - 1n) / b;
 }
 
-/** Live pair + sUSDS state every quote is built against. */
+/**
+ * Live pair + sUSDS state every quote is built against.
+ *
+ * The `ph` naming predates Antimatter: on the AM/sUSDS pair `rPh` is the AM
+ * reserve. Every `ph*` field in this module means "the pair's target token"
+ * (phUSD or AM), as UniswapHelper's own `phusdIn` / `phusdOut` event fields do.
+ */
 export interface PoolState {
-  /** phUSD reserve of the pair. */
+  /** Target-token reserve of the pair (phUSD, or AM on the AM/sUSDS pair). */
   rPh: bigint;
   /** sUSDS reserve of the pair. */
   rS: bigint;
@@ -193,7 +202,7 @@ export function spxNum(p: PoolState | undefined): number {
   return p ? toNum(p.spx, 18) : 0;
 }
 
-/** phUSD USD price implied by the pair reserves: (rS / rPh) × spx. */
+/** Target-token USD price implied by the pair reserves: (rS / rPh) × spx. */
 export function phPrice(rS: number, rPh: number, spx: number): number {
   return rPh > 0 ? (rS / rPh) * spx : 0;
 }
@@ -202,10 +211,17 @@ export function poolPrice(p: PoolState | undefined): number {
   return p ? phPrice(toNum(p.rS, 18), toNum(p.rPh, 18), spxNum(p)) : 0;
 }
 
-/** USD value of one unit of a market token. ETH has no oracle: pass the quote-derived figure. */
-export function unitUsd(sym: MarketSymbol, p: PoolState | undefined, ethUsd: number): number {
-  if (sym === 'phUSD') return poolPrice(p);
-  if (sym === 'sUSDS') return spxNum(p);
+/**
+ * USD value of one unit of a market token. `pools` holds the pair of every
+ * target in play; ETH has no oracle, so pass the quote-derived figure.
+ */
+export function unitUsd(
+  sym: MarketSymbol,
+  pools: Partial<Record<TargetSymbol, PoolState>>,
+  ethUsd: number,
+): number {
+  if (isTarget(sym)) return poolPrice(pools[sym]);
+  if (sym === 'sUSDS') return spxNum(pools.phUSD ?? pools.AM);
   if (sym === 'ETH') return ethUsd;
   return 1;
 }
@@ -247,7 +263,10 @@ export function needsApproval(allowance: bigint | undefined, amount: bigint): bo
 }
 
 export interface SwapInput {
-  tok: SwapTokenSymbol;
+  /** Token bought (`buy`) or sold (`sell`); defaults to phUSD. */
+  target?: TargetSymbol;
+  /** The other side: a routed token, or the other target for phUSD ↔ AM. */
+  tok: CounterSymbol;
   dir: Direction;
   /** Exact input amount in the input token's units. */
   inWei: bigint;
@@ -257,7 +276,10 @@ export interface SwapInput {
   quoteError: boolean;
   /** Slippage tolerance in percent (0.5 = 0.5%). */
   slip: number;
+  /** The target's pair. */
   pool: PoolState | undefined;
+  /** The counter's pair, needed only when the counter is the other target. */
+  counterPool?: PoolState | undefined;
   inBal: bigint | undefined;
   /** Input-token allowance to UniswapHelper (ignored for native ETH in). */
   allowance: bigint | undefined;
@@ -266,8 +288,12 @@ export interface SwapInput {
 }
 
 export interface SwapQuote {
-  token: SwapTokenMeta;
+  /** Counter-token metadata. */
+  token: TokenMeta;
+  target: TargetSymbol;
   buy: boolean;
+  /** phUSD ↔ AM: one Router02 path across both pairs. */
+  cross: boolean;
   direct: boolean;
   inSym: MarketSymbol;
   outSym: MarketSymbol;
@@ -297,21 +323,33 @@ export interface SwapQuote {
   stats: Stat[];
 }
 
-export function swapMethod(t: SwapTokenMeta, buy: boolean): HelperMethod {
-  if (buy) return t.native ? 'swapETHToPhUSD' : 'swapToPhUSD';
-  return t.native ? 'swapPhUSDToETH' : 'swapFromPhUSD';
+/** How a target token is spelled inside UniswapHelper function names. */
+const METHOD_NAME: Record<TargetSymbol, string> = { phUSD: 'PhUSD', AM: 'AM' };
+
+/** The UniswapHelper swap for counter `t` and `target`, in the given direction. */
+export function swapMethod(t: TokenMeta, buy: boolean, target: TargetSymbol = 'phUSD'): HelperMethod {
+  const T = METHOD_NAME[target];
+  if (isTarget(t.sym)) {
+    const C = METHOD_NAME[t.sym];
+    return (buy ? `swap${C}To${T}` : `swap${T}To${C}`) as HelperMethod;
+  }
+  if (buy) return (t.native ? `swapETHTo${T}` : `swapTo${T}`) as HelperMethod;
+  return (t.native ? `swap${T}ToETH` : `swapFrom${T}`) as HelperMethod;
 }
 
 export function swapQuote(s: SwapInput): SwapQuote {
-  const t = TOKENS[s.tok];
+  const target = s.target ?? 'phUSD';
+  const t = metaOf(s.tok);
+  const cross = isTarget(t.sym);
   const buy = s.dir === 'buy';
-  const direct = t.hops.length === 0;
-  const inSym: MarketSymbol = buy ? t.sym : 'phUSD';
-  const outSym: MarketSymbol = buy ? 'phUSD' : t.sym;
+  const direct = !cross && t.hops.length === 0;
+  const inSym: MarketSymbol = buy ? t.sym : target;
+  const outSym: MarketSymbol = buy ? target : t.sym;
   const inDec = metaOf(inSym).decimals;
   const outDec = metaOf(outSym).decimals;
   const pool = s.pool;
-  const live = hasLiquidity(pool);
+  const cPool = s.counterPool;
+  const live = hasLiquidity(pool) && (!cross || hasLiquidity(cPool));
 
   const inWei = s.inWei;
   const quoting = inWei > 0n && s.quoteLoading && s.quoteOut === undefined;
@@ -328,7 +366,22 @@ export function swapQuote(s: SwapInput): SwapQuote {
     const rS = toNum(pool.rS, 18);
     const rPh = toNum(pool.rPh, 18);
     const spx = spxNum(pool);
-    if (buy) {
+    if (cross && cPool) {
+      // Two V2 legs through sUSDS: the counter's pair first on a buy, the target's first on a sell.
+      const cS = toNum(cPool.rS, 18);
+      const cT = toNum(cPool.rPh, 18);
+      const ideal = buy
+        ? inA * 0.997 * (cS / cT) * 0.997 * (rPh / rS)
+        : inA * 0.997 * (rS / rPh) * 0.997 * (cT / cS);
+      impact = ideal > 0 ? Math.max(0, 1 - outA / ideal) : 0;
+      if (buy) {
+        const sMid = toNum(getAmountOut(inWei, cPool.rPh, cPool.rS), 18);
+        priceAfter = phPrice(rS + sMid, rPh - outA, spx);
+      } else {
+        const sMid = toNum(getAmountOut(inWei, pool.rPh, pool.rS), 18);
+        priceAfter = phPrice(rS - sMid, rPh + inA, spx);
+      }
+    } else if (buy) {
       const sIn = getAmountIn(outWei, pool.rS, pool.rPh);
       if (sIn === null) {
         noLiq = true;
@@ -349,35 +402,48 @@ export function swapQuote(s: SwapInput): SwapQuote {
   const nativeIn = buy && t.native;
   const approveSym = inSym;
   const needApprove = !nativeIn && needsApproval(s.allowance, inWei);
-  const method = swapMethod(t, buy);
+  const method = swapMethod(t, buy, target);
 
-  const outUsd = outA * unitUsd(outSym, pool, s.ethUsd);
+  const pools: Partial<Record<TargetSymbol, PoolState>> = { [target]: pool };
+  if (cross) pools[t.sym as TargetSymbol] = cPool;
+  const outUsd = outA * unitUsd(outSym, pools, s.ethUsd);
   // No ETH oracle on Anvil: an ETH buy is valued at what it buys.
-  const inUsd = nativeIn ? outUsd : inA * unitUsd(inSym, pool, s.ethUsd);
+  const inUsd = nativeIn ? outUsd : inA * unitUsd(inSym, pools, s.ethUsd);
 
-  let syms: MarketSymbol[] = [t.sym, ...t.hops.map((h) => h.to), 'phUSD'];
-  let venues: string[] = [...t.hops.map((h) => h.venue), POOL_VENUE];
-  if (!buy) {
-    syms = [...syms].reverse();
-    venues = [POOL_VENUE, ...[...t.hops].reverse().map((h) => h.venueRev)];
+  let syms: MarketSymbol[];
+  let venues: string[];
+  if (cross) {
+    syms = [inSym, 'sUSDS', outSym];
+    venues = [POOL_VENUE, POOL_VENUE];
+  } else {
+    syms = [t.sym, ...t.hops.map((h) => h.to), target];
+    venues = [...t.hops.map((h) => h.venue), POOL_VENUE];
+    if (!buy) {
+      syms = [...syms].reverse();
+      venues = [POOL_VENUE, ...[...t.hops].reverse().map((h) => h.venueRev)];
+    }
   }
 
   const stats: Stat[] = [];
   if (valid) {
-    stats.push({ label: 'Rate', value: `1 phUSD = ${fmt(rate, t.native ? 8 : 4)} ${t.sym}`, tone: 'default' });
+    stats.push({ label: 'Rate', value: `1 ${target} = ${fmt(rate, t.native ? 8 : 4)} ${t.sym}`, tone: 'default' });
     stats.push({ label: 'Price impact', value: pct(impact), tone: impactTone(impact) });
-    stats.push({ label: 'phUSD price after trade', value: `$${fmt(priceBefore, 4)} → $${fmt(priceAfter, 4)}`, tone: 'default' });
+    stats.push({ label: `${target} price after trade`, value: `$${fmt(priceBefore, 4)} → $${fmt(priceAfter, 4)}`, tone: 'default' });
     stats.push({
       label: `Minimum received (${s.slip}% slippage)`,
       value: `${fmtUnits(minOutWei, outDec, dpOf(outSym))} ${outSym}`,
       tone: 'default',
     });
-    const feeUsd = usd(inUsd * POOL_FEE) || '≈ $0.00';
-    stats.push({
-      label: 'Fees (0.30% pool)',
-      value: direct ? feeUsd : `${feeUsd} · venue fees included in quote`,
-      tone: 'default',
-    });
+    if (cross) {
+      stats.push({ label: 'Fees (0.30% × 2 pools)', value: usd(inUsd * POOL_FEE * 2) || '≈ $0.00', tone: 'default' });
+    } else {
+      const feeUsd = usd(inUsd * POOL_FEE) || '≈ $0.00';
+      stats.push({
+        label: 'Fees (0.30% pool)',
+        value: direct ? feeUsd : `${feeUsd} · venue fees included in quote`,
+        tone: 'default',
+      });
+    }
     stats.push({
       label: 'Allowance',
       value: nativeIn ? 'Not needed (native ETH)' : needApprove ? `Approve ${approveSym} first` : `${approveSym} approved`,
@@ -386,7 +452,7 @@ export function swapQuote(s: SwapInput): SwapQuote {
   }
 
   return {
-    token: t, buy, direct, inSym, outSym, inWei, outWei, minOutWei, inA, outA, valid, quoting, noLiq,
+    token: t, target, buy, cross, direct, inSym, outSym, inWei, outWei, minOutWei, inA, outA, valid, quoting, noLiq,
     impact, priceBefore, priceAfter,
     insufficient: s.inBal !== undefined ? inWei > s.inBal : false,
     nativeIn, needApprove, approveSym, method, inUsd, outUsd, syms, venues, stats,
@@ -396,11 +462,13 @@ export function swapQuote(s: SwapInput): SwapQuote {
 export type AddEditedSide = 'tok' | 'ph';
 
 export interface AddInput {
+  /** Pair being supplied (defaults to phUSD/sUSDS); the `ph*` fields carry this token. */
+  target?: TargetSymbol;
   depositSym: AddTokenSymbol;
   edited: AddEditedSide;
   /** Typed deposit-token amount (used when edited === 'tok'). */
   tokWei: bigint;
-  /** Typed phUSD amount (used when edited === 'ph'). */
+  /** Typed target-token amount (used when edited === 'ph'). */
   phWei: bigint;
   /** `sUSDS.previewDeposit(tokWei)` for the USDS path, when read. */
   previewShares: bigint | undefined;
@@ -413,12 +481,13 @@ export interface AddInput {
 }
 
 export interface AddQuote {
+  target: TargetSymbol;
   depositSym: AddTokenSymbol;
   /** Deposit-token amount (USDS or sUSDS) desired. */
   a: bigint;
   /** sUSDS that reaches the pair (equals `a` on the sUSDS path). */
   s: bigint;
-  /** phUSD amount desired. */
+  /** Target-token (phUSD or AM) amount desired. */
   b: bigint;
   aMin: bigint;
   bMin: bigint;
@@ -429,7 +498,7 @@ export interface AddQuote {
   lp: bigint;
   share: number;
   /** '' when balances suffice, else the symbol that is short. */
-  insufficient: '' | AddTokenSymbol | 'phUSD';
+  insufficient: '' | AddTokenSymbol | TargetSymbol;
   needTok: boolean;
   needPh: boolean;
   method: HelperMethod;
@@ -447,6 +516,7 @@ export function lpForDeposit(s: bigint, ph: bigint, p: PoolState): bigint {
 }
 
 export function addQuote(s: AddInput): AddQuote {
+  const T = s.target ?? 'phUSD';
   const pool = s.pool;
   const live = hasLiquidity(pool);
   const viaUsds = s.depositSym === 'USDS';
@@ -483,9 +553,9 @@ export function addQuote(s: AddInput): AddQuote {
 
   const stats: Stat[] = [];
   if (valid) {
-    stats.push({ label: 'Pool price', value: `1 phUSD = ${fmt(toNum(pool.rS, 18) / toNum(pool.rPh, 18), 4)} sUSDS ($${fmt(price, 4)})`, tone: 'default' });
+    stats.push({ label: 'Pool price', value: `1 ${T} = ${fmt(toNum(pool.rS, 18) / toNum(pool.rPh, 18), 4)} sUSDS ($${fmt(price, 4)})`, tone: 'default' });
     stats.push({ label: 'sUSDS price', value: `1 sUSDS = $${fmt(spx, 4)} (accrues savings rate)`, tone: 'default' });
-    stats.push({ label: 'Deposited (up to)', value: `${fmtUnits(a, 18, dpA)} ${s.depositSym} + ${fmtUnits(b, 18, 2)} phUSD`, tone: 'default' });
+    stats.push({ label: 'Deposited (up to)', value: `${fmtUnits(a, 18, dpA)} ${s.depositSym} + ${fmtUnits(b, 18, 2)} ${T}`, tone: 'default' });
     if (viaUsds) {
       stats.push({ label: 'Wrapped to sUSDS', value: `${fmtUnits(sAmt, 18, 4)} sUSDS via ${WRAP_VENUE}`, tone: 'default' });
     }
@@ -493,20 +563,22 @@ export function addQuote(s: AddInput): AddQuote {
     stats.push({ label: 'Share of pool', value: pct(share), tone: 'default' });
     stats.push({
       label: `Min. deposited (${s.slip}% slippage)`,
-      value: `${fmtUnits(aMin, 18, dpA)} ${s.depositSym} + ${fmtUnits(bMin, 18, 2)} phUSD`,
+      value: `${fmtUnits(aMin, 18, dpA)} ${s.depositSym} + ${fmtUnits(bMin, 18, 2)} ${T}`,
       tone: 'default',
     });
     stats.push({ label: 'Deposit value', value: usd(aUsd + bUsd), tone: 'default' });
   }
 
   return {
-    depositSym: s.depositSym, a, s: sAmt, b, aMin, bMin, valid, noLiq, price, lp, share,
+    target: T, depositSym: s.depositSym, a, s: sAmt, b, aMin, bMin, valid, noLiq, price, lp, share,
     insufficient: s.tokBal !== undefined && a > s.tokBal
       ? s.depositSym
-      : s.phBal !== undefined && b > s.phBal ? 'phUSD' : '',
+      : s.phBal !== undefined && b > s.phBal ? T : '',
     needTok: needsApproval(s.tokAllowance, a),
     needPh: needsApproval(s.phAllowance, b),
-    method: viaUsds ? 'addLiquidityUSDS' : 'addLiquiditySUSDS',
+    method: T === 'AM'
+      ? (viaUsds ? 'addLiquidityAMUSDS' : 'addLiquidityAMSUSDS')
+      : (viaUsds ? 'addLiquidityUSDS' : 'addLiquiditySUSDS'),
     aUsd, bUsd, stats,
   };
 }
@@ -522,7 +594,7 @@ export interface PositionView {
   share: number;
   /** Underlying sUSDS (floored). */
   s: bigint;
-  /** Underlying phUSD (floored). */
+  /** Underlying target token, phUSD or AM (floored). */
   ph: bigint;
   /** USD value of the underlying. */
   value: number;
@@ -543,6 +615,8 @@ export function positionView(lp: bigint, p: PoolState | undefined): PositionView
 }
 
 export interface RemoveInput {
+  /** Pair being burned (defaults to phUSD/sUSDS); `phAmt` / `phMin` carry this token. */
+  target?: TargetSymbol;
   /** LP to burn. */
   burnWei: bigint;
   /** Current LP balance. */
@@ -557,6 +631,7 @@ export interface RemoveInput {
 }
 
 export interface RemoveQuote {
+  target: TargetSymbol;
   burn: bigint;
   lp: bigint;
   /** True when the sUSDS side is paid out as USDS. */
@@ -585,6 +660,7 @@ function sharesToUsds(shares: bigint, p: PoolState): bigint {
 }
 
 export function removeQuote(s: RemoveInput): RemoveQuote {
+  const T = s.target ?? 'phUSD';
   const pool = s.pool;
   const live = hasLiquidity(pool);
   const usds = s.out === 'USDS';
@@ -606,7 +682,7 @@ export function removeQuote(s: RemoveInput): RemoveQuote {
   if (valid) {
     const left = s.lpBal > burn ? s.lpBal - burn : 0n;
     const ts = toNum(pool.totalSupply, LP_DECIMALS);
-    stats.push({ label: 'Pool price', value: `1 phUSD = ${fmt(toNum(pool.rS, 18) / toNum(pool.rPh, 18), 4)} sUSDS ($${fmt(price, 4)})`, tone: 'default' });
+    stats.push({ label: 'Pool price', value: `1 ${T} = ${fmt(toNum(pool.rS, 18) / toNum(pool.rPh, 18), 4)} sUSDS ($${fmt(price, 4)})`, tone: 'default' });
     stats.push({
       label: 'LP tokens burned',
       value: `${fmtUnits(burn, LP_DECIMALS, LP_DP)} ${LP_SYMBOL} (${pct(s.lpBal > 0n ? toNum(burn, 18) / toNum(s.lpBal, 18) : 0)} of position)`,
@@ -615,7 +691,7 @@ export function removeQuote(s: RemoveInput): RemoveQuote {
     if (usds) stats.push({ label: 'sUSDS redeemed to USDS', value: `${fmtUnits(sAmt, 18, 4)} sUSDS × ${fmt(spxNum(pool), 4)}`, tone: 'default' });
     stats.push({
       label: `Min. received (${s.slip}% slippage)`,
-      value: `${fmtUnits(outMin, 18, outDp)} ${outSym} + ${fmtUnits(phMin, 18, 2)} phUSD`,
+      value: `${fmtUnits(outMin, 18, outDp)} ${outSym} + ${fmtUnits(phMin, 18, 2)} ${T}`,
       tone: 'default',
     });
     stats.push({ label: 'Remaining position', value: `${fmtUnits(left, LP_DECIMALS, LP_DP)} ${LP_SYMBOL} · ${pct(ts > 0 ? toNum(left, 18) / ts : 0)} of pool`, tone: 'default' });
@@ -628,8 +704,10 @@ export function removeQuote(s: RemoveInput): RemoveQuote {
   }
 
   return {
-    burn, lp: s.lpBal, usds, valid, over, needApprove,
-    method: usds ? 'removeLiquidityUSDS' : 'removeLiquiditySUSDS',
+    target: T, burn, lp: s.lpBal, usds, valid, over, needApprove,
+    method: T === 'AM'
+      ? (usds ? 'removeLiquidityAMUSDS' : 'removeLiquidityAMSUSDS')
+      : (usds ? 'removeLiquidityUSDS' : 'removeLiquiditySUSDS'),
     sAmt, phAmt, outSym, outAmt, outMin, phMin, outDp, value, stats,
   };
 }
@@ -704,10 +782,10 @@ export function swapSteps(q: SwapQuote): ReviewStep[] {
 export function addSteps(q: AddQuote): ReviewStep[] {
   const steps: ReviewStep[] = [];
   if (q.needTok) steps.push(approveStep(q.depositSym, q.a));
-  if (q.needPh) steps.push(approveStep('phUSD', q.b));
+  if (q.needPh) steps.push(approveStep(q.target, q.b));
   steps.push({
     kind: 'action',
-    label: q.depositSym === 'USDS' ? 'Supply USDS + phUSD (wraps to sUSDS)' : 'Supply sUSDS + phUSD',
+    label: q.depositSym === 'USDS' ? `Supply USDS + ${q.target} (wraps to sUSDS)` : `Supply sUSDS + ${q.target}`,
     sub: methodLabel(q.method),
   });
   return steps;

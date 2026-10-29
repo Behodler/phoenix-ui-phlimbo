@@ -7,8 +7,12 @@ import { BOX, FOCUS_RING, PCT_CHIP_ON_STYLE } from './styles';
 
 /**
  * Remove-liquidity mode: burn UNI-V2 (typed or 25/50/75/Max of the position)
- * and receive phUSD plus the sUSDS side, either as sUSDS (UniswapHelper.removeLiquiditySUSDS) or redeemed
- * to USDS (UniswapHelper.removeLiquidityUSDS).
+ * and receive the target (phUSD or AM) plus the sUSDS side, either as sUSDS
+ * (UniswapHelper.removeLiquiditySUSDS / …AMSUSDS) or redeemed to USDS
+ * (UniswapHelper.removeLiquidityUSDS / …AMUSDS).
+ *
+ * The LP chip doubles as the pair toggle (sUSDS/phUSD ↔ sUSDS/AM) wherever the
+ * AM pair is live; elsewhere it is a static label.
  */
 export default function RemoveLiquidityPanel({ m }: { m: UniMarket }) {
   return (
@@ -29,10 +33,27 @@ export default function RemoveLiquidityPanel({ m }: { m: UniMarket }) {
             onChange={(e) => m.setRemoveLp(e.target.value)}
             className={`flex-1 min-w-0 bg-transparent border-none text-foreground text-[30px] font-semibold p-0 placeholder:text-[rgba(240,245,248,0.35)] rounded-md ${FOCUS_RING} focus:outline-none`}
           />
-          <span className="inline-flex items-center gap-2 h-11 pl-2 pr-3.5 rounded-full border border-pxusd-teal-400 bg-pxusd-teal-600 text-foreground text-base font-semibold flex-shrink-0">
-            <LpPairIcon size={24} ringClass="border-pxusd-teal-600" />
-            <span>{m.lpSymbol}</span>
-          </span>
+          {m.canPickTarget ? (
+            <button
+              type="button"
+              onClick={m.toggleLiqTarget}
+              aria-label={`Pool ${m.liqPairLabel}; switch pool`}
+              title={`${m.liqPairLabel} · click to switch pool`}
+              className={`inline-flex items-center gap-2 h-11 pl-2 pr-3 rounded-full border border-pxusd-teal-400 bg-pxusd-teal-600 text-foreground text-base font-semibold flex-shrink-0 hover:brightness-110 transition ${FOCUS_RING}`}
+            >
+              <LpPairIcon size={24} ringClass="border-pxusd-teal-600" target={m.liqTarget} />
+              <span>{m.lpSymbol}</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+                <path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" />
+              </svg>
+            </button>
+          ) : (
+            <span className="inline-flex items-center gap-2 h-11 pl-2 pr-3.5 rounded-full border border-pxusd-teal-400 bg-pxusd-teal-600 text-foreground text-base font-semibold flex-shrink-0">
+              <LpPairIcon size={24} ringClass="border-pxusd-teal-600" />
+              <span>{m.lpSymbol}</span>
+            </span>
+          )}
         </div>
         <div className="grid grid-cols-4 gap-2">
           {m.pctOptions.map((o) => (

@@ -1,18 +1,26 @@
-import type { SwapTokenSymbol } from '../../../data/uniMarketConfig';
+import { useRef } from 'react';
+import type { MarketSymbol } from '../../../data/uniMarketConfig';
 import type { TokenRowView } from '../../../hooks/useUniMarket';
 import TokenIcon from './TokenIcon';
+import { useDismiss } from './useDismiss';
 import { FOCUS_RING, GHOST_ICON_BTN } from './styles';
 
 interface TokenPickerPanelProps {
   rows: TokenRowView[];
-  onSelect: (sym: SwapTokenSymbol) => void;
+  /** Explainer under the title. */
+  note: string;
+  onSelect: (sym: MarketSymbol) => void;
   onClose: () => void;
 }
 
-/** Inline token picker covering the trade panel. */
-export default function TokenPickerPanel({ rows, onSelect, onClose }: TokenPickerPanelProps) {
+/** Inline token picker covering the trade panel; closes on the ×, a click outside it, or Escape. */
+export default function TokenPickerPanel({ rows, note, onSelect, onClose }: TokenPickerPanelProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDismiss(ref, onClose);
+
   return (
     <div
+      ref={ref}
       role="dialog"
       aria-label="Select a token"
       className="absolute inset-0 z-[6] bg-pxusd-teal-800 rounded-[18px] p-4 flex flex-col gap-3 overflow-y-auto"
@@ -25,9 +33,7 @@ export default function TokenPickerPanel({ rows, onSelect, onClose }: TokenPicke
           </svg>
         </button>
       </div>
-      <span className="text-[13px] text-muted-foreground">
-        phUSD has one pool, phUSD/sUSDS on Uniswap V2. Other tokens are routed through sUSDS in the same transaction.
-      </span>
+      <span className="text-[13px] text-muted-foreground">{note}</span>
       <div className="flex flex-col gap-1">
         {rows.map((r) => (
           <button

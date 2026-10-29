@@ -54,7 +54,9 @@ function makeMarket(over: Partial<UniMarket> = {}): UniMarket {
     topMode: 'swap',
     slip: 0.5,
     settingsOpen: false,
+    canPickTarget: false,
     dir: 'buy',
+    target: 'phUSD',
     token: 'USDC',
     swap,
     payStr: '100',
@@ -65,11 +67,17 @@ function makeMarket(over: Partial<UniMarket> = {}): UniMarket {
     recvUsd: '≈ $92.84',
     routeSummary: '3 hops · 1 transaction',
     pickerOpen: false,
+    pickerKind: null,
+    pickerNote: 'phUSD has one pool, phUSD/sUSDS on Uniswap V2. Other tokens are routed through sUSDS in the same transaction.',
     tokenRows: [
       { sym: 'DOLA', name: 'Dola USD Stablecoin', hint: 'via USDC → USDS → sUSDS', balText: '0.00', selected: false },
       { sym: 'USDC', name: 'USD Coin', hint: 'via USDS → sUSDS', balText: '10,000.00', selected: true },
       { sym: 'sUSDS', name: 'Savings USDS', hint: 'direct pair', balText: '10,000.00', selected: false },
     ],
+    liqTarget: 'phUSD',
+    liqPairLabel: 'sUSDS/phUSD',
+    targetOptions: [{ sym: 'phUSD', name: 'Phoenix USD' }, { sym: 'AM', name: 'Phoenix Antimatter' }],
+    liqTargetPickerOpen: false,
     addSym: 'USDS',
     add,
     addTokens: ['USDS', 'sUSDS'],
@@ -135,6 +143,11 @@ function makeMarket(over: Partial<UniMarket> = {}): UniMarket {
     openPicker: fn(),
     closePicker: fn(),
     selectToken: fn(),
+    selectLiqTarget: fn(),
+    toggleLiqTarget: fn(),
+    toggleLiqTargetPicker: fn(),
+    closeLiqTargetPicker: fn(),
+    closeAddPicker: fn(),
     setPay: fn(),
     payMax: fn(),
     flip: fn(),
@@ -242,6 +255,39 @@ describe('MarketUniTab (story 087, live hook mocked)', () => {
     expect(within(picker).getByText(/USD Coin · via USDS → sUSDS/)).toBeInTheDocument();
     fireEvent.click(within(picker).getByRole('button', { name: /^sUSDS/ }));
     expect(market.selectToken).toHaveBeenCalledWith('sUSDS');
+  });
+
+  it('token picker closes on a click outside it', () => {
+    market = makeMarket({ pickerOpen: true });
+    render(<MarketUniTab />);
+    fireEvent.pointerDown(within(screen.getByRole('dialog', { name: 'Select a token' })).getByText('USD Coin · via USDS → sUSDS'));
+    expect(market.closePicker).not.toHaveBeenCalled();
+    fireEvent.pointerDown(document.body);
+    expect(market.closePicker).toHaveBeenCalled();
+  });
+
+  it('with AM live, the phUSD side is a picker that opens the target list', () => {
+    market = makeMarket({ canPickTarget: true });
+    render(<MarketUniTab />);
+    fireEvent.click(screen.getByRole('button', { name: 'Select Phoenix token to receive, currently phUSD' }));
+    expect(market.openPicker).toHaveBeenCalledWith('target');
+  });
+
+  it('remove liquidity with AM live: the LP chip toggles the pair; the add side picks the pool token', () => {
+    market = makeMarket({ canPickTarget: true, mode: 'remove', topMode: 'liquidity' });
+    const { unmount } = render(<MarketUniTab />);
+    fireEvent.click(screen.getByRole('button', { name: 'Pool sUSDS/phUSD; switch pool' }));
+    expect(market.toggleLiqTarget).toHaveBeenCalled();
+    unmount();
+
+    market = makeMarket({ canPickTarget: true, mode: 'add', topMode: 'liquidity', liqTargetPickerOpen: true });
+    render(<MarketUniTab />);
+    const group = screen.getByRole('group', { name: 'Pool token' });
+    expect(within(group).getByText('Phoenix Antimatter')).toBeInTheDocument();
+    fireEvent.click(within(group).getByRole('button', { name: /^AM/ }));
+    expect(market.selectLiqTarget).toHaveBeenCalledWith('AM');
+    fireEvent.pointerDown(document.body);
+    expect(market.closeLiqTargetPicker).toHaveBeenCalled();
   });
 
   it('settings popover selects slippage', () => {

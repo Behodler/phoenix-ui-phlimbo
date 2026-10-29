@@ -2,8 +2,8 @@
  * Static configuration for the "Market" tab (stories 084, 085, 087).
  *
  * Nothing here is a balance, price or reserve: those are read live by
- * `useUniMarket` from the UniswapHelper, the phUSD/sUSDS Uniswap V2 pair and
- * the token contracts. This file holds only what the chain does not expose —
+ * `useUniMarket` from the UniswapHelper, the phUSD/sUSDS and AM/sUSDS Uniswap
+ * V2 pairs and the token contracts. This file holds only what the chain does not expose —
  * token metadata, the route labels the helper takes (it does not publish its
  * route), and UI constants.
  */
@@ -11,10 +11,17 @@ import type { ContractAddresses } from '../types/contracts';
 import { mainnetAddresses } from '../lib/contracts';
 
 export type SwapTokenSymbol = 'DOLA' | 'USDC' | 'USDe' | 'USDS' | 'sUSDS' | 'ETH';
-export type MarketSymbol = SwapTokenSymbol | 'phUSD';
+/**
+ * A UniswapHelper "target": a token with its own Uniswap V2 pair against sUSDS.
+ * AM is Phoenix Antimatter (phStaging2 story 120).
+ */
+export type TargetSymbol = 'phUSD' | 'AM';
+export type MarketSymbol = SwapTokenSymbol | TargetSymbol;
+/** The non-target side of a swap: a routed token, or the other target (phUSD ↔ AM). */
+export type CounterSymbol = SwapTokenSymbol | TargetSymbol;
 export type AddTokenSymbol = 'USDS' | 'sUSDS';
 
-/** Symbol of the phUSD/sUSDS Uniswap V2 pair's LP token. */
+/** Symbol of both pairs' LP token (phUSD/sUSDS and AM/sUSDS are each plain UNI-V2). */
 export const LP_SYMBOL = 'UNI-V2';
 export type LpSymbol = typeof LP_SYMBOL;
 
@@ -22,7 +29,7 @@ export type LpSymbol = typeof LP_SYMBOL;
 export type ApprovableSymbol = MarketSymbol | LpSymbol;
 
 /** `ContractAddresses` keys the tab reads token addresses from (note `Dola` / `SUSDS` casing). */
-export type TokenAddressKey = Extract<keyof ContractAddresses, 'Dola' | 'USDC' | 'USDe' | 'USDS' | 'SUSDS' | 'PhUSD'>;
+export type TokenAddressKey = Extract<keyof ContractAddresses, 'Dola' | 'USDC' | 'USDe' | 'USDS' | 'SUSDS' | 'PhUSD' | 'Antimatter'>;
 
 export interface RouteHop {
   /** Token reached by this hop (on the way towards sUSDS). */
@@ -71,23 +78,45 @@ export const PHUSD: TokenMeta = {
   sym: 'phUSD', name: 'Phoenix USD', decimals: 18, dp: 2, native: false, addressKey: 'PhUSD', hops: [],
 };
 
+/** Phoenix Antimatter. `AM` is its on-chain ticker; the Market tab shows the ticker. */
+export const AM: TokenMeta = {
+  sym: 'AM', name: 'Phoenix Antimatter', decimals: 18, dp: 2, native: false, addressKey: 'Antimatter', hops: [],
+};
+
+export const TARGETS: Record<TargetSymbol, TokenMeta> = { phUSD: PHUSD, AM };
+/** Target picker order. */
+export const TARGET_ORDER: readonly TargetSymbol[] = ['phUSD', 'AM'];
+export const DEFAULT_TARGET: TargetSymbol = 'phUSD';
+
+export function isTarget(sym: MarketSymbol): sym is TargetSymbol {
+  return sym === 'phUSD' || sym === 'AM';
+}
+
+/** The target that is not `t`: the counter a phUSD ↔ AM swap trades against. */
+export function otherTarget(t: TargetSymbol): TargetSymbol {
+  return t === 'phUSD' ? 'AM' : 'phUSD';
+}
+
 /** UNI-V2 LP token decimals (always 18). */
 export const LP_DECIMALS = 18;
 export const LP_DP = 4;
 
 export function metaOf(sym: MarketSymbol): TokenMeta {
-  return sym === 'phUSD' ? PHUSD : TOKENS[sym];
+  return isTarget(sym) ? TARGETS[sym] : TOKENS[sym];
 }
 
 /** Token picker order. */
 export const ORDER: readonly SwapTokenSymbol[] = ['DOLA', 'USDC', 'USDe', 'USDS', 'sUSDS', 'ETH'];
 
-/** The pair leg every route crosses. */
+/** The pair leg every route crosses (phUSD ↔ AM crosses it twice, via sUSDS). */
 export const POOL_VENUE = 'Uniswap V2 · 0.30%';
 /** Uniswap V2 pair fee (display). */
 export const POOL_FEE = 0.003;
 
-/** Deposit tokens accepted by Add liquidity; USDS is wrapped to sUSDS by UniswapHelper.addLiquidityUSDS. */
+/**
+ * Deposit tokens accepted by Add liquidity; USDS is wrapped to sUSDS by
+ * UniswapHelper.addLiquidityUSDS / addLiquidityAMUSDS.
+ */
 export const ADD_TOKENS: readonly AddTokenSymbol[] = ['USDS', 'sUSDS'];
 export const DEFAULT_ADD_TOKEN: AddTokenSymbol = 'USDS';
 export const WRAP_VENUE = 'sUSDS deposit';
@@ -120,10 +149,20 @@ export const HELPER_METHODS = {
   swapETHToPhUSD: 'swapETHToPhUSD',
   swapFromPhUSD: 'swapFromPhUSD',
   swapPhUSDToETH: 'swapPhUSDToETH',
+  swapToAM: 'swapToAM',
+  swapETHToAM: 'swapETHToAM',
+  swapFromAM: 'swapFromAM',
+  swapAMToETH: 'swapAMToETH',
+  swapPhUSDToAM: 'swapPhUSDToAM',
+  swapAMToPhUSD: 'swapAMToPhUSD',
   addLiquiditySUSDS: 'addLiquiditySUSDS',
   addLiquidityUSDS: 'addLiquidityUSDS',
+  addLiquidityAMSUSDS: 'addLiquidityAMSUSDS',
+  addLiquidityAMUSDS: 'addLiquidityAMUSDS',
   removeLiquiditySUSDS: 'removeLiquiditySUSDS',
   removeLiquidityUSDS: 'removeLiquidityUSDS',
+  removeLiquidityAMSUSDS: 'removeLiquidityAMSUSDS',
+  removeLiquidityAMUSDS: 'removeLiquidityAMUSDS',
 } as const;
 export type HelperMethod = keyof typeof HELPER_METHODS;
 

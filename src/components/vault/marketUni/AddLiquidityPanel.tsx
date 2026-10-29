@@ -1,49 +1,39 @@
 import type { UniMarket } from '../../../hooks/useUniMarket';
+import { metaOf } from '../../../data/uniMarketConfig';
 import TokenAmountBox from './TokenAmountBox';
-import TokenIcon from './TokenIcon';
-import { PhUSDChip, TokenPickerButton } from './TokenChips';
-import { FOCUS_RING } from './styles';
+import TokenDropdown from './TokenDropdown';
+import { TargetChip } from './TokenChips';
 
 /**
- * Add-liquidity mode: chosen deposit token (USDS default, or sUSDS) + phUSD,
- * linked at the pool ratio. USDS is wrapped to sUSDS by UniswapHelper.addLiquidityUSDS.
+ * Add-liquidity mode: chosen deposit token (USDS default, or sUSDS) + the pair's
+ * target (phUSD, or AM where the AM/sUSDS pair is live), linked at the pool ratio.
+ * USDS is wrapped to sUSDS by UniswapHelper.addLiquidityUSDS / addLiquidityAMUSDS.
  */
 export default function AddLiquidityPanel({ m }: { m: UniMarket }) {
   const depositSelector = (
-    <div className="relative flex-shrink-0">
-      <TokenPickerButton
-        sym={m.addSym}
-        ariaLabel={`Select deposit token, currently ${m.addSym}`}
-        onClick={m.toggleAddPicker}
-        expanded={m.addPickerOpen}
-      />
-      {m.addPickerOpen && (
-        <div
-          role="group"
-          aria-label="Deposit token"
-          className="absolute right-0 top-[calc(100%+6px)] z-[7] w-44 rounded-xl border border-pxusd-teal-400 bg-pxusd-teal-700 p-1.5 flex flex-col gap-1 shadow-[0_16px_40px_rgba(0,0,0,0.5)]"
-        >
-          {m.addTokens.map((sym) => {
-            const on = sym === m.addSym;
-            return (
-              <button
-                key={sym}
-                type="button"
-                aria-pressed={on}
-                onClick={() => m.selectAddToken(sym)}
-                className={`flex items-center gap-2.5 w-full min-h-[44px] px-2.5 rounded-lg text-left text-foreground text-[15px] font-semibold hover:bg-pxusd-teal-600 ${FOCUS_RING}`}
-                style={on ? { background: 'rgba(255,140,66,0.10)', border: '1px solid rgba(255,140,66,0.45)' } : { border: '1px solid transparent' }}
-              >
-                <TokenIcon sym={sym} size={24} />
-                <span className="flex-1">{sym}</span>
-                {sym === 'USDS' && <span className="text-[11px] font-medium text-muted-foreground">wraps</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    <TokenDropdown
+      value={m.addSym}
+      options={m.addTokens.map((sym) => ({ sym, name: metaOf(sym).name, tag: sym === 'USDS' ? 'wraps' : undefined }))}
+      open={m.addPickerOpen}
+      onToggle={m.toggleAddPicker}
+      onClose={m.closeAddPicker}
+      onSelect={m.selectAddToken}
+      ariaLabel="Select deposit token"
+      groupLabel="Deposit token"
+    />
   );
+  const targetSelector = m.canPickTarget ? (
+    <TokenDropdown
+      value={m.liqTarget}
+      options={m.targetOptions}
+      open={m.liqTargetPickerOpen}
+      onToggle={m.toggleLiqTargetPicker}
+      onClose={m.closeLiqTargetPicker}
+      onSelect={m.selectLiqTarget}
+      ariaLabel="Select pool token"
+      groupLabel="Pool token"
+    />
+  ) : <TargetChip sym={m.liqTarget} />;
 
   return (
     <div className="flex flex-col">
@@ -79,7 +69,7 @@ export default function AddLiquidityPanel({ m }: { m: UniMarket }) {
         balanceText={m.phBalText}
         usdText={m.aPhUsd}
         onMax={m.addPhMax}
-        token={<PhUSDChip />}
+        token={targetSelector}
       />
     </div>
   );

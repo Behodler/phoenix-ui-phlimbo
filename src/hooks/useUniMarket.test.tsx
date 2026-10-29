@@ -18,6 +18,8 @@ const USDS = '0x00000000000000000000000000000000000000d3' as const;
 const USDC = '0x00000000000000000000000000000000000000d4' as const;
 const USDE = '0x00000000000000000000000000000000000000d5' as const;
 const DOLA = '0x00000000000000000000000000000000000000d6' as const;
+const AM = '0x00000000000000000000000000000000000000d7' as const;
+const AM_PAIR = '0x00000000000000000000000000000000000000a3' as const;
 const WALLET = '0x00000000000000000000000000000000000000cc' as const;
 
 const e18 = (n: string) => parseUnits(n, 18);
@@ -26,6 +28,7 @@ interface ReadCall { functionName: string; address?: string; enabled: boolean }
 
 let reads: ReadCall[];
 let helperAddress: string;
+let amPairAddress: string;
 let allowanceByToken: Record<string, bigint>;
 /** USDC → phUSD quote returned by quoteToPhUSD (any amount). */
 let quotePhusd: bigint;
@@ -45,6 +48,9 @@ const chainValue = (functionName: string, address: string | undefined, args: unk
     case 'allowance': return allowanceByToken[address ?? ''] ?? 0n;
     case 'quoteToPhUSD': return quotePhusd;
     case 'quoteFromPhUSD': return e18('1');
+    case 'quoteToAM': return e18('80');
+    case 'quotePhUSDToAM': return e18('99');
+    case 'quoteAMToPhUSD': return e18('98');
     case 'previewDeposit': return ((args[0] as bigint) * 10n ** 18n) / e18('1.0735');
     case 'previewRedeem': return ((args[0] as bigint) * e18('1.0735')) / 10n ** 18n;
     default: return undefined;
@@ -83,6 +89,8 @@ vi.mock('../contexts/ContractAddressContext', () => ({
     addresses: {
       UniswapHelper: helperAddress,
       PhusdSusdsPair: PAIR,
+      AntimatterSusdsPair: amPairAddress,
+      Antimatter: AM,
       PhUSD: PHUSD, SUSDS, USDS, USDC, USDe: USDE, Dola: DOLA,
     },
     networkType: 'local',
@@ -112,6 +120,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-10-17T12:00:00Z'));
   reads = [];
   helperAddress = HELPER;
+  amPairAddress = AM_PAIR;
   allowanceByToken = {};
   quotePhusd = 93_123_456_789_012_345_678n;
   writeContractAsync.mockReset().mockResolvedValue('0xbeef');
@@ -274,6 +283,116 @@ describe('useUniMarket — step derivation from allowances', () => {
       await m.advanceStep();
     });
     expect(approve).toHaveBeenCalledWith(PAIR, HELPER, maxUint256);
+  });
+});
+
+describe('useUniMarket — Antimatter (AM)', () => {
+  it('a zero AntimatterSusdsPair hides the AM choice and leaves the phUSD market intact', () => {
+    amPairAddress = zeroAddress;
+    render(<Harness />);
+    expect(m.available).toBe(true);
+    expect(m.canPickTarget).toBe(false);
+    expect(reads.filter((r) => r.address === AM_PAIR || r.address === AM).filter((r) => r.enabled)).toEqual([]);
+    act(() => m.openPicker('target'));
+    act(() => m.selectToken('AM'));
+    expect(m.target).toBe('phUSD');
+    act(() => m.openPicker('counter'));
+    expect(m.tokenRows.map((r) => r.sym)).not.toContain('AM');
+  });
+
+  it('target AM: the counter list gains phUSD, USDC quotes via quoteToAM and sends swapToAM', async () => {
+    allowanceByToken[USDC] = maxUint256;
+    render(<Harness />);
+    expect(m.canPickTarget).toBe(true);
+    act(() => m.openPicker('target'));
+    expect(m.tokenRows.map((r) => [r.sym, r.name])).toEqual([['phUSD', 'Phoenix USD'], ['AM', 'Phoenix Antimatter']]);
+    act(() => m.selectToken('AM'));
+    expect(m.target).toBe('AM');
+    act(() => m.openPicker('counter'));
+    expect(m.tokenRows.at(-1)).toMatchObject({ sym: 'phUSD', hint: 'via sUSDS' });
+    act(() => m.closePicker());
+
+    typePay('100');
+    expect(reads.filter((r) => r.functionName === 'quoteToAM').at(-1)?.enabled).toBe(true);
+    expect(m.swap.outWei).toBe(e18('80'));
+    act(() => m.startReview());
+    expect(m.steps.map((s) => s.sub)).toEqual(['UniswapHelper.swapToAM']);
+    await act(async () => {
+      await m.advanceStep();
+    });
+    const call = writeContractAsync.mock.calls[0][0];
+    expect(call.functionName).toBe('swapToAM');
+    expect(call.args.slice(0, 4)).toEqual([USDC, parseUnits('100', 6), (e18('80') * 9950n) / 10000n, WALLET]);
+  });
+
+  it('phUSD → AM crosses both pairs and sends swapPhUSDToAM (approving phUSD)', async () => {
+    render(<Harness />);
+    act(() => m.openPicker('target'));
+    act(() => m.selectToken('AM'));
+    act(() => m.openPicker('counter'));
+    act(() => m.selectToken('phUSD'));
+    typePay('100');
+    expect(m.swap.syms).toEqual(['phUSD', 'sUSDS', 'AM']);
+    expect(m.swap.outWei).toBe(e18('99'));
+    act(() => m.startReview());
+    expect(m.steps.map((s) => s.sub)).toEqual(['phUSD.approve(UniswapHelper)', 'UniswapHelper.swapPhUSDToAM']);
+    for (let i = 0; i < 2; i++) {
+      await act(async () => {
+        await m.advanceStep();
+      });
+    }
+    expect(approve).toHaveBeenCalledWith(PHUSD, HELPER, maxUint256);
+    const call = writeContractAsync.mock.calls[0][0];
+    expect(call.functionName).toBe('swapPhUSDToAM');
+    expect(call.args.slice(0, 3)).toEqual([e18('100'), (e18('99') * 9950n) / 10000n, WALLET]);
+  });
+
+  it('picking the counter token as target swaps the two sides', () => {
+    render(<Harness />);
+    act(() => m.openPicker('target'));
+    act(() => m.selectToken('AM'));
+    act(() => m.openPicker('counter'));
+    act(() => m.selectToken('phUSD'));
+    act(() => m.openPicker('target'));
+    act(() => m.selectToken('phUSD'));
+    expect([m.target, m.token]).toEqual(['phUSD', 'AM']);
+  });
+
+  it('AM liquidity: add approves AM and calls addLiquidityAMSUSDS; remove approves the AM pair', async () => {
+    render(<Harness />);
+    act(() => m.setLiqAction('add'));
+    act(() => m.selectLiqTarget('AM'));
+    expect(m.liqPairLabel).toBe('sUSDS/AM');
+    act(() => m.selectAddToken('sUSDS'));
+    act(() => m.setAddTok('10'));
+    act(() => m.startReview());
+    expect(m.steps.map((s) => s.sub)).toEqual([
+      'sUSDS.approve(UniswapHelper)',
+      'AM.approve(UniswapHelper)',
+      'UniswapHelper.addLiquidityAMSUSDS',
+    ]);
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        await m.advanceStep();
+      });
+    }
+    expect(approve).toHaveBeenCalledWith(AM, HELPER, maxUint256);
+    expect(writeContractAsync.mock.calls[0][0].functionName).toBe('addLiquidityAMSUSDS');
+    act(() => m.done());
+
+    approve.mockClear();
+    act(() => m.setLiqAction('remove'));
+    act(() => m.toggleLiqTarget());
+    expect(m.liqTarget).toBe('phUSD');
+    act(() => m.toggleLiqTarget());
+    act(() => m.pickRemovePct(0.5));
+    act(() => m.startReview());
+    expect(m.steps.map((s) => s.sub)).toEqual(['UNI-V2.approve(UniswapHelper)', 'UniswapHelper.removeLiquidityAMSUSDS']);
+    expect(m.legs[1].sym).toBe('AM');
+    await act(async () => {
+      await m.advanceStep();
+    });
+    expect(approve).toHaveBeenCalledWith(AM_PAIR, HELPER, maxUint256);
   });
 });
 

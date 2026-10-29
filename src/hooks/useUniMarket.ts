@@ -5,7 +5,7 @@
  * Reads:
  *   - quotes from the UniswapHelper `quote*` functions (exact-in only; the ETH
  *     quotes are non-view and go through `useSimulateContract`)
- *   - reserves, token0 and LP totalSupply from the phUSD/sUSDS V2 pair
+ *   - reserves, token0 and LP totalSupply from the phUSD/sUSDS and AM/sUSDS V2 pairs
  *   - the sUSDS share price (`convertToAssets(1e18)`), previewDeposit/previewRedeem
  *   - every token balance + allowance to UniswapHelper, the native ETH balance
  *     and the LP (pair) balance + allowance
@@ -15,7 +15,9 @@
  * Zero-address guard: while `UniswapHelper` or `PhusdSusdsPair` is missing or
  * the zero address (mainnet / Sepolia until the cutover) every read is
  * disabled, no write is ever sent, and the CTA reads "Not available on this
- * network".
+ * network". Antimatter (AM) is gated separately on `AntimatterSusdsPair` and
+ * `Antimatter`: while either is zero the AM options are simply not offered
+ * and the tab behaves as the phUSD-only market.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -42,6 +44,7 @@ import {
   DEFAULT_ADD_TOKEN,
   DEFAULT_REMOVE_OUT,
   DEFAULT_SLIPPAGE,
+  DEFAULT_TARGET,
   ETH_GAS_RESERVE_WEI,
   LP_DECIMALS,
   LP_DP,
@@ -50,16 +53,20 @@ import {
   REMOVE_OUT_TOKENS,
   REMOVE_PCTS,
   SLIPPAGE_OPTIONS,
-  TOKENS,
+  TARGET_ORDER,
   UNISWAP_TRADE_URL,
   explorerTxUrl,
+  isTarget,
   metaOf,
+  otherTarget,
   type AddTokenSymbol,
   type ApprovableSymbol,
+  type CounterSymbol,
   type HelperMethod,
   type MarketSymbol,
   type RemoveOutSymbol,
   type SwapTokenSymbol,
+  type TargetSymbol,
 } from '../data/uniMarketConfig';
 import {
   UNAVAILABLE_CTA,
@@ -92,6 +99,7 @@ import {
   swapCta,
   swapModalStats,
   swapQuote,
+  swapMethod,
   swapSteps,
   toNum,
   usd,
@@ -135,23 +143,40 @@ export interface ReceiveRowView {
 }
 
 export interface TokenRowView {
-  sym: SwapTokenSymbol;
+  sym: MarketSymbol;
   name: string;
   hint: string;
   balText: string;
   selected: boolean;
 }
 
+/** Which token picker covers the trade panel: the routed side, or the phUSD / AM side. */
+export type PickerKind = 'counter' | 'target';
+
+/** Swaps taking a routed ERC20 address as their first argument. */
+type RoutedSwapMethod = 'swapToPhUSD' | 'swapFromPhUSD' | 'swapToAM' | 'swapFromAM';
+/** Swaps paid in native ETH (`msg.value`). */
+type PayableSwapMethod = 'swapETHToPhUSD' | 'swapETHToAM';
+/** Swaps taking only `(amountIn, min, recipient, deadline)`. */
+type AmountSwapMethod = 'swapPhUSDToETH' | 'swapAMToETH' | 'swapPhUSDToAM' | 'swapAMToPhUSD';
+type AddMethod = 'addLiquiditySUSDS' | 'addLiquidityUSDS' | 'addLiquidityAMSUSDS' | 'addLiquidityAMUSDS';
+type RemoveMethod = 'removeLiquiditySUSDS' | 'removeLiquidityUSDS' | 'removeLiquidityAMSUSDS' | 'removeLiquidityAMUSDS';
+type RoutedQuoteFn = 'quoteToPhUSD' | 'quoteFromPhUSD' | 'quoteToAM' | 'quoteFromAM';
+type CrossQuoteFn = 'quotePhUSDToAM' | 'quoteAMToPhUSD';
+type EthQuoteFn = 'quoteETHToPhUSD' | 'quotePhUSDToETH' | 'quoteETHToAM' | 'quoteAMToETH';
+
 /** The one helper call a review ends in. Amounts are frozen when the review opens. */
 export type ActionPlan =
-  | { method: 'swapToPhUSD' | 'swapFromPhUSD'; token: SwapTokenSymbol; amountIn: bigint; min: bigint }
-  | { method: 'swapETHToPhUSD' | 'swapPhUSDToETH'; amountIn: bigint; min: bigint }
-  | { method: 'addLiquiditySUSDS' | 'addLiquidityUSDS'; a: bigint; b: bigint; aMin: bigint; bMin: bigint }
-  | { method: 'removeLiquiditySUSDS' | 'removeLiquidityUSDS'; liquidity: bigint; outMin: bigint; phMin: bigint };
+  | { method: RoutedSwapMethod; token: SwapTokenSymbol; amountIn: bigint; min: bigint }
+  | { method: PayableSwapMethod | AmountSwapMethod; amountIn: bigint; min: bigint }
+  | { method: AddMethod; a: bigint; b: bigint; aMin: bigint; bMin: bigint }
+  | { method: RemoveMethod; liquidity: bigint; outMin: bigint; phMin: bigint };
 
 /** Everything the review modal shows, frozen at `startReview()`. */
 interface Review {
   mode: MarketMode;
+  /** Pair the review acts on; resolves which UNI-V2 an LP approval targets. */
+  target: TargetSymbol;
   steps: ReviewStep[];
   action: ActionPlan;
   legs: [ReviewLeg, ReviewLeg];
@@ -162,16 +187,23 @@ interface Review {
 interface UniMarketState {
   mode: MarketMode;
   dir: Direction;
-  tok: SwapTokenSymbol;
+  /** Swap target: the phUSD / AM side. */
+  target: TargetSymbol;
+  /** Swap counter side; never equal to `target`. */
+  tok: CounterSymbol;
   pay: string;
+  /** Pair the Liquidity mode (position, Add, Remove) works on. */
+  liqTarget: TargetSymbol;
   addSym: AddTokenSymbol;
   aTok: string;
   aPh: string;
   aEdited: AddEditedSide;
   slip: number;
   settingsOpen: boolean;
-  pickerOpen: boolean;
+  picker: PickerKind | null;
   addPickerOpen: boolean;
+  /** Add-liquidity phUSD / AM dropdown. */
+  liqTargetPickerOpen: boolean;
   review: Review | null;
   stepIdx: number;
   pending: boolean;
@@ -191,16 +223,19 @@ interface UniMarketState {
 const INITIAL_STATE: UniMarketState = {
   mode: 'swap',
   dir: 'buy',
+  target: DEFAULT_TARGET,
   tok: 'USDC',
   pay: '',
+  liqTarget: DEFAULT_TARGET,
   addSym: DEFAULT_ADD_TOKEN,
   aTok: '',
   aPh: '',
   aEdited: 'tok',
   slip: DEFAULT_SLIPPAGE,
   settingsOpen: false,
-  pickerOpen: false,
+  picker: null,
   addPickerOpen: false,
+  liqTargetPickerOpen: false,
   review: null,
   stepIdx: 0,
   pending: false,
@@ -213,7 +248,7 @@ const INITIAL_STATE: UniMarketState = {
   lastLiq: 'add',
 };
 
-const CLOSE_POPOVERS = { pickerOpen: false, settingsOpen: false, addPickerOpen: false } as const;
+const CLOSE_POPOVERS = { picker: null, settingsOpen: false, addPickerOpen: false, liqTargetPickerOpen: false } as const;
 
 /** Resolve an address to `undefined` when missing or zero, so dependent reads disable at source. */
 export function liveAddress(value: unknown): Address | undefined {
@@ -264,42 +299,8 @@ function useErc20State(token: Address | undefined, owner: Address | undefined, s
 
 const asBig = (v: unknown): bigint | undefined => (typeof v === 'bigint' ? v : undefined);
 
-export function useUniMarket() {
-  const [state, setState] = useState<UniMarketState>(INITIAL_STATE);
-  const patch = useCallback((p: Partial<UniMarketState>) => setState((prev) => ({ ...prev, ...p })), []);
-
-  const { address: wallet } = useAccount();
-  const chainId = useChainId();
-  const { addresses } = useContractAddresses();
-  const { addToast } = useToast();
-  const { refreshWalletBalances } = useWalletBalances();
-  const { approve } = useTokenApproval();
-  const { writeContractAsync } = useWriteContract();
-
-  // ---- zero-address guard -------------------------------------------------
-  const helperRaw = liveAddress(addresses?.UniswapHelper);
-  const pairRaw = liveAddress(addresses?.PhusdSusdsPair);
-  const available = !!helperRaw && !!pairRaw;
-  const helper = available ? helperRaw : undefined;
-  const pair = available ? pairRaw : undefined;
-  const tokenAddresses: Record<ApprovableSymbol, Address | undefined> = useMemo(() => {
-    const addrOf = (key: 'Dola' | 'USDC' | 'USDe' | 'USDS' | 'SUSDS' | 'PhUSD'): Address | undefined =>
-      available ? liveAddress(addresses?.[key]) : undefined;
-    return {
-      DOLA: addrOf('Dola'),
-      USDC: addrOf('USDC'),
-      USDe: addrOf('USDe'),
-      USDS: addrOf('USDS'),
-      sUSDS: addrOf('SUSDS'),
-      phUSD: addrOf('PhUSD'),
-      ETH: undefined,
-      [LP_SYMBOL]: pair,
-    };
-  }, [addresses, available, pair]);
-  const owner = available ? wallet : undefined;
-  const connected = !!wallet;
-
-  // ---- pair + sUSDS -------------------------------------------------------
+/** Reserves (oriented by token0), LP totalSupply and the shared sUSDS price, as one PoolState. */
+function usePairPool(pair: Address | undefined, target: Address | undefined, spx: bigint | undefined) {
   const { data: reservesRaw, refetch: refetchReserves } = useReadContract({
     address: pair,
     abi: uniV2PairAbi,
@@ -318,6 +319,67 @@ export function useUniMarket() {
     functionName: 'totalSupply',
     query: { enabled: !!pair },
   });
+  const pool: PoolState | undefined = useMemo(() => {
+    const r = reservesRaw as readonly [bigint, bigint, number] | undefined;
+    const t0 = token0Raw as Address | undefined;
+    const ts = asBig(totalSupplyRaw);
+    if (!r || !t0 || ts === undefined || spx === undefined || !target) return undefined;
+    const tIs0 = t0.toLowerCase() === target.toLowerCase();
+    return { rPh: tIs0 ? r[0] : r[1], rS: tIs0 ? r[1] : r[0], totalSupply: ts, spx };
+  }, [reservesRaw, token0Raw, totalSupplyRaw, spx, target]);
+  const refetch = useCallback(() => {
+    void refetchReserves();
+    void refetchTotalSupply();
+  }, [refetchReserves, refetchTotalSupply]);
+  return { pool, refetch };
+}
+
+export function useUniMarket() {
+  const [state, setState] = useState<UniMarketState>(INITIAL_STATE);
+  const patch = useCallback((p: Partial<UniMarketState>) => setState((prev) => ({ ...prev, ...p })), []);
+
+  const { address: wallet } = useAccount();
+  const chainId = useChainId();
+  const { addresses } = useContractAddresses();
+  const { addToast } = useToast();
+  const { refreshWalletBalances } = useWalletBalances();
+  const { approve } = useTokenApproval();
+  const { writeContractAsync } = useWriteContract();
+
+  // ---- zero-address guard -------------------------------------------------
+  const helperRaw = liveAddress(addresses?.UniswapHelper);
+  const pairRaw = liveAddress(addresses?.PhusdSusdsPair);
+  const available = !!helperRaw && !!pairRaw;
+  const helper = available ? helperRaw : undefined;
+  const pair = available ? pairRaw : undefined;
+  const amPairRaw = liveAddress(addresses?.AntimatterSusdsPair);
+  const amRaw = liveAddress(addresses?.Antimatter);
+  const amAvailable = available && !!amPairRaw && !!amRaw;
+  const amPair = amAvailable ? amPairRaw : undefined;
+  const pairs: Record<TargetSymbol, Address | undefined> = useMemo(() => ({ phUSD: pair, AM: amPair }), [pair, amPair]);
+  const tokenAddresses: Record<MarketSymbol, Address | undefined> = useMemo(() => {
+    const addrOf = (key: 'Dola' | 'USDC' | 'USDe' | 'USDS' | 'SUSDS' | 'PhUSD'): Address | undefined =>
+      available ? liveAddress(addresses?.[key]) : undefined;
+    return {
+      DOLA: addrOf('Dola'),
+      USDC: addrOf('USDC'),
+      USDe: addrOf('USDe'),
+      USDS: addrOf('USDS'),
+      sUSDS: addrOf('SUSDS'),
+      phUSD: addrOf('PhUSD'),
+      AM: amAvailable ? amRaw : undefined,
+      ETH: undefined,
+    };
+  }, [addresses, available, amAvailable, amRaw]);
+  const owner = available ? wallet : undefined;
+  const connected = !!wallet;
+
+  // AM falls back to phUSD wherever the AM pair is not deployed (mainnet / Sepolia).
+  const target: TargetSymbol = amAvailable ? state.target : 'phUSD';
+  const liqTarget: TargetSymbol = amAvailable ? state.liqTarget : 'phUSD';
+  const tok: CounterSymbol = !amAvailable && isTarget(state.tok) ? 'USDC' : state.tok;
+
+  // ---- pairs + sUSDS ------------------------------------------------------
   const susds = tokenAddresses.sUSDS;
   const { data: spxRaw, refetch: refetchSpx } = useReadContract({
     address: susds,
@@ -327,16 +389,11 @@ export function useUniMarket() {
     query: { enabled: !!susds },
   });
 
-  const phusdAddr = tokenAddresses.phUSD;
-  const pool: PoolState | undefined = useMemo(() => {
-    const r = reservesRaw as readonly [bigint, bigint, number] | undefined;
-    const t0 = token0Raw as Address | undefined;
-    const ts = asBig(totalSupplyRaw);
-    const spx = asBig(spxRaw);
-    if (!r || !t0 || ts === undefined || spx === undefined || !phusdAddr) return undefined;
-    const phIs0 = t0.toLowerCase() === phusdAddr.toLowerCase();
-    return { rPh: phIs0 ? r[0] : r[1], rS: phIs0 ? r[1] : r[0], totalSupply: ts, spx };
-  }, [reservesRaw, token0Raw, totalSupplyRaw, spxRaw, phusdAddr]);
+  const spx = asBig(spxRaw);
+  const phPair = usePairPool(pair, tokenAddresses.phUSD, spx);
+  const amPairPool = usePairPool(amPair, tokenAddresses.AM, spx);
+  const pools: Record<TargetSymbol, PoolState | undefined> = { phUSD: phPair.pool, AM: amPairPool.pool };
+  const pool = pools.phUSD;
 
   // ---- balances + allowances (spender = UniswapHelper) --------------------
   const dola = useErc20State(tokenAddresses.DOLA, owner, helper);
@@ -345,64 +402,64 @@ export function useUniMarket() {
   const usdsT = useErc20State(tokenAddresses.USDS, owner, helper);
   const susdsT = useErc20State(tokenAddresses.sUSDS, owner, helper);
   const phusd = useErc20State(tokenAddresses.phUSD, owner, helper);
-  const lpT = useErc20State(pair, owner, helper);
+  const amT = useErc20State(tokenAddresses.AM, owner, helper);
+  const lpPh = useErc20State(pair, owner, helper);
+  const lpAm = useErc20State(amPair, owner, helper);
+  const lpT = liqTarget === 'AM' ? lpAm : lpPh;
   const { data: ethBalRaw, refetch: refetchEth } = useBalance({
     address: owner,
     query: { enabled: !!owner },
   });
   const ethBal = ethBalRaw?.value;
 
-  const balances: Record<ApprovableSymbol, bigint | undefined> = {
+  const balances: Record<MarketSymbol, bigint | undefined> = {
     DOLA: dola.balance, USDC: usdc.balance, USDe: usde.balance, USDS: usdsT.balance,
-    sUSDS: susdsT.balance, phUSD: phusd.balance, ETH: ethBal, [LP_SYMBOL]: lpT.balance,
+    sUSDS: susdsT.balance, phUSD: phusd.balance, AM: amT.balance, ETH: ethBal,
   };
-  const allowances: Record<ApprovableSymbol, bigint | undefined> = {
+  const allowances: Record<MarketSymbol, bigint | undefined> = {
     DOLA: dola.allowance, USDC: usdc.allowance, USDe: usde.allowance, USDS: usdsT.allowance,
-    sUSDS: susdsT.allowance, phUSD: phusd.allowance, ETH: undefined, [LP_SYMBOL]: lpT.allowance,
+    sUSDS: susdsT.allowance, phUSD: phusd.allowance, AM: amT.allowance, ETH: undefined,
   };
   const lpBal = lpT.balance ?? 0n;
 
   // ---- swap quote ---------------------------------------------------------
-  const t = TOKENS[state.tok];
+  const t = metaOf(tok);
+  const cross = isTarget(tok);
   const buy = state.dir === 'buy';
-  const inSym: MarketSymbol = buy ? t.sym : 'phUSD';
+  const inSym: MarketSymbol = buy ? tok : target;
   const inDec = metaOf(inSym).decimals;
   const inWei = parseAmount(state.pay, inDec);
   const debouncedPay = useDebounced(state.pay, QUOTE_DEBOUNCE_MS);
   const quoteIn = parseAmount(debouncedPay, inDec);
-  const tokAddr = tokenAddresses[state.tok];
+  const tokAddr = cross ? undefined : tokenAddresses[tok];
   const quoteOn = available && quoteIn > 0n && state.mode === 'swap';
+  // Every swap has a same-named quote: swapToAM → quoteToAM, swapAMToPhUSD → quoteAMToPhUSD, …
+  const quoteFn = swapMethod(t, buy, target).replace(/^swap/, 'quote');
+  const routedOn = quoteOn && !cross && !t.native;
 
-  const stableBuy = useReadContract({
+  const routedQuote = useReadContract({
     address: helper,
     abi: uniswapHelperAbi,
-    functionName: 'quoteToPhUSD',
+    functionName: (routedOn ? quoteFn : buy ? 'quoteToPhUSD' : 'quoteFromPhUSD') as RoutedQuoteFn,
     args: tokAddr ? [tokAddr, quoteIn] : undefined,
-    query: { enabled: quoteOn && buy && !t.native && !!tokAddr },
+    query: { enabled: routedOn && !!tokAddr },
   });
-  const stableSell = useReadContract({
+  // phUSD ↔ AM: one Router02 path [in, sUSDS, out].
+  const crossQuote = useReadContract({
     address: helper,
     abi: uniswapHelperAbi,
-    functionName: 'quoteFromPhUSD',
-    args: tokAddr ? [tokAddr, quoteIn] : undefined,
-    query: { enabled: quoteOn && !buy && !t.native && !!tokAddr },
+    functionName: (cross ? quoteFn : 'quotePhUSDToAM') as CrossQuoteFn,
+    args: [quoteIn],
+    query: { enabled: quoteOn && cross },
   });
-  // quoteETHToPhUSD / quotePhUSDToETH are nonpayable (they call the V3 quoter): simulate.
-  const ethBuy = useSimulateContract({
+  // The ETH quotes are nonpayable (they call the V3 quoter): simulate.
+  const ethQuote = useSimulateContract({
     address: helper,
     abi: uniswapHelperAbi,
-    functionName: 'quoteETHToPhUSD',
+    functionName: (t.native ? quoteFn : 'quoteETHToPhUSD') as EthQuoteFn,
     args: [quoteIn],
     account: zeroAddress,
-    query: { enabled: quoteOn && buy && t.native },
-  });
-  const ethSell = useSimulateContract({
-    address: helper,
-    abi: uniswapHelperAbi,
-    functionName: 'quotePhUSDToETH',
-    args: [quoteIn],
-    account: zeroAddress,
-    query: { enabled: quoteOn && !buy && t.native },
+    query: { enabled: quoteOn && t.native },
   });
   // phUSD per 1 ETH — the only ETH price source on Anvil.
   const ethUnit = useSimulateContract({
@@ -414,10 +471,10 @@ export function useUniMarket() {
     query: { enabled: available },
   });
 
-  const activeQuote = t.native ? (buy ? ethBuy : ethSell) : buy ? stableBuy : stableSell;
+  const activeQuote = t.native ? ethQuote : cross ? crossQuote : routedQuote;
   const quoteData = t.native
-    ? asBig((activeQuote as typeof ethBuy).data?.result)
-    : asBig((activeQuote as typeof stableBuy).data);
+    ? asBig(ethQuote.data?.result)
+    : asBig(cross ? crossQuote.data : routedQuote.data);
   const debouncing = inWei !== quoteIn;
   const quoteOut = !debouncing && quoteOn ? quoteData : undefined;
   const quoteLoading = debouncing || (quoteOn && (activeQuote.isLoading || activeQuote.isFetching) && quoteData === undefined);
@@ -428,7 +485,8 @@ export function useUniMarket() {
 
   // Pure and cheap: rebuilt every render from the live reads.
   const swap = swapQuote({
-    tok: state.tok, dir: state.dir, inWei, quoteOut, quoteLoading, quoteError, slip: state.slip, pool,
+    target, tok, dir: state.dir, inWei, quoteOut, quoteLoading, quoteError, slip: state.slip,
+    pool: pools[target], counterPool: cross ? pools[tok as TargetSymbol] : undefined,
     inBal: balances[inSym], allowance: allowances[inSym], ethUsd,
   });
 
@@ -443,18 +501,19 @@ export function useUniMarket() {
     args: [addTokWei],
     query: { enabled: previewDepositOn },
   });
+  const liqPool = pools[liqTarget];
   // Pure and cheap: rebuilt every render from the live reads.
   const add = addQuote({
-    depositSym: state.addSym, edited: state.aEdited, tokWei: addTokWei, phWei: addPhWei,
+    target: liqTarget, depositSym: state.addSym, edited: state.aEdited, tokWei: addTokWei, phWei: addPhWei,
     previewShares: previewDepositOn ? asBig(previewSharesRaw) : undefined,
-    slip: state.slip, pool,
-    tokBal: balances[state.addSym], phBal: balances.phUSD,
-    tokAllowance: allowances[state.addSym], phAllowance: allowances.phUSD,
+    slip: state.slip, pool: liqPool,
+    tokBal: balances[state.addSym], phBal: balances[liqTarget],
+    tokAllowance: allowances[state.addSym], phAllowance: allowances[liqTarget],
   });
 
   // ---- remove quote -------------------------------------------------------
   const burnWei = parseAmount(state.rLp, LP_DECIMALS);
-  const sShare = pool && pool.totalSupply > 0n ? (burnWei * pool.rS) / pool.totalSupply : 0n;
+  const sShare = liqPool && liqPool.totalSupply > 0n ? (burnWei * liqPool.rS) / liqPool.totalSupply : 0n;
   const previewRedeemOn = !!susds && state.out === 'USDS' && sShare > 0n;
   const { data: previewUsdsRaw } = useReadContract({
     address: susds,
@@ -465,10 +524,10 @@ export function useUniMarket() {
   });
   // Pure and cheap: rebuilt every render from the live reads.
   const remove = removeQuote({
-    burnWei, lpBal, out: state.out, previewUsds: previewRedeemOn ? asBig(previewUsdsRaw) : undefined,
-    slip: state.slip, pool, allowance: allowances[LP_SYMBOL],
+    target: liqTarget, burnWei, lpBal, out: state.out, previewUsds: previewRedeemOn ? asBig(previewUsdsRaw) : undefined,
+    slip: state.slip, pool: liqPool, allowance: lpT.allowance,
   });
-  const position = positionView(lpBal, pool);
+  const position = positionView(lpBal, liqPool);
 
   // ---- CTA ----------------------------------------------------------------
   const isSwap = state.mode === 'swap';
@@ -483,19 +542,21 @@ export function useUniMarket() {
 
   // ---- refetch after every confirmed receipt ------------------------------
   const refetchAll = useCallback(() => {
-    void refetchReserves();
-    void refetchTotalSupply();
+    phPair.refetch();
+    amPairPool.refetch();
     void refetchSpx();
-    dola.refetch(); usdc.refetch(); usde.refetch(); usdsT.refetch(); susdsT.refetch(); phusd.refetch(); lpT.refetch();
+    dola.refetch(); usdc.refetch(); usde.refetch(); usdsT.refetch(); susdsT.refetch(); phusd.refetch(); amT.refetch();
+    lpPh.refetch(); lpAm.refetch();
     void refetchEth();
-    void stableBuy.refetch(); void stableSell.refetch(); void ethBuy.refetch(); void ethSell.refetch();
+    void routedQuote.refetch(); void crossQuote.refetch(); void ethQuote.refetch();
     refreshWalletBalances();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refetchReserves, refetchTotalSupply, refetchSpx, refetchEth, refreshWalletBalances,
-    dola.refetch, usdc.refetch, usde.refetch, usdsT.refetch, susdsT.refetch, phusd.refetch, lpT.refetch]);
+  }, [phPair.refetch, amPairPool.refetch, refetchSpx, refetchEth, refreshWalletBalances,
+    dola.refetch, usdc.refetch, usde.refetch, usdsT.refetch, susdsT.refetch, phusd.refetch, amT.refetch,
+    lpPh.refetch, lpAm.refetch]);
 
   // ---- input display strings ----------------------------------------------
-  const outSym: MarketSymbol = buy ? 'phUSD' : t.sym;
+  const outSym: MarketSymbol = buy ? target : tok;
   const payStr = state.pay;
   const recvStr = rawUnits(swap.outWei, metaOf(outSym).decimals, metaOf(outSym).decimals === 6 ? 6 : 8);
   const aTokStr = state.aEdited === 'tok' ? state.aTok : rawUnits(add.a, 18, 6);
@@ -521,19 +582,37 @@ export function useUniMarket() {
     [patch, lpBal],
   );
   const setRemoveOut = useCallback((out: RemoveOutSymbol) => patch({ out }), [patch]);
-  const toggleSettings = useCallback(() => setState((p) => ({ ...p, settingsOpen: !p.settingsOpen, pickerOpen: false, addPickerOpen: false })), []);
+  const toggleSettings = useCallback(() => setState((p) => ({
+    ...p, settingsOpen: !p.settingsOpen, picker: null, addPickerOpen: false, liqTargetPickerOpen: false,
+  })), []);
   const setSlippage = useCallback((slip: number) => patch({ slip }), [patch]);
-  const openPicker = useCallback(() => patch({ pickerOpen: true, settingsOpen: false }), [patch]);
-  const closePicker = useCallback(() => patch({ pickerOpen: false }), [patch]);
-  const selectToken = useCallback((tok: SwapTokenSymbol) => patch({ tok, pickerOpen: false }), [patch]);
+  const openPicker = useCallback((kind: PickerKind = 'counter') => patch({ picker: kind, settingsOpen: false }), [patch]);
+  const closePicker = useCallback(() => patch({ picker: null }), [patch]);
+  /** Picks a row of whichever picker is open. Choosing the counter's token as target swaps the two sides. */
+  const selectToken = useCallback((sym: MarketSymbol) => setState((p) => {
+    if (p.picker === 'target' && isTarget(sym)) {
+      return { ...p, picker: null, target: sym, tok: p.tok === sym ? otherTarget(sym) : p.tok };
+    }
+    return { ...p, picker: null, tok: sym as CounterSymbol };
+  }), []);
+  const selectLiqTarget = useCallback((liq: TargetSymbol) => setState((p) => ({
+    ...p, liqTargetPickerOpen: false, liqTarget: liq, rLp: liq === p.liqTarget ? p.rLp : '',
+  })), []);
+  const toggleLiqTarget = useCallback(() => {
+    if (amAvailable) selectLiqTarget(otherTarget(liqTarget));
+  }, [amAvailable, liqTarget, selectLiqTarget]);
+  const toggleLiqTargetPicker = useCallback(() => setState((p) => ({
+    ...p, liqTargetPickerOpen: !p.liqTargetPickerOpen, addPickerOpen: false, settingsOpen: false,
+  })), []);
+  const closeLiqTargetPicker = useCallback(() => patch({ liqTargetPickerOpen: false }), [patch]);
   const setPay = useCallback((v: string) => patch({ pay: clean(v) }), [patch]);
 
   // MAX on native ETH leaves ETH_GAS_RESERVE behind for gas.
   const payMaxBal = buy
     ? t.native
       ? ethBal !== undefined ? (ethBal > ETH_GAS_RESERVE_WEI ? ethBal - ETH_GAS_RESERVE_WEI : 0n) : undefined
-      : balances[t.sym]
-    : balances.phUSD;
+      : balances[tok]
+    : balances[target];
   const payMax = useCallback(() => {
     if (payMaxBal === undefined) return;
     patch({ pay: payMaxBal > 0n ? formatUnits(payMaxBal, inDec) : '0' });
@@ -543,12 +622,15 @@ export function useUniMarket() {
     patch({ dir: state.dir === 'buy' ? 'sell' : 'buy', pay: recvStr });
   }, [patch, state.dir, recvStr]);
 
-  const toggleAddPicker = useCallback(() => setState((p) => ({ ...p, addPickerOpen: !p.addPickerOpen, settingsOpen: false })), []);
+  const toggleAddPicker = useCallback(() => setState((p) => ({
+    ...p, addPickerOpen: !p.addPickerOpen, liqTargetPickerOpen: false, settingsOpen: false,
+  })), []);
+  const closeAddPicker = useCallback(() => patch({ addPickerOpen: false }), [patch]);
   const selectAddToken = useCallback((addSym: AddTokenSymbol) => patch({ addSym, addPickerOpen: false }), [patch]);
   const setAddTok = useCallback((v: string) => patch({ aTok: clean(v), aEdited: 'tok' }), [patch]);
   const setAddPh = useCallback((v: string) => patch({ aPh: clean(v), aEdited: 'ph' }), [patch]);
   const addTokBal = balances[state.addSym];
-  const phBal = balances.phUSD;
+  const phBal = balances[liqTarget];
   const addTokMax = useCallback(() => {
     if (addTokBal !== undefined) patch({ aTok: formatUnits(addTokBal, 18), aEdited: 'tok' });
   }, [patch, addTokBal]);
@@ -563,13 +645,14 @@ export function useUniMarket() {
     let next: Review;
     if (mode === 'swap') {
       const q = swap;
-      const action: ActionPlan = q.token.native
-        ? { method: q.method as 'swapETHToPhUSD' | 'swapPhUSDToETH', amountIn: q.inWei, min: q.minOutWei }
-        : { method: q.method as 'swapToPhUSD' | 'swapFromPhUSD', token: q.token.sym, amountIn: q.inWei, min: q.minOutWei };
+      const action: ActionPlan = q.token.native || q.cross
+        ? { method: q.method as PayableSwapMethod | AmountSwapMethod, amountIn: q.inWei, min: q.minOutWei }
+        : { method: q.method as RoutedSwapMethod, token: q.token.sym as SwapTokenSymbol, amountIn: q.inWei, min: q.minOutWei };
       const inD = metaOf(q.inSym);
       const outD = metaOf(q.outSym);
       next = {
         mode,
+        target: q.target,
         steps: swapSteps(q),
         action,
         legs: [
@@ -584,11 +667,12 @@ export function useUniMarket() {
       const dpA = dpOf(q.depositSym);
       next = {
         mode,
+        target: q.target,
         steps: addSteps(q),
-        action: { method: q.method as 'addLiquiditySUSDS' | 'addLiquidityUSDS', a: q.a, b: q.b, aMin: q.aMin, bMin: q.bMin },
+        action: { method: q.method as AddMethod, a: q.a, b: q.b, aMin: q.aMin, bMin: q.bMin },
         legs: [
           { caption: 'Deposit (up to)', sym: q.depositSym, amount: fmtUnits(q.a, 18, dpA) },
-          { caption: 'Deposit (up to)', sym: 'phUSD', amount: fmtUnits(q.b, 18, 2) },
+          { caption: 'Deposit (up to)', sym: q.target, amount: fmtUnits(q.b, 18, 2) },
         ],
         stats: addModalStats(q),
         successText: `Supplied liquidity · ≈ ${fmtUnits(q.lp, LP_DECIMALS, LP_DP)} ${LP_SYMBOL} received`,
@@ -597,14 +681,15 @@ export function useUniMarket() {
       const q = remove;
       next = {
         mode,
+        target: q.target,
         steps: removeSteps(q),
-        action: { method: q.method as 'removeLiquiditySUSDS' | 'removeLiquidityUSDS', liquidity: q.burn, outMin: q.outMin, phMin: q.phMin },
+        action: { method: q.method as RemoveMethod, liquidity: q.burn, outMin: q.outMin, phMin: q.phMin },
         legs: [
           { caption: 'You receive (estimated)', sym: q.outSym, amount: fmtUnits(q.outAmt, 18, q.outDp) },
-          { caption: 'You receive (estimated)', sym: 'phUSD', amount: fmtUnits(q.phAmt, 18, 2) },
+          { caption: 'You receive (estimated)', sym: q.target, amount: fmtUnits(q.phAmt, 18, 2) },
         ],
         stats: removeModalStats(q),
-        successText: `Burned ${fmtUnits(q.burn, LP_DECIMALS, LP_DP)} ${LP_SYMBOL} · received ≈ ${fmtUnits(q.outAmt, 18, q.outDp)} ${q.outSym} + ${fmtUnits(q.phAmt, 18, 2)} phUSD`,
+        successText: `Burned ${fmtUnits(q.burn, LP_DECIMALS, LP_DP)} ${LP_SYMBOL} · received ≈ ${fmtUnits(q.outAmt, 18, q.outDp)} ${q.outSym} + ${fmtUnits(q.phAmt, 18, 2)} ${q.target}`,
       };
     }
     patch({
@@ -616,6 +701,7 @@ export function useUniMarket() {
       lastHash: undefined,
       settingsOpen: false,
       addPickerOpen: false,
+      liqTargetPickerOpen: false,
     });
   }, [patch, cta.enabled, available, state.mode, swap, add, remove]);
 
@@ -624,7 +710,9 @@ export function useUniMarket() {
     const deadline = deadlineFromNow();
     switch (plan.method) {
       case 'swapToPhUSD':
-      case 'swapFromPhUSD': {
+      case 'swapFromPhUSD':
+      case 'swapToAM':
+      case 'swapFromAM': {
         const token = tokenAddresses[plan.token];
         if (!token) throw new Error(`${plan.token} address unavailable on this network`);
         return writeContractAsync({
@@ -633,23 +721,31 @@ export function useUniMarket() {
         });
       }
       case 'swapETHToPhUSD':
+      case 'swapETHToAM':
         return writeContractAsync({
-          address: h, abi: uniswapHelperAbi, functionName: 'swapETHToPhUSD',
+          address: h, abi: uniswapHelperAbi, functionName: plan.method,
           args: [plan.min, recipient, deadline], value: plan.amountIn,
         });
       case 'swapPhUSDToETH':
+      case 'swapAMToETH':
+      case 'swapPhUSDToAM':
+      case 'swapAMToPhUSD':
         return writeContractAsync({
-          address: h, abi: uniswapHelperAbi, functionName: 'swapPhUSDToETH',
+          address: h, abi: uniswapHelperAbi, functionName: plan.method,
           args: [plan.amountIn, plan.min, recipient, deadline],
         });
       case 'addLiquiditySUSDS':
       case 'addLiquidityUSDS':
+      case 'addLiquidityAMSUSDS':
+      case 'addLiquidityAMUSDS':
         return writeContractAsync({
           address: h, abi: uniswapHelperAbi, functionName: plan.method,
           args: [plan.a, plan.b, plan.aMin, plan.bMin, recipient, deadline],
         });
       case 'removeLiquiditySUSDS':
       case 'removeLiquidityUSDS':
+      case 'removeLiquidityAMSUSDS':
+      case 'removeLiquidityAMUSDS':
         return writeContractAsync({
           address: h, abi: uniswapHelperAbi, functionName: plan.method,
           args: [plan.liquidity, plan.outMin, plan.phMin, recipient, deadline],
@@ -685,7 +781,7 @@ export function useUniMarket() {
       let hash: Hash;
       if (step.kind === 'approve') {
         const sym = step.sym as ApprovableSymbol;
-        const token = tokenAddresses[sym];
+        const token = sym === LP_SYMBOL ? pairs[review.target] : tokenAddresses[sym];
         if (!token) throw new Error(`${sym} address unavailable on this network`);
         const amount = state.exactApprove && step.amount !== undefined ? step.amount : maxUint256;
         hash = await approve(token, helper, amount);
@@ -706,7 +802,7 @@ export function useUniMarket() {
       patch({ pending: false });
     }
   }, [state.pending, state.success, state.stepIdx, state.exactApprove, review, helper, available, wallet, chainId,
-    tokenAddresses, patch, addToast, approve, sendAction, reportError]);
+    tokenAddresses, pairs, patch, addToast, approve, sendAction, reportError]);
 
   const receipt = useWaitForTransactionReceipt({ hash: state.txHash, query: { enabled: !!state.txHash } });
   useEffect(() => {
@@ -749,7 +845,7 @@ export function useUniMarket() {
   const isRemoveModal = review?.mode === 'remove';
   const removeLegs: [ReviewLeg, ReviewLeg] = [
     { caption: 'You receive (estimated)', sym: remove.outSym, amount: fmtUnits(remove.outAmt, 18, remove.outDp) },
-    { caption: 'You receive (estimated)', sym: 'phUSD', amount: fmtUnits(remove.phAmt, 18, 2) },
+    { caption: 'You receive (estimated)', sym: liqTarget, amount: fmtUnits(remove.phAmt, 18, 2) },
   ];
   const exactSym = currentStep?.kind === 'approve' ? currentStep.sym : undefined;
   const exactLabel = exactSym && currentStep?.amount !== undefined
@@ -769,13 +865,23 @@ export function useUniMarket() {
     selected: removePctSelected(lpBal, burnWei, p),
   }));
   const outOptions: OutOptionView[] = REMOVE_OUT_TOKENS.map((sym) => ({ sym, selected: sym === remove.outSym }));
-  const tokenRows: TokenRowView[] = ORDER.map((sym) => ({
+  const pickingTarget = state.picker === 'target';
+  // The counter list offers the other target (phUSD ↔ AM) after the routed tokens, when AM is live.
+  const counterSyms: MarketSymbol[] = amAvailable ? [...ORDER, otherTarget(target)] : [...ORDER];
+  const tokenRows: TokenRowView[] = (pickingTarget ? [...TARGET_ORDER] : counterSyms).map((sym) => ({
     sym,
-    name: TOKENS[sym].name,
-    hint: routeHint(sym),
+    name: metaOf(sym).name,
+    hint: pickingTarget && isTarget(sym)
+      ? `${sym}/sUSDS pool`
+      : isTarget(sym) ? 'via sUSDS' : routeHint(sym),
     balText: balText(sym, balances[sym]),
-    selected: sym === state.tok,
+    selected: sym === (pickingTarget ? target : tok),
   }));
+  const pickerNote = pickingTarget
+    ? 'phUSD and AM each have one pool against sUSDS on Uniswap V2. Pick the one to trade.'
+    : `${target} has one pool, ${target}/sUSDS on Uniswap V2. Other tokens are routed through sUSDS in the same transaction.`;
+  /** Add-liquidity pool-token dropdown options. */
+  const targetOptions = TARGET_ORDER.map((sym) => ({ sym, name: metaOf(sym).name }));
   const addTokUsd = add.a > 0n ? usd(add.aUsd) : '';
   const addPhUsd = add.b > 0n ? usd(add.bUsd) : '';
 
@@ -802,9 +908,13 @@ export function useUniMarket() {
     slip: state.slip,
     settingsOpen: state.settingsOpen,
 
+    /** True when the AM/sUSDS pair is live, so phUSD / AM can be chosen. */
+    canPickTarget: amAvailable,
+
     // swap (exact-in only: the receive side is read-only)
     dir: state.dir,
-    token: state.tok,
+    target,
+    token: tok,
     swap,
     payStr,
     recvStr,
@@ -813,8 +923,16 @@ export function useUniMarket() {
     payUsd: swap.valid ? usd(swap.inUsd) : '',
     recvUsd: swap.valid ? usd(swap.outUsd) : '',
     routeSummary: routeSummary(swap.syms),
-    pickerOpen: state.pickerOpen,
+    pickerOpen: state.picker !== null,
+    pickerKind: state.picker,
+    pickerNote,
     tokenRows,
+
+    // liquidity pair (shared by the position card, Add and Remove)
+    liqTarget,
+    liqPairLabel: `sUSDS/${liqTarget}`,
+    targetOptions,
+    liqTargetPickerOpen: state.liqTargetPickerOpen,
 
     // add liquidity
     addSym: state.addSym,
@@ -823,7 +941,7 @@ export function useUniMarket() {
     aTokStr,
     aPhStr,
     addTokBalText: balText(state.addSym, balances[state.addSym]),
-    phBalText: balText('phUSD', balances.phUSD),
+    phBalText: balText(liqTarget, balances[liqTarget]),
     aTokUsd: addTokUsd,
     aPhUsd: addPhUsd,
     addPickerOpen: state.addPickerOpen,
@@ -878,6 +996,11 @@ export function useUniMarket() {
     openPicker,
     closePicker,
     selectToken,
+    selectLiqTarget,
+    toggleLiqTarget,
+    toggleLiqTargetPicker,
+    closeLiqTargetPicker,
+    closeAddPicker,
     setPay,
     payMax,
     flip,
