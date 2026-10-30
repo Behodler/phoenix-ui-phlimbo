@@ -52,16 +52,14 @@ describe('DepositConfirmationDialog Component', () => {
       render(<DepositConfirmationDialog {...defaultProps} />);
 
       expect(screen.getByText(/You're depositing/i)).toBeInTheDocument();
-      expect(screen.getByText(/100/)).toBeInTheDocument();
-      expect(screen.getByText(/DOLA/)).toBeInTheDocument();
+      expect(screen.getByText('100 DOLA')).toBeInTheDocument();
     });
 
     it('should display expected output amount correctly', () => {
       render(<DepositConfirmationDialog {...defaultProps} />);
 
       expect(screen.getByText(/You'll receive/i)).toBeInTheDocument();
-      expect(screen.getByText(/123\.4568/)).toBeInTheDocument();
-      expect(screen.getByText(/phUSD/)).toBeInTheDocument();
+      expect(screen.getByText('123.4568 phUSD')).toBeInTheDocument();
     });
 
     it('should display price impact correctly', () => {
@@ -140,8 +138,8 @@ describe('DepositConfirmationDialog Component', () => {
 
       render(<DepositConfirmationDialog {...props} />);
 
-      // Min received: 1234.5679 * (1 - 0.001) = 1233.3333
-      expect(screen.getByText(/1233\.3333/)).toBeInTheDocument();
+      // Min received: 1234.5679 * (1 - 0.001) = 1233.3333 (rendered with a thousands separator)
+      expect(screen.getByText(/1,233\.3333/)).toBeInTheDocument();
     });
   });
 
@@ -159,8 +157,8 @@ describe('DepositConfirmationDialog Component', () => {
 
       render(<DepositConfirmationDialog {...props} />);
 
-      // Min received: 12345.6790 * (1 - 0.001) = 12333.3333
-      expect(screen.getByText(/12333\.3333/)).toBeInTheDocument();
+      // Min received: 12345.6790 * (1 - 0.001) = 12333.3333 (rendered with a thousands separator)
+      expect(screen.getByText(/12,333\.3333/)).toBeInTheDocument();
     });
   });
 
@@ -174,8 +172,9 @@ describe('DepositConfirmationDialog Component', () => {
       await user.clear(slippageInput);
       await user.type(slippageInput, '0.50');
 
+      // A number input normalises "0.50" to "0.5", so compare numerically
       await waitFor(() => {
-        expect(slippageInput.value).toBe('0.50');
+        expect(parseFloat(slippageInput.value)).toBe(0.5);
       });
     });
 
@@ -230,7 +229,8 @@ describe('DepositConfirmationDialog Component', () => {
       render(<DepositConfirmationDialog {...props} />);
 
       expect(screen.getByText(/High price impact detected/i)).toBeInTheDocument();
-      expect(screen.getByText(/8\.00%/)).toBeInTheDocument();
+      // 8.00% appears in the Price Impact row and in the insufficient-slippage warning
+      expect(screen.getAllByText(/8\.00%/).length).toBeGreaterThan(0);
     });
 
     it('should not show warning for low price impact (<5%)', () => {
@@ -355,8 +355,8 @@ describe('DepositConfirmationDialog Component', () => {
 
       render(<DepositConfirmationDialog {...props} />);
 
-      expect(screen.getByText(/0\.01/)).toBeInTheDocument();
-      expect(screen.getByText(/0\.0123/)).toBeInTheDocument();
+      expect(screen.getByText('0.01 DOLA')).toBeInTheDocument();
+      expect(screen.getByText('0.0123 phUSD')).toBeInTheDocument();
     });
 
     it('should sync slippage when dialog reopens', () => {
