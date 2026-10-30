@@ -77,6 +77,7 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       AntimatterPoolSeeder: data.AntimatterPoolSeeder || '0x0000000000000000000000000000000000000000',
       AntimatterSusdsPair: data.AntimatterSusdsPair || '0x0000000000000000000000000000000000000000',
       SYAHarvester: data.SYAHarvester || '0x0000000000000000000000000000000000000000',
+      BalancerLPMigrator: data.BalancerLPMigrator || '0x0000000000000000000000000000000000000000',
       SUSDS: data.SUSDS || '0x0000000000000000000000000000000000000000',
 
       SUSDe: data.SUSDe || '0x0000000000000000000000000000000000000000',

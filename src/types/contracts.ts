@@ -69,6 +69,7 @@ export interface ContractAddresses {
   /** UniV2 Antimatter/sUSDS pair (UniswapHelper `amPair()`); zero until it exists on a chain. */
   AntimatterSusdsPair: string;
   SYAHarvester: string;
+  BalancerLPMigrator: string;
 }
 
 

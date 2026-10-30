@@ -113,6 +113,10 @@ export const mainnetAddresses: ContractAddresses = {
   AntimatterSusdsPair: "0x0000000000000000000000000000000000000000",
   // phStaging2 story 116: not deployed on mainnet yet.
   SYAHarvester: "0x0000000000000000000000000000000000000000",
+  // Story 121: user-facing Balancer V3 phUSD/sUSDS BPT -> UniV2 phUSD/sUSDS migrator (BalancerLPMigrator),
+  // deployed by DeployBalancerLPMigratorMainnet and patched from progress.balancer-lp-migrator.1.json.
+  // The BPT has no key: read it from BalancerLPMigrator.pool().
+  BalancerLPMigrator: "0x94f69b2eB445A8a74400FF3282d861CA0341cBd0",
   GatherWBTC: "0xfd3775f2ccfb94b532b34b2b683e210ba4449880",
   MultiPooler: "0xd1E5774159381915f5579dFd68507E2614f67b51",
   // View contracts
@@ -218,4 +222,5 @@ export const sepoliaAddresses: ContractAddresses = {
   AntimatterPoolSeeder: "0xb6fE42437803cd1dF0757AaB4255E2ec1A901dB0",
   AntimatterSusdsPair: "0x1dD2Da9B6faf90b9500bAcf3ea4F90Ff7b1aA388",
   SYAHarvester: "0x995C633DF7E0E10E0A0486171B420464C4F2B53F",
+  BalancerLPMigrator: "0x0000000000000000000000000000000000000000",
 };
