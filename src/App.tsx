@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ToastProvider } from './components/ui/ToastProvider'
 import { DisclaimerModal } from './components/ui/DisclaimerModal'
 import { MaintenanceBanner } from './components/ui/MaintenanceBanner'
+import BalancerExitModal from './components/vault/balancerExit/BalancerExitModal'
 import VaultPage from './pages/VaultPage'
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
       <ToastProvider>
         <MaintenanceBanner />
         <DisclaimerModal />
+        <BalancerExitModal />
         <Routes>
           <Route path="/" element={<VaultPage />} />
           <Route path="/stake" element={<VaultPage />} />
