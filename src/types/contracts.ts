@@ -38,6 +38,9 @@ export interface ContractAddresses {
   UniboostEYE: string;
   UniboostSCX: string;
   UniboostFLX: string;
+  PhusdSusdsPair: string;
+  UniPooler: string;
+  BalancerPoolerMintDebtHook: string;
   GatherWBTC: string;
   MultiPooler: string;
   UniboostHookEYE: string;
@@ -45,7 +48,6 @@ export interface ContractAddresses {
   UniboostHookFLX: string;
   WaUSDC: string;
   SkyPSM: string;
-  BalancerPoolerMintDebtHook: string;
   NFTStaker: string;
   NudgeStreamer: string;
   BatchNFTMinter: string;
@@ -62,9 +64,11 @@ export interface ContractAddresses {
   Antimatter: string;
   StableStakerV2: string;
   ViewRouter: string;
-  UniPooler: string;
-  PhusdSusdsPair: string;
   UniswapHelper: string;
+  AntimatterPoolSeeder: string;
+  AntimatterSusdsPair: string;
+  SYAHarvester: string;
+  BalancerLPMigrator: string;
 }
 
 
