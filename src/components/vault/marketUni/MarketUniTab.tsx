@@ -151,18 +151,30 @@ export default function MarketUniTab() {
         )}
       </section>
 
-      <a
-        href={m.uniswapUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`self-center inline-flex items-center gap-2 min-h-[44px] text-sm font-medium no-underline text-pxusd-orange-300 hover:brightness-110 rounded ${FOCUS_RING}`}
-      >
+      <p className="self-center inline-flex items-center gap-2 min-h-[44px] text-sm font-medium text-pxusd-orange-300">
         <UniswapLogo className="w-4 h-4" />
-        <span>Or trade directly on Uniswap</span>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-        </svg>
-      </a>
+        <span>
+          Or trade{' '}
+          <a
+            href={m.uniswapPoolUrls.antimatter}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`underline underline-offset-2 hover:brightness-110 rounded ${FOCUS_RING}`}
+          >
+            Antimatter
+          </a>{' '}
+          and{' '}
+          <a
+            href={m.uniswapPoolUrls.phUSD}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`underline underline-offset-2 hover:brightness-110 rounded ${FOCUS_RING}`}
+          >
+            phUSD
+          </a>{' '}
+          directly on Uniswap
+        </span>
+      </p>
 
       {m.modal && <ReviewModal m={m} />}
     </div>

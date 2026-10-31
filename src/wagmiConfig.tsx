@@ -1,7 +1,7 @@
 import { createConfig, http, fallback, unstable_connector } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import { mainnet, arbitrum, sepolia } from 'wagmi/chains'
-import { defineChain } from 'viem'
+import { defineChain, ProviderDisconnectedError, type Transport } from 'viem'
 import { connectorsForWallets } from '@rainbow-me/rainbowkit'
 import {
   metaMaskWallet,
@@ -15,6 +15,37 @@ export const anvil = defineChain({
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: { default: { http: ['http://127.0.0.1:8545'] } },
 })
+
+/**
+ * Methods the wallet's own RPC must NOT answer. Some injected wallets (MetaMask
+ * with Smart Transactions, Rabby) hand back a non-null "receipt" for a
+ * transaction that is only submitted, not mined. viem's
+ * waitForTransactionReceipt resolves on the first non-null receipt when
+ * confirmations is 1, so every useWaitForTransactionReceipt in the app would
+ * fire its success toast the instant the wallet returned the hash. Throwing a
+ * ProviderDisconnectedError here is not in viem's fallback `shouldThrow` set,
+ * so `fallback` silently moves these calls on to the public endpoints, which
+ * only return a receipt once the transaction is in a block.
+ */
+const WALLET_UNTRUSTED_METHODS = new Set([
+  'eth_getTransactionReceipt',
+  'eth_getTransactionByHash',
+])
+
+function withoutReceiptMethods(transport: Transport): Transport {
+  return (params) => {
+    const inner = transport(params)
+    const request: typeof inner.request = async (args, options) => {
+      if (WALLET_UNTRUSTED_METHODS.has(args.method)) {
+        throw new ProviderDisconnectedError(
+          new Error(`${args.method} is routed past the wallet RPC`),
+        )
+      }
+      return inner.request(args, options)
+    }
+    return { ...inner, request }
+  }
+}
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID
 
@@ -62,7 +93,9 @@ export const wagmiConfig = createConfig({
       // Throws when no injected wallet is connected or it sits on another
       // chain, so `fallback` moves on to the public endpoints below — which
       // still carry every visitor who has not connected.
-      unstable_connector(injected),
+      // Receipt and transaction-by-hash lookups skip it: see
+      // WALLET_UNTRUSTED_METHODS above.
+      withoutReceiptMethods(unstable_connector(injected)),
       // Free public endpoints, tried in order. All verified to send
       // Access-Control-Allow-Origin for https://phoenixdefi.app — an endpoint
       // without it surfaces every outage as an opaque CORS error in the console.

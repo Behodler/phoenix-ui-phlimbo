@@ -169,11 +169,13 @@ export type HelperMethod = keyof typeof HELPER_METHODS;
 export const methodLabel = (m: HelperMethod): string => `${HELPER_LABEL}.${HELPER_METHODS[m]}`;
 
 /**
- * Outbound link for users who want app.uniswap.org instead. Uses the real
- * mainnet sUSDS and phUSD addresses already held in src/lib/contracts.ts.
+ * Outbound links for users who want app.uniswap.org instead: the mainnet AM/sUSDS and
+ * phUSD/sUSDS UniV2 pool pages, built from the real pair addresses in src/lib/contracts.ts.
  */
-export const UNISWAP_TRADE_URL =
-  `https://app.uniswap.org/swap?chain=mainnet&inputCurrency=${mainnetAddresses.SUSDS}&outputCurrency=${mainnetAddresses.PhUSD}`;
+export const UNISWAP_POOL_URLS = {
+  antimatter: `https://app.uniswap.org/explore/pools/ethereum/${mainnetAddresses.AntimatterSusdsPair}`,
+  phUSD: `https://app.uniswap.org/explore/pools/ethereum/${mainnetAddresses.PhusdSusdsPair}`,
+} as const;
 
 /** Per-transaction explorer link; '' on chains without a public explorer (Anvil). */
 export function explorerTxUrl(chainId: number | undefined, hash: string | undefined): string {

@@ -104,15 +104,16 @@ export const mainnetAddresses: ContractAddresses = {
   // phStaging2 story 107 removed the Balancer keys (BalancerPool/Vault/Router and the retired,
   // paused and empty BalancerPooler 0x7f6874332c4629429d70D15f685A8230323F11F1).
   UniPooler: "0x56997ea45091CBc01DB8a09E60DEDB8b3706a3D2",
-  // UniswapHelper swap/liquidity periphery (phStaging2 story 110), deployed to mainnet by
-  // story 111 (2026-10-23).
-  UniswapHelper: "0x564810D5d9D31754C8dbdb8F62Bb429D50Dfa5b3",
-  // phStaging2 story 114: the Antimatter/sUSDS pair and its seeder are not on mainnet yet, and
-  // the live UniswapHelper above predates story 120's AM routes. ZERO until the cutover.
-  AntimatterPoolSeeder: "0x0000000000000000000000000000000000000000",
-  AntimatterSusdsPair: "0x0000000000000000000000000000000000000000",
-  // phStaging2 story 116: not deployed on mainnet yet.
-  SYAHarvester: "0x0000000000000000000000000000000000000000",
+  // UniswapHelper swap/liquidity periphery (phStaging2 story 110). Redeployed by phStaging2
+  // story 122 (2026-10-31) as the story-120 build with Antimatter routes; replaces the story-111
+  // instance 0x564810D5d9D31754C8dbdb8F62Bb429D50Dfa5b3.
+  UniswapHelper: "0x86CcCD22849e48C197048bE96a3D6049fC8d7078",
+  // phStaging2 story 114/122: Antimatter/sUSDS cutover broadcast 2026-10-31. The seeder moved 10%
+  // of the protocol-owned phUSD/sUSDS LP into the new AM/sUSDS UniV2 pair.
+  AntimatterPoolSeeder: "0x7643046Eb5AeC0162bff96663000797CCc0B2E23",
+  AntimatterSusdsPair: "0xb6da5138C761Eb7a3Ef7030212bfc9e2EAB8a4DA",
+  // phStaging2 story 116/122: deployed 2026-10-31 (StableStakerV2 claims opened in the same run).
+  SYAHarvester: "0xeE426A950Cb17D559F6391ef0D140715CD46703B",
   // Story 121: user-facing Balancer V3 phUSD/sUSDS BPT -> UniV2 phUSD/sUSDS migrator (BalancerLPMigrator),
   // deployed by DeployBalancerLPMigratorMainnet and patched from progress.balancer-lp-migrator.1.json.
   // The BPT has no key: read it from BalancerLPMigrator.pool().

@@ -13,7 +13,7 @@ import {
   swapSteps,
   type PoolState,
 } from '../../../lib/uniV2Math';
-import { SLIPPAGE_OPTIONS, UNISWAP_TRADE_URL } from '../../../data/uniMarketConfig';
+import { SLIPPAGE_OPTIONS, UNISWAP_POOL_URLS } from '../../../data/uniMarketConfig';
 
 // ---------------------------------------------------------------------------
 // The tab is a pure renderer of `useUniMarket()`. The hook's chain logic is
@@ -44,7 +44,7 @@ function makeMarket(over: Partial<UniMarket> = {}): UniMarket {
     tickerPair: 'phUSD/sUSDS pool · 2.0k phUSD / 1.9k sUSDS',
     tickerPrice: '$0.992987',
     priceAtOrAboveDollar: false,
-    uniswapUrl: UNISWAP_TRADE_URL,
+    uniswapPoolUrls: UNISWAP_POOL_URLS,
     etherscanUrl: '',
     available: true,
     connected: true,
@@ -398,13 +398,19 @@ describe('MarketUniTab (story 087, live hook mocked)', () => {
     expect(link).toHaveAttribute('target', '_blank');
   });
 
-  it('renders the "Or trade directly on Uniswap" link with real mainnet addresses', () => {
+  it('links Antimatter and phUSD to their mainnet sUSDS pools on Uniswap', () => {
     render(<MarketUniTab />);
-    const link = screen.getByRole('link', { name: /Or trade directly on Uniswap/ });
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(link).toHaveAttribute(
+    const am = screen.getByRole('link', { name: 'Antimatter' });
+    const ph = screen.getByRole('link', { name: 'phUSD' });
+    expect(am).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(am).toHaveAttribute(
       'href',
-      `https://app.uniswap.org/swap?chain=mainnet&inputCurrency=${mainnetAddresses.SUSDS}&outputCurrency=${mainnetAddresses.PhUSD}`,
+      `https://app.uniswap.org/explore/pools/ethereum/${mainnetAddresses.AntimatterSusdsPair}`,
+    );
+    expect(ph).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(ph).toHaveAttribute(
+      'href',
+      `https://app.uniswap.org/explore/pools/ethereum/${mainnetAddresses.PhusdSusdsPair}`,
     );
   });
 

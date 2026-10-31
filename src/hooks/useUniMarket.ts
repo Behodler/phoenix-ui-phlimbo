@@ -54,7 +54,7 @@ import {
   REMOVE_PCTS,
   SLIPPAGE_OPTIONS,
   TARGET_ORDER,
-  UNISWAP_TRADE_URL,
+  UNISWAP_POOL_URLS,
   explorerTxUrl,
   isTarget,
   metaOf,
@@ -892,7 +892,7 @@ export function useUniMarket() {
       : 'phUSD/sUSDS pool',
     tickerPrice: pool && phPriceNum > 0 ? `$${fmt(phPriceNum, 6)}` : '—',
     priceAtOrAboveDollar: phPriceNum >= 1,
-    uniswapUrl: UNISWAP_TRADE_URL,
+    uniswapPoolUrls: UNISWAP_POOL_URLS,
     /** Per-tx explorer link for the completed review; '' on Anvil (hidden). */
     etherscanUrl: explorerTxUrl(chainId, state.lastHash),
     available,
