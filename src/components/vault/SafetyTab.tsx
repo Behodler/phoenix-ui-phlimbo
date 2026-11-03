@@ -9,6 +9,7 @@ import { useApprovalTransaction } from '../../hooks/useTransaction';
 import { getErrorTitle, shouldOfferRetry } from '../../utils/transactionErrors';
 import ActionButton from '../ui/ActionButton';
 import { log } from '../../utils/logger';
+import PauserCoverageIndicator from './pauser/PauserCoverageIndicator';
 
 interface SafetyTabProps {
   resetKey?: number;
@@ -348,6 +349,9 @@ export default function SafetyTab({ resetKey }: SafetyTabProps) {
           </div>
         </div>
       </div>
+
+      {/* PauserV2 coverage; renders nothing against a V1 Pauser */}
+      <PauserCoverageIndicator />
 
       <div className="bg-red-900/20 border border-red-500 rounded-lg p-4 mb-6">
         <p className="text-red-400 font-bold text-sm mb-2">WARNING</p>
