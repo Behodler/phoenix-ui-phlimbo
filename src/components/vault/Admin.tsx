@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useChainId, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { readContract } from '@wagmi/core';
 import { wagmiConfig } from '../../wagmiConfig';
@@ -13,6 +13,10 @@ import {
   multiPoolerAbi,
 } from '@behodler/phase2-wagmi-hooks';
 import { pauserAbi } from '../../lib/pauserAbi';
+import { parsePauserTxLogs } from '../../lib/pauserHealth';
+import { usePauserHealth } from '../../hooks/usePauserHealth';
+import PauserHealthPanel from './pauser/PauserHealthPanel';
+import PauserTxResults, { type PauserTxResult } from './pauser/PauserTxResults';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useToast } from '../ui/ToastProvider';
 import ActionButton from '../ui/ActionButton';
@@ -328,6 +332,14 @@ export default function Admin() {
 
   // State for transaction management
   const [isCalling, setIsCalling] = useState(false);
+
+  // PauserV2: health() lists (capability-gated; unsupported against V1) and the
+  // per-contract results of the last owner pause()/unpause() through this panel.
+  const pauserHealth = usePauserHealth();
+  const [pauserTxResult, setPauserTxResult] = useState<PauserTxResult | null>(null);
+  // What the generic write path last submitted, captured at submit time so the
+  // receipt is attributed correctly even if the selection changes meanwhile.
+  const lastSubmittedTxRef = useRef<{ hash: string; addressKey: string; functionName: string; address: string } | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
 
   // Fetch the owner address from the PhlimboV3 contract (new Phase 2 architecture)
@@ -1175,7 +1187,7 @@ export default function Admin() {
 
   // Wagmi hooks for contract write and transaction tracking
   const { data: txHash, writeContractAsync } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({
+  const { data: txReceipt, isLoading: isConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({
     hash: txHash,
     query: {
       enabled: !!txHash,
@@ -1538,6 +1550,30 @@ export default function Admin() {
   }, [isTxSuccess, txHash, networkType, addToast]);
 
   /**
+   * PauserV2 owner pause()/unpause(): decode the receipt's skip/failure events into
+   * per-contract results. Only when the Pauser answered health() (V2); a V1 receipt
+   * has no such events and the results block is not rendered at all.
+   */
+  useEffect(() => {
+    if (!isTxSuccess || !txHash || !txReceipt) return;
+    // A reverted receipt carries no events; never report it as "all unpaused".
+    if (txReceipt.status !== 'success') return;
+    const meta = lastSubmittedTxRef.current;
+    if (!meta || meta.hash !== txHash || meta.addressKey !== 'Pauser') return;
+    if (meta.functionName !== 'unpause' && meta.functionName !== 'pause') return;
+    pauserHealth.refetch();
+    if (!pauserHealth.supported) return;
+    try {
+      const kind = meta.functionName as 'pause' | 'unpause';
+      const rows = parsePauserTxLogs(txReceipt.logs, meta.address as `0x${string}`, kind);
+      setPauserTxResult({ kind, txHash, rows });
+    } catch (error) {
+      console.error('[Admin Panel] Failed to parse Pauser receipt:', error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTxSuccess, txHash, txReceipt]);
+
+  /**
    * Handle parameter value change
    */
   const handleParameterChange = (paramName: string, value: string) => {
@@ -1749,6 +1785,13 @@ export default function Admin() {
         functionName: selectedFunction.name,
         args: args as any,
       });
+
+      lastSubmittedTxRef.current = {
+        hash,
+        addressKey: selectedContract.addressKey,
+        functionName: selectedFunction.name,
+        address: contractAddress as string,
+      };
 
       // Remove pending toast
       removeToast(pendingToastId);
@@ -2865,6 +2908,11 @@ export default function Admin() {
         </div>
       )}
 
+      {/* PauserV2 health lists (hidden against a V1 Pauser) */}
+      {selectedContractKey === 'Pauser' && pauserHealth.supported && (
+        <PauserHealthPanel health={pauserHealth} />
+      )}
+
       {/* Contract and Function Dropdowns */}
       <div className="flex gap-4 mb-6">
         {/* Contracts Dropdown */}
@@ -2981,6 +3029,11 @@ export default function Admin() {
             />
           )}
         </div>
+      )}
+
+      {/* PauserV2 per-contract results of the last owner pause()/unpause() */}
+      {selectedContractKey === 'Pauser' && pauserTxResult && (
+        <PauserTxResults result={pauserTxResult} />
       )}
 
       {/* FAQ Editor — no-code editing of /faq-data.json via the FAQ write API */}
