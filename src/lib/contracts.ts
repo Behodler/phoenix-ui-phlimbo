@@ -12,7 +12,9 @@ export const mainnetAddresses: ContractAddresses = {
   PhUSD: "0xf3B5B661b92B75C71fA5Aba8Fd95D7514A9CD605",
 
   // Deployed Phase 2 contracts
-  Pauser: "0x7c5A8EeF1d836450C019FB036453ac6eC97885a3",
+  // phStaging2 story 128 (2026-11-05): PauserV2 (tolerant global pause). The V1 Pauser
+  // 0x7c5A8EeF1d836450C019FB036453ac6eC97885a3 is RETIRED; only the 9 retired registrants remain on it.
+  Pauser: "0x669Ebfa5309db66683c199Cfe22516DECBe1a154",
   PhusdStableMinter: "0x94855ACA13952D81507C92D3CdBb2e25D3bbE60C",
   // The `PhlimboEA` key is RETIRED. It named PhlimboV2 (0x6084a02c2ac0127ddf1e617de257c61480a2aee0,
   // deployed by story 049), which still exists on mainnet wound down, mint-revoked and NOT paused
