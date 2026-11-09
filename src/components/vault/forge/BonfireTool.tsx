@@ -1,110 +1,83 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useToast } from '../../ui/ToastProvider';
+import { formatUnits } from 'viem';
 import ActionButton from '../../ui/ActionButton';
 import ConfirmationDialog from '../../ui/ConfirmationDialog';
-import {
-  FORGE_BONFIRE_DEFAULT_NFT_ID,
-  FORGE_BONFIRE_MIN_PAYOUT_BPS,
-  FORGE_BONFIRE_MOCK,
-  FORGE_MOCK_NFT_HOLDINGS,
-} from '../../../data/forgeMockData';
 import { nftStaticConfig } from '../../../data/nftMockData';
+import type { BonfireBlocker, ForgeBonfireState } from '../../../hooks/useForgeBonfire';
 import antimatterIcon from '../../../assets/antimatter.png';
 import ForgeNftPicker from './ForgeNftPicker';
 import ForgeNftPickerModal from './ForgeNftPickerModal';
 import ForgeStatusPill from './ForgeStatusPill';
-import { createBonfirePotClock, useBonfirePot, type BonfirePotClock } from './bonfirePotClock';
-import {
-  bonfireMinPayout,
-  buildForgeNftOptions,
-  floorTo,
-  fmt2,
-  fmtPot2,
-  nextHeldNftId,
-  type ForgeNftOption,
-} from './forgeFormat';
+import { useBonfirePot } from './bonfirePotClock';
+import { buildForgeNftOptions, floorTo, fmt2, fmtPot2, type ForgeNftOption } from './forgeFormat';
 
 const ORANGE = '#FF8C42';
 const YELLOW = '#FFD93D';
 
-/** Arguments of `NFTBonfire.burn`, in human units. The live-wiring story converts minPayout to wei. */
-export interface BonfireMockCall {
-  tokenId: number;
-  minPayout: number;
+export interface BonfireToolProps {
+  /** Live state from `useForgeBonfire`, owned by ForgeTab so the row header can share it. */
+  state: ForgeBonfireState;
 }
 
-export interface BonfireToolProps {
-  /** Shared pot ticker. ForgeTab passes the one its header metric reads; defaults to a private clock. */
-  clock?: BonfirePotClock;
-  /**
-   * Wallet NFT holdings, tokenId → units. When given, the parent owns them and must apply `onBurn`;
-   * when omitted, the tool keeps a local copy of FORGE_MOCK_NFT_HOLDINGS and decrements it itself.
-   */
-  nftHoldings?: Record<number, number>;
-  /** Called with the mock burn() arguments after the user confirms. */
-  onBurn?: (call: BonfireMockCall) => void;
-}
+/** What the button says when a burn cannot be sent, keyed by the reason. */
+const BLOCKER_LABEL: Record<Exclude<BonfireBlocker, null>, string> = {
+  inactive: 'Bonfire not live on this network',
+  disconnected: 'Connect your wallet',
+  loading: 'Loading…',
+  disabled: 'The Bonfire is switched off',
+  paused: 'The Bonfire is paused',
+  'no-nft': 'No NFT to burn',
+  empty: 'The pot is empty',
+};
+
+/** Wei → Antimatter, floored to 2 dp so the guarantee shown never overstates what is signed. */
+const minPayoutDisplay = (wei: bigint) => floorTo(Number(formatUnits(wei, 18)), 2);
+
+/** Rate per day without trailing zeros, e.g. 10 → "10", 2.5 → "2.5". */
+const fmtRate = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 4 });
 
 /**
- * Body of the Forge "NFT Bonfire" row. MOCKED: no contract reads or writes.
- * Confirming a burn decrements the local NFT count, resets the pot to zero
- * and toasts that nothing was sent.
+ * Body of the Forge "NFT Bonfire" row (`NFTBonfire`). Presentational: reads
+ * and the burn itself live in `useForgeBonfire`. The pot ticks from the
+ * hook's display-only clock; the burn's `minPayout` is the block-attested pot
+ * less the haircut, frozen when the confirmation dialog opens.
  */
-export default function BonfireTool({ clock: clockProp, nftHoldings, onBurn }: BonfireToolProps) {
-  const { addToast } = useToast();
-  const [ownClock] = useState(() => clockProp ?? createBonfirePotClock(FORGE_BONFIRE_MOCK));
-  const clock = clockProp ?? ownClock;
+export default function BonfireTool({ state }: BonfireToolProps) {
+  const { clock, loaded, ratePerDay, maxPayout, nftHoldings, selectedNftId, setSelectedNftId, minPayoutWei, blocker, pendingBurn } =
+    state;
   const pot = useBonfirePot(clock);
 
-  const [localHoldings, setLocalHoldings] = useState<Record<number, number>>(() => ({ ...FORGE_MOCK_NFT_HOLDINGS }));
-  const holdings = nftHoldings ?? localHoldings;
-  const nfts = useMemo(() => buildForgeNftOptions(nftStaticConfig, holdings), [holdings]);
-
-  const [selectedNftId, setSelectedNftId] = useState(() => {
-    const initial = buildForgeNftOptions(nftStaticConfig, holdings);
-    const preferred = initial.find((n) => n.id === FORGE_BONFIRE_DEFAULT_NFT_ID);
-    if (preferred && preferred.held > 0) return preferred.id;
-    return nextHeldNftId(initial, FORGE_BONFIRE_DEFAULT_NFT_ID) ?? FORGE_BONFIRE_DEFAULT_NFT_ID;
-  });
+  const nfts = useMemo(() => buildForgeNftOptions(nftStaticConfig, nftHoldings), [nftHoldings]);
   const [pickerOpen, setPickerOpen] = useState(false);
   // Burn being confirmed. minPayout is frozen when the dialog opens so the
   // figure the user approves is exactly the one sent.
-  const [pendingBurn, setPendingBurn] = useState<{ nft: ForgeNftOption; minPayout: number } | null>(null);
+  const [confirming, setConfirming] = useState<{ nft: ForgeNftOption; minPayoutWei: bigint } | null>(null);
 
   const selectedNft = nfts.find((n) => n.id === selectedNftId) ?? nfts[0];
-  const canBurn = selectedNft.held > 0;
   const closePicker = useCallback(() => setPickerOpen(false), []);
 
-  const pot2 = fmtPot2(pot);
-  const minPayoutNow = bonfireMinPayout(pot, FORGE_BONFIRE_MIN_PAYOUT_BPS);
+  const pot2 = loaded ? fmtPot2(pot) : '—';
   const pot6 = floorTo(pot, 6).toFixed(6);
-  const capPct = Math.min(100, (pot / clock.maxPayout) * 100);
+  const capPct = maxPayout ? Math.min(100, (pot / maxPayout) * 100) : 0;
+  const minPayoutNow = minPayoutWei === undefined ? null : minPayoutDisplay(minPayoutWei);
+
+  const canBurn = blocker === null && minPayoutWei !== undefined && !pendingBurn;
+  const buttonLabel = pendingBurn
+    ? 'Burning…'
+    : blocker !== null
+      ? BLOCKER_LABEL[blocker]
+      : `Burn ${selectedNft.name} → receive ${pot2} Antimatter`;
 
   const openConfirm = () => {
-    if (!canBurn) return;
-    setPendingBurn({ nft: selectedNft, minPayout: bonfireMinPayout(pot, FORGE_BONFIRE_MIN_PAYOUT_BPS) });
+    if (!canBurn || minPayoutWei === undefined) return;
+    setConfirming({ nft: selectedNft, minPayoutWei });
   };
 
   const handleConfirm = () => {
-    if (!pendingBurn) return;
-    // Mirrors NFTBonfire.burn(tokenId, minPayout): burns from msg.sender, no approval needed.
-    const call: BonfireMockCall = { tokenId: pendingBurn.nft.id, minPayout: pendingBurn.minPayout };
-    const remaining = Math.max(0, (holdings[call.tokenId] ?? 0) - 1);
-    if (nftHoldings === undefined) {
-      setLocalHoldings((h) => ({ ...h, [call.tokenId]: Math.max(0, (h[call.tokenId] ?? 0) - 1) }));
-    }
-    if (remaining === 0) {
-      const after = nfts.map((n) => (n.id === call.tokenId ? { ...n, held: 0 } : n));
-      setSelectedNftId(nextHeldNftId(after, call.tokenId) ?? call.tokenId);
-    }
-    clock.reset();
-    onBurn?.(call);
-    setPendingBurn(null);
-    addToast({
-      type: 'info',
-      title: 'Preview only',
-      description: 'Burning is mocked on this page. Nothing was sent.',
-    });
+    if (!confirming) return;
+    const { nft, minPayoutWei: frozen } = confirming;
+    setConfirming(null);
+    void state.burn(nft.id, frozen);
   };
 
   return (
@@ -135,32 +108,42 @@ export default function BonfireTool({ clock: clockProp, nftHoldings, onBurn }: B
                   data-testid="bonfire-pot"
                   className="font-mono text-[34px] font-light tracking-[-0.02em] tabular-nums text-pxusd-white"
                 >
-                  {pot6.slice(0, -2)}
-                  <span style={{ opacity: 0.45 }}>{pot6.slice(-2)}</span>
+                  {loaded ? (
+                    <>
+                      {pot6.slice(0, -2)}
+                      <span style={{ opacity: 0.45 }}>{pot6.slice(-2)}</span>
+                    </>
+                  ) : (
+                    '—'
+                  )}
                 </span>
                 <span className="text-sm text-muted-foreground">Antimatter</span>
               </div>
             </div>
-            <ForgeStatusPill tone="fire">+{clock.ratePerDay} / day</ForgeStatusPill>
+            {loaded && <ForgeStatusPill tone="fire">+{fmtRate(ratePerDay)} / day</ForgeStatusPill>}
           </div>
 
-          <div className="mt-4">
-            <div
-              role="img"
-              aria-label={`Pot ${pot2} of a ${clock.maxPayout} Antimatter cap`}
-              className="h-2.5 overflow-hidden rounded-full bg-white/[0.06]"
-            >
-              <span
-                data-testid="bonfire-cap-fill"
-                className="block h-full rounded-full"
-                style={{ width: `${capPct}%`, background: 'var(--grad-accent)' }}
-              />
+          {maxPayout !== null ? (
+            <div className="mt-4">
+              <div
+                role="img"
+                aria-label={`Pot ${pot2} of a ${fmtRate(maxPayout)} Antimatter cap`}
+                className="h-2.5 overflow-hidden rounded-full bg-white/[0.06]"
+              >
+                <span
+                  data-testid="bonfire-cap-fill"
+                  className="block h-full rounded-full"
+                  style={{ width: `${capPct}%`, background: 'var(--grad-accent)' }}
+                />
+              </div>
+              <div className="mt-2 flex justify-between gap-3 text-[11.5px] text-muted-foreground">
+                <span>0</span>
+                <span className="text-right">Cap {fmtRate(maxPayout)} · anything over the cap is lost</span>
+              </div>
             </div>
-            <div className="mt-2 flex justify-between gap-3 text-[11.5px] text-muted-foreground">
-              <span>0</span>
-              <span className="text-right">Cap {clock.maxPayout} · anything over the cap is lost</span>
-            </div>
-          </div>
+          ) : (
+            loaded && <div className="mt-4 text-[11.5px] text-muted-foreground">No cap on the pot.</div>
+          )}
         </div>
 
         {/* Right: NFT, warning, action */}
@@ -178,14 +161,15 @@ export default function BonfireTool({ clock: clockProp, nftHoldings, onBurn }: B
           >
             <strong style={{ color: YELLOW }}>First burner takes it all.</strong> If someone burns before you in the
             same block, the pot is empty when your transaction lands. Your burn then reverts and your NFT is kept,
-            because it only goes through if you receive at least {fmt2(minPayoutNow)} Antimatter.
+            because it only goes through if you receive at least{' '}
+            {minPayoutNow === null ? 'the pot shown' : `${fmt2(minPayoutNow)} Antimatter`}.
           </div>
 
           <div className="-mt-3">
             <ActionButton
               disabled={!canBurn}
               onAction={openConfirm}
-              label={canBurn ? `Burn ${selectedNft.name} → receive ${pot2} Antimatter` : 'No NFT to burn'}
+              label={buttonLabel}
             />
           </div>
         </div>
@@ -202,25 +186,25 @@ export default function BonfireTool({ clock: clockProp, nftHoldings, onBurn }: B
       />
 
       <ConfirmationDialog
-        isOpen={pendingBurn !== null}
-        onClose={() => setPendingBurn(null)}
+        isOpen={confirming !== null}
+        onClose={() => setConfirming(null)}
         onConfirm={handleConfirm}
         title="Confirm NFT burn"
         confirmLabel="Confirm Burn"
       >
-        {pendingBurn && (
+        {confirming && (
           <div className="flex flex-col gap-3 text-sm">
             <div className="rounded-lg bg-pxusd-teal-700 p-4">
               <div className="mb-2 text-xs text-muted-foreground">You're burning</div>
               <div className="flex items-center gap-3">
                 <img
-                  src={pendingBurn.nft.image}
+                  src={confirming.nft.image}
                   alt=""
                   aria-hidden="true"
                   className="h-10 w-10 flex-shrink-0 rounded-[10px] object-cover"
                 />
                 <span className="min-w-0 truncate font-semibold text-foreground">
-                  {pendingBurn.nft.name} #{pendingBurn.nft.id}
+                  {confirming.nft.name} #{confirming.nft.id}
                 </span>
               </div>
             </div>
@@ -229,7 +213,7 @@ export default function BonfireTool({ clock: clockProp, nftHoldings, onBurn }: B
               <div className="flex items-center gap-3">
                 <img src={antimatterIcon} alt="" aria-hidden="true" className="h-8 w-8 flex-shrink-0 rounded-full" />
                 <span data-testid="bonfire-min-payout" className="font-mono font-semibold tabular-nums text-foreground">
-                  {fmt2(pendingBurn.minPayout)} Antimatter
+                  {fmt2(minPayoutDisplay(confirming.minPayoutWei))} Antimatter
                 </span>
               </div>
             </div>

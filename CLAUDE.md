@@ -267,10 +267,10 @@ id is what preserves it. Do not rename the tab, and do not add a new route.
 `src/components/vault/stakeMock/` is a different thing entirely: the admin-only **NFT** staking
 preview reached from `NFTListTab`, which merely shares the word "mock".
 
-## The `Forge` tab: two live rows, one admin-only mock
+## The `Forge` tab: three live rows
 
-`src/components/vault/forge/`. Stories 088–090 built it as a mock; Annihilate and Harvest
-Yield are now wired. The row components are presentational, and `ForgeTab` owns the hooks
+`src/components/vault/forge/`. Stories 088–090 built it as a mock; all three rows are now
+wired. The row components are presentational, and `ForgeTab` owns the hooks
 so the row headers can share them.
 
 - **Annihilate** (`useForgeAnnihilate`) calls `Antimatter.annihilate(stable, recipient,
@@ -284,9 +284,19 @@ so the row headers can share them.
   `harvest([], nftIndex, 0)` **with real fee fields**. A zero-gas-price simulation passes the
   contract's `Unprofitable` check trivially. While SYA's `nftMinter()` is set, the quote also
   needs a held claim NFT plus `setApprovalForAll(harvester)`.
-- **NFT Bonfire** is still `src/data/forgeMockData.ts`. It renders only for
-  `SYAHarvester.owner()` on the connected chain (the admin allowlist does not apply), and its title carries
-  "- only visible to admins" until it ships.
+- **NFT Bonfire** (`useForgeBonfire`) calls `NFTBonfire.burn(tokenId, minPayout)`. It always
+  burns one unit from `msg.sender`, and the bonfire is an authorised burner on NFTMinterV2, so
+  **no ERC1155 approval is needed**. Holdings come from the bonfire's own `nftMinter()` through
+  `useClaimNftHoldings`, which Harvest shares; the tokenId is the dispatcher index from
+  MintPageView, not the `nftStaticConfig` id. The pot ticker (`bonfirePotClock`) re-syncs to
+  `pendingPayout()` on every poll and extrapolates between polls for **display only**:
+  `minPayout` is the block-attested `pendingPayout()` × 98%, frozen when the confirm dialog
+  opens, never the extrapolation. `maxPayout == 0` means unlimited and `ratePerDay == 0` reverts
+  `NFTBonfire__BurningDisabled`. The row is public; mainnet carries the zero address until the
+  deploy is broadcast, so it reports "Not live" there.
+
+_Historical note: NFT Bonfire was an admin-only mock (`SYAHarvester.owner()`-gated, title
+suffixed "- only visible to admins") until the live wiring landed. Do not reinstate the gate._
 
 ## Questions?
 

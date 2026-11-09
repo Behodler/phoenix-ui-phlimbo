@@ -83,6 +83,11 @@ const ERROR_MESSAGES: Record<string, (args: readonly unknown[]) => string> = {
   AmountNotRepresentable: () => 'That amount is finer than the stablecoin can express. Use fewer decimals.',
   StablecoinNotRegistered: () => 'That stablecoin is not registered with the phUSD minter.',
 
+  // --- NFTBonfire (Forge tab) ---------------------------------------------
+  NFTBonfire__PayoutBelowMinimum: () =>
+    'Someone burned before you and took the pot. Your burn was cancelled and your NFT was kept.',
+  NFTBonfire__BurningDisabled: () => 'The Bonfire is switched off right now. Your NFT was kept.',
+
   // --- shared --------------------------------------------------------------
   EnforcedPause: () =>
     'The contract is paused right now. If a promotion is flushing, it will unpause once the flush completes.',

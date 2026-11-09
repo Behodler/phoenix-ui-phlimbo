@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createBonfirePotClock } from './bonfirePotClock';
-import { bonfireMinPayout, bonfirePotAt, fmtPot2, nextHeldNftId } from './forgeFormat';
-import { FORGE_BONFIRE_MIN_PAYOUT_BPS, FORGE_BONFIRE_MOCK } from '../../../data/forgeMockData';
+import { bonfirePotAt, fmtPot2 } from './forgeFormat';
+
+const POT = { potInitial: 18.4062, ratePerDay: 2.5, maxPayout: 50 };
 
 const DAY_MS = 86_400_000;
 
@@ -16,25 +17,9 @@ describe('bonfirePotAt', () => {
 });
 
 describe('bonfire formatting', () => {
-  it('floors the pot and minPayout to 2 dp', () => {
+  it('floors the pot to 2 dp', () => {
     expect(fmtPot2(18.4062)).toBe('18.40');
     expect(fmtPot2(18.4099)).toBe('18.40');
-    // 18.4062 × 98% = 18.038076 → 18.03
-    expect(bonfireMinPayout(18.4062, FORGE_BONFIRE_MIN_PAYOUT_BPS)).toBe(18.03);
-    expect(bonfireMinPayout(0, FORGE_BONFIRE_MIN_PAYOUT_BPS)).toBe(0);
-  });
-
-  it('nextHeldNftId scans forward from the given id and wraps', () => {
-    const nfts = [
-      { id: 1, name: 'a', image: '', held: 0 },
-      { id: 2, name: 'b', image: '', held: 0 },
-      { id: 3, name: 'c', image: '', held: 2 },
-      { id: 4, name: 'd', image: '', held: 1 },
-    ];
-    expect(nextHeldNftId(nfts, 1)).toBe(3);
-    expect(nextHeldNftId(nfts, 3)).toBe(4);
-    expect(nextHeldNftId(nfts, 4)).toBe(3);
-    expect(nextHeldNftId(nfts.map((n) => ({ ...n, held: 0 })), 2)).toBeNull();
   });
 });
 
@@ -46,7 +31,7 @@ describe('createBonfirePotClock (fake timers)', () => {
   it('advances at 2.5/day and clamps at the 50 cap', () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
-    const clock = createBonfirePotClock(FORGE_BONFIRE_MOCK, { intervalMs: 1000 });
+    const clock = createBonfirePotClock(POT, { intervalMs: 1000 });
     const seen: number[] = [];
     const unsubscribe = clock.subscribe(() => seen.push(clock.getSnapshot()));
 
@@ -74,7 +59,7 @@ describe('createBonfirePotClock (fake timers)', () => {
   it('reset() empties the pot, which then accrues again from zero', () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
-    const clock = createBonfirePotClock(FORGE_BONFIRE_MOCK, { intervalMs: 1000 });
+    const clock = createBonfirePotClock(POT, { intervalMs: 1000 });
     const unsubscribe = clock.subscribe(() => {});
     clock.reset();
     expect(clock.getSnapshot()).toBe(0);
@@ -92,6 +77,42 @@ describe('createBonfirePotClock (fake timers)', () => {
     const unsubscribe = clock.subscribe(() => {});
     expect(clock.getSnapshot()).toBeCloseTo(10, 8);
     unsubscribe();
+  });
+
+  it('sync() re-anchors to a fresh chain read, adopting its rate and cap', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const clock = createBonfirePotClock(POT, { intervalMs: 1000 });
+    const seen: number[] = [];
+    const unsubscribe = clock.subscribe(() => seen.push(clock.getSnapshot()));
+
+    vi.setSystemTime(DAY_MS);
+    clock.sync({ potInitial: 30, ratePerDay: 10, maxPayout: 100 });
+    expect(clock.getSnapshot()).toBe(30);
+    expect(seen.at(-1)).toBe(30);
+    expect(clock.ratePerDay).toBe(10);
+    expect(clock.maxPayout).toBe(100);
+
+    // Half a day after the sync: 30 + 5.
+    vi.setSystemTime(DAY_MS * 1.5 - 1000);
+    vi.advanceTimersByTime(1000);
+    expect(clock.getSnapshot()).toBeCloseTo(35, 8);
+    unsubscribe();
+  });
+
+  it('an unlimited cap (Infinity) never clamps; a zero rate holds the pot still', () => {
+    let t = 0;
+    const clock = createBonfirePotClock({ potInitial: 0, ratePerDay: 0, maxPayout: Infinity }, { now: () => t, intervalMs: 10 });
+    clock.sync({ potInitial: 500, ratePerDay: 100, maxPayout: Infinity });
+    t = DAY_MS * 10;
+    const unsubscribe = clock.subscribe(() => {});
+    expect(clock.getSnapshot()).toBeCloseTo(1500, 8);
+    clock.sync({ potInitial: 1500, ratePerDay: 0, maxPayout: Infinity });
+    t = DAY_MS * 20;
+    unsubscribe();
+    const again = clock.subscribe(() => {});
+    expect(clock.getSnapshot()).toBe(1500);
+    again();
   });
 
   it('starts clamped when potInitial exceeds the cap', () => {

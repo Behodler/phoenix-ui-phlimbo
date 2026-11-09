@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAccount, useChainId, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { useQuery } from '@tanstack/react-query';
 import { formatEther, formatUnits, zeroAddress } from 'viem';
-import { nftMinterV2Abi, stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
+import { stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { usePolling } from '../contexts/PollingContext';
-import { useMinterPageView } from './useMinterPageView';
+import { useClaimNftHoldings } from './useClaimNftHoldings';
 import { useToast } from '../components/ui/ToastProvider';
 import { useERC1155ApprovalForAll } from './useERC1155ApprovalForAll';
 import { syaHarvesterAbi } from '../lib/syaHarvesterAbi';
@@ -146,35 +146,8 @@ export function useForgeHarvest(): ForgeHarvestState {
   });
   const yieldUsd = totalYieldRaw === undefined ? null : Number(formatUnits(totalYieldRaw as bigint, 18));
 
-  // NFTMinterV2 mints tokenId == dispatcher index, assigned in registration
-  // order (EYE 1, SCX 2, Flax 3, ...), which is NOT the nftStaticConfig id
-  // order. Read each NFT's index from MintPageView, as the mint flow does.
-  const { data: mintView, isLoading: mintViewLoading } = useMinterPageView();
-  const tokenIds = useMemo(() => {
-    const out: { configId: number; tokenId: bigint }[] = [];
-    if (!mintView) return out;
-    for (const n of nftStaticConfig) {
-      const index = mintView[n.tokenPrefix]?.dispatcherIndex;
-      if (index) out.push({ configId: n.id, tokenId: BigInt(index) });
-    }
-    return out;
-  }, [mintView]);
-
-  const { data: balancesRaw, refetch: refetchHoldings } = useReadContract({
-    address: nftMinter,
-    abi: nftMinterV2Abi,
-    functionName: 'balanceOfBatch',
-    args: wallet ? [tokenIds.map(() => wallet), tokenIds.map((t) => t.tokenId)] : undefined,
-    query: { enabled: !!nftMinter && !!wallet && tokenIds.length > 0, refetchInterval },
-  });
-  const nftHoldings = useMemo(() => {
-    const out: Record<number, number> = {};
-    const balances = balancesRaw as readonly bigint[] | undefined;
-    tokenIds.forEach(({ configId }, i) => {
-      out[configId] = balances ? Number(balances[i] ?? 0n) : 0;
-    });
-    return out;
-  }, [balancesRaw, tokenIds]);
+  const holdings = useClaimNftHoldings(wallet, nftMinter, refetchInterval);
+  const { nftHoldings, refetch: refetchHoldings } = holdings;
 
   const approval = useERC1155ApprovalForAll(wallet, harvester, nftMinter);
 
@@ -188,13 +161,13 @@ export function useForgeHarvest(): ForgeHarvestState {
   }, [nftHoldings]);
 
   const holdsSelected = (nftHoldings[selectedNftId] ?? 0) > 0;
-  const selectedTokenId = tokenIds.find((t) => t.configId === selectedNftId)?.tokenId;
+  const selectedTokenId = holdings.tokenIdFor(selectedNftId);
   const nftIndex = requiresNft ? selectedTokenId ?? 0n : 0n;
 
   let blocker: HarvestBlocker = null;
   if (!active) blocker = 'inactive';
   else if (!wallet) blocker = 'disconnected';
-  else if (!sya || nftMinterLoading || (requiresNft && (mintViewLoading || !mintView))) blocker = 'loading';
+  else if (!sya || nftMinterLoading || (requiresNft && holdings.mappingLoading)) blocker = 'loading';
   else if (requiresNft && !holdsSelected) blocker = 'no-nft';
   else if (requiresNft && !approval.isApprovedForAll) blocker = 'needs-approval';
 

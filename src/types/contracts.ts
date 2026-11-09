@@ -69,6 +69,8 @@ export interface ContractAddresses {
   /** UniV2 Antimatter/sUSDS pair (UniswapHelper `amPair()`); zero until it exists on a chain. */
   AntimatterSusdsPair: string;
   SYAHarvester: string;
+  /** NFTBonfire: burn one claim NFT for the accrued Antimatter pot. Zero until deployed on a chain. */
+  NFTBonfire: string;
   BalancerLPMigrator: string;
 }
 

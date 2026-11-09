@@ -5,19 +5,10 @@ import ForgeTab, { type ForgeRowDef } from './ForgeTab';
 import { FORGE_DEFAULT_OPEN } from '../../../data/forgeMockData';
 import type { ForgeAnnihilateState } from '../../../hooks/useForgeAnnihilate';
 import type { ForgeHarvestState } from '../../../hooks/useForgeHarvest';
+import type { ForgeBonfireState } from '../../../hooks/useForgeBonfire';
+import { createBonfirePotClock } from './bonfirePotClock';
 
 const OWNER = '0x00000000000000000000000000000000000000aa';
-const STRANGER = '0x00000000000000000000000000000000000000bb';
-// First entry of the mainnet ADMIN_ALLOWLIST in src/lib/adminAllowlist.ts.
-const ALLOWLISTED = '0x186c77B80Bbfd21b01C7D7FA44bA27031322a77F';
-
-let wallet: string | undefined;
-let chainId: number;
-
-vi.mock('wagmi', () => ({
-  useAccount: () => ({ address: wallet }),
-  useChainId: () => chainId,
-}));
 vi.mock('../../ui/ToastProvider', () => ({
   useToast: () => ({ addToast: vi.fn() }),
 }));
@@ -65,18 +56,35 @@ const harvestState = (): ForgeHarvestState => ({
   approveNfts: vi.fn(),
   harvest: vi.fn(),
 });
+const bonfireState = (): ForgeBonfireState => ({
+  active: true,
+  loaded: true,
+  // Real clock: the header-tick test drives it with fake timers.
+  clock: createBonfirePotClock({ potInitial: 18.4062, ratePerDay: 2.5, maxPayout: 50 }, { intervalMs: 50 }),
+  ratePerDay: 2.5,
+  maxPayout: 50,
+  paused: false,
+  nftHoldings: { 6: 2, 1: 1, 5: 3, 2: 1, 3: 0, 4: 0 },
+  selectedNftId: 1,
+  setSelectedNftId: vi.fn(),
+  minPayoutWei: 18_030_000_000_000_000_000n,
+  blocker: null,
+  pendingBurn: false,
+  burn: vi.fn().mockResolvedValue(undefined),
+});
 let annihilate: ForgeAnnihilateState;
 let harvest: ForgeHarvestState;
+let bonfire: ForgeBonfireState;
 vi.mock('../../../hooks/useForgeAnnihilate', () => ({ useForgeAnnihilate: () => annihilate, ANNIHILATE_STABLE_ORDER: ['USDC', 'USDe', 'DOLA'] }));
 vi.mock('../../../hooks/useForgeHarvest', () => ({ useForgeHarvest: () => harvest }));
+vi.mock('../../../hooks/useForgeBonfire', () => ({ useForgeBonfire: () => bonfire }));
 
-const BONFIRE = 'NFT Bonfire - only visible to admins';
+const BONFIRE = 'NFT Bonfire';
 
 beforeEach(() => {
-  wallet = OWNER;
-  chainId = 31337;
   annihilate = annihilateState();
   harvest = harvestState();
+  bonfire = bonfireState();
 });
 
 function makeRow(key: string, title: string): ForgeRowDef {
@@ -184,6 +192,7 @@ describe('ForgeTab', () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(0);
+      bonfire = bonfireState(); // anchor the clock at the fake epoch
       render(<ForgeTab />);
       fireEvent.click(screen.getByRole('button', { name: BONFIRE }));
       const header = () => screen.getAllByTestId('bonfire-header-pot').map((el) => el.textContent);
@@ -201,9 +210,8 @@ describe('ForgeTab', () => {
       expect(screen.getByTestId('bonfire-pot')).toHaveTextContent('20.906200');
       expect(screen.getByRole('button', { name: 'Burn EYE ignition → receive 20.90 Antimatter' })).toBeInTheDocument();
 
-      // Burning resets the shared pot: header and panel both drop to zero.
-      fireEvent.click(screen.getByRole('button', { name: 'Burn EYE ignition → receive 20.90 Antimatter' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Confirm Burn' }));
+      // A fresh chain read re-anchors the shared pot: header and panel move together.
+      act(() => bonfire.clock.sync({ potInitial: 0, ratePerDay: 2.5, maxPayout: 50 }));
       expect(header()).toEqual(['0.00', '0.00']);
       expect(screen.getByTestId('bonfire-pot')).toHaveTextContent('0.000000');
     } finally {
@@ -211,30 +219,28 @@ describe('ForgeTab', () => {
     }
   });
 
-  it('hides the Bonfire row from a wallet that is not the harvester owner', () => {
-    wallet = STRANGER;
+  it('shows the Bonfire row to everyone, with no admin suffix', () => {
     render(<ForgeTab />);
-    expect(screen.queryByRole('button', { name: BONFIRE })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Harvest Yield' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'NFT Bonfire' })).toBeInTheDocument();
+    expect(screen.queryByText(/only visible to admins/)).not.toBeInTheDocument();
   });
 
-  it('hides the Bonfire row when no wallet is connected', () => {
-    wallet = undefined;
-    render(<ForgeTab />);
-    expect(screen.queryByRole('button', { name: BONFIRE })).not.toBeInTheDocument();
-  });
+  it('Bonfire header: dash before the first read, Paused when paused, Off at rate 0', () => {
+    bonfire = { ...bonfireState(), loaded: false, blocker: 'loading' };
+    const { unmount } = render(<ForgeTab />);
+    const header = () => screen.getByRole('button', { name: BONFIRE });
+    expect(within(header()).queryByTestId('bonfire-header-pot')).not.toBeInTheDocument();
+    expect(within(header()).getAllByText('—').length).toBeGreaterThan(0);
+    unmount();
 
-  it('shows the Bonfire row to the SYAHarvester owner, case-insensitively', () => {
-    wallet = OWNER.toUpperCase().replace('0X', '0x');
-    render(<ForgeTab />);
-    expect(screen.getByRole('button', { name: BONFIRE })).toBeInTheDocument();
-  });
+    bonfire = { ...bonfireState(), paused: true, blocker: 'paused' };
+    const second = render(<ForgeTab />);
+    expect(within(header()).getByText('Paused')).toBeInTheDocument();
+    second.unmount();
 
-  it('hides the Bonfire row from an allowlisted admin wallet that is not the harvester owner', () => {
-    wallet = ALLOWLISTED;
-    chainId = 1;
+    bonfire = { ...bonfireState(), ratePerDay: 0, blocker: 'disabled' };
     render(<ForgeTab />);
-    expect(screen.queryByRole('button', { name: BONFIRE })).not.toBeInTheDocument();
+    expect(within(header()).getByText('Off')).toBeInTheDocument();
   });
 
   it('header pills reflect live state: Paused annihilation, Approve NFTs harvest', () => {
@@ -250,8 +256,10 @@ describe('ForgeTab', () => {
   it('marks undeployed contracts as Not live', () => {
     annihilate = { ...annihilateState(), active: false, gateReason: 'Annihilation is not live on this network yet.' };
     harvest = { ...harvestState(), active: false, owner: undefined, blocker: 'inactive', quote: undefined, display: null };
+    bonfire = { ...bonfireState(), active: false, loaded: false, blocker: 'inactive' };
     render(<ForgeTab />);
     expect(within(screen.getByRole('button', { name: 'Annihilate Antimatter' })).getByText('Not live')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: 'Harvest Yield' })).getByText('Not live')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: BONFIRE })).getByText('Not live')).toBeInTheDocument();
   });
 });

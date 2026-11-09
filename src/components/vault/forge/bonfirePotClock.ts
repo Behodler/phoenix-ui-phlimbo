@@ -2,8 +2,11 @@ import { useSyncExternalStore } from 'react';
 import { bonfirePotAt } from './forgeFormat';
 
 export interface BonfirePotParams {
+  /** Pot (Antimatter) at the moment of the sync, i.e. `NFTBonfire.pendingPayout()`. */
   potInitial: number;
+  /** `NFTBonfire.ratePerDay()`, Antimatter. `0` stops accrual. */
   ratePerDay: number;
+  /** `NFTBonfire.maxPayout()`, Antimatter. `Infinity` when the contract's cap is `0` (unlimited). */
   maxPayout: number;
 }
 
@@ -11,15 +14,20 @@ export interface BonfirePotParams {
  * Shared ticking source for the NFT Bonfire pot. The row header metric, the
  * pot panel and the burn button all read the same snapshot, so they always
  * agree. Ticks only while something is subscribed; elapsed time is measured
- * from the last reset, so pausing the ticker never loses accrual.
+ * from the last sync, so pausing the ticker never loses accrual.
  *
- * MOCKED: the live-wiring story replaces this with NFTBonfire.pendingPayout().
+ * DISPLAY ONLY. `useForgeBonfire` re-syncs it to the block-attested
+ * `NFTBonfire.pendingPayout()` on every poll and extrapolates between polls.
+ * The burn's `minPayout` is always signed from the attested figure, never from
+ * this extrapolation, so a browser clock running ahead cannot revert a burn.
  */
 export interface BonfirePotClock {
   readonly ratePerDay: number;
   readonly maxPayout: number;
   getSnapshot: () => number;
   subscribe: (listener: () => void) => () => void;
+  /** Re-anchor to a fresh chain read; accrual restarts from `potInitial` now. */
+  sync: (params: BonfirePotParams) => void;
   /** A burn paid out the pot: restart accrual from zero. */
   reset: () => void;
 }
@@ -32,10 +40,11 @@ export interface BonfirePotClockOptions {
 }
 
 export function createBonfirePotClock(
-  { potInitial, ratePerDay, maxPayout }: BonfirePotParams,
+  initial: BonfirePotParams,
   { intervalMs = 50, now = () => Date.now() }: BonfirePotClockOptions = {},
 ): BonfirePotClock {
-  let start = Math.min(maxPayout, potInitial);
+  let { ratePerDay, maxPayout } = initial;
+  let start = Math.min(maxPayout, initial.potInitial);
   let origin = now();
   let snapshot = start;
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -51,8 +60,12 @@ export function createBonfirePotClock(
   };
 
   return {
-    ratePerDay,
-    maxPayout,
+    get ratePerDay() {
+      return ratePerDay;
+    },
+    get maxPayout() {
+      return maxPayout;
+    },
     getSnapshot: () => snapshot,
     subscribe: (listener) => {
       listeners.add(listener);
@@ -67,6 +80,14 @@ export function createBonfirePotClock(
           timer = null;
         }
       };
+    },
+    sync: (params) => {
+      ratePerDay = params.ratePerDay;
+      maxPayout = params.maxPayout;
+      start = Math.min(maxPayout, params.potInitial);
+      origin = now();
+      snapshot = start;
+      emit();
     },
     reset: () => {
       start = 0;
