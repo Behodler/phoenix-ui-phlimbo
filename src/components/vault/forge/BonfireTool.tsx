@@ -21,11 +21,11 @@ export interface BonfireToolProps {
 
 /** What the button says when a burn cannot be sent, keyed by the reason. */
 const BLOCKER_LABEL: Record<Exclude<BonfireBlocker, null>, string> = {
-  inactive: 'Bonfire not live on this network',
+  inactive: 'Not live on this network',
   disconnected: 'Connect your wallet',
   loading: 'Loading…',
-  disabled: 'The Bonfire is switched off',
-  paused: 'The Bonfire is paused',
+  disabled: 'Burning is switched off',
+  paused: 'Burning is paused',
   'no-nft': 'No NFT to burn',
   empty: 'The pot is empty',
 };
@@ -37,7 +37,7 @@ const minPayoutDisplay = (wei: bigint) => floorTo(Number(formatUnits(wei, 18)), 
 const fmtRate = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 4 });
 
 /**
- * Body of the Forge "NFT Bonfire" row (`NFTBonfire`). Presentational: reads
+ * Body of the Forge "Burn NFTs for Antimatter" row (`NFTBonfire`). Presentational: reads
  * and the burn itself live in `useForgeBonfire`. The pot ticks from the
  * hook's display-only clock; the burn's `minPayout` is the block-attested pot
  * less the haircut, frozen when the confirmation dialog opens.
@@ -83,8 +83,7 @@ export default function BonfireTool({ state }: BonfireToolProps) {
   return (
     <>
       <p className="max-w-[68ch] text-[13px] leading-[1.55] text-muted-foreground">
-        Antimatter piles up in the Bonfire at a steady rate. Burn one NFT to take the whole pot, and the pot starts
-        again from zero. Every NFT counts the same.
+        Antimatter builds up over time. Burn any NFT to claim it all.
       </p>
 
       <div className="grid gap-4 xl:grid-cols-2 xl:items-start">

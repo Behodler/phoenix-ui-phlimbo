@@ -1,6 +1,6 @@
 import type React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import YieldFunnelTab from './YieldFunnelTab';
 
 // ---------------------------------------------------------------------------
@@ -12,7 +12,8 @@ import YieldFunnelTab from './YieldFunnelTab';
 //   2. Unchecking a row adds that row's strategyAddress to exempt array.
 //   3. Re-checking removes it.
 //   4. The 3-arg `claim(nftIndex, minRewardTokenSupplied, exemptStrategies)`
-//      call site forwards the exempt array as the third argument.
+//      call site forwards the exempt array as the third argument. `nftIndex`
+//      is always 0: the gate-free SYA (phStaging2 story 131) burns no NFT.
 //
 // We mock out wagmi, contract-address context, wallet-balances context, and
 // every hook the component pulls in so the render is purely deterministic
@@ -145,90 +146,6 @@ vi.mock('../../hooks/useYieldFunnelData', () => ({
   },
 }));
 
-// One NFT with non-zero balance so the component can build a valid claim call.
-vi.mock('../../hooks/useMinterPageView', () => ({
-  useMinterPageView: () => ({
-    data: {
-      // EYE/SCX/Flax now pay in USDC (6-decimal). Raw values are USDC-scale
-      // (1e6 = 1 USDC) so the decimals change is actually exercised.
-      EYE: {
-        allowanceRaw: 5_000_000n,
-        priceRaw: 2_000_000n,
-        balanceRaw: 10_000_000n,
-        allowance: '5',
-        price: '2',
-        growthBasisPoints: 250,
-        balance: '10',
-        nftBalance: 1, // owned → selectable
-        dispatcherIndex: 0,
-        decimals: 6,
-      },
-      SCX: {
-        allowanceRaw: 3_000_000n,
-        priceRaw: 1_500_000n,
-        balanceRaw: 8_000_000n,
-        allowance: '3',
-        price: '1.5',
-        growthBasisPoints: 100,
-        balance: '8',
-        nftBalance: 0,
-        dispatcherIndex: 1,
-        decimals: 6,
-      },
-      Flax: {
-        allowanceRaw: 4_000_000n,
-        priceRaw: 2_500_000n,
-        balanceRaw: 6_000_000n,
-        allowance: '4',
-        price: '2.5',
-        growthBasisPoints: 300,
-        balance: '6',
-        nftBalance: 0,
-        dispatcherIndex: 2,
-        decimals: 6,
-      },
-      USDS: {
-        allowanceRaw: 0n,
-        priceRaw: 0n,
-        balanceRaw: 0n,
-        allowance: '0',
-        price: '0',
-        growthBasisPoints: 0,
-        balance: '0',
-        nftBalance: 0,
-        dispatcherIndex: 3,
-      },
-      WBTC: {
-        allowanceRaw: 0n,
-        priceRaw: 0n,
-        balanceRaw: 0n,
-        allowance: '0',
-        price: '0',
-        growthBasisPoints: 0,
-        balance: '0',
-        nftBalance: 0,
-        dispatcherIndex: 4,
-      },
-      // Reservoir Ratchet (USDC, 6-decimal). dispatcherIndex 7 mirrors the
-      // on-chain MintPageView USDC row — never hardcoded as 6. Owned
-      // (nftBalance 1) so the ratchet-claim test can select and keep it.
-      USDC: {
-        allowanceRaw: 0n,
-        priceRaw: 0n,
-        balanceRaw: 0n,
-        allowance: '0',
-        price: '0',
-        growthBasisPoints: 0,
-        balance: '0',
-        nftBalance: 1,
-        dispatcherIndex: 7,
-      },
-    },
-    isLoading: false,
-    refetch: vi.fn(),
-  }),
-}));
-
 vi.mock('../../hooks/useContractInteractions', () => ({
   useTokenAllowance: () => ({
     allowance: 10n ** 30n, // huge → no approval needed
@@ -272,40 +189,6 @@ vi.mock('../ui/ConfirmationDialog', () => ({
     ) : null,
 }));
 
-// Stub the NFT selector grid: auto-select the first owned NFT on mount so
-// the supply button is enabled without user interaction.
-type NftStub = { nftBalance: number; tokenPrefix?: string };
-type SelectorStubProps = {
-  nfts: NftStub[];
-  onSelect: (n: NftStub) => void;
-  selectedNft: NftStub | null;
-};
-vi.mock('./NFTSelectorGrid', () => ({
-  default: ({ nfts, onSelect, selectedNft }: SelectorStubProps) => {
-    // Auto-select the first NFT with a balance the first time we render.
-    if (!selectedNft && nfts.length > 0) {
-      const owned = nfts.find((n) => n.nftBalance > 0);
-      if (owned) {
-        // Defer the call so it happens during render commit, not parent's render.
-        queueMicrotask(() => onSelect(owned));
-      }
-    }
-    // Expose an explicit per-NFT select button so tests can pick a specific
-    // NFT (e.g. Reservoir Ratchet / USDC) regardless of auto-select order.
-    return (
-      <div data-testid="nft-selector-stub">
-        {nfts.map((n) => (
-          <button
-            key={n.tokenPrefix}
-            data-testid={`nft-select-${n.tokenPrefix}`}
-            onClick={() => onSelect(n)}
-          />
-        ))}
-      </div>
-    );
-  },
-}));
-
 type ActionButtonStubProps = {
   label: string;
   onAction: () => void;
@@ -329,13 +212,11 @@ vi.mock('../ui/ActionButton', () => ({
 // ---------------------------------------------------------------------------
 
 /**
- * Render YieldFunnelTab and flush the NFTSelectorGrid auto-select microtask
- * so the supply button is enabled before the test asserts on it.
+ * Render YieldFunnelTab and wait until the supply button is enabled before
+ * the test asserts on it. No NFT selection is involved: the SYA is gate-free.
  */
-async function renderAndAutoSelectNft() {
+async function renderReady() {
   const result = render(<YieldFunnelTab />);
-  // Flush the queueMicrotask in the NFTSelectorGrid stub and the resulting
-  // setSelectedNft commit. waitFor polls until the supply button enables.
   await waitFor(() => {
     const btn = screen.getByTestId('action-button') as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
@@ -366,7 +247,7 @@ describe('YieldFunnelTab — exempt strategies checkboxes', () => {
   });
 
   it('renders one checkbox per pending-yield row, all checked by default', async () => {
-    await renderAndAutoSelectNft();
+    await renderReady();
 
     const checkboxA = screen.getByTestId(
       `yield-funnel-include-checkbox-${STRATEGY_A}`,
@@ -382,7 +263,7 @@ describe('YieldFunnelTab — exempt strategies checkboxes', () => {
   });
 
   it('passes an empty exempt array as the third claim arg when all checkboxes remain checked', async () => {
-    await renderAndAutoSelectNft();
+    await renderReady();
     await triggerClaim();
 
     expect(writeContractMock).toHaveBeenCalledTimes(1);
@@ -400,7 +281,7 @@ describe('YieldFunnelTab — exempt strategies checkboxes', () => {
     // Unchecking B halves the claimable set, so the hook re-quotes the cost.
     // The floor must track that re-quote — a stale full-set floor would revert
     // every partial claim.
-    await renderAndAutoSelectNft();
+    await renderReady();
 
     const checkboxB = screen.getByTestId(
       `yield-funnel-include-checkbox-${STRATEGY_B}`,
@@ -417,26 +298,40 @@ describe('YieldFunnelTab — exempt strategies checkboxes', () => {
     expect(minRewardTokenSupplied).toBeLessThan(1_500_000n);
   });
 
-  it('claims with the live Reservoir Ratchet dispatcher index (7) when ratchet is selected', async () => {
-    // Reservoir Ratchet is UI config id 6 but its on-chain dispatcher index is
-    // 7 (read from the MintPageView USDC row, never hardcoded). Selecting it
-    // must forward 7n as the first claim arg.
-    await renderAndAutoSelectNft();
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('nft-select-USDC'));
-    });
+  it('claims with nftIndex 0 and renders no NFT selection or burn (gate-free SYA)', async () => {
+    // The supply button enabled in renderReady() without any NFT being chosen.
+    await renderReady();
+    expect(screen.queryByText(/NFT/)).not.toBeInTheDocument();
 
     await triggerClaim();
 
     expect(writeContractMock).toHaveBeenCalledTimes(1);
     const callArgs = writeContractMock.mock.calls[0][0];
     expect(callArgs.functionName).toBe('claim');
-    expect(callArgs.args[0]).toBe(7n);
+    expect(callArgs.args[0]).toBe(0n);
+  });
+
+  it('confirmation dialog lists only the selected rows and the selected profit', async () => {
+    await renderReady();
+
+    // Uncheck Strategy A (1.00 USD): selected total 2.00, cost 1.00, profit 1.00.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(`yield-funnel-include-checkbox-${STRATEGY_A}`));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('action-button'));
+    });
+
+    const dialog = await screen.findByTestId('confirmation-dialog');
+    expect(dialog).not.toHaveTextContent('NFT to Burn');
+    expect(dialog).not.toHaveTextContent('USDS');
+    expect(dialog).toHaveTextContent('2.00 USDe');
+    const profitRow = within(dialog).getByText('Estimated Profit').closest('div');
+    expect(profitRow).toHaveTextContent('$1.00');
   });
 
   it("unchecking a row puts that row's strategyAddress into the exempt array passed to claim", async () => {
-    await renderAndAutoSelectNft();
+    await renderReady();
 
     const checkboxA = screen.getByTestId(
       `yield-funnel-include-checkbox-${STRATEGY_A}`,
@@ -453,7 +348,7 @@ describe('YieldFunnelTab — exempt strategies checkboxes', () => {
   });
 
   it('re-checking a previously-unchecked row removes its address from the exempt array', async () => {
-    await renderAndAutoSelectNft();
+    await renderReady();
 
     const checkboxB = screen.getByTestId(
       `yield-funnel-include-checkbox-${STRATEGY_B}`,
@@ -481,7 +376,7 @@ describe('YieldFunnelTab — exempt strategies checkboxes', () => {
     // the UI). The underlying claim path still accepts a full exempt array
     // if invoked programmatically — see the "Select a Yield Source"
     // empty-state test below for the disabled-button assertion.
-    await renderAndAutoSelectNft();
+    await renderReady();
 
     await act(async () => {
       fireEvent.click(
@@ -539,14 +434,14 @@ describe('YieldFunnelTab — selected totals + empty selection', () => {
   }
 
   it('renders the panel with the renamed "Total Selected Yield Value:" label', async () => {
-    await renderAndAutoSelectNft();
+    await renderReady();
 
     expect(screen.getByText('Total Selected Yield Value:')).toBeInTheDocument();
     expect(screen.queryByText('Total Yield Value:')).not.toBeInTheDocument();
   });
 
   it('shows the full total / cost / profit when every checkbox is checked', async () => {
-    await renderAndAutoSelectNft();
+    await renderReady();
 
     const panel = findResultsPanel();
     expect(panel).not.toBeNull();
@@ -559,7 +454,7 @@ describe('YieldFunnelTab — selected totals + empty selection', () => {
   });
 
   it('unchecking one row reduces total, cost, and profit proportionally', async () => {
-    await renderAndAutoSelectNft();
+    await renderReady();
 
     // Uncheck Strategy A (1.00 USD) → selected total drops to 2.00, cost to 1.00.
     await act(async () => {
@@ -577,7 +472,7 @@ describe('YieldFunnelTab — selected totals + empty selection', () => {
   });
 
   it('unchecking every row hides the results panel and disables the button with "Select a Yield Source"', async () => {
-    await renderAndAutoSelectNft();
+    await renderReady();
 
     await act(async () => {
       fireEvent.click(
@@ -601,7 +496,7 @@ describe('YieldFunnelTab — selected totals + empty selection', () => {
   });
 
   it('re-checking at least one row restores the panel and the supply button', async () => {
-    await renderAndAutoSelectNft();
+    await renderReady();
 
     // Uncheck both, then re-check B.
     const checkboxA = screen.getByTestId(

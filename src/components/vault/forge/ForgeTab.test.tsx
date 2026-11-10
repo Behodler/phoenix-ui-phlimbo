@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ForgeTab, { type ForgeRowDef } from './ForgeTab';
-import { FORGE_DEFAULT_OPEN } from '../../../data/forgeMockData';
+import { FORGE_DEFAULT_OPEN, FORGE_OPEN_ROW_STORAGE_KEY } from '../../../data/forgeMockData';
 import type { ForgeAnnihilateState } from '../../../hooks/useForgeAnnihilate';
 import type { ForgeHarvestState } from '../../../hooks/useForgeHarvest';
 import type { ForgeBonfireState } from '../../../hooks/useForgeBonfire';
@@ -35,11 +35,6 @@ const annihilateState = (): ForgeAnnihilateState => ({
 const harvestState = (): ForgeHarvestState => ({
   active: true,
   owner: OWNER,
-  requiresNft: true,
-  nftHoldings: { 6: 2, 1: 1, 5: 3, 2: 1, 3: 0, 4: 0 },
-  selectedNftId: 6,
-  setSelectedNftId: vi.fn(),
-  nftApproved: true,
   yieldUsd: 412.8,
   blocker: null,
   quote: {
@@ -53,7 +48,6 @@ const harvestState = (): ForgeHarvestState => ({
   isQuoting: false,
   display: { ethOut: 0.0421, gasEth: 0.0026, gasUnits: 640_000, gasGwei: 4.1, minEthOut: 0.04, profitable: true },
   pendingAction: null,
-  approveNfts: vi.fn(),
   harvest: vi.fn(),
 });
 const bonfireState = (): ForgeBonfireState => ({
@@ -79,9 +73,11 @@ vi.mock('../../../hooks/useForgeAnnihilate', () => ({ useForgeAnnihilate: () => 
 vi.mock('../../../hooks/useForgeHarvest', () => ({ useForgeHarvest: () => harvest }));
 vi.mock('../../../hooks/useForgeBonfire', () => ({ useForgeBonfire: () => bonfire }));
 
-const BONFIRE = 'NFT Bonfire';
+const BONFIRE = 'Burn NFTs for Antimatter';
 
 beforeEach(() => {
+  // The open row is remembered in localStorage; start every test as a first visit.
+  localStorage.clear();
   annihilate = annihilateState();
   harvest = harvestState();
   bonfire = bonfireState();
@@ -107,13 +103,43 @@ describe('ForgeTab', () => {
     expect(screen.getByText('Handy one-transaction actions. Each one is a single click.')).toBeInTheDocument();
   });
 
-  it('opens the FORGE_DEFAULT_OPEN row (Harvest) initially, with Annihilate collapsed', () => {
-    expect(FORGE_DEFAULT_OPEN).toBe('harvest');
+  it('opens the FORGE_DEFAULT_OPEN row (Annihilate) on a first visit, with Harvest collapsed', () => {
+    expect(FORGE_DEFAULT_OPEN).toBe('annihilate');
+    render(<ForgeTab />);
+    expect(screen.getByRole('button', { name: 'Annihilate Antimatter' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Harvest Yield' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('Annihilation preview')).toBeInTheDocument();
+    expect(screen.queryByText('Estimated profit')).not.toBeInTheDocument();
+  });
+
+  it('remembers the last opened row across mounts', async () => {
+    const user = userEvent.setup();
+    const first = render(<ForgeTab />);
+    await user.click(screen.getByRole('button', { name: 'Harvest Yield' }));
+    expect(localStorage.getItem(FORGE_OPEN_ROW_STORAGE_KEY)).toBe('harvest');
+    first.unmount();
+
     render(<ForgeTab />);
     expect(screen.getByRole('button', { name: 'Harvest Yield' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('button', { name: 'Annihilate Antimatter' })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText('Annihilation preview')).not.toBeInTheDocument();
-    expect(screen.getByText('Estimated profit')).toBeInTheDocument();
+  });
+
+  it('remembers that every row was collapsed', async () => {
+    const user = userEvent.setup();
+    const first = render(<ForgeTab />);
+    await user.click(screen.getByRole('button', { name: 'Annihilate Antimatter' }));
+    first.unmount();
+
+    render(<ForgeTab />);
+    for (const name of ['Annihilate Antimatter', 'Harvest Yield', BONFIRE]) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
+    }
+  });
+
+  it('falls back to the default row when the remembered key names no row', () => {
+    localStorage.setItem(FORGE_OPEN_ROW_STORAGE_KEY, 'retired-tool');
+    render(<ForgeTab />);
+    expect(screen.getByRole('button', { name: 'Annihilate Antimatter' })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('renders the Harvest row after Annihilate with the profitable header metric and pill', () => {
@@ -129,6 +155,7 @@ describe('ForgeTab', () => {
   });
 
   it('opens Annihilate when its header is clicked, collapsing Harvest', async () => {
+    localStorage.setItem(FORGE_OPEN_ROW_STORAGE_KEY, 'harvest');
     const user = userEvent.setup();
     render(<ForgeTab />);
     const annihilate = screen.getByRole('button', { name: 'Annihilate Antimatter' });
@@ -141,6 +168,7 @@ describe('ForgeTab', () => {
   });
 
   it('clicking the open row header collapses it', async () => {
+    localStorage.setItem(FORGE_OPEN_ROW_STORAGE_KEY, 'harvest');
     const user = userEvent.setup();
     render(<ForgeTab />);
     const header = screen.getByRole('button', { name: 'Harvest Yield' });
@@ -153,11 +181,11 @@ describe('ForgeTab', () => {
 
   it('keeps only one row open at a time', async () => {
     const user = userEvent.setup();
-    render(<ForgeTab rows={[makeRow('harvest', 'Alpha'), makeRow('beta', 'Beta')]} />);
+    render(<ForgeTab rows={[makeRow('annihilate', 'Alpha'), makeRow('beta', 'Beta')]} />);
     const alpha = screen.getByRole('button', { name: 'Alpha' });
     const beta = screen.getByRole('button', { name: 'Beta' });
 
-    // Default-open key is 'harvest' → Alpha.
+    // Default-open key is 'annihilate' → Alpha.
     expect(alpha).toHaveAttribute('aria-expanded', 'true');
     expect(beta).toHaveAttribute('aria-expanded', 'false');
 
@@ -172,7 +200,7 @@ describe('ForgeTab', () => {
     expect(beta).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('appends the NFT Bonfire row after Harvest with the live pot metric and Burning pill', () => {
+  it('appends the Burn NFTs for Antimatter row after Harvest with the live pot metric and Burning pill', () => {
     render(<ForgeTab />);
     const harvest = screen.getByRole('button', { name: 'Harvest Yield' });
     const bonfire = screen.getByRole('button', { name: BONFIRE });
@@ -221,7 +249,7 @@ describe('ForgeTab', () => {
 
   it('shows the Bonfire row to everyone, with no admin suffix', () => {
     render(<ForgeTab />);
-    expect(screen.getByRole('button', { name: 'NFT Bonfire' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: BONFIRE })).toBeInTheDocument();
     expect(screen.queryByText(/only visible to admins/)).not.toBeInTheDocument();
   });
 
@@ -243,13 +271,13 @@ describe('ForgeTab', () => {
     expect(within(header()).getByText('Off')).toBeInTheDocument();
   });
 
-  it('header pills reflect live state: Paused annihilation, Approve NFTs harvest', () => {
+  it('header pills reflect live state: Paused annihilation, No quote harvest', () => {
     annihilate = { ...annihilateState(), gateReason: 'Annihilation is paused.', paused: true };
-    harvest = { ...harvestState(), blocker: 'needs-approval', quote: undefined, display: null };
+    harvest = { ...harvestState(), blocker: 'loading', quote: undefined, display: null };
     render(<ForgeTab />);
     expect(within(screen.getByRole('button', { name: 'Annihilate Antimatter' })).getByText('Paused')).toBeInTheDocument();
     const harvestHeader = screen.getByRole('button', { name: 'Harvest Yield' });
-    expect(within(harvestHeader).getByText('Approve NFTs')).toBeInTheDocument();
+    expect(within(harvestHeader).getByText('No quote')).toBeInTheDocument();
     expect(within(harvestHeader).getAllByText('—').length).toBeGreaterThan(0);
   });
 

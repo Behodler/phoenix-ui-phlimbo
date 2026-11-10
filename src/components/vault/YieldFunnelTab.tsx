@@ -4,17 +4,14 @@ import { maxUint256, formatUnits } from 'viem';
 import { stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
 import ActionButton from '../ui/ActionButton';
 import ConfirmationDialog from '../ui/ConfirmationDialog';
-import NFTSelectorGrid from './NFTSelectorGrid';
 import { useContractAddresses } from '../../contexts/ContractAddressContext';
 import { useWalletBalances } from '../../contexts/WalletBalancesContext';
 import { useYieldFunnelData, type PendingYieldItem } from '../../hooks/useYieldFunnelData';
-import { useMinterPageView, type TokenMintData } from '../../hooks/useMinterPageView';
 import { useTokenAllowance, useTokenApproval } from '../../hooks/useContractInteractions';
 import { useApprovalTransaction } from '../../hooks/useTransaction';
 import { useToast } from '../ui/ToastProvider';
 import { getErrorTitle, shouldOfferRetry } from '../../utils/transactionErrors';
 import { log } from '../../utils/logger';
-import { nftStaticConfig, type NFTData } from '../../data/nftMockData';
 
 // Slack allowed below the contract-quoted claim amount when setting the
 // `minRewardTokenSupplied` front-running floor. USDe's rebasing moves the
@@ -23,6 +20,10 @@ import { nftStaticConfig, type NFTData } from '../../data/nftMockData';
 // from leaving the user a fraction of the previewed yield.
 const CLAIM_FLOOR_TOLERANCE_BPS = 1000;
 
+// `claim`'s `nftIndex` argument. The gate-free SYA (phStaging2 story 131) has
+// `nftMinter() == 0`, so the index is ignored and no claim NFT is burned.
+const NO_NFT_INDEX = 0n;
+
 // Props interface for YieldFunnelTab
 interface YieldFunnelTabProps {
   isPaused?: boolean;
@@ -30,7 +31,6 @@ interface YieldFunnelTabProps {
 
 export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
 
   // Per-strategy exemption set for the claim call. A strategy address present
   // in this set is "unchecked" in the UI and will be skipped when claim runs.
@@ -75,8 +75,6 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
     discountPercent,
     claimAmount,
     claimAmountFormatted,
-    totalYieldFormatted,
-    profitFormatted,
     isLoading: isDataLoading,
     isError: isDataError,
     error: dataError,
@@ -90,11 +88,15 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   const selectedCount = pendingYield.length - exemptSet.size;
   const allUnchecked = pendingYield.length > 0 && selectedCount === 0;
 
-  const selectedTotalUsd = useMemo(() => {
-    return pendingYield
-      .filter((row) => !exemptSet.has(row.strategyAddress as `0x${string}`))
-      .reduce((sum, row) => sum + parseFloat(row.amountFormatted), 0);
-  }, [pendingYield, exemptSet]);
+  const selectedYield = useMemo(
+    () => pendingYield.filter((row) => !exemptSet.has(row.strategyAddress as `0x${string}`)),
+    [pendingYield, exemptSet]
+  );
+
+  const selectedTotalUsd = useMemo(
+    () => selectedYield.reduce((sum, row) => sum + parseFloat(row.amountFormatted), 0),
+    [selectedYield]
+  );
 
   // Selected cost comes straight from the contract via `claimAmount`, which
   // already reflects the exempt set we passed to the hook.
@@ -104,52 +106,6 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   const selectedTotalFormatted = selectedTotalUsd.toFixed(2);
   const selectedCostFormatted = selectedCostUsd.toFixed(2);
   const selectedProfitFormatted = selectedProfitUsd.toFixed(2);
-
-  // NFT data from MinterPageView
-  const {
-    data: minterPageData,
-    isLoading: isMinterLoading,
-    refetch: refetchMinterData,
-  } = useMinterPageView();
-
-  // Merge static NFT config with live MinterPageView data. Every NFT — now
-  // including Reservoir Ratchet (USDC row, dispatcher index 7) — has on-chain
-  // MinterPageView data, so the whole static config maps directly.
-  const liveMappedNfts: NFTData[] = minterPageData
-    ? nftStaticConfig.map((cfg) => {
-        const live = (minterPageData as unknown as Record<string, TokenMintData>)[cfg.tokenPrefix];
-        return {
-          ...cfg,
-          price: live.price,
-          balance: live.balance,
-          nftBalance: live.nftBalance,
-          allowanceRaw: live.allowanceRaw,
-          priceRaw: live.priceRaw,
-          balanceRaw: live.balanceRaw,
-          growthBasisPoints: live.growthBasisPoints,
-          dispatcherIndex: live.dispatcherIndex,
-        };
-      })
-    : [];
-
-  const nftList: NFTData[] = liveMappedNfts;
-
-  // Stable callback ref for NFT selection (avoids re-triggering auto-select effect)
-  const handleNftSelect = useCallback((nft: NFTData) => {
-    setSelectedNft(nft);
-  }, []);
-
-  // After minter data refetch (e.g., post-claim), invalidate selected NFT if its balance dropped to 0
-  useEffect(() => {
-    if (selectedNft && nftList.length > 0) {
-      const updated = nftList.find((n) => n.id === selectedNft.id);
-      if (updated && updated.nftBalance === 0) {
-        // Selected NFT was burned to zero — pick the next available or clear
-        const nextOwned = nftList.find((n) => n.nftBalance > 0);
-        setSelectedNft(nextOwned ?? null);
-      }
-    }
-  }, [nftList]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Token approval hook for USDC
   const { approve } = useTokenApproval();
@@ -321,16 +277,8 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
         duration: 30000,
       });
 
-      if (!selectedNft) {
-        addToast({
-          type: 'error',
-          title: 'No NFT Selected',
-          description: 'Please select an NFT to burn before claiming.',
-        });
-        return;
-      }
-
-      // Call claim(nftIndex, minRewardTokenSupplied, exemptStrategies).
+      // Call claim(nftIndex, minRewardTokenSupplied, exemptStrategies). nftIndex
+      // is always 0: the SYA is gate-free and ignores it.
       //
       // exemptStrategies is the list of yield-strategy addresses to skip. Use
       // `effectiveExemptStrategies`, which folds the user's unchecks together
@@ -346,7 +294,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       // accrues, so a stale (lower) quote is a weaker floor but never a false
       // revert; the case it catches is a bot claiming a subset of the
       // strategies out of the mempool ahead of us, leaving a residue that
-      // would burn the user's NFT for a fraction of the previewed yield.
+      // would leave the user a fraction of the previewed yield for the gas.
       //
       // The floor is the quote less CLAIM_FLOOR_TOLERANCE_BPS. USDe rebases
       // between quote and execution, so a tight floor rejects honest claims;
@@ -360,7 +308,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
         abi: stableYieldAccumulatorAbi,
         functionName: 'claim',
         args: [
-          BigInt(selectedNft.dispatcherIndex),
+          NO_NFT_INDEX,
           minRewardTokenSupplied,
           effectiveExemptStrategies,
         ],
@@ -399,12 +347,12 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       } else if (errorMessage.includes('InsufficientYield')) {
         // The minRewardTokenSupplied floor rejected the claim: the yield on
         // offer dropped between quote and execution, which in practice means
-        // someone claimed ahead of us. The NFT was not burned.
+        // someone claimed ahead of us.
         addToast({
           type: 'error',
           title: 'Yield Claimed by Someone Else',
           description:
-            'The available yield dropped below the amount quoted, so the claim was rejected before your NFT was burned. Refresh to see the current yield.',
+            'The available yield dropped below the amount quoted, so the claim was rejected. Refresh to see the current yield.',
           duration: 16000,
         });
         refetchYieldData();
@@ -425,7 +373,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       addToast({
         type: 'success',
         title: 'Claim Successful',
-        description: `Successfully claimed yield tokens! You paid ${claimAmountFormatted} USDC for ${totalYieldFormatted} worth of yield.`,
+        description: `Successfully claimed yield tokens! You paid ${selectedCostFormatted} USDC for $${selectedTotalFormatted} worth of yield.`,
         duration: 30000,
         action: {
           label: 'View Transaction',
@@ -444,9 +392,6 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
 
       // Refresh navbar wallet balances (USDC balance decreases, yield tokens received)
       refreshWalletBalances();
-
-      // Refetch minter data so NFT balances update (claim burns 1 NFT)
-      refetchMinterData();
     }
   }, [isClaimSuccess, claimHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -475,7 +420,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
   let buttonLoading = false;
 
   if (isConnected) {
-    if (isDataLoading || usdcAllowanceLoading || usdcLoading || isMinterLoading) {
+    if (isDataLoading || usdcAllowanceLoading || usdcLoading) {
       buttonLabel = 'Loading...';
       buttonLoading = true;
       buttonDisabled = true;
@@ -484,9 +429,6 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
       buttonDisabled = true;
     } else if (pendingYield.length === 0 || claimAmount === 0n) {
       buttonLabel = 'No yield available';
-      buttonDisabled = true;
-    } else if (!selectedNft) {
-      buttonLabel = 'Select an NFT';
       buttonDisabled = true;
     } else if (needsApproval) {
       buttonLabel = 'Approve USDC';
@@ -528,10 +470,6 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
     isConnected,
     hasAddresses: !!addresses,
     accumulatorAddress: addresses?.StableYieldAccumulator ?? 'MISSING',
-    isMinterLoading,
-    minterPageData: minterPageData ? Object.keys(minterPageData) : 'null',
-    nftListCount: nftList.length,
-    selectedNft: selectedNft?.name ?? 'none',
     isPaused,
   });
 
@@ -659,14 +597,6 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
           </p>
         </div>
 
-        {/* NFT Selector Grid */}
-        <NFTSelectorGrid
-          nfts={nftList}
-          selectedNft={selectedNft}
-          onSelect={handleNftSelect}
-          isConnected={isConnected}
-        />
-
         {/* Pending Yield Breakdown Panel */}
         <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-4 mb-6">
           <h3 className="text-lg font-semibold text-pxusd-orange-300 mb-3">Pending Yield</h3>
@@ -766,16 +696,6 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
             </div>
           </div>
 
-          {/* NFT to Burn */}
-          {selectedNft && (
-            <div className="bg-pxusd-teal-700 rounded-lg p-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">NFT to Burn:</span>
-                <span className="text-sm font-medium text-foreground">{selectedNft.name} (1 unit)</span>
-              </div>
-            </div>
-          )}
-
           {/* Arrow */}
           <div className="flex justify-center">
             <svg width="16" height="16" viewBox="0 0 16 16" className="text-muted-foreground">
@@ -790,7 +710,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
           <div className="bg-pxusd-teal-700 rounded-lg p-4">
             <div className="text-sm text-muted-foreground mb-2">You'll receive</div>
             <div className="space-y-2">
-              {pendingYield.map((token: PendingYieldItem) => (
+              {selectedYield.map((token: PendingYieldItem) => (
                 <div key={token.strategyAddress} className="flex justify-between items-center">
                   <span className="font-medium">{formatAmount(token.amountFormatted)} {token.symbol}</span>
                   <span className="text-sm text-muted-foreground">${formatAmount(token.amountFormatted)}</span>
@@ -802,7 +722,7 @@ export default function YieldFunnelTab({ isPaused = false }: YieldFunnelTabProps
           {/* Profit Summary */}
           <div className="flex justify-between items-center pt-2 text-sm">
             <span className="text-muted-foreground">Estimated Profit</span>
-            <span className="font-bold text-pxusd-green-400">${formatAmount(profitFormatted)}</span>
+            <span className="font-bold text-pxusd-green-400">${formatAmount(selectedProfitFormatted)}</span>
           </div>
         </div>
       </ConfirmationDialog>

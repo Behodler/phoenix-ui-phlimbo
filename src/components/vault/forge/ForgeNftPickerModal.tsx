@@ -11,7 +11,7 @@ export interface ForgeNftPickerModalProps {
   onSelect: (id: number) => void;
 }
 
-// Card styling copied from NFTSelectorGrid. Tints are literal rgba / arbitrary
+// Card styling originally copied from the (since deleted) Yield Funnel NFT grid. Tints are literal rgba / arbitrary
 // values: opacity modifiers on the bare-var pxusd-* tokens emit no CSS.
 const SELECTED_CLASS = 'border-pxusd-orange-400 bg-pxusd-teal-700 shadow-[0_0_8px_rgba(251,146,60,0.3)]';
 const HELD_CLASS = 'border-pxusd-teal-600 bg-pxusd-teal-700 cursor-pointer hover:border-[rgba(255,140,66,.5)]';
@@ -21,7 +21,7 @@ const UNHELD_CLASS = 'border-pxusd-teal-600 bg-pxusd-teal-700 opacity-40 cursor-
  * NFT choice modal for Forge rows. List below `sm`, 3-column card grid from
  * `sm` up. NFTs the wallet does not hold are disabled. Selecting an NFT
  * closes the modal; Esc, backdrop click and × also close it. Shared by
- * Harvest Yield (089) and NFT Bonfire (090).
+ * Harvest Yield (089) and Burn NFTs for Antimatter (090).
  */
 export default function ForgeNftPickerModal({
   isOpen,

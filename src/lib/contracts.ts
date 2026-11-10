@@ -25,7 +25,9 @@ export const mainnetAddresses: ContractAddresses = {
   // superseded generation is how a UI silently keeps reading the wrong contract. Anything that
   // still needs V2's address hardcodes it.
   PhlimboV3: "0x8D3A8E3ba43DEb8C7e2110DF437a92243523b6ca",
-  StableYieldAccumulator: "0x0cD353bfda674D04823B2826ffafB83B560D21B6",
+  // phStaging2 story 131 (2026-11-09): gate-free SYA (no NFT claim gate, 1% discount). Replaces
+  // 0x0cD353bfda674D04823B2826ffafB83B560D21B6, which is stripped and retired.
+  StableYieldAccumulator: "0x9d69c68F354575B95c1ebf7E87DB85BF3BFF2cE8",
   // Story 055 migration (executed 2026-06-10: MigrateStableStakerMainnet run txs 1-20 +
   // ResumeStableStakerMigration run, all receipts 0x1). DOLA/USDC are plain
   // ERC4626YieldStrategy; USDe is ERC4626MarketYieldStrategy @ 30 bps (sUSDe cooldown
@@ -114,10 +116,11 @@ export const mainnetAddresses: ContractAddresses = {
   // of the protocol-owned phUSD/sUSDS LP into the new AM/sUSDS UniV2 pair.
   AntimatterPoolSeeder: "0x7643046Eb5AeC0162bff96663000797CCc0B2E23",
   AntimatterSusdsPair: "0xb6da5138C761Eb7a3Ef7030212bfc9e2EAB8a4DA",
-  // phStaging2 story 116/122: deployed 2026-10-31 (StableStakerV2 claims opened in the same run).
-  SYAHarvester: "0xeE426A950Cb17D559F6391ef0D140715CD46703B",
-  // phStaging2 story 125: NFTBonfire. Zero placeholder until the mainnet deploy is broadcast.
-  NFTBonfire: "0x0000000000000000000000000000000000000000",
+  // phStaging2 story 131 (2026-11-09): redeployed against the gate-free SYA (its `sya` is immutable).
+  // Replaces the story-116/122 harvester 0xeE426A950Cb17D559F6391ef0D140715CD46703B.
+  SYAHarvester: "0xbB0D5e0C7bb621df8Db65133D3DF625D04F0F7E3",
+  // phStaging2 story 129 (2026-11-09): NFTBonfire deployed + wired (10 AM/day, 100 AM cap).
+  NFTBonfire: "0xE5983721f009AB57d464e611C9A06B148cEC3Acc",
   // Story 121: user-facing Balancer V3 phUSD/sUSDS BPT -> UniV2 phUSD/sUSDS migrator (BalancerLPMigrator),
   // deployed by DeployBalancerLPMigratorMainnet and patched from progress.balancer-lp-migrator.1.json.
   // The BPT has no key: read it from BalancerLPMigrator.pool().

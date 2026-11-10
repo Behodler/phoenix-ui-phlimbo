@@ -5,9 +5,13 @@
  * because `@behodler/phase2-wagmi-hooks@0.19.0` does not export the
  * harvester. Replace with the package export once a release ships it.
  *
- * The custom errors are listed so viem can decode a reverted simulation by
- * name: `Unprofitable(ethOut, gasCost)` is how the quote learns that a harvest
- * would not cover its gas.
+ * The custom errors are listed so viem can decode a reverted simulation or
+ * transaction by name. The Forge quote simulates at a zero gas price, so it
+ * never hits `Unprofitable`; that error only surfaces if gas spikes between
+ * quote and inclusion. `GAS_OVERHEAD` feeds the client-side profit check.
+ *
+ * `harvest` still takes an `nftIndex`, but the gate-free SYA (phStaging2 story
+ * 131) ignores it and the UI always passes `0`, so no claim NFT ever moves.
  */
 export const syaHarvesterAbi = [
   {
@@ -27,6 +31,13 @@ export const syaHarvesterAbi = [
     stateMutability: 'view',
     inputs: [],
     outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'GAS_OVERHEAD',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
   },
   {
     type: 'function',
@@ -54,25 +65,6 @@ export const syaHarvesterAbi = [
     inputs: [
       { name: 'ethOut', type: 'uint256' },
       { name: 'gasCost', type: 'uint256' },
-    ],
-  },
-  // OZ ERC1155 errors surfaced through the claim-NFT pull.
-  {
-    type: 'error',
-    name: 'ERC1155MissingApprovalForAll',
-    inputs: [
-      { name: 'operator', type: 'address' },
-      { name: 'owner', type: 'address' },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'ERC1155InsufficientBalance',
-    inputs: [
-      { name: 'sender', type: 'address' },
-      { name: 'balance', type: 'uint256' },
-      { name: 'needed', type: 'uint256' },
-      { name: 'tokenId', type: 'uint256' },
     ],
   },
 ] as const;

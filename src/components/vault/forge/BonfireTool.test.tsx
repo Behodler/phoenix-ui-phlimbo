@@ -42,7 +42,7 @@ describe('BonfireTool', () => {
   it('renders the explainer, pot panel, cap legend, picker and attested minimum', () => {
     render(<BonfireTool state={bonfireState()} />);
 
-    expect(screen.getByText(/Antimatter piles up in the Bonfire at a steady rate\./)).toBeInTheDocument();
+    expect(screen.getByText(/Antimatter builds up over time\. Burn any NFT to claim it all\./)).toBeInTheDocument();
     expect(screen.getByText('In the pot now')).toBeInTheDocument();
     expect(screen.getByTestId('bonfire-pot')).toHaveTextContent('18.406200');
     expect(screen.getByText('+2.5 / day')).toBeInTheDocument();
@@ -132,10 +132,10 @@ describe('BonfireTool', () => {
   });
 
   it.each([
-    ['inactive', 'Bonfire not live on this network'],
+    ['inactive', 'Not live on this network'],
     ['disconnected', 'Connect your wallet'],
-    ['disabled', 'The Bonfire is switched off'],
-    ['paused', 'The Bonfire is paused'],
+    ['disabled', 'Burning is switched off'],
+    ['paused', 'Burning is paused'],
     ['no-nft', 'No NFT to burn'],
     ['empty', 'The pot is empty'],
   ] as const)('blocker %s disables the button as "%s"', (blocker, label) => {

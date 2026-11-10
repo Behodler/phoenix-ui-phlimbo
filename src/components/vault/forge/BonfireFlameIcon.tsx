@@ -1,7 +1,7 @@
 import { useId } from 'react';
 
 /**
- * NFT Bonfire row icon: a gradient flame on a warm tinted disc. The gradient
+ * Burn NFTs for Antimatter row icon: a gradient flame on a warm tinted disc. The gradient
  * id comes from useId (colons stripped so `url(#…)` resolves) so several
  * icons on one page never collide.
  */

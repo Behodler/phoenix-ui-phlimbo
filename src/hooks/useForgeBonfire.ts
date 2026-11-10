@@ -64,7 +64,7 @@ const liveAddress = (value: unknown): `0x${string}` | undefined => {
 const toAntimatter = (raw: bigint) => Number(formatUnits(raw, 18));
 
 /**
- * Live wiring for the Forge "NFT Bonfire" row (`NFTBonfire`).
+ * Live wiring for the Forge "Burn NFTs for Antimatter" row (`NFTBonfire`).
  *
  * `burn(tokenId, minPayout)` always burns one unit from `msg.sender`; the
  * bonfire is an authorised burner on NFTMinterV2, so no ERC1155 approval is

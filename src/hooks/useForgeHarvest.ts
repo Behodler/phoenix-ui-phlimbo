@@ -5,27 +5,38 @@ import { formatEther, formatUnits, zeroAddress } from 'viem';
 import { stableYieldAccumulatorAbi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
 import { usePolling } from '../contexts/PollingContext';
-import { useClaimNftHoldings } from './useClaimNftHoldings';
 import { useToast } from '../components/ui/ToastProvider';
-import { useERC1155ApprovalForAll } from './useERC1155ApprovalForAll';
 import { syaHarvesterAbi } from '../lib/syaHarvesterAbi';
 import { decodeContractError } from '../lib/decodeContractError';
-import { nftStaticConfig } from '../data/nftMockData';
-import { FORGE_HARVEST_DEFAULT_NFT_ID, FORGE_HARVEST_MIN_OUT_BPS } from '../data/forgeMockData';
+import { FORGE_HARVEST_MIN_OUT_BPS } from '../data/forgeMockData';
 import { log } from '../utils/logger';
 
 /** Re-quote cadence while real-time updates are on. Matches the Stake tab heartbeat. */
 const HARVEST_REFRESH_INTERVAL_MS = 12_000;
 /** Margin on the gas estimate used as the tx gas limit (harvest.sh default: 20%). */
 const GAS_LIMIT_MARGIN_BPS = 2_000n;
+/**
+ * `harvest`'s `nftIndex` argument. The gate-free SYA (phStaging2 story 131) has
+ * `nftMinter() == 0`, so `claim` ignores the index and the harvester moves no
+ * NFT. `0` is the harvester's documented "transfer no NFT" value.
+ */
+const NO_NFT_INDEX = 0n;
 
 /**
- * The simulated outcome of `harvest([], nftIndex, 0)`.
+ * The outcome of simulating `harvest([], 0, 0)` at a ZERO gas price.
  *
- * `ok` carries the fee fields the quote was taken at, so the transaction is
- * sent with exactly those: the contract's on-chain `Unprofitable` check uses
- * `tx.gasprice`, and simulating at a zero gas price (most wallets' default)
- * would pass it trivially and quote a harvest that reverts for real.
+ * The harvester has no view quote, and its on-chain guard reverts
+ * `Unprofitable` whenever `ethOut < (gasUsed + GAS_OVERHEAD) * tx.gasprice`.
+ * At a zero gas price that guard is trivially satisfied, so the simulation runs
+ * the real flash-loan path and returns the real `ethOut`, and the gas estimate
+ * returns the real gas units (gas use does not depend on price). Profitability
+ * is then decided client-side against live fees (`harvestProfitability`)
+ * instead of by decoding an `Unprofitable` revert, which wallet RPCs often
+ * strip of its data.
+ *
+ * `ok` also carries the live fee fields the profit was priced at. The harvest
+ * transaction is sent with exactly those, so the contract's own guard sees the
+ * same gas price and stays the on-chain backstop if gas spikes.
  */
 export type HarvestQuoteResult =
   | {
@@ -36,8 +47,6 @@ export type HarvestQuoteResult =
       maxFeePerGas: bigint;
       maxPriorityFeePerGas: bigint;
     }
-  /** The contract itself rejected the harvest as not covering its gas. */
-  | { kind: 'unprofitable'; ethOutWei: bigint; gasCostWei: bigint; maxFeePerGas: bigint }
   | { kind: 'error'; message: string };
 
 /** Why there is no quote yet. `null` once a quote can be (or has been) taken. */
@@ -45,8 +54,6 @@ export type HarvestBlocker =
   | 'inactive'
   | 'disconnected'
   | 'loading'
-  | 'no-nft'
-  | 'needs-approval'
   | null;
 
 export interface ForgeHarvestState {
@@ -54,17 +61,6 @@ export interface ForgeHarvestState {
   active: boolean;
   /** `SYAHarvester.owner()`, used to gate admin-only Forge rows. */
   owner: `0x${string}` | undefined;
-  /** SYA still burns a claim NFT per claim (its `nftMinter()` is set). */
-  requiresNft: boolean;
-  /**
-   * Wallet claim-NFT holdings, keyed by `nftStaticConfig` id → units. That id is
-   * a display key only; the on-chain ERC1155 tokenId is the dispatcher index.
-   */
-  nftHoldings: Record<number, number>;
-  selectedNftId: number;
-  setSelectedNftId: (id: number) => void;
-  /** `setApprovalForAll(harvester)` on the claim-NFT minter. */
-  nftApproved: boolean;
   /** SYA `getTotalYield()`, USD (18 dp on-chain). `null` while unknown. */
   yieldUsd: number | null;
   blocker: HarvestBlocker;
@@ -79,8 +75,7 @@ export interface ForgeHarvestState {
     minEthOut: number;
     profitable: boolean;
   } | null;
-  pendingAction: 'approve' | 'harvest' | null;
-  approveNfts: () => Promise<void>;
+  pendingAction: 'harvest' | null;
   harvest: () => Promise<void>;
 }
 
@@ -94,11 +89,11 @@ const liveAddress = (value: unknown): `0x${string}` | undefined => {
  *
  * There is no view quote on the harvester: the ETH it pays is only known by
  * running the whole flash-loan path. So the quote is a gas estimate plus an
- * `eth_call` of `harvest(exempt=[], nftIndex, minEthOut=0)` from the connected
- * wallet, both carrying real EIP-1559 fee fields (see `HarvestQuoteResult`).
- * While SYA still burns a claim NFT, that simulation needs the wallet to hold
- * the chosen NFT and to have approved the harvester, so no quote is possible
- * before both.
+ * `eth_call` of `harvest(exempt=[], nftIndex=0, minEthOut=0)` from the connected
+ * wallet, both at a zero gas price, with profit priced client-side against live
+ * fees (see `HarvestQuoteResult`).
+ * The SYA is gate-free, so no claim NFT is held, approved or burned: any
+ * connected wallet can be quoted.
  */
 export function useForgeHarvest(): ForgeHarvestState {
   const { address: wallet } = useAccount();
@@ -120,7 +115,7 @@ export function useForgeHarvest(): ForgeHarvestState {
   });
 
   // The harvester's own SYA (immutable), not the address-server key, so the
-  // NFT minter and yield are read from the accumulator it actually claims from.
+  // yield is read from the accumulator it actually claims from.
   const { data: syaRaw } = useReadContract({
     address: harvester,
     abi: syaHarvesterAbi,
@@ -128,15 +123,6 @@ export function useForgeHarvest(): ForgeHarvestState {
     query: { enabled: active },
   });
   const sya = liveAddress(syaRaw);
-
-  const { data: nftMinterRaw, isLoading: nftMinterLoading } = useReadContract({
-    address: sya,
-    abi: stableYieldAccumulatorAbi,
-    functionName: 'nftMinter',
-    query: { enabled: !!sya },
-  });
-  const nftMinter = liveAddress(nftMinterRaw);
-  const requiresNft = !!nftMinter;
 
   const { data: totalYieldRaw, refetch: refetchYield } = useReadContract({
     address: sya,
@@ -146,59 +132,46 @@ export function useForgeHarvest(): ForgeHarvestState {
   });
   const yieldUsd = totalYieldRaw === undefined ? null : Number(formatUnits(totalYieldRaw as bigint, 18));
 
-  const holdings = useClaimNftHoldings(wallet, nftMinter, refetchInterval);
-  const { nftHoldings, refetch: refetchHoldings } = holdings;
-
-  const approval = useERC1155ApprovalForAll(wallet, harvester, nftMinter);
-
-  // Default to the first held NFT once holdings load, unless the user picked one they hold.
-  const [selectedNftId, setSelectedNftId] = useState(FORGE_HARVEST_DEFAULT_NFT_ID);
-  useEffect(() => {
-    if ((nftHoldings[selectedNftId] ?? 0) > 0) return;
-    const held = nftStaticConfig.find((n) => (nftHoldings[n.id] ?? 0) > 0);
-    if (held) setSelectedNftId(held.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nftHoldings]);
-
-  const holdsSelected = (nftHoldings[selectedNftId] ?? 0) > 0;
-  const selectedTokenId = holdings.tokenIdFor(selectedNftId);
-  const nftIndex = requiresNft ? selectedTokenId ?? 0n : 0n;
+  // The fixed gas the contract adds to its own measurement before comparing
+  // against `ethOut`. Read rather than hard-coded so a redeploy cannot drift.
+  const { data: gasOverhead } = useReadContract({
+    address: harvester,
+    abi: syaHarvesterAbi,
+    functionName: 'GAS_OVERHEAD',
+    query: { enabled: active },
+  });
 
   let blocker: HarvestBlocker = null;
   if (!active) blocker = 'inactive';
   else if (!wallet) blocker = 'disconnected';
-  else if (!sya || nftMinterLoading || (requiresNft && holdings.mappingLoading)) blocker = 'loading';
-  else if (requiresNft && !holdsSelected) blocker = 'no-nft';
-  else if (requiresNft && !approval.isApprovedForAll) blocker = 'needs-approval';
+  else if (!sya || gasOverhead === undefined) blocker = 'loading';
 
   const quoteQuery = useQuery<HarvestQuoteResult>({
-    queryKey: ['forge-harvest-quote', chainId, harvester, wallet, nftIndex.toString()],
+    queryKey: ['forge-harvest-quote', chainId, harvester, wallet],
     enabled: blocker === null && !!publicClient,
     refetchInterval,
     retry: false,
     queryFn: async () => {
       const client = publicClient!;
-      const { maxFeePerGas, maxPriorityFeePerGas } = await client.estimateFeesPerGas();
+      // Zero gas price on purpose: see HarvestQuoteResult.
       const call = {
         address: harvester!,
         abi: syaHarvesterAbi,
         functionName: 'harvest',
-        args: [[], nftIndex, 0n],
+        args: [[], NO_NFT_INDEX, 0n],
         account: wallet!,
-        maxFeePerGas,
-        maxPriorityFeePerGas,
+        gasPrice: 0n,
       } as const;
       try {
-        const gasUnits = await client.estimateContractGas(call);
+        const [{ maxFeePerGas, maxPriorityFeePerGas }, gasUnits] = await Promise.all([
+          client.estimateFeesPerGas(),
+          client.estimateContractGas(call),
+        ]);
         const gasLimit = (gasUnits * (10_000n + GAS_LIMIT_MARGIN_BPS)) / 10_000n;
         const { result } = await client.simulateContract({ ...call, gas: gasLimit });
         return { kind: 'ok', ethOutWei: result, gasUnits, gasLimit, maxFeePerGas, maxPriorityFeePerGas };
       } catch (error) {
         const decoded = decodeContractError(error);
-        if (decoded.errorName === 'Unprofitable') {
-          const [ethOutWei, gasCostWei] = decoded.args as readonly [bigint, bigint];
-          return { kind: 'unprofitable', ethOutWei, gasCostWei, maxFeePerGas };
-        }
         log.warn('Harvest quote failed:', error);
         return { kind: 'error', message: decoded.message };
       }
@@ -207,28 +180,20 @@ export function useForgeHarvest(): ForgeHarvestState {
   const quote = blocker === null ? quoteQuery.data : undefined;
 
   const display = useMemo<ForgeHarvestState['display']>(() => {
-    if (!quote || quote.kind === 'error') return null;
-    const gasGwei = Number(formatUnits(quote.maxFeePerGas, 9));
-    if (quote.kind === 'unprofitable') {
-      const ethOut = Number(formatEther(quote.ethOutWei));
-      const gasEth = Number(formatEther(quote.gasCostWei));
-      const gasUnits = quote.maxFeePerGas > 0n ? Number(quote.gasCostWei / quote.maxFeePerGas) : 0;
-      return { ethOut, gasEth, gasUnits, gasGwei, minEthOut: 0, profitable: false };
-    }
-    const ethOut = Number(formatEther(quote.ethOutWei));
-    // Priced at maxFeePerGas: an upper bound on what the tx actually pays.
-    const gasEth = Number(formatEther(quote.gasUnits * quote.maxFeePerGas));
-    const minEthOut = Number(formatEther(minEthOutWei(quote.ethOutWei)));
-    return { ethOut, gasEth, gasUnits: Number(quote.gasUnits), gasGwei, minEthOut, profitable: ethOut > gasEth };
-  }, [quote]);
+    if (!quote || quote.kind === 'error' || gasOverhead === undefined) return null;
+    const { gasCostWei, profitable } = harvestProfitability(quote, gasOverhead);
+    return {
+      ethOut: Number(formatEther(quote.ethOutWei)),
+      gasEth: Number(formatEther(gasCostWei)),
+      gasUnits: Number(quote.gasUnits),
+      gasGwei: Number(formatUnits(quote.maxFeePerGas, 9)),
+      minEthOut: profitable ? Number(formatEther(minEthOutWei(quote.ethOutWei))) : 0,
+      profitable,
+    };
+  }, [quote, gasOverhead]);
 
   // ---- Writes -------------------------------------------------------------
-  const [pendingAction, setPendingAction] = useState<'approve' | 'harvest' | null>(null);
-  const [approveHash, setApproveHash] = useState<`0x${string}` | undefined>();
-  const { isSuccess: approveDone, isError: approveFailed } = useWaitForTransactionReceipt({
-    hash: approveHash,
-    query: { enabled: !!approveHash },
-  });
+  const [pendingAction, setPendingAction] = useState<'harvest' | null>(null);
   const { data: harvestHash, writeContractAsync } = useWriteContract();
   const { isSuccess: harvestDone, isError: harvestFailed } = useWaitForTransactionReceipt({
     hash: harvestHash,
@@ -255,23 +220,6 @@ export function useForgeHarvest(): ForgeHarvestState {
     );
   };
 
-  const approveNfts = async () => {
-    if (!wallet) {
-      addToast({ type: 'error', title: 'Wallet Not Connected', description: 'Please connect your wallet using the button in the header.' });
-      return;
-    }
-    try {
-      setPendingAction('approve');
-      addToast({ type: 'info', title: 'Confirm in Wallet', description: 'Approve the Harvester to use your claim NFTs.', duration: 30000 });
-      const hash = await approval.approveAll();
-      setApproveHash(hash);
-      submittedToast(hash);
-    } catch (error) {
-      failToast(error, 'Approval Failed');
-      setPendingAction(null);
-    }
-  };
-
   const harvest = async () => {
     if (!quote || quote.kind !== 'ok' || !display?.profitable || !harvester) return;
     try {
@@ -281,7 +229,7 @@ export function useForgeHarvest(): ForgeHarvestState {
         address: harvester,
         abi: syaHarvesterAbi,
         functionName: 'harvest',
-        args: [[], nftIndex, minEthOutWei(quote.ethOutWei)],
+        args: [[], NO_NFT_INDEX, minEthOutWei(quote.ethOutWei)],
         gas: quote.gasLimit,
         maxFeePerGas: quote.maxFeePerGas,
         maxPriorityFeePerGas: quote.maxPriorityFeePerGas,
@@ -292,21 +240,6 @@ export function useForgeHarvest(): ForgeHarvestState {
       setPendingAction(null);
     }
   };
-
-  useEffect(() => {
-    if (!approveHash) return;
-    if (approveDone) {
-      addToast({ type: 'success', title: 'Approval Successful', description: 'The Harvester can now use your claim NFTs.', duration: 12000 });
-      approval.refetch();
-    } else if (approveFailed) {
-      addToast({ type: 'error', title: 'Approval Failed', description: 'The approval transaction reverted.', duration: 16000 });
-    } else {
-      return;
-    }
-    setPendingAction(null);
-    setApproveHash(undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [approveDone, approveFailed, approveHash]);
 
   useEffect(() => {
     if (!harvestHash || pendingAction !== 'harvest') return;
@@ -323,7 +256,6 @@ export function useForgeHarvest(): ForgeHarvestState {
     } else {
       return;
     }
-    refetchHoldings();
     refetchYield();
     quoteQuery.refetch();
     setPendingAction(null);
@@ -333,20 +265,36 @@ export function useForgeHarvest(): ForgeHarvestState {
   return {
     active,
     owner,
-    requiresNft,
-    nftHoldings,
-    selectedNftId,
-    setSelectedNftId,
-    nftApproved: approval.isApprovedForAll,
     yieldUsd,
     blocker,
     quote,
     isQuoting: quoteQuery.isFetching && !quoteQuery.data,
     display,
     pendingAction,
-    approveNfts,
     harvest,
   };
+}
+
+/**
+ * Client-side profitability of a zero-fee harvest quote, priced at live fees.
+ *
+ * `gasCostWei` is what the caller pays, priced at `maxFeePerGas` (an upper
+ * bound: the tx is charged `min(maxFee, baseFee + priority)`).
+ *
+ * `profitable` mirrors the contract's own guard,
+ * `ethOut >= (gasUsed + GAS_OVERHEAD) * tx.gasprice`, conservatively: the
+ * estimate already exceeds the contract's in-call `gasUsed` (it adds the 21k
+ * intrinsic cost and calldata), and `maxFeePerGas >= tx.gasprice`. So a quote
+ * shown as profitable is one the contract will not reject as `Unprofitable`
+ * at the quoted fees, and it also covers what the caller actually pays.
+ */
+export function harvestProfitability(
+  quote: { ethOutWei: bigint; gasUnits: bigint; maxFeePerGas: bigint },
+  gasOverhead: bigint,
+): { gasCostWei: bigint; profitable: boolean } {
+  const gasCostWei = quote.gasUnits * quote.maxFeePerGas;
+  const contractThresholdWei = (quote.gasUnits + gasOverhead) * quote.maxFeePerGas;
+  return { gasCostWei, profitable: quote.ethOutWei > contractThresholdWei };
 }
 
 /** `minEthOut` in wei: the quoted payout less the Forge haircut, rounded down. */

@@ -86,7 +86,7 @@ const ERROR_MESSAGES: Record<string, (args: readonly unknown[]) => string> = {
   // --- NFTBonfire (Forge tab) ---------------------------------------------
   NFTBonfire__PayoutBelowMinimum: () =>
     'Someone burned before you and took the pot. Your burn was cancelled and your NFT was kept.',
-  NFTBonfire__BurningDisabled: () => 'The Bonfire is switched off right now. Your NFT was kept.',
+  NFTBonfire__BurningDisabled: () => 'Burning is switched off right now. Your NFT was kept.',
 
   // --- shared --------------------------------------------------------------
   EnforcedPause: () =>

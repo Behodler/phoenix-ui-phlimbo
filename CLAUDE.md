@@ -280,14 +280,20 @@ so the row headers can share them.
   less 50 bps. Never assume 2×. It uses the same price gate as the Stake tab.
 - **Harvest Yield** (`useForgeHarvest`) targets `SYAHarvester`. The ABI is hand-written in
   `src/lib/syaHarvesterAbi.ts` because the hooks package does not ship it. There is no view
-  quote: `ethOut` comes from `estimateContractGas` + `simulateContract` of
-  `harvest([], nftIndex, 0)` **with real fee fields**. A zero-gas-price simulation passes the
-  contract's `Unprofitable` check trivially. While SYA's `nftMinter()` is set, the quote also
-  needs a held claim NFT plus `setApprovalForAll(harvester)`.
-- **NFT Bonfire** (`useForgeBonfire`) calls `NFTBonfire.burn(tokenId, minPayout)`. It always
+  quote: `ethOut` and gas units come from `estimateContractGas` + `simulateContract` of
+  `harvest([], 0, 0)` **at a zero gas price, on purpose**. That makes the contract's
+  `Unprofitable` guard pass trivially, so the real path runs and returns the real payout instead
+  of a revert (whose data wallet RPCs often strip). Profitability is then decided client-side by
+  `harvestProfitability`: `ethOut > (gasUnits + GAS_OVERHEAD) × maxFeePerGas`, a conservative
+  mirror of the on-chain guard, with `GAS_OVERHEAD` read from the harvester. The harvest
+  transaction itself is still sent with the live fee fields, so the on-chain guard remains the
+  backstop. Never decide profitability by decoding an `Unprofitable` revert. The SYA is gate-free since phStaging2 story 131
+  (`nftMinter() == 0`), so `nftIndex` is always `0`: no claim NFT is picked, approved or burned,
+  here or in the Yield Funnel's `claim`. Do not reinstate an NFT picker.
+- **NFT Bonfire** (`useForgeBonfire`, row title "Burn NFTs for Antimatter") calls `NFTBonfire.burn(tokenId, minPayout)`. It always
   burns one unit from `msg.sender`, and the bonfire is an authorised burner on NFTMinterV2, so
   **no ERC1155 approval is needed**. Holdings come from the bonfire's own `nftMinter()` through
-  `useClaimNftHoldings`, which Harvest shares; the tokenId is the dispatcher index from
+  `useClaimNftHoldings`; the tokenId is the dispatcher index from
   MintPageView, not the `nftStaticConfig` id. The pot ticker (`bonfirePotClock`) re-syncs to
   `pendingPayout()` on every poll and extrapolates between polls for **display only**:
   `minPayout` is the block-attested `pendingPayout()` × 98%, frozen when the confirm dialog

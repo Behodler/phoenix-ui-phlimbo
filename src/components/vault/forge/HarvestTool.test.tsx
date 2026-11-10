@@ -1,11 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useState } from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import HarvestTool from './HarvestTool';
 import type { ForgeHarvestState } from '../../../hooks/useForgeHarvest';
 
-const approveNfts = vi.fn(async () => {});
 const harvest = vi.fn(async () => {});
 
 const WARNING_LEAD = 'Estimates, not guarantees.';
@@ -35,24 +33,17 @@ const OK_QUOTE = {
   maxPriorityFeePerGas: 1_000_000_000n,
 } as const;
 
-/** HarvestTool is presentational; the harness owns the NFT selection the hook would. */
+/** HarvestTool is presentational; the harness stands in for `useForgeHarvest`. */
 function Harness(overrides: Partial<ForgeHarvestState>) {
-  const [selectedNftId, setSelectedNftId] = useState(6);
   const state: ForgeHarvestState = {
     active: true,
     owner: undefined,
-    requiresNft: true,
-    nftHoldings: { 6: 2, 1: 1, 5: 3, 2: 1, 3: 0, 4: 0 },
-    selectedNftId,
-    setSelectedNftId,
-    nftApproved: true,
     yieldUsd: 412.8,
     blocker: null,
     quote: OK_QUOTE,
     isQuoting: false,
     display: PROFITABLE,
     pendingAction: null,
-    approveNfts,
     harvest,
     ...overrides,
   };
@@ -61,11 +52,10 @@ function Harness(overrides: Partial<ForgeHarvestState>) {
 
 describe('HarvestTool', () => {
   beforeEach(() => {
-    approveNfts.mockClear();
     harvest.mockClear();
   });
 
-  it('profitable quote: numbers, NFT picker, Harvest calls the hook', async () => {
+  it('profitable quote: numbers, no NFT UI, Harvest calls the hook', async () => {
     const user = userEvent.setup();
     render(<Harness />);
 
@@ -79,54 +69,29 @@ describe('HarvestTool', () => {
     expect(screen.getByText('0.0400 ETH')).toBeInTheDocument();
     expect(screen.getByTestId('harvest-bar-profit')).toBeInTheDocument();
 
-    expect(screen.getByText('Claim NFT')).toBeInTheDocument();
-    expect(screen.getByText('#6 · you hold 2')).toBeInTheDocument();
+    // The SYA is gate-free: no claim-NFT picker, no approval step.
+    expect(screen.queryByText('Claim NFT')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Approve NFTs/)).not.toBeInTheDocument();
     expect(screen.getByText(WARNING_LEAD)).toBeInTheDocument();
     expect(screen.queryByText('Not profitable.')).not.toBeInTheDocument();
-
-    const steps = screen.getByTestId('harvest-steps');
-    expect(within(steps).getByText('Approve NFTs (once)').closest('li')).toHaveAttribute('data-state', 'done');
-    expect(within(steps).getByText('Harvest').closest('li')).toHaveAttribute('data-state', 'current');
 
     await user.click(screen.getByRole('button', { name: 'Harvest → receive ~0.0421 ETH' }));
     expect(harvest).toHaveBeenCalledOnce();
   });
 
-  it('needs approval: no numbers yet, Approve calls the hook', async () => {
-    const user = userEvent.setup();
-    render(<Harness blocker="needs-approval" nftApproved={false} quote={undefined} display={null} />);
-    expect(screen.getByTestId('harvest-profit')).toHaveTextContent('—');
-    const steps = screen.getByTestId('harvest-steps');
-    expect(within(steps).getByText('Approve NFTs (once)').closest('li')).toHaveAttribute('data-state', 'current');
-    await user.click(screen.getByRole('button', { name: 'Approve NFTs for the Harvester' }));
-    expect(approveNfts).toHaveBeenCalledOnce();
-    expect(harvest).not.toHaveBeenCalled();
-  });
-
   it.each([
     ['inactive', 'Harvester not live on this network'],
     ['disconnected', 'Connect your wallet'],
-    ['no-nft', 'You do not hold this NFT'],
+    ['loading', 'Loading…'],
   ] as const)('blocker %s disables the button', (blocker, label) => {
     render(<Harness blocker={blocker} quote={undefined} display={null} />);
     expect(screen.getByRole('button', { name: label })).toBeDisabled();
   });
 
-  it('opens the NFT modal from the picker and updates the selection', async () => {
-    const user = userEvent.setup();
-    render(<Harness />);
-    await user.click(screen.getByRole('button', { name: /Reservoir Ratchet/ }));
-    const dialog = screen.getByRole('dialog', { name: 'Choose a claim NFT' });
-    expect(within(dialog).getByRole('button', { name: /Smouldering Scarcity/ })).toBeDisabled();
-    await user.click(within(dialog).getByRole('button', { name: /Flax Wild Fire/ }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByText('#5 · you hold 3')).toBeInTheDocument();
-  });
-
   it('unprofitable: negative metric, disabled button, danger callout', () => {
     render(
       <Harness
-        quote={{ kind: 'unprofitable', ethOutWei: 1_900_000_000_000_000n, gasCostWei: 2_600_000_000_000_000n, maxFeePerGas: 4_100_000_000n }}
+        quote={{ ...OK_QUOTE, ethOutWei: 1_900_000_000_000_000n }}
         display={UNPROFITABLE}
       />,
     );
@@ -145,12 +110,5 @@ describe('HarvestTool', () => {
     render(<Harness quote={{ kind: 'error', message: 'No sell route is registered.' }} display={null} />);
     expect(screen.getByRole('alert')).toHaveTextContent('Harvest would fail. No sell route is registered.');
     expect(screen.getByRole('button', { name: 'Harvest unavailable' })).toBeDisabled();
-  });
-
-  it('requiresNft=false: no picker, no steps, button goes straight to Harvest', () => {
-    render(<Harness requiresNft={false} />);
-    expect(screen.queryByTestId('harvest-nft-block')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('harvest-steps')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Harvest → receive ~0.0421 ETH' })).toBeEnabled();
   });
 });
