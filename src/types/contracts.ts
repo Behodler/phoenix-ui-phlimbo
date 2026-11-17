@@ -1,78 +1,9 @@
 /**
- * Contract addresses structure shared across mainnet and local development
- *
- * IMPORTANT DISTINCTION:
- * - bondingCurve: The Behodler3Tokenlaunch contract that MINTS bonding tokens (the factory/minter)
- * - bond ingToken: The ERC20 token PRODUCED by the bonding curve (the product)
- * - surplusTracker: Tracks surplus yield accumulation from the yield strategy
- * - surplusWithdrawer: Handles withdrawal of accumulated surplus yield
+ * Contract address registry shape. Copied from phStaging2
+ * `server/deployments/addresses.ts` — never edit it locally; re-sync by
+ * re-copying (see `src/types/generated/phStaging2/`).
  */
-export interface ContractAddresses {
-  PhUSD: string;
-  USDC: string;
-  USDS: string;
-  SUSDS: string;
-  USDe: string;
-  SUSDe: string;
-  Dola: string;
-  EYE: string;
-  SCX: string;
-  Kendu: string;
-  Flax: string;
-  WBTC: string;
-  Pauser: string;
-  AutoDOLA: string;
-  YieldStrategyDolaLegacy: string;
-  SDOLA: string;
-  YieldStrategyDola: string;
-  AutoUSDC: string;
-  YieldStrategyUSDC: string;
-  USDeAMMAdapter: string;
-  YieldStrategyUSDe: string;
-  PhusdStableMinter: string;
-  PhlimboV3: string;
-  StableYieldAccumulator: string;
-  BurnRecorder: string;
-  NFTMinter: string;
-  UniswapV2Router: string;
-  UniboostEYE: string;
-  UniboostSCX: string;
-  UniboostFLX: string;
-  GatherWBTC: string;
-  MultiPooler: string;
-  UniboostHookEYE: string;
-  UniboostHookSCX: string;
-  UniboostHookFLX: string;
-  WaUSDC: string;
-  SkyPSM: string;
-  BalancerPoolerMintDebtHook: string;
-  NFTStaker: string;
-  NudgeStreamer: string;
-  BatchNFTMinter: string;
-  UniboostStakerEYE: string;
-  UniboostStakerSCX: string;
-  UniboostStakerFLX: string;
-  EyeBatchNFTMinter: string;
-  ScxBatchNFTMinter: string;
-  FlxBatchNFTMinter: string;
-  NudgeRatchet: string;
-  NudgeRatchetMintDebtHook: string;
-  RatchetNFTStaker: string;
-  RatchetBatchNFTMinter: string;
-  Antimatter: string;
-  StableStakerV2: string;
-  ViewRouter: string;
-  UniPooler: string;
-  PhusdSusdsPair: string;
-  UniswapHelper: string;
-  AntimatterPoolSeeder: string;
-  /** UniV2 Antimatter/sUSDS pair (UniswapHelper `amPair()`); zero until it exists on a chain. */
-  AntimatterSusdsPair: string;
-  SYAHarvester: string;
-  /** NFTBonfire: burn one claim NFT for the accrued Antimatter pot. Zero until deployed on a chain. */
-  NFTBonfire: string;
-  BalancerLPMigrator: string;
-}
+export type { ContractAddresses } from './generated/phStaging2/addresses'
 
 
 /**

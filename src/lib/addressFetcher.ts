@@ -87,6 +87,7 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       BalancerPoolerMintDebtHook: data.BalancerPoolerMintDebtHook || '0x0000000000000000000000000000000000000000',
       NFTStaker: data.NFTStaker || '0x0000000000000000000000000000000000000000',
       BatchNFTMinter: data.BatchNFTMinter || '0x0000000000000000000000000000000000000000',
+      NudgeDiscountBatchMinter: data.NudgeDiscountBatchMinter || '0x0000000000000000000000000000000000000000',
       WaUSDC: data.WaUSDC || '0x0000000000000000000000000000000000000000',
       StableStakerV2: data.StableStakerV2 || '0x0000000000000000000000000000000000000000',
       SkyPSM: data.SkyPSM || '0x0000000000000000000000000000000000000000',

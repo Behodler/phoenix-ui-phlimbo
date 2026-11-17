@@ -104,11 +104,25 @@ This points to the deployment server that manages contract deployments and addre
 ### Contract Address Loading
 
 Phoenix UI uses a dynamic contract address system:
-- **Mainnet**: Hardcoded addresses in `/src/lib/contracts.ts`
+- **Mainnet / Sepolia**: `mainnetAddresses` / `sepoliaAddresses`, re-exported by `/src/lib/contracts.ts`
+  from `/src/types/generated/phStaging2/` (copies of phStaging2 `server/deployments/`, see below)
 - **Local Development**: Fetched from `http://localhost:3001/contracts`
 - **Network Detection**: Automatic based on connected wallet chain ID
 
 The `ContractAddressContext` provides contract addresses throughout the app.
+
+**Addresses are copied from phStaging2, never edited here.** `src/types/generated/phStaging2/`
+holds copies of phStaging2 `server/deployments/addresses.ts` (the `ContractAddresses` interface),
+`mainnet-addresses.ts` and `sepolia-addresses.ts`. Each carries a one-line provenance header with
+the phStaging2 commit it was copied from; the two network files also change
+`import { ContractAddresses }` to `import type { ContractAddresses }` (required by
+`verbatimModuleSyntax`). Nothing else differs from the source. Do not edit these files: a
+mainnet address change lands in phStaging2's `mainnet-addresses.ts` (via its patch scripts), and
+the UI re-syncs by re-copying all three. Never copy `local-addresses.ts` (Anvil is fetched at
+runtime) or any history/backup file.
+
+When the copied interface gains a key, `tsc` flags `src/lib/addressFetcher.ts` as missing it —
+add the explicit `Key: data.Key || '0x000…'` mapping by hand (unmapped keys are silently dropped).
 
 ### Wagmi Integration
 
@@ -130,12 +144,12 @@ Uses wagmi v2 for Web3 interactions:
 
 ## Key Files
 
-- `/src/types/contracts.ts` - Contract address type definitions and documentation
-- `/src/lib/contracts.ts` - Mainnet contract addresses
+- `/src/types/contracts.ts` - Re-exports `ContractAddresses` from the phStaging2 copy; defines `NetworkType`
+- `/src/types/generated/phStaging2/` - Address interface + mainnet/sepolia objects copied from phStaging2 (do not edit)
+- `/src/lib/contracts.ts` - Re-exports the copied mainnet/sepolia address objects
 - `/src/lib/addressFetcher.ts` - Dynamic address loading logic
 - `/src/contexts/ContractAddressContext.tsx` - React context for contract addresses
 - `/src/hooks/useContractInteractions.ts` - Custom contract interaction hooks
-- `/src/types/contracts.ts` - The local `ContractAddresses` interface (address-key source of truth)
 
 ## Story Execution
 

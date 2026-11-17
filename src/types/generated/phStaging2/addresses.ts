@@ -1,0 +1,70 @@
+// Copied from phStaging2 server/deployments/addresses.ts @ 16ec5369b36046a896c264a42817358c69dd8b8f. Do not edit locally; re-sync by re-copying.
+// Generated interface from local.json on 2026-11-16T04:01:09.462Z
+// Chain ID: 31337 (anvil)
+// This interface can be copied directly into UI projects
+
+export interface ContractAddresses {
+  PhUSD: string;
+  USDC: string;
+  USDS: string;
+  SUSDS: string;
+  USDe: string;
+  SUSDe: string;
+  Dola: string;
+  EYE: string;
+  SCX: string;
+  Kendu: string;
+  Flax: string;
+  WBTC: string;
+  Pauser: string;
+  AutoDOLA: string;
+  YieldStrategyDolaLegacy: string;
+  SDOLA: string;
+  YieldStrategyDola: string;
+  AutoUSDC: string;
+  YieldStrategyUSDC: string;
+  USDeAMMAdapter: string;
+  YieldStrategyUSDe: string;
+  PhusdStableMinter: string;
+  PhlimboV3: string;
+  StableYieldAccumulator: string;
+  BurnRecorder: string;
+  NFTMinter: string;
+  UniswapV2Router: string;
+  UniboostEYE: string;
+  UniboostSCX: string;
+  UniboostFLX: string;
+  PhusdSusdsPair: string;
+  UniPooler: string;
+  BalancerPoolerMintDebtHook: string;
+  GatherWBTC: string;
+  MultiPooler: string;
+  UniboostHookEYE: string;
+  UniboostHookSCX: string;
+  UniboostHookFLX: string;
+  WaUSDC: string;
+  SkyPSM: string;
+  NFTStaker: string;
+  NudgeStreamer: string;
+  BatchNFTMinter: string;
+  UniboostStakerEYE: string;
+  UniboostStakerSCX: string;
+  UniboostStakerFLX: string;
+  EyeBatchNFTMinter: string;
+  ScxBatchNFTMinter: string;
+  FlxBatchNFTMinter: string;
+  NudgeRatchet: string;
+  NudgeRatchetMintDebtHook: string;
+  RatchetNFTStaker: string;
+  RatchetBatchNFTMinter: string;
+  Antimatter: string;
+  StableStakerV2: string;
+  ViewRouter: string;
+  UniswapHelper: string;
+  AntimatterPoolSeeder: string;
+  AntimatterSusdsPair: string;
+  SYAHarvester: string;
+  NFTBonfire: string;
+  NudgeDiscountBatchMinter: string;
+  BalancerLPMigrator: string;
+}
