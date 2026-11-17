@@ -12,7 +12,11 @@ import { useBalancerPrice } from './useBalancerPrice';
 import { useKenduPrice } from './useKenduPrice';
 import { useNFTPrices } from './useNFTPrices';
 import { geometricSumRaw } from '../utils/batchMintMath';
-import { canonicalSymbol, nudgeTokenMeta } from '../data/nudgeTokenMeta';
+import {
+  canonicalSymbol,
+  nudgeTokenMeta,
+  type NudgeTokenMeta,
+} from '../data/nudgeTokenMeta';
 import {
   tokenPrefixToAddressKey,
   tokenPrefixToPriceKey,
@@ -158,6 +162,30 @@ export function formatTokenAmount(raw: bigint, decimals: number): string {
     });
   }
   return value.toLocaleString('en-US', { maximumFractionDigits: 6 });
+}
+
+/**
+ * USD per whole token for a nudge leg, by its `nudgeTokenMeta` price source,
+ * or `null` when we have no price. Shared by every surface that values nudge
+ * tokens so they can never disagree.
+ */
+export function nudgeUsdPerUnit(
+  meta: NudgeTokenMeta | undefined,
+  phUsdPrice: number | null | undefined,
+  kenduPrice: number | null | undefined
+): number | null {
+  switch (meta?.priceSource) {
+    case 'stable':
+      return 1;
+    case 'phusd':
+      // Mirrors `useStakingPageData`: the Balancer pool lives on mainnet,
+      // so off-mainnet the read fails and phUSD falls back to its $1 peg.
+      return phUsdPrice ?? 1;
+    case 'kendu':
+      return kenduPrice ?? null;
+    default:
+      return null;
+  }
 }
 
 /**
@@ -342,22 +370,7 @@ export function useNudgePot(): UseNudgePotResult {
       // what `batchMint` pays out.
       const amount = Number(formatUnits(totalRaw, decimals));
 
-      let usdPerUnit: number | null = null;
-      switch (meta?.priceSource) {
-        case 'stable':
-          usdPerUnit = 1;
-          break;
-        case 'phusd':
-          // Mirrors `useStakingPageData`: the Balancer pool lives on mainnet,
-          // so off-mainnet the read fails and phUSD falls back to its $1 peg.
-          usdPerUnit = phUsdPrice ?? 1;
-          break;
-        case 'kendu':
-          usdPerUnit = kenduPrice;
-          break;
-        default:
-          usdPerUnit = null;
-      }
+      const usdPerUnit = nudgeUsdPerUnit(meta, phUsdPrice, kenduPrice);
       const usd = usdPerUnit === null ? null : amount * usdPerUnit;
 
       return {

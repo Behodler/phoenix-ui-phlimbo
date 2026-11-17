@@ -26,6 +26,15 @@ function formatUsds(raw: bigint, decimals: number): string {
   });
 }
 
+function formatUsd(value: number): string {
+  return value.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function ctaLabel(
   blocker: DiscountBatchBlocker,
   phase: DiscountBatchPhase,
@@ -72,15 +81,16 @@ function StateCard({ testId, children }: { testId: string; children: ReactNode }
  * index-4 price ramp. There is no mock fallback.
  *
  * The discount is the message: quantity at a discount, usual price vs
- * discount price, and the saving. The discount fund is described only
- * qualitatively — no amount is ever shown, because the old "net of the fund"
- * framing made users think they would be paid out.
+ * discount price, and the saving. The bonus tokens the batch also pays out
+ * (`bonus`, from `useDiscountBonusTokens` via the batch hook) are listed under the quantity, hidden when there
+ * are none. The fund's size is shown as a plain figure next to the
+ * explanation that it is never paid out.
  *
  * Gating is the caller's job (`NFTListTab` + `VaultPage`); this component does
  * not check admin status.
  */
 export default function WhaleMockPanel() {
-  const { status, quote, config, payment, maxPaymentRaw, blocker, phase, mint } =
+  const { status, quote, config, fund, bonus, payment, maxPaymentRaw, blocker, phase, mint } =
     useDiscountBatchMinter();
 
   const display = useMemo(
@@ -208,6 +218,26 @@ export default function WhaleMockPanel() {
                 NFTs, and the protocol uses it to buy phUSD for NFT stakers.
                 Discounted NFTs don't push up the mint price.
               </p>
+              {fund && (
+                <p className="m-0 text-foreground" data-testid="whale-mock-fund">
+                  Discount fund:{' '}
+                  <span className="font-mono tabular-nums">
+                    {formatUsd(Number(formatUnits(fund.potUsdRaw, 18)))}
+                  </span>
+                  {fund.nextStepUsdcRaw > 0n && (
+                    <span className="text-muted-foreground" data-testid="whale-mock-fund-next">
+                      {' '}· {formatUsd(Number(formatUnits(fund.nextStepUsdcRaw, 6)))} more
+                      covers another NFT
+                    </span>
+                  )}
+                  {fund.reservedUsdcRaw > 0n && (
+                    <span className="text-muted-foreground" data-testid="whale-mock-fund-reserved">
+                      {' '}· {formatUsd(Number(formatUnits(fund.reservedUsdcRaw, 6)))} reserved
+                      for phUSD buys
+                    </span>
+                  )}
+                </p>
+              )}
               {capReached && (
                 <p className="m-0" data-testid="whale-mock-cap-sentence">
                   This batch has hit the {config.maxFreePerBatch}-NFT limit.
@@ -306,6 +336,49 @@ export default function WhaleMockPanel() {
                     </div>
                   </div>
                 </div>
+
+                {/* 5b. Bonus tokens paid out with the batch (hidden when none). */}
+                {bonus.tokens.length > 0 && (
+                  <div className="flex flex-col gap-2" data-testid="whale-mock-bonus">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Plus bonus tokens
+                      {bonus.usdTotal > 0 && (
+                        <span className="text-foreground" data-testid="whale-mock-bonus-total">
+                          {' '}· {bonus.isPartial ? '≥ ' : '≈ '}
+                          {formatUsd(bonus.usdTotal)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {bonus.tokens.map((token) => (
+                        <div
+                          key={token.address}
+                          className="inline-flex items-center gap-2 rounded-[10px] border py-1.5 pl-1.5 pr-3"
+                          style={{ borderColor: CYAN_BORDER, background: CYAN_FILL }}
+                          data-testid={`whale-mock-bonus-${token.canonical}`}
+                        >
+                          {token.logo ? (
+                            <img
+                              src={token.logo}
+                              alt=""
+                              className="flex-none w-[20px] h-[20px] rounded-full object-cover bg-[#050a14]"
+                            />
+                          ) : (
+                            <span className="flex-none w-[20px] h-[20px] rounded-full grid place-items-center bg-[#050a14] text-[10px] font-semibold text-foreground">
+                              {token.symbol.charAt(0)}
+                            </span>
+                          )}
+                          <span className="font-mono text-[13px] font-semibold text-foreground tabular-nums">
+                            {token.amountFormatted}
+                          </span>
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                            {token.symbol}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 4. Price comparison: usual → discount → you save */}

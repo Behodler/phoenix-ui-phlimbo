@@ -54,6 +54,8 @@ const state = vi.hoisted(() => ({
   allowance: 0n,
   receiptLogs: [] as unknown[],
   receiptStatus: 'success',
+  shownBonus: [] as { address: string; totalRaw: bigint }[],
+  freshBonus: [] as bigint[],
 }));
 
 const fns = vi.hoisted(() => ({
@@ -62,11 +64,17 @@ const fns = vi.hoisted(() => ({
   addToast: vi.fn(),
   waitForTransactionReceipt: vi.fn(),
   refetchMinterView: vi.fn(),
+  readBonusAmounts: vi.fn(),
+}));
+
+vi.mock('./useDiscountBonusTokens', () => ({
+  useDiscountBonusTokens: () => ({ tokens: [], all: state.shownBonus, usdTotal: 0, isPartial: false }),
+  readBonusAmounts: fns.readBonusAmounts,
 }));
 
 vi.mock('wagmi', () => ({
   useAccount: () => ({ address: state.wallet }),
-  usePublicClient: () => ({ waitForTransactionReceipt: fns.waitForTransactionReceipt }),
+  usePublicClient: () => ({ waitForTransactionReceipt: fns.waitForTransactionReceipt, readContract: vi.fn() }),
   useWriteContract: () => ({ writeContractAsync: fns.writeContractAsync }),
   useReadContracts: ({ query }: { query?: { enabled?: boolean } }) => {
     state.readsEnabled.push(query?.enabled);
@@ -138,6 +146,9 @@ beforeEach(() => {
   state.minter = MINTER;
   state.wallet = WALLET;
   state.reads = reads();
+  state.shownBonus = [];
+  state.freshBonus = [5n * ONE, 7n * ONE];
+  fns.readBonusAmounts.mockImplementation(async () => state.freshBonus);
   state.freshReads = undefined;
   state.readsEnabled = [];
   state.balance = 10_000n * ONE;
@@ -229,7 +240,7 @@ describe('useDiscountBatchMinter — mint', () => {
     const call = fns.writeContractAsync.mock.calls[0][0];
     expect(call.address).toBe(MINTER);
     expect(call.functionName).toBe('batchMint');
-    expect(call.args).toEqual([24n, 0, WALLET, maxPayment, BONUS, [0n, 0n]]);
+    expect(call.args).toEqual([24n, 0, WALLET, maxPayment, BONUS, [5n * ONE, 7n * ONE]]);
     expect(fns.approve.mock.invocationCallOrder[0]).toBeLessThan(
       fns.writeContractAsync.mock.invocationCallOrder[0]
     );
@@ -255,6 +266,7 @@ describe('useDiscountBatchMinter — mint', () => {
     const bonus = [BONUS[1], BONUS[0], '0x00000000000000000000000000000000000000b3'];
     state.reads = reads({ free: 50n, total: 84n, paid: 34n, paidCost: 3_400n * ONE, boost: 10, effective: 60, maxBoost: 10, bonus });
     state.allowance = 10n ** 30n;
+    state.freshBonus = [1n, 2n, 3n];
     const { result } = renderHook(() => useDiscountBatchMinter());
     await act(async () => {
       await result.current.mint();
@@ -265,8 +277,31 @@ describe('useDiscountBatchMinter — mint', () => {
       WALLET,
       maxPaymentFor(3_400n * ONE),
       bonus,
-      [0n, 0n, 0n],
+      [1n, 2n, 3n],
     ]);
+  });
+
+  it('signs the fresh bonus payouts as bonusMinRewards, read against the live order', async () => {
+    state.allowance = 10n ** 30n;
+    state.shownBonus = [{ address: BONUS[0], totalRaw: 4n * ONE }, { address: BONUS[1], totalRaw: 7n * ONE }];
+    const { result } = renderHook(() => useDiscountBatchMinter());
+    await act(async () => {
+      await result.current.mint();
+    });
+    expect(fns.readBonusAmounts).toHaveBeenCalledWith(expect.anything(), MINTER, BONUS);
+    expect(fns.writeContractAsync.mock.calls[0][0].args[5]).toEqual([5n * ONE, 7n * ONE]);
+  });
+
+  it('a bonus payout below what was shown → no transaction, warning toast', async () => {
+    state.allowance = 10n ** 30n;
+    state.shownBonus = [{ address: BONUS[0], totalRaw: 5n * ONE }, { address: BONUS[1], totalRaw: 9n * ONE }];
+    const { result } = renderHook(() => useDiscountBatchMinter());
+    await act(async () => {
+      await result.current.mint();
+    });
+    expect(fns.writeContractAsync).not.toHaveBeenCalled();
+    expect(fns.approve).not.toHaveBeenCalled();
+    expect(fns.addToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'warning', title: 'Bonus Updated' }));
   });
 
   it('changed total on the pre-sign re-read → no transaction, warning toast', async () => {

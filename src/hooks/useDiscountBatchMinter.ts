@@ -8,6 +8,11 @@ import { usePolling } from '../contexts/PollingContext';
 import { useToast } from '../components/ui/ToastProvider';
 import { useMinterPageView, type TokenMintData } from './useMinterPageView';
 import { useTokenAllowance, useTokenApproval, useTokenBalance } from './useContractInteractions';
+import {
+  readBonusAmounts,
+  useDiscountBonusTokens,
+  type DiscountBonusTokensResult,
+} from './useDiscountBonusTokens';
 import { tokenPrefixToAddressKey } from '../data/nftMockData';
 import { decodeContractError } from '../lib/decodeContractError';
 import type { ContractAddresses } from '../types/contracts';
@@ -77,6 +82,16 @@ export interface DiscountBatchConfig {
   bonusTokens: readonly Address[];
 }
 
+/** The discount fund, from `previewBatch()` / `previewBoost()`. Admin display only. */
+export interface DiscountFund {
+  /** `previewBatch().potUSD`: the pot in USD (18 dp), net of the PSM `tin`. */
+  potUsdRaw: bigint;
+  /** `previewBatch().nextStepUSDC`: extra USDC (6 dp) for `free` to grow by one. */
+  nextStepUsdcRaw: bigint;
+  /** `previewBoost().reservedUSDC`: USDC (6 dp) already reserved for `buyAndBurn`. */
+  reservedUsdcRaw: bigint;
+}
+
 export interface DiscountBatchPayment {
   address: Address | undefined;
   /** `useMinterPageView` row key, e.g. `USDS`. */
@@ -92,6 +107,9 @@ export interface DiscountBatchMinterState {
   minter: Address | undefined;
   quote: DiscountBatchQuote | undefined;
   config: DiscountBatchConfig | undefined;
+  fund: DiscountFund | undefined;
+  /** Bonus tokens the batch pays out on top of the NFTs (polled, display only). */
+  bonus: DiscountBonusTokensResult;
   payment: DiscountBatchPayment | undefined;
   /** `paidCost` + 2%: what gets approved and passed as `maxPayment`. */
   maxPaymentRaw: bigint;
@@ -146,12 +164,15 @@ function toQuote(reads: ReadTuple): DiscountBatchQuote {
  *
  * `mint()` re-reads before signing. If `total` or `boost` moved from what the
  * user was looking at, it stops (the display has already updated) and the user
- * must click again: no silent re-quote. Otherwise it approves `maxPayment` if
- * needed and calls the 6-arg `batchMint` with the live bonus-token order and
- * zero minimum rewards.
+ * must click again: no silent re-quote. The same applies to the bonus tokens:
+ * it re-reads each payout (`readBonusAmounts`) and stops if any is below what
+ * the panel showed. Otherwise it approves `maxPayment` if needed and calls the
+ * 6-arg `batchMint` with the live bonus-token order and those fresh payouts as
+ * `bonusMinRewards`, so a batch that lands after someone else's pays the full
+ * advertised bonus or reverts.
  *
- * Pot amounts (`potUSD`, `nextStepUSDC`, `reservedUSDC`) are read but never
- * returned: the panel must not show them.
+ * The fund figures (`potUSD`, `nextStepUSDC`, `reservedUSDC`) are returned as
+ * `fund` for the admin-only panel.
  */
 export function useDiscountBatchMinter(): DiscountBatchMinterState {
   const { address: wallet } = useAccount();
@@ -200,6 +221,14 @@ export function useDiscountBatchMinter(): DiscountBatchMinterState {
 
   const quote = useMemo(() => (reads ? toQuote(reads) : undefined), [reads]);
 
+  const fund = useMemo<DiscountFund | undefined>(
+    () =>
+      reads
+        ? { potUsdRaw: reads[0][5], nextStepUsdcRaw: reads[0][6], reservedUsdcRaw: reads[1][3] }
+        : undefined,
+    [reads],
+  );
+
   // Match the pinned dispatcher against MinterPageView's rows to recover the
   // payment token AND its live price ramp. Index 0 is the contract's own
   // "unconfigured" sentinel, so it can never match.
@@ -218,6 +247,8 @@ export function useDiscountBatchMinter(): DiscountBatchMinterState {
       growthBps: row.growthBasisPoints,
     };
   }, [minterData, config?.dispatcherIndex, addresses]);
+
+  const bonus = useDiscountBonusTokens(minter, config?.bonusTokens);
 
   const maxPaymentRaw = quote ? maxPaymentFor(quote.paidCostRaw) : 0n;
 
@@ -266,6 +297,7 @@ export function useDiscountBatchMinter(): DiscountBatchMinterState {
   const mint = async () => {
     if (blocker !== null || !minter || !wallet || !payment?.address || !quote) return;
     const shown = quote;
+    const shownBonus = bonus.all;
     const token = payment.address;
     try {
       // 1. Pre-sign re-read. A changed quote stops here: the refetch has
@@ -294,6 +326,24 @@ export function useDiscountBatchMinter(): DiscountBatchMinterState {
       }
       const maxPayment = maxPaymentFor(now.paidCostRaw);
       const bonusTokens = fresh[8];
+
+      // Bonus floors: the fresh payouts, signed verbatim. A payout below what
+      // the panel showed means another batch took it: stop, like a changed quote.
+      if (!publicClient) throw new Error('No RPC client is available to read the bonus tokens.');
+      const bonusMinRewards = await readBonusAmounts(publicClient, minter, bonusTokens);
+      const bonusShrank = bonusTokens.some((address, j) => {
+        const seen = shownBonus.find((leg) => leg.address.toLowerCase() === address.toLowerCase());
+        return seen !== undefined && bonusMinRewards[j] < seen.totalRaw;
+      });
+      if (bonusShrank) {
+        addToast({
+          type: 'warning',
+          title: 'Bonus Updated',
+          description: 'The bonus tokens changed. Check the new amounts and click Mint again.',
+          duration: 12000,
+        });
+        return;
+      }
 
       // 2. Approve the whole budget: `batchMint` pulls all of `maxPayment`.
       const { data: allowance } = await refetchAllowance();
@@ -328,7 +378,7 @@ export function useDiscountBatchMinter(): DiscountBatchMinterState {
         address: minter,
         abi: batchNftMinterNudgeDiscountAbi,
         functionName: 'batchMint',
-        args: [now.totalRaw, now.boost, wallet, maxPayment, bonusTokens, bonusTokens.map(() => 0n)],
+        args: [now.totalRaw, now.boost, wallet, maxPayment, bonusTokens, bonusMinRewards],
       });
       addToast({
         type: 'info',
@@ -367,6 +417,8 @@ export function useDiscountBatchMinter(): DiscountBatchMinterState {
     minter,
     quote,
     config,
+    fund,
+    bonus,
     payment,
     maxPaymentRaw,
     balanceRaw,

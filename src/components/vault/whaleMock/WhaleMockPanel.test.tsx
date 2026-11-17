@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import WhaleMockPanel from './WhaleMockPanel';
 import type { DiscountBatchMinterState } from '../../../hooks/useDiscountBatchMinter';
+import type { DiscountBonusTokensResult } from '../../../hooks/useDiscountBonusTokens';
 
 // ---------------------------------------------------------------------------
 // The panel's only data seam is useDiscountBatchMinter; the hook's own reads,
@@ -10,8 +11,10 @@ import type { DiscountBatchMinterState } from '../../../hooks/useDiscountBatchMi
 const hook = vi.hoisted(() => ({ value: null as unknown as DiscountBatchMinterState }));
 const mint = vi.hoisted(() => vi.fn());
 
+const NO_BONUS: DiscountBonusTokensResult = { tokens: [], all: [], usdTotal: 0, isPartial: false };
+const bonus = vi.hoisted(() => ({ value: null as unknown as DiscountBonusTokensResult }));
 vi.mock('../../../hooks/useDiscountBatchMinter', () => ({
-  useDiscountBatchMinter: () => hook.value,
+  useDiscountBatchMinter: () => ({ ...hook.value, bonus: bonus.value }),
 }));
 
 const ONE = 10n ** 18n;
@@ -52,6 +55,8 @@ function live(overrides: {
       paused,
       bonusTokens: [],
     },
+    fund: undefined,
+    bonus: NO_BONUS,
     payment: {
       address: '0x00000000000000000000000000000000000000d5',
       symbol: 'USDS',
@@ -85,6 +90,7 @@ const BOOSTED = { free: 50, total: 84, paid: 34, boost: 10, effectivePercent: 60
 beforeEach(() => {
   vi.clearAllMocks();
   hook.value = live();
+  bonus.value = NO_BONUS;
 });
 
 describe('WhaleMockPanel — live figures', () => {
@@ -237,5 +243,60 @@ describe('WhaleMockPanel — states', () => {
     expect(screen.getByTestId('whale-mock-cta')).toBeDisabled();
     expect(screen.getByTestId('whale-mock-cta')).toHaveTextContent(label);
     expectNoForbiddenCopy(container);
+  });
+});
+
+describe('WhaleMockPanel — discount fund and bonus tokens', () => {
+  it('shows the fund size, next step and reserve', () => {
+    hook.value = {
+      ...live(),
+      fund: { potUsdRaw: 18_762_794n * 10n ** 12n, nextStepUsdcRaw: 1_681_857n, reservedUsdcRaw: 2_500_000n },
+    };
+    render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-fund')).toHaveTextContent('Discount fund: $18.76');
+    expect(screen.getByTestId('whale-mock-fund-next')).toHaveTextContent('$1.68 more covers another NFT');
+    expect(screen.getByTestId('whale-mock-fund-reserved')).toHaveTextContent('$2.50 reserved');
+  });
+
+  it('omits the next-step and reserve clauses when they are zero', () => {
+    hook.value = { ...live(), fund: { potUsdRaw: 10n * ONE, nextStepUsdcRaw: 0n, reservedUsdcRaw: 0n } };
+    render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-fund')).toHaveTextContent('Discount fund: $10.00');
+    expect(screen.queryByTestId('whale-mock-fund-next')).toBeNull();
+    expect(screen.queryByTestId('whale-mock-fund-reserved')).toBeNull();
+  });
+
+  it('lists the bonus tokens with their USD total', () => {
+    bonus.value = {
+      tokens: [
+        { address: '0x01', symbol: 'phUSD', canonical: 'PHUSD', decimals: 18, totalRaw: 109n * ONE, amountFormatted: '109.72', usd: 109.72 },
+        { address: '0x02', symbol: 'KENDU', canonical: 'KENDU', decimals: 18, totalRaw: 1087n * ONE, amountFormatted: '1,088', usd: 0.05 },
+      ],
+      all: [],
+      usdTotal: 109.77,
+      isPartial: false,
+    };
+    render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-bonus')).toHaveTextContent('Plus bonus tokens');
+    expect(screen.getByTestId('whale-mock-bonus-total')).toHaveTextContent('≈ $109.77');
+    expect(screen.getByTestId('whale-mock-bonus-PHUSD')).toHaveTextContent('109.72phUSD');
+    expect(screen.getByTestId('whale-mock-bonus-KENDU')).toHaveTextContent('1,088KENDU');
+  });
+
+  it('marks the total as a lower bound when a leg is unpriced', () => {
+    bonus.value = {
+      tokens: [{ address: '0x03', symbol: 'ODD', canonical: 'ODD', decimals: 18, totalRaw: ONE, amountFormatted: '1.00', usd: null }],
+      all: [],
+      usdTotal: 0,
+      isPartial: true,
+    };
+    render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-bonus-ODD')).toBeInTheDocument();
+    expect(screen.queryByTestId('whale-mock-bonus-total')).toBeNull();
+  });
+
+  it('hides the bonus section when there are no bonus tokens', () => {
+    render(<WhaleMockPanel />);
+    expect(screen.queryByTestId('whale-mock-bonus')).toBeNull();
   });
 });
