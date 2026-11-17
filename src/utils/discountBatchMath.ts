@@ -1,115 +1,77 @@
 /**
- * Display maths for the discount batch mint (nft-staking
- * `BatchNFTMinterNudgeDiscount._computeBatch`), used by the Whale-mock preview.
+ * Display-only maths for the discount batch mint (nft-staking
+ * `BatchNFTMinterNudgeDiscount`), used by the Whale-mock sub-tab.
  *
- * Mirrors the contract's integer maths exactly:
- *   free      = min(potFree, cap)
- *   overflow  = potFree > cap ? potFree - cap : 0
- *   boost     = min(maxBoost, floor(overflow / perPoint))
- *   effective = min(discountPercent + boost, 99)
- *   total     = ceil(free * 100 / effective);  paid = total - free  (>= 1)
+ * Everything the contract computes — `free`, `total`, `paid`, `paidCost`,
+ * `boost`, `effectivePercent` — is read from `previewBatch()` / `previewBoost()`
+ * and is NOT recomputed here. This module holds only the figures with no
+ * contract equivalent, fed by those live values:
  *
- * Free NFTs are minted without moving the price, so the user's cost is the
- * rising-price sum over `paid` NFTs only. The "usual" cost is the same ramp
- * over all `total` NFTs: what that quantity costs through the normal mint.
+ *   usual    = the price ramp over `total` NFTs (what that quantity costs
+ *              through the normal mint)
+ *   saving   = usual - paidCost
+ *   avg      = paidCost / total
+ *   unboosted comparison: the same `free` at `discountPercent` with no boost,
+ *              total = ceil(free * 100 / discountPercent), paid = total - free
+ *
+ * The ramp `p * (10000 + g) / 10000` per step is the contract's own
+ * (`geometricSumRaw` mirrors `_computeBatch`'s loop).
  */
 import { geometricSumRaw } from './batchMintMath';
 
-export interface DiscountBatchInput {
-  /** Free-NFT equivalents the discount fund covers (uncapped). */
-  potFree: number;
-  /** Base discount: 0 (off) or 50..99. */
+export interface DiscountDisplayInput {
+  /** `previewBatch().free`. */
+  free: number;
+  /** `previewBatch().total`. */
+  total: number;
+  /** `previewBatch().paidCost` — authoritative. */
+  paidCostRaw: bigint;
+  /** Base `discountPercent()` (before any boost). */
   discountPercent: number;
-  /** `maxFreePerBatch`. */
-  cap: number;
-  /** `overflowNFTsPerBoostPoint`. */
-  perPoint: number;
-  maxBoost: number;
-  /** Current per-NFT price (raw). */
+  /** Current per-NFT price on the minter's dispatcher (raw). */
   priceRaw: bigint;
   /** Per-mint growth in basis points. */
   growthBps: number;
 }
 
-export interface DiscountBatch {
-  free: number;
-  total: number;
-  paid: number;
-  boost: number;
-  effectivePercent: number;
-  overflow: number;
-  /** What the user pays: the price ramp over `paid` NFTs. */
-  paidCostRaw: bigint;
-  /** What `total` NFTs cost through the normal mint. */
+export interface DiscountDisplay {
+  /** Price ramp over all `total` NFTs. */
   usualCostRaw: bigint;
+  /** `usualCostRaw - paidCostRaw`, floored at 0. */
   savingRaw: bigint;
   /** `paidCostRaw / total`. */
   avgPricePaidRaw: bigint;
-  /** The same batch with boost = 0. */
-  unboostedTotal: number;
+  /** Paid count of the same batch with boost = 0. */
   unboostedPaid: number;
   /** Price ramp over `unboostedPaid` NFTs. */
   unboostedPaidCostRaw: bigint;
 }
 
-const ZERO: DiscountBatch = {
-  free: 0,
-  total: 0,
-  paid: 0,
-  boost: 0,
-  effectivePercent: 0,
-  overflow: 0,
-  paidCostRaw: 0n,
+const MAX_EFFECTIVE_PERCENT = 99;
+
+const ZERO: DiscountDisplay = {
   usualCostRaw: 0n,
   savingRaw: 0n,
   avgPricePaidRaw: 0n,
-  unboostedTotal: 0,
   unboostedPaid: 0,
   unboostedPaidCostRaw: 0n,
 };
 
-const MAX_EFFECTIVE_PERCENT = 99;
+export function computeDiscountDisplay(input: DiscountDisplayInput): DiscountDisplay {
+  const { free, total, paidCostRaw, discountPercent, priceRaw, growthBps } = input;
+  if (total <= 0 || free <= 0) return { ...ZERO };
 
-function ceilDiv(a: number, b: number): number {
-  return Math.floor((a + b - 1) / b);
-}
-
-function totalFor(free: number, percent: number): number {
-  return ceilDiv(free * 100, percent);
-}
-
-export function computeDiscountBatch(input: DiscountBatchInput): DiscountBatch {
-  const { discountPercent, cap, perPoint, maxBoost, priceRaw, growthBps } = input;
-  const potFree = Math.max(0, Math.floor(input.potFree));
-
-  const free = Math.min(potFree, cap);
-  if (discountPercent <= 0 || free <= 0) return { ...ZERO };
-
-  const overflow = potFree > cap ? potFree - cap : 0;
-  const boost = perPoint > 0 ? Math.min(maxBoost, Math.floor(overflow / perPoint)) : 0;
-  const effectivePercent = Math.min(discountPercent + boost, MAX_EFFECTIVE_PERCENT);
-
-  const total = totalFor(free, effectivePercent);
-  const paid = total - free;
-
-  const unboostedTotal = totalFor(free, Math.min(discountPercent, MAX_EFFECTIVE_PERCENT));
-  const unboostedPaid = unboostedTotal - free;
-
-  const paidCostRaw = geometricSumRaw(priceRaw, growthBps, paid);
   const usualCostRaw = geometricSumRaw(priceRaw, growthBps, total);
+  const savingRaw = usualCostRaw > paidCostRaw ? usualCostRaw - paidCostRaw : 0n;
+
+  const basePercent = Math.min(discountPercent, MAX_EFFECTIVE_PERCENT);
+  const unboostedTotal = basePercent > 0 ? Math.ceil((free * 100) / basePercent) : 0;
+  const unboostedPaid = Math.max(0, unboostedTotal - free);
 
   return {
-    free,
-    total,
-    paid,
-    boost,
-    effectivePercent,
-    overflow,
-    paidCostRaw,
     usualCostRaw,
-    savingRaw: usualCostRaw - paidCostRaw,
+    savingRaw,
     avgPricePaidRaw: paidCostRaw / BigInt(total),
-    unboostedTotal,
     unboostedPaid,
     unboostedPaidCostRaw: geometricSumRaw(priceRaw, growthBps, unboostedPaid),
   };

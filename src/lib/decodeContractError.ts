@@ -42,6 +42,20 @@ const ERROR_MESSAGES: Record<string, (args: readonly unknown[]) => string> = {
     'The batch minter has no payment dispatcher configured. This is a deployment issue, not something you can retry.',
   Rescue__ZeroRecipient: () => 'A recipient address is required.',
 
+  // --- BatchNFTMinterNudgeDiscount (Whale-mock sub-tab, story 096) ---------
+  BatchMint__TotalMismatch: () =>
+    'The batch changed while you were signing — refresh and try again.',
+  BatchMint__BoostNotAvailable: (args) =>
+    `The discount boost changed while you were signing (quoted +${String(args[0] ?? '?')}%, now +${String(args[1] ?? '?')}%). Refresh and try again.`,
+  BatchMint__MaxPaymentExceeded: () =>
+    'The mint price moved past your payment limit while you were signing. Refresh and try again.',
+  BatchMint__NoDiscountAvailable: () =>
+    'No discount batch is available right now. Nothing was minted.',
+  BatchMint__DiscountNotConfigured: () =>
+    'The discount batch minter is not configured yet. This is a deployment issue, not something you can retry.',
+  BatchMint__BonusTokenMismatch: () =>
+    'The minter\'s token list changed while you were signing. Refresh and try again.',
+
   // --- NudgeStreamer -------------------------------------------------------
   NudgeStreamer__NotRegistered: () => 'No reward stream is registered for this minter and token.',
   NudgeStreamer__NotWhitelisted: (args) =>

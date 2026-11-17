@@ -1,62 +1,95 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import WhaleMockPanel from './WhaleMockPanel';
+import type { DiscountBatchMinterState } from '../../../hooks/useDiscountBatchMinter';
 
 // ---------------------------------------------------------------------------
-// The mock's only chain input is the index-4 USDS row from useMinterPageView,
-// so that hook is the only seam stubbed. wagmi is stubbed defensively so a
-// stray write hook would be caught by the "no wallet call" assertion.
+// The panel's only data seam is useDiscountBatchMinter; the hook's own reads,
+// guards and mint orchestration are covered in useDiscountBatchMinter.test.tsx.
 // ---------------------------------------------------------------------------
-const minterResult = vi.hoisted(() => ({ value: null as unknown }));
-const wagmiWrite = vi.hoisted(() => ({ writeContract: vi.fn() }));
+const hook = vi.hoisted(() => ({ value: null as unknown as DiscountBatchMinterState }));
+const mint = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../hooks/useMinterPageView', () => ({
-  useMinterPageView: () => minterResult.value,
-}));
-
-vi.mock('wagmi', () => ({
-  useWriteContract: () => ({ writeContract: wagmiWrite.writeContract }),
-  useAccount: () => ({ address: undefined }),
+vi.mock('../../../hooks/useDiscountBatchMinter', () => ({
+  useDiscountBatchMinter: () => hook.value,
 }));
 
 const ONE = 10n ** 18n;
 
-function usdsRow(priceRaw: bigint, growthBasisPoints = 0) {
+/** Flat 100 USDS price makes every figure exact. */
+function live(overrides: {
+  free?: number;
+  total?: number;
+  paid?: number;
+  boost?: number;
+  effectivePercent?: number;
+  maxBoost?: number;
+  cap?: number;
+  paused?: boolean;
+} & Partial<Pick<DiscountBatchMinterState, 'status' | 'blocker' | 'phase'>> = {}): DiscountBatchMinterState {
+  const { free = 12, total = 24, paid = 12, boost = 0, effectivePercent = 50, maxBoost = 0, cap = 50, paused = false } = overrides;
+  const paidCostRaw = BigInt(paid) * 100n * ONE;
   return {
-    allowanceRaw: 0n,
-    priceRaw,
-    balanceRaw: 0n,
-    allowance: '0',
-    price: '0',
-    growthBasisPoints,
-    balance: '0',
-    nftBalance: 0,
-    dispatcherIndex: 4,
-    decimals: 18,
-  };
-}
-
-function withPrice(priceRaw: bigint, growth = 0) {
-  minterResult.value = {
-    data: { USDS: usdsRow(priceRaw, growth) },
-    isLoading: false,
-    isError: false,
-    error: null,
-    refetch: vi.fn(),
+    status: overrides.status ?? (total > 0 ? 'ready' : 'no-discount'),
+    minter: '0x4914000000000000000000000000000000089c1a',
+    quote: {
+      totalRaw: BigInt(total),
+      freeRaw: BigInt(free),
+      paidRaw: BigInt(paid),
+      paidCostRaw,
+      boost,
+      effectivePercent,
+      total,
+      free,
+      paid,
+    },
+    config: {
+      discountPercent: 50,
+      maxFreePerBatch: cap,
+      overflowNFTsPerBoostPoint: 3,
+      maxBoost,
+      dispatcherIndex: 4,
+      paused,
+      bonusTokens: [],
+    },
+    payment: {
+      address: '0x00000000000000000000000000000000000000d5',
+      symbol: 'USDS',
+      decimals: 18,
+      priceRaw: 100n * ONE,
+      growthBps: 0,
+    },
+    maxPaymentRaw: (paidCostRaw * 10_200n) / 10_000n,
+    balanceRaw: 10n ** 30n,
+    blocker: overrides.blocker !== undefined ? overrides.blocker : paused ? 'paused' : total > 0 ? null : 'no-discount',
+    phase: overrides.phase ?? 'idle',
+    mint,
   };
 }
 
 const FORBIDDEN = [/\bpot\b/i, /claim/i, /reward/i, /you receive/i, /winner/i, /\bUSDC\b/, /\bKENDU\b/i];
 
+/** Rendered copy, without the inline <style> block's keyframe numbers. */
+function visibleText(container: HTMLElement): string {
+  const clone = container.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('style').forEach((el) => el.remove());
+  return clone.textContent ?? '';
+}
+
+function expectNoForbiddenCopy(container: HTMLElement) {
+  for (const re of FORBIDDEN) expect(visibleText(container)).not.toMatch(re);
+}
+
+const BOOSTED = { free: 50, total: 84, paid: 34, boost: 10, effectivePercent: 60, maxBoost: 10 };
+
 beforeEach(() => {
   vi.clearAllMocks();
-  // Flat 100 USDS price makes the figures exact.
-  withPrice(100n * ONE, 0);
+  hook.value = live();
 });
 
-describe('WhaleMockPanel', () => {
-  it('renders the default (normal) figures', () => {
-    render(<WhaleMockPanel addToast={vi.fn()} />);
+describe('WhaleMockPanel — live figures', () => {
+  it('renders the unboosted batch from the live quote', () => {
+    const { container } = render(<WhaleMockPanel />);
 
     expect(screen.getByTestId('whale-mock-headline')).toHaveTextContent('24 NFTs at 50% off');
     expect(screen.getByTestId('whale-mock-discount')).toHaveTextContent('50% discount');
@@ -64,7 +97,7 @@ describe('WhaleMockPanel', () => {
     expect(screen.queryByTestId('whale-mock-boost-compare')).toBeNull();
     expect(screen.queryByTestId('whale-mock-cap-sentence')).toBeNull();
 
-    // 24 × 100 usual; 12 × 100 paid; 1,200 saved.
+    // 24 × 100 usual; live paidCost 12 × 100; 1,200 saved.
     expect(screen.getByTestId('whale-mock-usual-cost')).toHaveTextContent('2,400.00');
     expect(screen.getByTestId('whale-mock-discount-cost')).toHaveTextContent('1,200.00');
     expect(screen.getByTestId('whale-mock-saving')).toHaveTextContent('1,200.00');
@@ -74,70 +107,135 @@ describe('WhaleMockPanel', () => {
       '12 covered by the discount fund · 12 paid'
     );
     expect(screen.getByTestId('whale-mock-cta')).toHaveTextContent('Mint 24 NFTs for 1,200.00 USDS');
+    expect(screen.getByTestId('whale-mock-cta')).not.toBeDisabled();
+    expect(screen.getByTestId('whale-mock-budget-note')).toHaveTextContent('1,224.00 USDS');
     expect(screen.getByTestId('whale-mock-explainer')).toHaveTextContent('discount fund');
+    expectNoForbiddenCopy(container);
   });
 
-  it('debug switch shows the boosted, cap-reached state', () => {
-    render(<WhaleMockPanel addToast={vi.fn()} />);
+  it('shows the boost badge and comparison when previewBoost().boost > 0', () => {
+    hook.value = live(BOOSTED);
+    const { container } = render(<WhaleMockPanel />);
 
-    const toggle = screen.getByTestId('whale-mock-debug-boost');
-    expect(toggle).toHaveAttribute('role', 'switch');
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
-
-    fireEvent.click(toggle);
-
-    expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId('whale-mock-headline')).toHaveTextContent('84 NFTs at 60% off');
     expect(screen.getByTestId('whale-mock-boost-badge')).toHaveTextContent('10% boost');
     expect(screen.getByTestId('whale-mock-discount')).toHaveTextContent('60% discount');
-    // 50 vs 34 paid at a flat 100 → another 1,600 saved.
+    // Unboosted: 50 free at 50% → 50 paid. 50 vs 34 at a flat 100 → another 1,600 saved.
     const compare = screen.getByTestId('whale-mock-boost-compare');
     expect(compare).toHaveTextContent('you pay for 34 instead of 50');
     expect(compare).toHaveTextContent('1,600.00 USDS');
-    expect(screen.getByTestId('whale-mock-cap-sentence')).toHaveTextContent(
-      'This batch has hit the 50-NFT limit'
-    );
-    expect(screen.getByTestId('whale-mock-cap-sentence')).toHaveTextContent('up to +10%');
+    expectNoForbiddenCopy(container);
+  });
 
-    fireEvent.click(toggle);
-    expect(screen.getByTestId('whale-mock-headline')).toHaveTextContent('24 NFTs at 50% off');
+  it('cap sentence with the boost clause when maxBoost > 0', () => {
+    hook.value = live(BOOSTED);
+    render(<WhaleMockPanel />);
+    const sentence = screen.getByTestId('whale-mock-cap-sentence');
+    expect(sentence).toHaveTextContent('This batch has hit the 50-NFT limit.');
+    expect(sentence).toHaveTextContent("raises the discount by 1 point for every 3 NFTs' worth, up to +10%.");
+  });
+
+  it('plain cap sentence (no boost clause) when maxBoost == 0', () => {
+    hook.value = live({ free: 50, total: 100, paid: 50, maxBoost: 0 });
+    const { container } = render(<WhaleMockPanel />);
+    const sentence = screen.getByTestId('whale-mock-cap-sentence');
+    expect(sentence).toHaveTextContent('This batch has hit the 50-NFT limit. Extra funding carries over to the next batch.');
+    expect(sentence.textContent).not.toMatch(/raises the discount|up to \+/);
+    expect(screen.queryByTestId('whale-mock-boost-badge')).toBeNull();
     expect(screen.queryByTestId('whale-mock-boost-compare')).toBeNull();
+    expectNoForbiddenCopy(container);
   });
 
-  it('CTA fires the info toast and makes no wallet call', () => {
-    const addToast = vi.fn();
-    render(<WhaleMockPanel addToast={addToast} />);
+  it('no cap sentence below the cap', () => {
+    hook.value = live({ free: 49, total: 98, paid: 49 });
+    render(<WhaleMockPanel />);
+    expect(screen.queryByTestId('whale-mock-cap-sentence')).toBeNull();
+  });
 
+  it('has no debug switch', () => {
+    render(<WhaleMockPanel />);
+    expect(screen.queryByTestId('whale-mock-debug-strip')).toBeNull();
+    expect(screen.queryByTestId('whale-mock-debug-boost')).toBeNull();
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByText(/Simulate cap reached/)).toBeNull();
+    expect(screen.queryByText(/Admin debug/)).toBeNull();
+  });
+
+  it('CTA calls the hook mint', () => {
+    render(<WhaleMockPanel />);
     fireEvent.click(screen.getByTestId('whale-mock-cta'));
+    expect(mint).toHaveBeenCalledTimes(1);
+  });
+});
 
-    expect(addToast).toHaveBeenCalledTimes(1);
-    expect(addToast).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'info', title: 'Preview only' })
-    );
-    expect(wagmiWrite.writeContract).not.toHaveBeenCalled();
+describe('WhaleMockPanel — states', () => {
+  it('unavailable (zero address)', () => {
+    hook.value = { ...live(), status: 'unavailable', quote: undefined, config: undefined, payment: undefined };
+    const { container } = render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-unavailable')).toHaveTextContent('Not available on this network yet');
+    expect(screen.queryByTestId('whale-mock-cta')).toBeNull();
+    expectNoForbiddenCopy(container);
   });
 
-  it('never shows the forbidden wording, in either switch state', () => {
-    const { container } = render(<WhaleMockPanel addToast={vi.fn()} />);
-    for (const re of FORBIDDEN) expect(container.textContent ?? '').not.toMatch(re);
-
-    fireEvent.click(screen.getByTestId('whale-mock-debug-boost'));
-    for (const re of FORBIDDEN) expect(container.textContent ?? '').not.toMatch(re);
+  it('loading → skeleton, no figures, no mock fallback', () => {
+    hook.value = { ...live(), status: 'loading', quote: undefined, config: undefined, payment: undefined };
+    const { container } = render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-skeleton')).toBeInTheDocument();
+    expect(screen.queryByTestId('whale-mock-headline')).toBeNull();
+    expect(visibleText(container)).not.toMatch(/\d+\.\d\d/);
+    expectNoForbiddenCopy(container);
   });
 
-  it('falls back to the mock price when useMinterPageView has no USDS row', () => {
-    minterResult.value = { data: null, isLoading: true, isError: false, error: null, refetch: vi.fn() };
-    render(<WhaleMockPanel addToast={vi.fn()} />);
-
-    // Fallback: 10 USDS, 10 bps growth.
-    expect(screen.getByTestId('whale-mock-headline')).toHaveTextContent('24 NFTs at 50% off');
-    expect(screen.getByText('10.00 USDS per NFT now')).toBeInTheDocument();
-    expect(screen.getByTestId('whale-mock-cta')).not.toBeDisabled();
+  it('no discount → message, disabled CTA, and no amounts', () => {
+    hook.value = live({ free: 0, total: 0, paid: 0, effectivePercent: 0 });
+    const { container } = render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-no-discount')).toHaveTextContent('No discount batch available right now');
+    expect(screen.getByTestId('whale-mock-cta')).toBeDisabled();
+    expect(screen.getByTestId('whale-mock-cta')).toHaveTextContent(/^Mint$/);
+    expect(screen.queryByTestId('whale-mock-usual-cost')).toBeNull();
+    expect(screen.queryByTestId('whale-mock-discount-cost')).toBeNull();
+    expect(screen.queryByTestId('whale-mock-saving')).toBeNull();
+    expect(screen.queryByTestId('whale-mock-budget-note')).toBeNull();
+    expect(visibleText(container)).not.toMatch(/USDS/);
+    expect(visibleText(container)).not.toMatch(/\d+\.\d\d/);
+    expectNoForbiddenCopy(container);
   });
 
-  it('uses the live price when present', () => {
-    withPrice(3n * ONE, 0);
-    render(<WhaleMockPanel addToast={vi.fn()} />);
-    expect(screen.getByTestId('whale-mock-discount-cost')).toHaveTextContent('36.00');
+  it('paused → CTA disabled with a paused label', () => {
+    hook.value = live({ paused: true });
+    const { container } = render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-cta')).toBeDisabled();
+    expect(screen.getByTestId('whale-mock-cta')).toHaveTextContent('Minting paused');
+    expect(screen.getByTestId('whale-mock-paused')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('whale-mock-cta'));
+    expect(mint).not.toHaveBeenCalled();
+    expectNoForbiddenCopy(container);
+  });
+
+  it('insufficient balance → "Insufficient USDS", disabled', () => {
+    hook.value = live({ blocker: 'insufficient-balance' });
+    const { container } = render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-cta')).toBeDisabled();
+    expect(screen.getByTestId('whale-mock-cta')).toHaveTextContent('Insufficient USDS');
+    expectNoForbiddenCopy(container);
+  });
+
+  it('disconnected → connect prompt, disabled', () => {
+    hook.value = live({ blocker: 'disconnected' });
+    render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-cta')).toBeDisabled();
+    expect(screen.getByTestId('whale-mock-cta')).toHaveTextContent('Connect wallet to mint');
+  });
+
+  it.each([
+    ['checking', 'Checking batch…'],
+    ['approving', 'Approving USDS…'],
+    ['minting', 'Minting…'],
+  ] as const)('busy (%s) → disabled with progress label', (phase, label) => {
+    hook.value = live({ blocker: 'busy', phase });
+    const { container } = render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-cta')).toBeDisabled();
+    expect(screen.getByTestId('whale-mock-cta')).toHaveTextContent(label);
+    expectNoForbiddenCopy(container);
   });
 });

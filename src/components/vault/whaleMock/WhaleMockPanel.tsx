@@ -1,17 +1,18 @@
-import { useMemo, useState } from 'react';
-import { formatUnits, parseUnits } from 'viem';
+import { useMemo, type ReactNode } from 'react';
+import { formatUnits } from 'viem';
 import {
   WHALE_ART,
   WHALE_DISCOUNT_CYAN,
   WHALE_PAYMENT_LOGO,
 } from '../../../data/nudgeTokenMeta';
-import { WHALE_MOCK } from '../../../data/whaleMockData';
-import { useMinterPageView } from '../../../hooks/useMinterPageView';
-import { computeDiscountBatch } from '../../../utils/discountBatchMath';
-import type { Toast } from '../../../types/toast';
+import {
+  useDiscountBatchMinter,
+  type DiscountBatchBlocker,
+  type DiscountBatchPhase,
+} from '../../../hooks/useDiscountBatchMinter';
+import { computeDiscountDisplay } from '../../../utils/discountBatchMath';
 
 const NFT_COLLECTION_NAME = 'Liquid Sky Phoenix';
-const PAYMENT_SYMBOL = 'USDS';
 
 /** Translucent cyan fills, as literal colours (Tailwind opacity modifiers on hex tokens emit no CSS). */
 const CYAN_BORDER = 'oklch(78% 0.13 220 / 0.45)';
@@ -25,18 +26,50 @@ function formatUsds(raw: bigint, decimals: number): string {
   });
 }
 
-interface WhaleMockPanelProps {
-  addToast: (toast: Omit<Toast, 'id'>) => string;
+function ctaLabel(
+  blocker: DiscountBatchBlocker,
+  phase: DiscountBatchPhase,
+  symbol: string,
+  readyLabel: string
+): string {
+  if (phase === 'checking') return 'Checking batch…';
+  if (phase === 'approving') return `Approving ${symbol}…`;
+  if (phase === 'minting') return 'Minting…';
+  switch (blocker) {
+    case 'paused':
+      return 'Minting paused';
+    case 'no-discount':
+      return 'Mint';
+    case 'disconnected':
+      return 'Connect wallet to mint';
+    case 'insufficient-balance':
+      return `Insufficient ${symbol}`;
+    default:
+      return readyLabel;
+  }
+}
+
+function StateCard({ testId, children }: { testId: string; children: ReactNode }) {
+  return (
+    <div className="mt-6" data-testid="whale-mock-panel">
+      <div
+        className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-6 text-sm text-muted-foreground"
+        data-testid={testId}
+      >
+        {children}
+      </div>
+    </div>
+  );
 }
 
 /**
- * Whale-mock — admin-only preview of the nft-staking
- * `BatchNFTMinterNudgeDiscount` batch mint.
+ * Whale-mock — admin-only sub-tab for the nft-staking
+ * `BatchNFTMinterNudgeDiscount` batch mint, wired to the live contract.
  *
- * A MOCK: it reads nothing from any batch minter. The only live input is the
- * index-4 (Liquid Sky Phoenix) price and growth from `useMinterPageView`, with
- * `WHALE_MOCK` fallbacks; every contract parameter comes from `WHALE_MOCK`.
- * The CTA only raises an info toast.
+ * Every batch figure comes from `previewBatch()` / `previewBoost()` via
+ * `useDiscountBatchMinter`; only the usual price, the saving and the unboosted
+ * comparison are computed here (`computeDiscountDisplay`), from the live
+ * index-4 price ramp. There is no mock fallback.
  *
  * The discount is the message: quantity at a discount, usual price vs
  * discount price, and the saving. The discount fund is described only
@@ -44,54 +77,82 @@ interface WhaleMockPanelProps {
  * framing made users think they would be paid out.
  *
  * Gating is the caller's job (`NFTListTab` + `VaultPage`); this component does
- * not check admin status. The "Admin debug" switch must be removed if the mock
- * is ever promoted to a live tab.
+ * not check admin status.
  */
-export default function WhaleMockPanel({ addToast }: WhaleMockPanelProps) {
-  const [simulateBoost, setSimulateBoost] = useState(false);
-  const { data: minterData } = useMinterPageView();
+export default function WhaleMockPanel() {
+  const { status, quote, config, payment, maxPaymentRaw, blocker, phase, mint } =
+    useDiscountBatchMinter();
 
-  const usdsRow = minterData?.USDS;
-  const hasLivePrice = !!usdsRow && usdsRow.priceRaw > 0n;
-  const decimals = hasLivePrice ? usdsRow.decimals : WHALE_MOCK.paymentDecimals;
-  const priceRaw = hasLivePrice
-    ? usdsRow.priceRaw
-    : parseUnits(WHALE_MOCK.fallbackPriceUsds, WHALE_MOCK.paymentDecimals);
-  const growthBps = hasLivePrice ? usdsRow.growthBasisPoints : WHALE_MOCK.fallbackGrowthBps;
-
-  const batch = useMemo(
+  const display = useMemo(
     () =>
-      computeDiscountBatch({
-        potFree: simulateBoost ? WHALE_MOCK.boostedPotFree : WHALE_MOCK.normalPotFree,
-        discountPercent: WHALE_MOCK.discountPercent,
-        cap: WHALE_MOCK.maxFreePerBatch,
-        perPoint: WHALE_MOCK.overflowNFTsPerBoostPoint,
-        maxBoost: WHALE_MOCK.maxBoost,
-        priceRaw,
-        growthBps,
-      }),
-    [simulateBoost, priceRaw, growthBps]
+      quote && config && payment
+        ? computeDiscountDisplay({
+            free: quote.free,
+            total: quote.total,
+            paidCostRaw: quote.paidCostRaw,
+            discountPercent: config.discountPercent,
+            priceRaw: payment.priceRaw,
+            growthBps: payment.growthBps,
+          })
+        : undefined,
+    [quote, config, payment]
   );
 
-  const d = WHALE_MOCK.discountPercent;
-  const usualCost = formatUsds(batch.usualCostRaw, decimals);
-  const paidCost = formatUsds(batch.paidCostRaw, decimals);
-  const saving = formatUsds(batch.savingRaw, decimals);
-  const usualPerNft = formatUsds(priceRaw, decimals);
-  const avgPerNft = formatUsds(batch.avgPricePaidRaw, decimals);
-  const savingPercent =
-    batch.usualCostRaw > 0n
-      ? (Number((batch.savingRaw * 10_000n) / batch.usualCostRaw) / 100).toFixed(1)
-      : '0.0';
-  const boostDelta = formatUsds(batch.unboostedPaidCostRaw - batch.paidCostRaw, decimals);
+  if (status === 'unavailable') {
+    return (
+      <StateCard testId="whale-mock-unavailable">Not available on this network yet.</StateCard>
+    );
+  }
 
-  const handleCta = () => {
-    addToast({
-      type: 'info',
-      title: 'Preview only',
-      description: 'This is a mock. Nothing was sent.',
-    });
-  };
+  if (status === 'loading' || !quote || !config || !payment || !display) {
+    return (
+      <div className="mt-6" data-testid="whale-mock-panel">
+        <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden">
+          <div
+            className="p-6 grid place-items-center text-xs uppercase tracking-[0.22em] text-muted-foreground"
+            data-testid="whale-mock-skeleton"
+          >
+            <span>
+              <span
+                className="inline-block whale-mock-dot mr-2"
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: WHALE_DISCOUNT_CYAN,
+                  boxShadow: `0 0 8px ${WHALE_DISCOUNT_CYAN}`,
+                }}
+              />
+              Loading discount batch…
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const PAYMENT_SYMBOL = payment.symbol;
+  const decimals = payment.decimals;
+  const ready = status === 'ready';
+  const d = config.discountPercent;
+  const usualCost = formatUsds(display.usualCostRaw, decimals);
+  const paidCost = formatUsds(quote.paidCostRaw, decimals);
+  const saving = formatUsds(display.savingRaw, decimals);
+  const usualPerNft = formatUsds(payment.priceRaw, decimals);
+  const avgPerNft = formatUsds(display.avgPricePaidRaw, decimals);
+  const maxPayment = formatUsds(maxPaymentRaw, decimals);
+  const savingPercent =
+    display.usualCostRaw > 0n
+      ? (Number((display.savingRaw * 10_000n) / display.usualCostRaw) / 100).toFixed(1)
+      : '0.0';
+  const boostDelta = formatUsds(
+    display.unboostedPaidCostRaw > quote.paidCostRaw
+      ? display.unboostedPaidCostRaw - quote.paidCostRaw
+      : 0n,
+    decimals
+  );
+  const capReached = ready && quote.free >= config.maxFreePerBatch;
+  const boosted = ready && quote.boost > 0;
 
   const amountWithSymbol = (amount: string) => (
     <>
@@ -110,41 +171,6 @@ export default function WhaleMockPanel({ addToast }: WhaleMockPanelProps) {
   return (
     <div className="mt-6" data-testid="whale-mock-panel">
       <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden">
-        {/* 1. Admin debug strip — low-key, clearly labelled. */}
-        <div
-          className="flex flex-wrap items-center justify-between gap-3 px-5 py-2 border-b border-dashed border-[rgba(255,255,255,0.14)] bg-[rgba(0,0,0,0.18)]"
-          data-testid="whale-mock-debug-strip"
-        >
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Admin debug
-          </span>
-          <label className="flex items-center gap-2.5 text-xs text-muted-foreground cursor-pointer select-none">
-            <span id="whale-mock-debug-boost-label">Simulate cap reached + boost on</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={simulateBoost}
-              aria-labelledby="whale-mock-debug-boost-label"
-              onClick={() => setSimulateBoost((on) => !on)}
-              className="relative inline-flex flex-none w-9 h-5 rounded-full border transition-colors"
-              style={{
-                borderColor: simulateBoost ? CYAN_BORDER : 'rgba(255,255,255,0.2)',
-                background: simulateBoost ? BOOST_FILL : 'rgba(255,255,255,0.06)',
-              }}
-              data-testid="whale-mock-debug-boost"
-            >
-              <span
-                aria-hidden="true"
-                className="absolute top-[2px] w-3.5 h-3.5 rounded-full transition-[left]"
-                style={{
-                  left: simulateBoost ? 18 : 2,
-                  background: simulateBoost ? WHALE_DISCOUNT_CYAN : 'rgba(255,255,255,0.55)',
-                }}
-              />
-            </button>
-          </label>
-        </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr]">
           {/* Art column + explainer (same seam feathering as Whale Discount). */}
           <div
@@ -182,12 +208,18 @@ export default function WhaleMockPanel({ addToast }: WhaleMockPanelProps) {
                 NFTs, and the protocol uses it to buy phUSD for NFT stakers.
                 Discounted NFTs don't push up the mint price.
               </p>
-              {simulateBoost && (
+              {capReached && (
                 <p className="m-0" data-testid="whale-mock-cap-sentence">
-                  This batch has hit the {WHALE_MOCK.maxFreePerBatch}-NFT limit.
-                  Extra funding carries over and raises the discount by 1 point
-                  for every {WHALE_MOCK.overflowNFTsPerBoostPoint} NFTs' worth,
-                  up to +{WHALE_MOCK.maxBoost}%.
+                  This batch has hit the {config.maxFreePerBatch}-NFT limit.
+                  {config.maxBoost > 0 ? (
+                    <>
+                      {' '}Extra funding carries over and raises the discount by 1
+                      point for every {config.overflowNFTsPerBoostPoint} NFTs'
+                      worth, up to +{config.maxBoost}%.
+                    </>
+                  ) : (
+                    <> Extra funding carries over to the next batch.</>
+                  )}
                 </p>
               )}
             </div>
@@ -195,6 +227,7 @@ export default function WhaleMockPanel({ addToast }: WhaleMockPanelProps) {
 
           {/* Body */}
           <div className="p-5 sm:p-6 flex flex-col gap-4 min-w-0">
+            {ready ? (
             <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-4">
               <div className="flex-1 min-w-0 basis-64 flex flex-col gap-4">
                 {/* 2. Eyebrow + headline */}
@@ -219,7 +252,7 @@ export default function WhaleMockPanel({ addToast }: WhaleMockPanelProps) {
                   className="m-0 text-[22px] font-bold tracking-tight text-foreground"
                   data-testid="whale-mock-headline"
                 >
-                  {batch.total} NFTs at {batch.effectivePercent}% off
+                  {quote.total} NFTs at {quote.effectivePercent}% off
                 </h2>
 
                 {/* 3. Discount badge (+ boost) */}
@@ -228,7 +261,7 @@ export default function WhaleMockPanel({ addToast }: WhaleMockPanelProps) {
                   style={{ borderColor: CYAN_BORDER, background: CYAN_FILL, color: WHALE_DISCOUNT_CYAN }}
                   data-testid="whale-mock-discount"
                 >
-                  {batch.boost > 0 ? (
+                  {boosted ? (
                     <>
                       <span>{d}%</span>
                       <span aria-hidden="true">+</span>
@@ -237,10 +270,10 @@ export default function WhaleMockPanel({ addToast }: WhaleMockPanelProps) {
                         style={{ background: BOOST_FILL, boxShadow: `0 0 10px ${CYAN_BORDER}` }}
                         data-testid="whale-mock-boost-badge"
                       >
-                        {batch.boost}% boost
+                        {quote.boost}% boost
                       </span>
                       <span aria-hidden="true">=</span>
-                      <span>{batch.effectivePercent}% discount</span>
+                      <span>{quote.effectivePercent}% discount</span>
                     </>
                   ) : (
                     <span>{d}% discount</span>
@@ -262,13 +295,13 @@ export default function WhaleMockPanel({ addToast }: WhaleMockPanelProps) {
                     />
                     <div className="flex flex-col gap-[3px]">
                       <span className="font-mono text-[15px] font-semibold leading-none text-foreground tabular-nums whitespace-nowrap">
-                        {batch.total} × {NFT_COLLECTION_NAME}
+                        {quote.total} × {NFT_COLLECTION_NAME}
                       </span>
                       <span
                         className="text-[10px] tracking-[0.04em] whitespace-nowrap text-muted-foreground"
                         data-testid="whale-mock-split"
                       >
-                        {batch.free} covered by the discount fund · {batch.paid} paid
+                        {quote.free} covered by the discount fund · {quote.paid} paid
                       </span>
                     </div>
                   </div>
@@ -325,15 +358,43 @@ export default function WhaleMockPanel({ addToast }: WhaleMockPanelProps) {
                     </span>
                   </div>
                   <div className="text-[10px] text-muted-foreground mt-1 max-w-[230px] leading-snug">
-                    Slightly more than {batch.effectivePercent}%, because
+                    Slightly more than {quote.effectivePercent}%, because
                     discounted NFTs don't raise the mint price.
                   </div>
                 </div>
               </div>
             </div>
+            ) : (
+              <div className="flex flex-col gap-2" data-testid="whale-mock-no-discount">
+                {/* 2. Eyebrow + headline */}
+                <div
+                  className="flex items-center gap-2 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em]"
+                  style={{ color: WHALE_DISCOUNT_CYAN }}
+                >
+                  <span
+                    className="inline-block whale-mock-dot"
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: WHALE_DISCOUNT_CYAN,
+                      boxShadow: `0 0 8px ${WHALE_DISCOUNT_CYAN}`,
+                      flex: 'none',
+                    }}
+                  />
+                  Whale Mint · {NFT_COLLECTION_NAME}
+                </div>
+                <h2
+                  className="m-0 text-[22px] font-bold tracking-tight text-foreground"
+                  data-testid="whale-mock-headline"
+                >
+                  No discount batch available right now
+                </h2>
+              </div>
+            )}
 
             {/* 6. Boost comparison */}
-            {batch.boost > 0 && (
+            {boosted && (
               <div
                 className="rounded-[10px] border px-3.5 py-2.5 text-[13px] text-foreground"
                 style={{ borderColor: CYAN_BORDER, background: CYAN_FILL }}
@@ -342,23 +403,37 @@ export default function WhaleMockPanel({ addToast }: WhaleMockPanelProps) {
                 <span className="font-semibold" style={{ color: WHALE_DISCOUNT_CYAN }}>
                   Boost:
                 </span>{' '}
-                you pay for {batch.paid} instead of {batch.unboostedPaid}, saving
+                you pay for {quote.paid} instead of {display.unboostedPaid}, saving
                 another {boostDelta} {PAYMENT_SYMBOL}.
               </div>
             )}
 
-            {/* 8. Stub CTA */}
+            {/* 8. CTA */}
             <div className="flex flex-wrap items-center gap-3.5 pt-4 border-t border-[rgba(255,255,255,0.12)]">
               <button
                 type="button"
-                onClick={handleCta}
-                disabled={batch.total === 0}
+                onClick={() => void mint()}
+                disabled={blocker !== null || phase !== 'idle'}
                 className="phoenix-btn-primary whitespace-nowrap !rounded-md !text-[13px] disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="whale-mock-cta"
               >
-                Mint {batch.total} NFTs for {paidCost} {PAYMENT_SYMBOL}
+                {ctaLabel(
+                  blocker,
+                  phase,
+                  PAYMENT_SYMBOL,
+                  `Mint ${quote.total} NFTs for ${paidCost} ${PAYMENT_SYMBOL}`
+                )}
               </button>
-              <span className="text-xs text-muted-foreground">Preview only.</span>
+              {config.paused ? (
+                <span className="text-xs text-muted-foreground" data-testid="whale-mock-paused">
+                  Discount batch minting is paused right now.
+                </span>
+              ) : ready ? (
+                <span className="text-xs text-muted-foreground" data-testid="whale-mock-budget-note">
+                  Approves up to {maxPayment} {PAYMENT_SYMBOL} in case the price moves; any
+                  unspent amount is refunded in the same transaction.
+                </span>
+              ) : null}
             </div>
           </div>
         </div>

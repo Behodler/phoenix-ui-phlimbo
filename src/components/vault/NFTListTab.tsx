@@ -217,7 +217,7 @@ export default function NFTListTab({
         // Admin-only mock. Double-guarded: the option above is absent for
         // non-admins, and this branch refuses to render without the prop.
         <div className="max-w-4xl lg:max-w-none mx-auto">
-          <WhaleMockPanel addToast={addToast} />
+          <WhaleMockPanel />
         </div>
       ) : subTab === 'whale-mock' ? null : (
         <div className="max-w-4xl mx-auto">
