@@ -178,9 +178,20 @@ The admin-only **Stake Preview** accordion (`src/components/vault/stakeMock/`) b
 mock (`nftStakeMockData.ts`); story 076 wires it to real per-staker contracts. After that,
 `nftStakeMockData.ts` is a static per-staker **wiring descriptor**, not live-value mock data.
 
-The admin-only **Whale Discount** sub-tab (`src/components/vault/whaleDiscount/`) is fully
-wired. It began life as "Nudge-mock" (`nudgeMockData.ts`, since deleted) — do not look for
-that fixture. Its data comes from `useNudgePot`:
+The public **Whale Discount** sub-tab (id `whale-discount`) renders
+`src/components/vault/whaleMock/WhaleMockPanel.tsx`, the live
+`BatchNFTMinterNudgeDiscount` batch mint driven by `useDiscountBatchMinter`. It was the
+admin-only "Whale-mock" tab until the mainnet cutover; the older multi-token-nudge Whale
+Discount panel (`src/components/vault/whaleDiscount/`) was deleted at the same time. Do not
+reinstate the admin gate or the old panel.
+
+**Reservoir Ratchet is a valid NFT that cannot be minted.** It carries `hideFromMint: true`
+in `nftStaticConfig`, which drops it from the Mint list only. Keep the entry: the Stake rail,
+the Forge Bonfire picker and `useClaimNftHoldings` all resolve Ratchet through it.
+
+The nudge-pot rules below still govern `useNudgePot` (used by `NudgeStreamerStatsPanel`) and
+the bonus-token legs in `useDiscountBonusTokens`. "Nudge-mock" (`nudgeMockData.ts`) is long
+deleted — do not look for that fixture.
 
 - The reward token set is read from `BatchNFTMinterMultiToken.getNudgeTokens()`, never
   listed in the UI, so it adapts per chain on its own. **Do NOT hard-code a token list.**

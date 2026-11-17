@@ -8,26 +8,19 @@ import { useMinterPageView, type TokenMintData } from '../../hooks/useMinterPage
 import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurfaceMock from './stakeMock/StakingSurfaceMock';
-import WhaleDiscountPanel from './whaleDiscount/WhaleDiscountPanel';
 import WhaleMockPanel from './whaleMock/WhaleMockPanel';
 import FeaturedProjectBanner from './featuredProject/FeaturedProjectBanner';
 
-export type NFTSubTab = 'mint' | 'stake' | 'whale-discount' | 'whale-mock';
+export type NFTSubTab = 'mint' | 'stake' | 'whale-discount';
 
 interface NFTListTabProps {
   subTab: NFTSubTab;
   onSubTabChange: (subTab: NFTSubTab) => void;
-  /**
-   * Admin-only: shows the Whale-mock preview sub-tab. VaultPage passes
-   * `hasAdminAccess`; this component never checks admin status itself.
-   */
-  canSeeWhaleMock?: boolean;
 }
 
 export default function NFTListTab({
   subTab,
   onSubTabChange,
-  canSeeWhaleMock = false,
 }: NFTListTabProps) {
   const { addToast } = useToast();
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
@@ -37,7 +30,7 @@ export default function NFTListTab({
 
   // Merge static config with live contract data
   const nftDataList: NFTData[] = useMemo(() => {
-    return nftStaticConfig.map((config) => {
+    return nftStaticConfig.filter((config) => !config.hideFromMint).map((config) => {
       // Index by prefix tolerantly: mock-only NFTs (e.g. USDC / Reservoir
       // Ratchet) have no on-chain MinterPageView field, so this resolves to
       // undefined and the defaults below apply.
@@ -150,9 +143,6 @@ export default function NFTListTab({
             { value: 'mint', label: 'Mint' },
             { value: 'stake', label: 'Stake' },
             { value: 'whale-discount', label: 'Whale Discount' },
-            ...(canSeeWhaleMock
-              ? [{ value: 'whale-mock' as const, label: 'Whale-mock' }]
-              : []),
           ]}
         />
       </div>
@@ -205,21 +195,11 @@ export default function NFTListTab({
         // Open to every user. `lg:max-w-none` lets the panel fill the widened
         // desktop column instead of being re-capped at 4xl.
         <div className="max-w-4xl lg:max-w-none mx-auto">
-          <WhaleDiscountPanel />
-          {/*
-            Promo for the project whose token is part of the nudge reward. It
-            carries its own `mt-6`, matching WhaleDiscountPanel's root, since
-            this wrapper supplies no vertical gap.
-          */}
+          <WhaleMockPanel />
+          {/* Promo for a project whose token is part of the nudge reward. */}
           <FeaturedProjectBanner />
         </div>
-      ) : subTab === 'whale-mock' && canSeeWhaleMock ? (
-        // Admin-only mock. Double-guarded: the option above is absent for
-        // non-admins, and this branch refuses to render without the prop.
-        <div className="max-w-4xl lg:max-w-none mx-auto">
-          <WhaleMockPanel />
-        </div>
-      ) : subTab === 'whale-mock' ? null : (
+      ) : (
         <div className="max-w-4xl mx-auto">
           <StakingSurfaceMock addToast={addToast} />
         </div>

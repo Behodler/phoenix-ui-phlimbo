@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { formatUnits } from 'viem';
 import {
   WHALE_ART,
@@ -58,21 +58,66 @@ function ctaLabel(
   }
 }
 
-function StateCard({ testId, children }: { testId: string; children: ReactNode }) {
+/** Keyframes for the pulsing dot and boost glow, shared by the loading card and the full panel. */
+function PanelStyles() {
+  return (
+    <style>{`
+        @keyframes whale-mock-pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(1.4); }
+        }
+        .whale-mock-dot {
+          animation: whale-mock-pulse 1.6s ease-in-out infinite;
+        }
+        @keyframes whale-mock-boost-glow {
+          0%, 100% { filter: brightness(1); }
+          50% { filter: brightness(1.25); }
+        }
+        .whale-mock-boost {
+          animation: whale-mock-boost-glow 2.4s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .whale-mock-dot, .whale-mock-boost { animation: none; }
+        }
+    `}</style>
+  );
+}
+
+/**
+ * The pulsing-dot card shown until the batch can be quoted. It also covers a
+ * zero-address minter, which is what a disconnected wallet sees: wagmi falls
+ * back to mainnet, where the minter is a placeholder until the cutover.
+ */
+function LoadingCard() {
   return (
     <div className="mt-6" data-testid="whale-mock-panel">
-      <div
-        className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg p-6 text-sm text-muted-foreground"
-        data-testid={testId}
-      >
-        {children}
+      <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden">
+        <div
+          className="p-6 grid place-items-center text-xs uppercase tracking-[0.22em] text-muted-foreground"
+          data-testid="whale-mock-skeleton"
+        >
+          <span>
+            <span
+              className="inline-block whale-mock-dot mr-2"
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: WHALE_DISCOUNT_CYAN,
+                boxShadow: `0 0 8px ${WHALE_DISCOUNT_CYAN}`,
+              }}
+            />
+            Loading Whale Discount…
+          </span>
+        </div>
       </div>
+      <PanelStyles />
     </div>
   );
 }
 
 /**
- * Whale-mock — admin-only sub-tab for the nft-staking
+ * Whale Discount — public NFT sub-tab for the nft-staking
  * `BatchNFTMinterNudgeDiscount` batch mint, wired to the live contract.
  *
  * Every batch figure comes from `previewBatch()` / `previewBoost()` via
@@ -85,9 +130,6 @@ function StateCard({ testId, children }: { testId: string; children: ReactNode }
  * (`bonus`, from `useDiscountBonusTokens` via the batch hook) are listed under the quantity, hidden when there
  * are none. The fund's size is shown as a plain figure next to the
  * explanation that it is never paid out.
- *
- * Gating is the caller's job (`NFTListTab` + `VaultPage`); this component does
- * not check admin status.
  */
 export default function WhaleMockPanel() {
   const { status, quote, config, fund, bonus, payment, maxPaymentRaw, blocker, phase, mint } =
@@ -108,37 +150,8 @@ export default function WhaleMockPanel() {
     [quote, config, payment]
   );
 
-  if (status === 'unavailable') {
-    return (
-      <StateCard testId="whale-mock-unavailable">Not available on this network yet.</StateCard>
-    );
-  }
-
-  if (status === 'loading' || !quote || !config || !payment || !display) {
-    return (
-      <div className="mt-6" data-testid="whale-mock-panel">
-        <div className="bg-pxusd-teal-700 border border-pxusd-teal-600 rounded-lg overflow-hidden">
-          <div
-            className="p-6 grid place-items-center text-xs uppercase tracking-[0.22em] text-muted-foreground"
-            data-testid="whale-mock-skeleton"
-          >
-            <span>
-              <span
-                className="inline-block whale-mock-dot mr-2"
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: WHALE_DISCOUNT_CYAN,
-                  boxShadow: `0 0 8px ${WHALE_DISCOUNT_CYAN}`,
-                }}
-              />
-              Loading discount batch…
-            </span>
-          </div>
-        </div>
-      </div>
-    );
+  if (status === 'unavailable' || status === 'loading' || !quote || !config || !payment || !display) {
+    return <LoadingCard />;
   }
 
   const PAYMENT_SYMBOL = payment.symbol;
@@ -512,25 +525,7 @@ export default function WhaleMockPanel() {
         </div>
       </div>
 
-      <style>{`
-        @keyframes whale-mock-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(1.4); }
-        }
-        .whale-mock-dot {
-          animation: whale-mock-pulse 1.6s ease-in-out infinite;
-        }
-        @keyframes whale-mock-boost-glow {
-          0%, 100% { filter: brightness(1); }
-          50% { filter: brightness(1.25); }
-        }
-        .whale-mock-boost {
-          animation: whale-mock-boost-glow 2.4s ease-in-out infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .whale-mock-dot, .whale-mock-boost { animation: none; }
-        }
-      `}</style>
+      <PanelStyles />
     </div>
   );
 }

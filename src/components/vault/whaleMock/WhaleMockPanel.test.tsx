@@ -175,10 +175,13 @@ describe('WhaleMockPanel — live figures', () => {
 });
 
 describe('WhaleMockPanel — states', () => {
-  it('unavailable (zero address)', () => {
+  it('unavailable (zero address) → the same pulsing loading card', () => {
     hook.value = { ...live(), status: 'unavailable', quote: undefined, config: undefined, payment: undefined };
     const { container } = render(<WhaleMockPanel />);
-    expect(screen.getByTestId('whale-mock-unavailable')).toHaveTextContent('Not available on this network yet');
+    expect(screen.getByTestId('whale-mock-skeleton')).toHaveTextContent('Loading Whale Discount…');
+    expect(screen.queryByText(/Not available/)).toBeNull();
+    // The keyframes ship with the card, so the dot actually pulses.
+    expect(container.querySelector('style')?.textContent).toContain('@keyframes whale-mock-pulse');
     expect(screen.queryByTestId('whale-mock-cta')).toBeNull();
     expectNoForbiddenCopy(container);
   });

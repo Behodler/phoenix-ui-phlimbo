@@ -61,6 +61,11 @@ export interface NFTStaticConfig {
   comingSoon?: boolean;
   /** Purely cosmetic. When true, the selector renders a small "NEW" badge. Never reaches a contract call. */
   isNew?: boolean;
+  /**
+   * When true, the NFT is left out of the NFT → Mint list. It stays in this
+   * config so staking, Bonfire burns and holdings lookups still resolve it.
+   */
+  hideFromMint?: boolean;
 }
 
 /**
@@ -185,6 +190,7 @@ export const nftStaticConfig: NFTStaticConfig[] = [
     decimals: 6,
     batchEnabled: true,
     batchMinterKey: "RatchetBatchNFTMinter",
+    hideFromMint: true,
   },
 ];
 
