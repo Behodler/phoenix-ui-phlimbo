@@ -9,16 +9,26 @@ import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurfaceMock from './stakeMock/StakingSurfaceMock';
 import WhaleDiscountPanel from './whaleDiscount/WhaleDiscountPanel';
+import WhaleMockPanel from './whaleMock/WhaleMockPanel';
 import FeaturedProjectBanner from './featuredProject/FeaturedProjectBanner';
 
-export type NFTSubTab = 'mint' | 'stake' | 'whale-discount';
+export type NFTSubTab = 'mint' | 'stake' | 'whale-discount' | 'whale-mock';
 
 interface NFTListTabProps {
   subTab: NFTSubTab;
   onSubTabChange: (subTab: NFTSubTab) => void;
+  /**
+   * Admin-only: shows the Whale-mock preview sub-tab. VaultPage passes
+   * `hasAdminAccess`; this component never checks admin status itself.
+   */
+  canSeeWhaleMock?: boolean;
 }
 
-export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) {
+export default function NFTListTab({
+  subTab,
+  onSubTabChange,
+  canSeeWhaleMock = false,
+}: NFTListTabProps) {
   const { addToast } = useToast();
   const [selectedNft, setSelectedNft] = useState<NFTData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -140,6 +150,9 @@ export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) 
             { value: 'mint', label: 'Mint' },
             { value: 'stake', label: 'Stake' },
             { value: 'whale-discount', label: 'Whale Discount' },
+            ...(canSeeWhaleMock
+              ? [{ value: 'whale-mock' as const, label: 'Whale-mock' }]
+              : []),
           ]}
         />
       </div>
@@ -200,7 +213,13 @@ export default function NFTListTab({ subTab, onSubTabChange }: NFTListTabProps) 
           */}
           <FeaturedProjectBanner />
         </div>
-      ) : (
+      ) : subTab === 'whale-mock' && canSeeWhaleMock ? (
+        // Admin-only mock. Double-guarded: the option above is absent for
+        // non-admins, and this branch refuses to render without the prop.
+        <div className="max-w-4xl lg:max-w-none mx-auto">
+          <WhaleMockPanel addToast={addToast} />
+        </div>
+      ) : subTab === 'whale-mock' ? null : (
         <div className="max-w-4xl mx-auto">
           <StakingSurfaceMock addToast={addToast} />
         </div>

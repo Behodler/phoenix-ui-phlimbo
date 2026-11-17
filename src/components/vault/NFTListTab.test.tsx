@@ -35,6 +35,10 @@ vi.mock('./whaleDiscount/WhaleDiscountPanel', () => ({
   default: () => <div data-testid="whale-discount-panel" />,
 }));
 
+vi.mock('./whaleMock/WhaleMockPanel', () => ({
+  default: () => <div data-testid="whale-mock-panel" />,
+}));
+
 vi.mock('./featuredProject/FeaturedProjectBanner', () => ({
   default: () => <div data-testid="featured-project-banner" />,
 }));
@@ -90,5 +94,36 @@ describe('NFTListTab — sub-tabs', () => {
 
     expect(screen.getByTestId('staking-surface-mock')).toBeInTheDocument();
     expect(screen.queryByTestId('whale-discount-panel')).toBeNull();
+  });
+});
+
+describe('NFTListTab — admin-only Whale-mock sub-tab', () => {
+  it('hides the Whale-mock tab when canSeeWhaleMock is omitted', () => {
+    render(<NFTListTab subTab="mint" onSubTabChange={vi.fn()} />);
+    expect(screen.queryByRole('tab', { name: 'Whale-mock' })).toBeNull();
+  });
+
+  it('hides the Whale-mock tab when canSeeWhaleMock is false', () => {
+    render(<NFTListTab subTab="mint" onSubTabChange={vi.fn()} canSeeWhaleMock={false} />);
+    expect(screen.queryByRole('tab', { name: 'Whale-mock' })).toBeNull();
+  });
+
+  it('shows the Whale-mock tab after Whale Discount for admins', () => {
+    render(<NFTListTab subTab="mint" onSubTabChange={vi.fn()} canSeeWhaleMock />);
+    const tabs = screen.getAllByRole('tab').map((t) => t.textContent);
+    expect(tabs).toEqual(['Mint', 'Stake', 'Whale Discount', 'Whale-mock']);
+  });
+
+  it('renders the Whale-mock panel for admins on that sub-tab', () => {
+    render(<NFTListTab subTab="whale-mock" onSubTabChange={vi.fn()} canSeeWhaleMock />);
+    expect(screen.getByTestId('whale-mock-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('whale-discount-panel')).toBeNull();
+    expect(screen.queryByTestId('staking-surface-mock')).toBeNull();
+  });
+
+  it('does not render the panel for a non-admin forced onto the sub-tab', () => {
+    render(<NFTListTab subTab="whale-mock" onSubTabChange={vi.fn()} />);
+    expect(screen.queryByTestId('whale-mock-panel')).toBeNull();
+    expect(screen.queryByTestId('staking-surface-mock')).toBeNull();
   });
 });

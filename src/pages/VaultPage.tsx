@@ -193,6 +193,14 @@ export default function VaultPage() {
 
   const [nftSubTab, setNftSubTab] = useState<NFTSubTab>('mint');
 
+  // The Whale-mock sub-tab is admin-only. If admin access is lost while it is
+  // open (wallet disconnect or switch), drop back to the public Mint sub-tab.
+  useEffect(() => {
+    if (nftSubTab === 'whale-mock' && !hasAdminAccess) {
+      setNftSubTab('mint');
+    }
+  }, [nftSubTab, hasAdminAccess]);
+
   // NOTE (story 069): the legacy Deposit/Withdraw tabs were removed. Their
   // phUSD stake/withdraw/claim functionality now lives on the Stake tab's
   // phUSD panel (usePhUsdStakePool), which owns its own DepositView polling.
@@ -789,7 +797,11 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "NFT" ? (
               <ErrorBoundary>
-                <NFTListTab subTab={nftSubTab} onSubTabChange={setNftSubTab} />
+                <NFTListTab
+                  subTab={nftSubTab}
+                  onSubTabChange={setNftSubTab}
+                  canSeeWhaleMock={hasAdminAccess}
+                />
               </ErrorBoundary>
             ) : activeTab === "Forge" ? (
               <ErrorBoundary>
