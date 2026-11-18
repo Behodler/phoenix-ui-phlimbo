@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Address, Hash } from 'viem';
-import { parseEventLogs, zeroAddress } from 'viem';
+import { parseEventLogs } from 'viem';
 import { useAccount, usePublicClient, useReadContracts, useWriteContract } from 'wagmi';
 import { batchNftMinterNudgeDiscountAbi } from '@behodler/phase2-wagmi-hooks';
 import { useContractAddresses } from '../contexts/ContractAddressContext';
@@ -15,6 +15,7 @@ import {
 } from './useDiscountBonusTokens';
 import { tokenPrefixToAddressKey } from '../data/nftMockData';
 import { decodeContractError } from '../lib/decodeContractError';
+import { liveAddress } from '../lib/liveAddress';
 import type { ContractAddresses } from '../types/contracts';
 import { log } from '../utils/logger';
 
@@ -131,11 +132,6 @@ type ReadTuple = readonly [
   boolean,
   readonly Address[],
 ];
-
-const liveAddress = (value: unknown): Address | undefined => {
-  const addr = value as Address | undefined;
-  return addr && addr.toLowerCase() !== zeroAddress ? addr : undefined;
-};
 
 function toQuote(reads: ReadTuple): DiscountBatchQuote {
   const [[freeRaw, totalRaw, paidRaw, paidCostRaw], [, boost, effective], discountPercent] = reads;

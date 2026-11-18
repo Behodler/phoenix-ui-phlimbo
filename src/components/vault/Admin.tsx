@@ -24,6 +24,7 @@ import FAQEditor from './FAQEditor';
 import NftStakerRunwayPanel from './NftStakerRunwayPanel';
 import NftStakerDepletionRunwayPanel from './NftStakerDepletionRunwayPanel';
 import NudgeStreamerStatsPanel from './NudgeStreamerStatsPanel';
+import NudgeDiscountPendingBuyPanel from './NudgeDiscountPendingBuyPanel';
 import { useTokenBalance } from '../../hooks/useContractInteractions';
 import { PromoPhase } from '../../hooks/useDepositPageView';
 import { useBalancerPrice } from '../../hooks/useBalancerPrice';
@@ -2888,6 +2889,7 @@ export default function Admin() {
       </div>
 
       <NudgeStreamerStatsPanel />
+      <NudgeDiscountPendingBuyPanel />
 
       {/* Selected Contract Address Display */}
       {selectedContractKey && addresses && (
