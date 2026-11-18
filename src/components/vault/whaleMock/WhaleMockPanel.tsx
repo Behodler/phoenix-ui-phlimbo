@@ -128,11 +128,11 @@ function LoadingCard() {
  * The discount is the message: quantity at a discount, usual price vs
  * discount price, and the saving. The bonus tokens the batch also pays out
  * (`bonus`, from `useDiscountBonusTokens` via the batch hook) are listed under the quantity, hidden when there
- * are none. The fund's size is shown as a plain figure next to the
- * explanation that it is never paid out.
+ * are none. The discount fund is described qualitatively only; its size is
+ * not shown.
  */
 export default function WhaleMockPanel() {
-  const { status, quote, config, fund, bonus, payment, maxPaymentRaw, blocker, phase, mint } =
+  const { status, quote, config, bonus, payment, maxPaymentRaw, blocker, phase, mint } =
     useDiscountBatchMinter();
 
   const display = useMemo(

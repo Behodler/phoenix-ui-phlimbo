@@ -250,23 +250,14 @@ describe('WhaleMockPanel — states', () => {
 });
 
 describe('WhaleMockPanel — discount fund and bonus tokens', () => {
-  it('shows the fund size, next step and reserve', () => {
+  it('does not show the fund size, even when the hook reports one', () => {
     hook.value = {
       ...live(),
       fund: { potUsdRaw: 18_762_794n * 10n ** 12n, nextStepUsdcRaw: 1_681_857n, reservedUsdcRaw: 2_500_000n },
     };
     render(<WhaleMockPanel />);
-    expect(screen.getByTestId('whale-mock-fund')).toHaveTextContent('Discount fund: $18.76');
-    expect(screen.getByTestId('whale-mock-fund-next')).toHaveTextContent('$1.68 more covers another NFT');
-    expect(screen.getByTestId('whale-mock-fund-reserved')).toHaveTextContent('$2.50 reserved');
-  });
-
-  it('omits the next-step and reserve clauses when they are zero', () => {
-    hook.value = { ...live(), fund: { potUsdRaw: 10n * ONE, nextStepUsdcRaw: 0n, reservedUsdcRaw: 0n } };
-    render(<WhaleMockPanel />);
-    expect(screen.getByTestId('whale-mock-fund')).toHaveTextContent('Discount fund: $10.00');
-    expect(screen.queryByTestId('whale-mock-fund-next')).toBeNull();
-    expect(screen.queryByTestId('whale-mock-fund-reserved')).toBeNull();
+    expect(screen.queryByTestId('whale-mock-fund')).toBeNull();
+    expect(screen.queryByText(/Discount fund:/)).toBeNull();
   });
 
   it('lists the bonus tokens with their USD total', () => {
