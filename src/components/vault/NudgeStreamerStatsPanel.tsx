@@ -1,5 +1,5 @@
 import { formatUnits } from "viem";
-import { useNudgePot } from "../../hooks/useNudgePot";
+import { useNudgeStreams } from "../../hooks/useNudgeStreams";
 
 /**
  * `NudgeStreamer.rewardPerSecond` is scaled by the contract's own `PRECISION`
@@ -83,12 +83,12 @@ function formatRemaining(bufferRaw: bigint, decimals: number): string {
 }
 
 /**
- * Admin read-only view of the NudgeStreamer's per-token streams into the
- * BatchNFTMinter's whale-discount pot.
+ * Admin read-only view of the NudgeStreamer's per-token streams into
+ * `BatchNFTMinterNudgeDiscount` (`NudgeDiscountBatchMinter`), the live
+ * whale-discount minter.
  *
- * The token set comes from `BatchNFTMinterMultiToken.getNudgeTokens()` via
- * `useNudgePot`, so it adapts per chain on its own — USDC is simply whichever
- * of these rows the streamer happens to be funding. Nothing here is
+ * The token set comes from that minter's `getNudgeTokens()` via
+ * `useNudgeStreams`, so it adapts per chain on its own. Nothing here is
  * hard-coded to a token list.
  *
  * Every figure is a block-attested read: this panel does no live
@@ -96,13 +96,12 @@ function formatRemaining(bufferRaw: bigint, decimals: number): string {
  */
 export default function NudgeStreamerStatsPanel() {
   const {
-    tokens,
+    streams: tokens,
     streamerAddress,
     minterAddress,
     isLoading,
-    isUnavailable,
     refetch,
-  } = useNudgePot();
+  } = useNudgeStreams();
 
   return (
     <div className="bg-card border border-border rounded-lg p-4 mb-6">
@@ -117,9 +116,9 @@ export default function NudgeStreamerStatsPanel() {
         </span>
       </div>
 
-      {isUnavailable || !minterAddress ? (
+      {!minterAddress ? (
         <p className="text-sm text-muted-foreground">
-          BatchNFTMinter (multi-token) not deployed on this chain.
+          NudgeDiscountBatchMinter not deployed on this chain.
         </p>
       ) : !streamerAddress ? (
         <p className="text-sm text-muted-foreground">
