@@ -139,13 +139,13 @@ export default function WhaleMockPanel() {
     () =>
       quote && config && payment
         ? computeDiscountDisplay({
-            free: quote.free,
-            total: quote.total,
-            paidCostRaw: quote.paidCostRaw,
-            discountPercent: config.discountPercent,
-            priceRaw: payment.priceRaw,
-            growthBps: payment.growthBps,
-          })
+          free: quote.free,
+          total: quote.total,
+          paidCostRaw: quote.paidCostRaw,
+          discountPercent: config.discountPercent,
+          priceRaw: payment.priceRaw,
+          growthBps: payment.growthBps,
+        })
         : undefined,
     [quote, config, payment]
   );
@@ -226,31 +226,6 @@ export default function WhaleMockPanel() {
                 grows enough to cover another NFT, the next batch gets bigger:
                 more NFTs at the discount.
               </p>
-              <p className="m-0">
-                The fund is never paid out to anyone. It covers the discounted
-                NFTs, and the protocol uses it to buy phUSD for NFT stakers.
-                Discounted NFTs don't push up the mint price.
-              </p>
-              {fund && (
-                <p className="m-0 text-foreground" data-testid="whale-mock-fund">
-                  Discount fund:{' '}
-                  <span className="font-mono tabular-nums">
-                    {formatUsd(Number(formatUnits(fund.potUsdRaw, 18)))}
-                  </span>
-                  {fund.nextStepUsdcRaw > 0n && (
-                    <span className="text-muted-foreground" data-testid="whale-mock-fund-next">
-                      {' '}· {formatUsd(Number(formatUnits(fund.nextStepUsdcRaw, 6)))} more
-                      covers another NFT
-                    </span>
-                  )}
-                  {fund.reservedUsdcRaw > 0n && (
-                    <span className="text-muted-foreground" data-testid="whale-mock-fund-reserved">
-                      {' '}· {formatUsd(Number(formatUnits(fund.reservedUsdcRaw, 6)))} reserved
-                      for phUSD buys
-                    </span>
-                  )}
-                </p>
-              )}
               {capReached && (
                 <p className="m-0" data-testid="whale-mock-cap-sentence">
                   This batch has hit the {config.maxFreePerBatch}-NFT limit.
@@ -271,185 +246,185 @@ export default function WhaleMockPanel() {
           {/* Body */}
           <div className="p-5 sm:p-6 flex flex-col gap-4 min-w-0">
             {ready ? (
-            <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-4">
-              <div className="flex-1 min-w-0 basis-64 flex flex-col gap-4">
-                {/* 2. Eyebrow + headline */}
-                <div
-                  className="flex items-center gap-2 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em]"
-                  style={{ color: WHALE_DISCOUNT_CYAN }}
-                >
-                  <span
-                    className="inline-block whale-mock-dot"
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      background: WHALE_DISCOUNT_CYAN,
-                      boxShadow: `0 0 8px ${WHALE_DISCOUNT_CYAN}`,
-                      flex: 'none',
-                    }}
-                  />
-                  Whale Mint · {NFT_COLLECTION_NAME}
-                </div>
-                <h2
-                  className="m-0 text-[22px] font-bold tracking-tight text-foreground"
-                  data-testid="whale-mock-headline"
-                >
-                  {quote.total} NFTs at {quote.effectivePercent}% off
-                </h2>
+              <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-4">
+                <div className="flex-1 min-w-0 basis-64 flex flex-col gap-4">
+                  {/* 2. Eyebrow + headline */}
+                  <div
+                    className="flex items-center gap-2 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em]"
+                    style={{ color: WHALE_DISCOUNT_CYAN }}
+                  >
+                    <span
+                      className="inline-block whale-mock-dot"
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: WHALE_DISCOUNT_CYAN,
+                        boxShadow: `0 0 8px ${WHALE_DISCOUNT_CYAN}`,
+                        flex: 'none',
+                      }}
+                    />
+                    Whale Mint · {NFT_COLLECTION_NAME}
+                  </div>
+                  <h2
+                    className="m-0 text-[22px] font-bold tracking-tight text-foreground"
+                    data-testid="whale-mock-headline"
+                  >
+                    {quote.total} NFTs at {quote.effectivePercent}% off
+                  </h2>
 
-                {/* 3. Discount badge (+ boost) */}
-                <div
-                  className="self-start flex flex-wrap items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-semibold"
-                  style={{ borderColor: CYAN_BORDER, background: CYAN_FILL, color: WHALE_DISCOUNT_CYAN }}
-                  data-testid="whale-mock-discount"
-                >
-                  {boosted ? (
-                    <>
-                      <span>{d}%</span>
-                      <span aria-hidden="true">+</span>
-                      <span
-                        className="rounded-full px-2 py-0.5 text-foreground whale-mock-boost"
-                        style={{ background: BOOST_FILL, boxShadow: `0 0 10px ${CYAN_BORDER}` }}
-                        data-testid="whale-mock-boost-badge"
-                      >
-                        {quote.boost}% boost
-                      </span>
-                      <span aria-hidden="true">=</span>
-                      <span>{quote.effectivePercent}% discount</span>
-                    </>
-                  ) : (
-                    <span>{d}% discount</span>
+                  {/* 3. Discount badge (+ boost) */}
+                  <div
+                    className="self-start flex flex-wrap items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-semibold"
+                    style={{ borderColor: CYAN_BORDER, background: CYAN_FILL, color: WHALE_DISCOUNT_CYAN }}
+                    data-testid="whale-mock-discount"
+                  >
+                    {boosted ? (
+                      <>
+                        <span>{d}%</span>
+                        <span aria-hidden="true">+</span>
+                        <span
+                          className="rounded-full px-2 py-0.5 text-foreground whale-mock-boost"
+                          style={{ background: BOOST_FILL, boxShadow: `0 0 10px ${CYAN_BORDER}` }}
+                          data-testid="whale-mock-boost-badge"
+                        >
+                          {quote.boost}% boost
+                        </span>
+                        <span aria-hidden="true">=</span>
+                        <span>{quote.effectivePercent}% discount</span>
+                      </>
+                    ) : (
+                      <span>{d}% discount</span>
+                    )}
+                  </div>
+
+                  {/* 5. Quantity chip */}
+                  <div className="min-w-0">
+                    <div
+                      className="self-start inline-flex items-center gap-2.5 rounded-[10px] border py-2.5 pl-2.5 pr-3.5"
+                      style={{ borderColor: CYAN_BORDER, background: CYAN_FILL }}
+                      data-testid="whale-mock-quantity"
+                    >
+                      <img
+                        src={WHALE_ART}
+                        alt=""
+                        className="flex-none w-[26px] h-[26px] rounded-md object-cover bg-[#050a14]"
+                        style={{ imageRendering: 'pixelated' }}
+                      />
+                      <div className="flex flex-col gap-[3px]">
+                        <span className="font-mono text-[15px] font-semibold leading-none text-foreground tabular-nums whitespace-nowrap">
+                          {quote.total} × {NFT_COLLECTION_NAME}
+                        </span>
+                        <span
+                          className="text-[10px] tracking-[0.04em] whitespace-nowrap text-muted-foreground"
+                          data-testid="whale-mock-split"
+                        >
+                          {quote.free} covered by the discount fund · {quote.paid} paid
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5b. Bonus tokens paid out with the batch (hidden when none). */}
+                  {bonus.tokens.length > 0 && (
+                    <div className="flex flex-col gap-2" data-testid="whale-mock-bonus">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                        Plus bonus tokens
+                        {bonus.usdTotal > 0 && (
+                          <span className="text-foreground" data-testid="whale-mock-bonus-total">
+                            {' '}· {bonus.isPartial ? '≥ ' : '≈ '}
+                            {formatUsd(bonus.usdTotal)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {bonus.tokens.map((token) => (
+                          <div
+                            key={token.address}
+                            className="inline-flex items-center gap-2 rounded-[10px] border py-1.5 pl-1.5 pr-3"
+                            style={{ borderColor: CYAN_BORDER, background: CYAN_FILL }}
+                            data-testid={`whale-mock-bonus-${token.canonical}`}
+                          >
+                            {token.logo ? (
+                              <img
+                                src={token.logo}
+                                alt=""
+                                className="flex-none w-[20px] h-[20px] rounded-full object-cover bg-[#050a14]"
+                              />
+                            ) : (
+                              <span className="flex-none w-[20px] h-[20px] rounded-full grid place-items-center bg-[#050a14] text-[10px] font-semibold text-foreground">
+                                {token.symbol.charAt(0)}
+                              </span>
+                            )}
+                            <span className="font-mono text-[13px] font-semibold text-foreground tabular-nums">
+                              {token.amountFormatted}
+                            </span>
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                              {token.symbol}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                {/* 5. Quantity chip */}
-                <div className="min-w-0">
-                  <div
-                    className="self-start inline-flex items-center gap-2.5 rounded-[10px] border py-2.5 pl-2.5 pr-3.5"
-                    style={{ borderColor: CYAN_BORDER, background: CYAN_FILL }}
-                    data-testid="whale-mock-quantity"
-                  >
-                    <img
-                      src={WHALE_ART}
-                      alt=""
-                      className="flex-none w-[26px] h-[26px] rounded-md object-cover bg-[#050a14]"
-                      style={{ imageRendering: 'pixelated' }}
-                    />
-                    <div className="flex flex-col gap-[3px]">
-                      <span className="font-mono text-[15px] font-semibold leading-none text-foreground tabular-nums whitespace-nowrap">
-                        {quote.total} × {NFT_COLLECTION_NAME}
-                      </span>
-                      <span
-                        className="text-[10px] tracking-[0.04em] whitespace-nowrap text-muted-foreground"
-                        data-testid="whale-mock-split"
-                      >
-                        {quote.free} covered by the discount fund · {quote.paid} paid
+                {/* 4. Price comparison: usual → discount → you save */}
+                <div className="flex-none flex flex-col gap-2 min-w-[210px]">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
+                      Usual price
+                    </div>
+                    <div
+                      className="flex items-baseline gap-1.5 font-mono text-[17px] font-semibold tracking-tight text-muted-foreground leading-none tabular-nums"
+                      data-testid="whale-mock-usual-cost"
+                    >
+                      <span className="line-through decoration-[rgba(255,255,255,0.45)]">{usualCost}</span>
+                      <span className="text-[11px] font-sans font-semibold uppercase tracking-[0.1em]">
+                        {PAYMENT_SYMBOL}
                       </span>
                     </div>
-                  </div>
-                </div>
-
-                {/* 5b. Bonus tokens paid out with the batch (hidden when none). */}
-                {bonus.tokens.length > 0 && (
-                  <div className="flex flex-col gap-2" data-testid="whale-mock-bonus">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Plus bonus tokens
-                      {bonus.usdTotal > 0 && (
-                        <span className="text-foreground" data-testid="whale-mock-bonus-total">
-                          {' '}· {bonus.isPartial ? '≥ ' : '≈ '}
-                          {formatUsd(bonus.usdTotal)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {bonus.tokens.map((token) => (
-                        <div
-                          key={token.address}
-                          className="inline-flex items-center gap-2 rounded-[10px] border py-1.5 pl-1.5 pr-3"
-                          style={{ borderColor: CYAN_BORDER, background: CYAN_FILL }}
-                          data-testid={`whale-mock-bonus-${token.canonical}`}
-                        >
-                          {token.logo ? (
-                            <img
-                              src={token.logo}
-                              alt=""
-                              className="flex-none w-[20px] h-[20px] rounded-full object-cover bg-[#050a14]"
-                            />
-                          ) : (
-                            <span className="flex-none w-[20px] h-[20px] rounded-full grid place-items-center bg-[#050a14] text-[10px] font-semibold text-foreground">
-                              {token.symbol.charAt(0)}
-                            </span>
-                          )}
-                          <span className="font-mono text-[13px] font-semibold text-foreground tabular-nums">
-                            {token.amountFormatted}
-                          </span>
-                          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            {token.symbol}
-                          </span>
-                        </div>
-                      ))}
+                    <div className="text-[11px] text-muted-foreground mt-1">
+                      {usualPerNft} {PAYMENT_SYMBOL} per NFT now
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* 4. Price comparison: usual → discount → you save */}
-              <div className="flex-none flex flex-col gap-2 min-w-[210px]">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
-                    Usual price
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
+                      Discount price
+                    </div>
+                    <div
+                      className="flex items-baseline gap-1.5 font-mono text-[19px] font-semibold tracking-tight text-foreground leading-none tabular-nums"
+                      data-testid="whale-mock-discount-cost"
+                    >
+                      {amountWithSymbol(paidCost)}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-1">
+                      avg {avgPerNft} {PAYMENT_SYMBOL} per NFT
+                    </div>
                   </div>
-                  <div
-                    className="flex items-baseline gap-1.5 font-mono text-[17px] font-semibold tracking-tight text-muted-foreground leading-none tabular-nums"
-                    data-testid="whale-mock-usual-cost"
-                  >
-                    <span className="line-through decoration-[rgba(255,255,255,0.45)]">{usualCost}</span>
-                    <span className="text-[11px] font-sans font-semibold uppercase tracking-[0.1em]">
-                      {PAYMENT_SYMBOL}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    {usualPerNft} {PAYMENT_SYMBOL} per NFT now
-                  </div>
-                </div>
 
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
-                    Discount price
-                  </div>
-                  <div
-                    className="flex items-baseline gap-1.5 font-mono text-[19px] font-semibold tracking-tight text-foreground leading-none tabular-nums"
-                    data-testid="whale-mock-discount-cost"
-                  >
-                    {amountWithSymbol(paidCost)}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    avg {avgPerNft} {PAYMENT_SYMBOL} per NFT
-                  </div>
-                </div>
-
-                <div className="pt-2.5 border-t border-[rgba(255,255,255,0.12)]">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
-                    You save
-                  </div>
-                  <div
-                    className="flex items-baseline gap-1.5 font-mono text-[19px] font-semibold tracking-tight leading-none tabular-nums"
-                    style={{ color: WHALE_DISCOUNT_CYAN }}
-                    data-testid="whale-mock-saving"
-                  >
-                    {saving}
-                    <span className="text-[11px] font-sans font-semibold uppercase tracking-[0.1em]">
-                      {PAYMENT_SYMBOL} · {savingPercent}%
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-1 max-w-[230px] leading-snug">
-                    Slightly more than {quote.effectivePercent}%, because
-                    discounted NFTs don't raise the mint price.
+                  <div className="pt-2.5 border-t border-[rgba(255,255,255,0.12)]">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
+                      You save
+                    </div>
+                    <div
+                      className="flex items-baseline gap-1.5 font-mono text-[19px] font-semibold tracking-tight leading-none tabular-nums"
+                      style={{ color: WHALE_DISCOUNT_CYAN }}
+                      data-testid="whale-mock-saving"
+                    >
+                      {saving}
+                      <span className="text-[11px] font-sans font-semibold uppercase tracking-[0.1em]">
+                        {PAYMENT_SYMBOL} · {savingPercent}%
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-1 max-w-[230px] leading-snug">
+                      Slightly more than {quote.effectivePercent}%, because
+                      discounted NFTs don't raise the mint price.
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
             ) : (
               <div className="flex flex-col gap-2" data-testid="whale-mock-no-discount">
                 {/* 2. Eyebrow + headline */}
