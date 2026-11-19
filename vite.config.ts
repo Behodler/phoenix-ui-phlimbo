@@ -20,6 +20,13 @@ export default defineConfig({
         target: 'https://phoenixdefi.app',
         changeOrigin: true,
       },
+      // history.json is written only by the phusd-history-indexer Lambda
+      // (lambda-history/) and lives only in S3, for the same reason as
+      // faq-data.json; see docs/HISTORY_DATA.md.
+      '/history.json': {
+        target: 'https://phoenixdefi.app',
+        changeOrigin: true,
+      },
     },
   },
 })
