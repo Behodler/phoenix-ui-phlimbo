@@ -9,6 +9,7 @@ import NFTListItem from './NFTListItem';
 import NFTListMintModal from './NFTListMintModal';
 import StakingSurfaceMock from './stakeMock/StakingSurfaceMock';
 import WhaleMockPanel from './whaleMock/WhaleMockPanel';
+import RecentBatchMints from './history/RecentBatchMints';
 import FeaturedProjectBanner from './featuredProject/FeaturedProjectBanner';
 
 export type NFTSubTab = 'mint' | 'stake' | 'whale-discount';
@@ -196,6 +197,11 @@ export default function NFTListTab({
         // desktop column instead of being re-capped at 4xl.
         <div className="max-w-4xl lg:max-w-none mx-auto">
           <WhaleMockPanel />
+          {/* Mainnet batch-mint history. Mounted beside the panel, not inside it, so it
+              renders even while the panel shows its loading card. */}
+          <div className="mt-3 rounded-lg border border-pxusd-teal-600 bg-pxusd-teal-800 px-4 pb-4 sm:px-5">
+            <RecentBatchMints divider={false} />
+          </div>
           {/* Promo for a project whose token is part of the nudge reward. */}
           <FeaturedProjectBanner />
         </div>

@@ -35,6 +35,10 @@ vi.mock('./whaleMock/WhaleMockPanel', () => ({
   default: () => <div data-testid="whale-mock-panel" />,
 }));
 
+vi.mock('./history/RecentBatchMints', () => ({
+  default: () => <div data-testid="recent-batch-mints" />,
+}));
+
 vi.mock('./featuredProject/FeaturedProjectBanner', () => ({
   default: () => <div data-testid="featured-project-banner" />,
 }));
@@ -79,5 +83,19 @@ describe('NFTListTab — sub-tabs', () => {
     // Banner second — DOCUMENT_POSITION_FOLLOWING is 4.
     expect(panel.compareDocumentPosition(banner) & 4).toBeTruthy();
     expect(screen.queryByTestId('staking-surface-mock')).toBeNull();
+  });
+
+  it('mounts Recent batch mints between the discount panel and the banner', () => {
+    render(<NFTListTab subTab="whale-discount" onSubTabChange={vi.fn()} />);
+    const panel = screen.getByTestId('whale-mock-panel');
+    const history = screen.getByTestId('recent-batch-mints');
+    const banner = screen.getByTestId('featured-project-banner');
+    expect(panel.compareDocumentPosition(history) & 4).toBeTruthy();
+    expect(history.compareDocumentPosition(banner) & 4).toBeTruthy();
+  });
+
+  it('does not mount Recent batch mints on the mint or stake sub-tabs', () => {
+    render(<NFTListTab subTab="mint" onSubTabChange={vi.fn()} />);
+    expect(screen.queryByTestId('recent-batch-mints')).toBeNull();
   });
 });

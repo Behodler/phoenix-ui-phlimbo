@@ -72,6 +72,11 @@ let bonfire: ForgeBonfireState;
 vi.mock('../../../hooks/useForgeAnnihilate', () => ({ useForgeAnnihilate: () => annihilate, ANNIHILATE_STABLE_ORDER: ['USDC', 'USDe', 'DOLA'] }));
 vi.mock('../../../hooks/useForgeHarvest', () => ({ useForgeHarvest: () => harvest }));
 vi.mock('../../../hooks/useForgeBonfire', () => ({ useForgeBonfire: () => bonfire }));
+// history.json failing to load: the Recent… sections show one muted line and the
+// tools above them must be unaffected.
+vi.mock('../../../hooks/useEventHistory', () => ({
+  useEventHistory: () => ({ history: null, isLoading: false, isUnavailable: true }),
+}));
 
 const BONFIRE = 'Burn NFTs for Antimatter';
 
@@ -97,6 +102,24 @@ function makeRow(key: string, title: string): ForgeRowDef {
 }
 
 describe('ForgeTab', () => {
+  it('mounts the Recent annihilations section under the Annihilate tool; a failed history fetch leaves the tool usable', () => {
+    render(<ForgeTab />);
+    const section = screen.getByTestId('history-annihilations');
+    expect(section).toHaveTextContent('Recent annihilations');
+    expect(section).toHaveTextContent('History unavailable right now');
+    // The tool still renders in full above it.
+    const preview = screen.getByText('Annihilation preview');
+    expect(preview.compareDocumentPosition(section) & 4).toBeTruthy();
+  });
+
+  it('mounts the Recent burns section under the Bonfire tool', async () => {
+    const user = userEvent.setup();
+    render(<ForgeTab />);
+    await user.click(screen.getByRole('button', { name: BONFIRE }));
+    expect(screen.getByTestId('history-bonfire-burns')).toHaveTextContent('History unavailable right now');
+    expect(screen.queryByTestId('history-annihilations')).not.toBeInTheDocument();
+  });
+
   it('renders the heading and sub copy', () => {
     render(<ForgeTab />);
     expect(screen.getByRole('heading', { name: 'Forge', level: 2 })).toBeInTheDocument();

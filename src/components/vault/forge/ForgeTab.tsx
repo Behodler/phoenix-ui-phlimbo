@@ -5,6 +5,8 @@ import AnnihilateTool from './AnnihilateTool';
 import HarvestTool from './HarvestTool';
 import BonfireTool from './BonfireTool';
 import BonfireFlameIcon from './BonfireFlameIcon';
+import RecentAnnihilations from '../history/RecentAnnihilations';
+import RecentBurns from '../history/RecentBurns';
 import { useBonfirePot, type BonfirePotClock } from './bonfirePotClock';
 import { fmt2, fmtPot2, fmtSigned4 } from './forgeFormat';
 import {
@@ -71,7 +73,13 @@ export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
       ) : (
         <ForgeStatusPill tone="antimatter">Ready</ForgeStatusPill>
       ),
-      body: <AnnihilateTool state={annihilate} />,
+      body: (
+        <>
+          <AnnihilateTool state={annihilate} />
+          {/* Mainnet history from /history.json; independent of the tool's own reads. */}
+          <RecentAnnihilations />
+        </>
+      ),
     },
     {
       key: 'harvest',
@@ -117,7 +125,12 @@ export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
       ) : (
         <ForgeStatusPill tone="fire">Burning</ForgeStatusPill>
       ),
-      body: <BonfireTool state={bonfire} />,
+      body: (
+        <>
+          <BonfireTool state={bonfire} />
+          <RecentBurns />
+        </>
+      ),
     },
   ];
   const rows = rowsOverride ?? builtInRows;
