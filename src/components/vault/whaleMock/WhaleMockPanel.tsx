@@ -10,7 +10,9 @@ import {
   type DiscountBatchBlocker,
   type DiscountBatchPhase,
 } from '../../../hooks/useDiscountBatchMinter';
+import { useNextDiscountNft } from '../../../hooks/useNextDiscountNft';
 import { computeDiscountDisplay } from '../../../utils/discountBatchMath';
+import NextDiscountNftProgress from './NextDiscountNftProgress';
 
 const NFT_COLLECTION_NAME = 'Liquid Sky Phoenix';
 
@@ -132,7 +134,7 @@ function LoadingCard() {
  * not shown.
  */
 export default function WhaleMockPanel() {
-  const { status, quote, config, bonus, payment, maxPaymentRaw, blocker, phase, mint } =
+  const { status, quote, config, fund, fundReadAtMs, bonus, payment, maxPaymentRaw, blocker, phase, mint } =
     useDiscountBatchMinter();
 
   const display = useMemo(
@@ -149,6 +151,18 @@ export default function WhaleMockPanel() {
         : undefined,
     [quote, config, payment]
   );
+
+  // Next-discount-NFT strip: loaded body, below the batch cap. The hook adds the
+  // fund checks (fund present, nextStepUSDC > 0).
+  const loaded = (status === 'ready' || status === 'no-discount') && !!quote && !!config && !!payment;
+  const belowCap = !(status === 'ready' && quote && config && quote.free >= config.maxFreePerBatch);
+  const nextNft = useNextDiscountNft({
+    enabled: loaded && belowCap,
+    fund,
+    fundReadAtMs,
+    p0Raw: payment?.priceRaw,
+    discountToken: config?.discountToken,
+  });
 
   if (status === 'unavailable' || status === 'loading' || !quote || !config || !payment || !display) {
     return <LoadingCard />;
@@ -496,6 +510,15 @@ export default function WhaleMockPanel() {
                 </span>
               ) : null}
             </div>
+
+            {/* 9. Next discount NFT progress (hidden at the cap). */}
+            {nextNft.visible && (
+              <NextDiscountNftProgress
+                fillPct={nextNft.fillPct}
+                secondsLeft={nextNft.secondsLeft}
+                paused={nextNft.paused}
+              />
+            )}
           </div>
         </div>
       </div>

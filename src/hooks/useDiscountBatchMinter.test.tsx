@@ -12,10 +12,12 @@ const BONUS = [
   '0x00000000000000000000000000000000000000b2',
 ] as const;
 const ONE = 10n ** 18n;
+const DISCOUNT_TOKEN = '0x00000000000000000000000000000000000000c6';
+const READ_AT_MS = 1_763_553_600_000;
 
 type Reads = readonly unknown[];
 
-/** previewBatch, previewBoost, discountPercent, cap, perPoint, maxBoost, dispatcherIndex, paused, bonusTokens. */
+/** previewBatch, previewBoost, discountPercent, cap, perPoint, maxBoost, dispatcherIndex, paused, bonusTokens, discountToken. */
 function reads({
   free = 12n,
   total = 24n,
@@ -30,6 +32,7 @@ function reads({
   dispatcherIndex = 4n,
   paused = false,
   bonus = BONUS as readonly string[],
+  discountToken = DISCOUNT_TOKEN as string,
 } = {}): Reads {
   return [
     [free, total, paid, paidCost, 0n, 999n * ONE, 7_000_000n],
@@ -41,6 +44,7 @@ function reads({
     dispatcherIndex,
     paused,
     bonus,
+    discountToken,
   ];
 }
 
@@ -50,6 +54,8 @@ const state = vi.hoisted(() => ({
   reads: undefined as Reads | undefined,
   freshReads: undefined as Reads | undefined,
   readsEnabled: [] as (boolean | undefined)[],
+  readContracts: [] as { functionName: string }[][],
+  dataUpdatedAt: 0,
   balance: undefined as bigint | undefined,
   allowance: 0n,
   receiptLogs: [] as unknown[],
@@ -76,12 +82,14 @@ vi.mock('wagmi', () => ({
   useAccount: () => ({ address: state.wallet }),
   usePublicClient: () => ({ waitForTransactionReceipt: fns.waitForTransactionReceipt, readContract: vi.fn() }),
   useWriteContract: () => ({ writeContractAsync: fns.writeContractAsync }),
-  useReadContracts: ({ query }: { query?: { enabled?: boolean } }) => {
+  useReadContracts: ({ contracts, query }: { contracts: { functionName: string }[]; query?: { enabled?: boolean } }) => {
     state.readsEnabled.push(query?.enabled);
-    // Mirrors wagmi: a disabled query never resolves data.
-    if (query?.enabled === false) return { data: undefined, refetch: vi.fn() };
+    state.readContracts.push(contracts);
+    // Mirrors wagmi: a disabled query never resolves data (and dataUpdatedAt stays 0).
+    if (query?.enabled === false) return { data: undefined, dataUpdatedAt: 0, refetch: vi.fn() };
     return {
       data: state.reads,
+      dataUpdatedAt: state.dataUpdatedAt,
       refetch: vi.fn(async () => {
         if (state.freshReads) state.reads = state.freshReads;
         return { data: state.reads };
@@ -151,6 +159,8 @@ beforeEach(() => {
   fns.readBonusAmounts.mockImplementation(async () => state.freshBonus);
   state.freshReads = undefined;
   state.readsEnabled = [];
+  state.readContracts = [];
+  state.dataUpdatedAt = READ_AT_MS;
   state.balance = 10_000n * ONE;
   state.allowance = 0n;
   state.receiptLogs = [batchMintedLog(12n, 12n)];
@@ -220,6 +230,29 @@ describe('useDiscountBatchMinter — reads', () => {
     state.balance = 1_210n * ONE; // covers paidCost (1,200) but not the 1,224 budget
     const { result } = renderHook(() => useDiscountBatchMinter());
     expect(result.current.blocker).toBe('insufficient-balance');
+  });
+
+  it('reads discountToken() in the same multicall and exposes it on config', () => {
+    const { result } = renderHook(() => useDiscountBatchMinter());
+    const names = state.readContracts.at(-1)?.map((c) => c.functionName);
+    expect(names?.at(-1)).toBe('discountToken');
+    expect(names).toContain('previewBatch');
+    expect(result.current.config?.discountToken).toBe(DISCOUNT_TOKEN);
+    // Existing fields are unchanged by the extra read.
+    expect(result.current.config?.bonusTokens).toEqual(BONUS);
+  });
+
+  it('exposes the fund and its read time (dataUpdatedAt) as fundReadAtMs', () => {
+    const { result } = renderHook(() => useDiscountBatchMinter());
+    expect(result.current.fund).toEqual({ potUsdRaw: 999n * ONE, nextStepUsdcRaw: 7_000_000n, reservedUsdcRaw: 1_000_000n });
+    expect(result.current.fundReadAtMs).toBe(READ_AT_MS);
+  });
+
+  it('fundReadAtMs is 0 before any read', () => {
+    state.minter = zeroAddress;
+    const { result } = renderHook(() => useDiscountBatchMinter());
+    expect(result.current.fund).toBeUndefined();
+    expect(result.current.fundReadAtMs).toBe(0);
   });
 
   it('maxPaymentFor adds 2%', () => {

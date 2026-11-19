@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import WhaleMockPanel from './WhaleMockPanel';
 import type { DiscountBatchMinterState } from '../../../hooks/useDiscountBatchMinter';
 import type { DiscountBonusTokensResult } from '../../../hooks/useDiscountBonusTokens';
+import type { NudgeStream } from '../../../hooks/useNudgeStreams';
 
 // ---------------------------------------------------------------------------
 // The panel's only data seam is useDiscountBatchMinter; the hook's own reads,
@@ -18,6 +19,42 @@ vi.mock('../../../hooks/useDiscountBatchMinter', () => ({
 }));
 
 const ONE = 10n ** 18n;
+const USDC_UNIT = 10n ** 6n;
+const WAD = 10n ** 18n;
+const DISCOUNT_TOKEN = '0x00000000000000000000000000000000000000C6';
+
+// The next-discount-NFT strip reads the stream through useNudgeStreams; the
+// real useNextDiscountNft hook (and its maths) runs on top of this seam.
+const streams = vi.hoisted(() => ({ value: [] as unknown[] }));
+vi.mock('../../../hooks/useNudgeStreams', () => ({
+  useNudgeStreams: () => ({
+    streams: streams.value,
+    minterAddress: undefined,
+    streamerAddress: undefined,
+    isLoading: false,
+    refetch: () => {},
+  }),
+}));
+
+/** 100 USDC per NFT over 12 h. Lower-case address: selection must be case-insensitive. */
+const RATE = (100n * USDC_UNIT * WAD) / 43_200n;
+function usdcStream(over: Partial<NudgeStream> = {}): NudgeStream {
+  return {
+    address: DISCOUNT_TOKEN.toLowerCase() as `0x${string}`,
+    symbol: 'USDC',
+    decimals: 6,
+    pendingRaw: 2n * USDC_UNIT,
+    durationSeconds: 30n * 86_400n,
+    bufferRaw: 1_000n * USDC_UNIT,
+    rewardPerSecondRaw: RATE,
+    isStreaming: true,
+    ...over,
+  };
+}
+const BONUS_STREAM = usdcStream({ address: '0x00000000000000000000000000000000000000b1', rewardPerSecondRaw: RATE * 1000n });
+
+/** 40 % into the next NFT at P0 = 100: 60 USDC to go → 7.2 h = 25,920 s at RATE. */
+const FUND = { potUsdRaw: 12n * 100n * ONE + 40n * ONE, nextStepUsdcRaw: 60n * USDC_UNIT, reservedUsdcRaw: 0n };
 
 /** Flat 100 USDS price makes every figure exact. */
 function live(overrides: {
@@ -54,8 +91,10 @@ function live(overrides: {
       dispatcherIndex: 4,
       paused,
       bonusTokens: [],
+      discountToken: DISCOUNT_TOKEN,
     },
     fund: undefined,
+    fundReadAtMs: 0,
     bonus: NO_BONUS,
     payment: {
       address: '0x00000000000000000000000000000000000000d5',
@@ -91,6 +130,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   hook.value = live();
   bonus.value = NO_BONUS;
+  streams.value = [BONUS_STREAM, usdcStream()];
 });
 
 describe('WhaleMockPanel — live figures', () => {
@@ -292,5 +332,151 @@ describe('WhaleMockPanel — discount fund and bonus tokens', () => {
   it('hides the bonus section when there are no bonus tokens', () => {
     render(<WhaleMockPanel />);
     expect(screen.queryByTestId('whale-mock-bonus')).toBeNull();
+  });
+});
+
+describe('WhaleMockPanel — next discount NFT strip', () => {
+  const NOW = Date.UTC(2026, 10, 19, 12, 0, 0);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const withFund = (over: Parameters<typeof live>[0] = {}, fund = FUND, fundReadAtMs = NOW) => ({
+    ...live(over),
+    fund,
+    fundReadAtMs,
+  });
+  const bar = () => screen.getByRole('progressbar', { name: 'Progress to the next discount NFT' });
+
+  it('shows in the ready state, below the CTA, with label, countdown and progressbar ARIA', () => {
+    hook.value = withFund();
+    const { container } = render(<WhaleMockPanel />);
+    const strip = screen.getByTestId('whale-next-nft');
+    expect(strip).toHaveTextContent('Next discount NFT');
+    // 60 USDC at 100 USDC / 12 h = 25,920 s (+1 s for the floored rate).
+    expect(screen.getByTestId('whale-next-nft-countdown').textContent).toMatch(/^07:12:0[01]$/);
+    expect(bar()).toHaveAttribute('aria-valuemin', '0');
+    expect(bar()).toHaveAttribute('aria-valuemax', '100');
+    expect(bar()).toHaveAttribute('aria-valuenow', '40');
+    expect(screen.getByTestId('whale-next-nft-countdown')).not.toHaveAttribute('aria-live');
+    expect(strip.closest('[aria-live]')).toBeNull();
+    // Mounted after the CTA.
+    expect(screen.getByTestId('whale-mock-cta').compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Out of the left explainer column.
+    expect(screen.getByTestId('whale-mock-explainer').contains(strip)).toBe(false);
+    // The fund size itself is still not shown.
+    expect(screen.queryByTestId('whale-mock-fund')).toBeNull();
+    expectNoForbiddenCopy(container);
+  });
+
+  it('shows in the no-discount state without breaking its no-amounts rules', () => {
+    hook.value = withFund({ free: 0, total: 0, paid: 0, effectivePercent: 0 });
+    const { container } = render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-next-nft')).toBeInTheDocument();
+    expect(visibleText(container)).not.toMatch(/USDS/);
+    expect(visibleText(container)).not.toMatch(/\d+\.\d\d/);
+    expectNoForbiddenCopy(container);
+  });
+
+  it('is absent at the batch cap', () => {
+    hook.value = withFund({ free: 50, total: 100, paid: 50 });
+    render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-mock-cap-sentence')).toBeInTheDocument();
+    expect(screen.queryByTestId('whale-next-nft')).toBeNull();
+  });
+
+  it('is absent with no fund, or nextStepUSDC == 0', () => {
+    hook.value = { ...live(), fund: undefined };
+    const { unmount } = render(<WhaleMockPanel />);
+    expect(screen.queryByTestId('whale-next-nft')).toBeNull();
+    unmount();
+    hook.value = withFund({}, { ...FUND, nextStepUsdcRaw: 0n });
+    render(<WhaleMockPanel />);
+    expect(screen.queryByTestId('whale-next-nft')).toBeNull();
+  });
+
+  it('is absent while loading', () => {
+    hook.value = { ...withFund(), status: 'loading', quote: undefined, config: undefined, payment: undefined };
+    render(<WhaleMockPanel />);
+    expect(screen.queryByTestId('whale-next-nft')).toBeNull();
+  });
+
+  it('stays visible when the minter is paused', () => {
+    hook.value = withFund({ paused: true });
+    render(<WhaleMockPanel />);
+    expect(screen.getByTestId('whale-next-nft')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['the buffer is short of the step', [usdcStream({ bufferRaw: 61n * USDC_UNIT, pendingRaw: 2n * USDC_UNIT })]],
+    ['the rate is 0', [usdcStream({ rewardPerSecondRaw: 0n, isStreaming: false })]],
+    ['there is no stream for the discount token', [BONUS_STREAM]],
+  ])('"Paused" in amber when %s, and the bar holds', (_, legs) => {
+    streams.value = legs;
+    hook.value = withFund();
+    render(<WhaleMockPanel />);
+    const countdown = screen.getByTestId('whale-next-nft-countdown');
+    expect(countdown).toHaveTextContent(/^Paused$/);
+    expect(countdown).toHaveStyle({ color: '#f0a24a' });
+    expect(screen.getByTestId('whale-next-nft-fill')).toHaveStyle({ background: '#b97a35' });
+    expect(bar()).toHaveAttribute('aria-valuenow', '40');
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(bar()).toHaveAttribute('aria-valuenow', '40');
+    expect(countdown).toHaveTextContent(/^Paused$/);
+  });
+
+  it('the countdown decrements every second and the bar fills between reads', () => {
+    hook.value = withFund();
+    render(<WhaleMockPanel />);
+    const countdown = screen.getByTestId('whale-next-nft-countdown');
+    const first = countdown.textContent;
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(countdown.textContent).not.toBe(first);
+    expect(countdown.textContent).toMatch(/^07:1(1:59|2:00)$/);
+    // An hour on: 1 h of 7.2 h of the remaining 60 % → 40 + 60/7.2 ≈ 48 %.
+    act(() => {
+      vi.advanceTimersByTime(3_600_000 - 1000);
+    });
+    expect(countdown.textContent).toMatch(/^06:12:0[01]$/);
+    expect(bar()).toHaveAttribute('aria-valuenow', '48');
+  });
+
+  it('runs down to 00:00:00 with a full bar and holds there until the next read', () => {
+    hook.value = withFund();
+    render(<WhaleMockPanel />);
+    act(() => {
+      vi.advanceTimersByTime(8 * 3_600_000);
+    });
+    expect(screen.getByTestId('whale-next-nft-countdown')).toHaveTextContent('00:00:00');
+    expect(bar()).toHaveAttribute('aria-valuenow', '100');
+  });
+
+  it('after a mint the refetched fund (pot below P0) resets the bar toward 0 and re-anchors the clock', () => {
+    hook.value = withFund();
+    const { rerender } = render(<WhaleMockPanel />);
+    act(() => {
+      vi.advanceTimersByTime(3_600_000);
+    });
+    expect(bar()).toHaveAttribute('aria-valuenow', '48');
+
+    // The mint reserved the whole pot, partial step included: a dust pot, a full step to go.
+    const readAt = Date.now();
+    hook.value = withFund({ free: 0, total: 0, paid: 0, effectivePercent: 0 }, {
+      potUsdRaw: 10n ** 12n,
+      nextStepUsdcRaw: 100n * USDC_UNIT,
+      reservedUsdcRaw: 0n,
+    }, readAt);
+    rerender(<WhaleMockPanel />);
+    expect(bar()).toHaveAttribute('aria-valuenow', '0');
+    expect(screen.getByTestId('whale-next-nft-countdown').textContent).toMatch(/^12:00:0[01]$/);
   });
 });

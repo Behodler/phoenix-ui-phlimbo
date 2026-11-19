@@ -81,9 +81,11 @@ export interface DiscountBatchConfig {
   dispatcherIndex: number;
   paused: boolean;
   bonusTokens: readonly Address[];
+  /** `discountToken()`: the token the nudge stream funds the discount with (USDC on mainnet). */
+  discountToken: Address;
 }
 
-/** The discount fund, from `previewBatch()` / `previewBoost()`. Admin display only. */
+/** The discount fund, from `previewBatch()` / `previewBoost()`. Never shown as a figure; drives the next-discount-NFT strip. */
 export interface DiscountFund {
   /** `previewBatch().potUSD`: the pot in USD (18 dp), net of the PSM `tin`. */
   potUsdRaw: bigint;
@@ -109,6 +111,11 @@ export interface DiscountBatchMinterState {
   quote: DiscountBatchQuote | undefined;
   config: DiscountBatchConfig | undefined;
   fund: DiscountFund | undefined;
+  /**
+   * When `fund` was read (`dataUpdatedAt` of the multicall, ms since epoch).
+   * Anchor for extrapolating the fund between reads. 0 before the first read.
+   */
+  fundReadAtMs: number;
   /** Bonus tokens the batch pays out on top of the NFTs (polled, display only). */
   bonus: DiscountBonusTokensResult;
   payment: DiscountBatchPayment | undefined;
@@ -131,6 +138,7 @@ type ReadTuple = readonly [
   bigint,
   boolean,
   readonly Address[],
+  Address,
 ];
 
 function toQuote(reads: ReadTuple): DiscountBatchQuote {
@@ -168,7 +176,8 @@ function toQuote(reads: ReadTuple): DiscountBatchQuote {
  * advertised bonus or reverts.
  *
  * The fund figures (`potUSD`, `nextStepUSDC`, `reservedUSDC`) are returned as
- * `fund` for the admin-only panel.
+ * `fund`, with the read time as `fundReadAtMs`. The panel never shows the fund
+ * size; it only drives the next-discount-NFT progress strip from them.
  */
 export function useDiscountBatchMinter(): DiscountBatchMinterState {
   const { address: wallet } = useAccount();
@@ -185,7 +194,7 @@ export function useDiscountBatchMinter(): DiscountBatchMinterState {
   const refetchInterval = isPollingEnabled ? DISCOUNT_BATCH_REFRESH_INTERVAL_MS : false;
 
   const contract = { address: minter, abi: batchNftMinterNudgeDiscountAbi } as const;
-  const { data: readsRaw, refetch: refetchReads } = useReadContracts({
+  const { data: readsRaw, dataUpdatedAt: fundReadAtMs = 0, refetch: refetchReads } = useReadContracts({
     contracts: [
       { ...contract, functionName: 'previewBatch' },
       { ...contract, functionName: 'previewBoost' },
@@ -196,6 +205,7 @@ export function useDiscountBatchMinter(): DiscountBatchMinterState {
       { ...contract, functionName: 'dispatcherIndex' },
       { ...contract, functionName: 'paused' },
       { ...contract, functionName: 'getBonusTokens' },
+      { ...contract, functionName: 'discountToken' },
     ],
     allowFailure: false,
     query: { enabled: active, refetchInterval },
@@ -212,6 +222,7 @@ export function useDiscountBatchMinter(): DiscountBatchMinterState {
       dispatcherIndex: Number(reads[6]),
       paused: reads[7],
       bonusTokens: reads[8],
+      discountToken: reads[9],
     };
   }, [reads]);
 
@@ -414,6 +425,7 @@ export function useDiscountBatchMinter(): DiscountBatchMinterState {
     quote,
     config,
     fund,
+    fundReadAtMs,
     bonus,
     payment,
     maxPaymentRaw,
