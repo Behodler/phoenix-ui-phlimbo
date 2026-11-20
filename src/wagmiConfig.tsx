@@ -81,8 +81,25 @@ const connectors = connectorsForWallets(
   }
 )
 
+/**
+ * Chain order, by build mode (story 101).
+ *
+ * Before a wallet connects, wagmi's `useChainId()` reports `chains[0]`, and
+ * ContractAddressContext picks its address source from that id. Anvil first
+ * would make every unconnected production visitor try to fetch
+ * `http://localhost:3001/contracts`, so production builds put mainnet first.
+ * Dev (`yarn dev`) keeps Anvil first so the local workflow is unchanged.
+ * Both lists hold the same chains, so every transport below stays in use.
+ */
+const DEV_CHAINS = [anvil, sepolia, arbitrum, mainnet] as const
+const PROD_CHAINS = [mainnet, sepolia, arbitrum, anvil] as const
+
+export function chainsForMode(isDev: boolean) {
+  return isDev ? DEV_CHAINS : PROD_CHAINS
+}
+
 export const wagmiConfig = createConfig({
-  chains: [anvil, sepolia, arbitrum, mainnet],
+  chains: chainsForMode(import.meta.env.DEV),
   connectors,
   transports: {
     [anvil.id]: http('http://127.0.0.1:8545'),
