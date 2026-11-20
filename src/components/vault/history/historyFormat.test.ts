@@ -124,7 +124,7 @@ describe('summaries', () => {
     expect(s.freeTotal).toBe(27n);
     expect(s.avgDiscountPercent).toBe(45); // 27 / 60
     expect(s.firstTimestamp).toBe(fixture.batchMints[0].timestamp);
-    expect(formatTokenAmount(fixture.batchMints[1].paidCost, 6)).toBe('2,412.00');
+    expect(formatTokenAmount(fixture.batchMints[1].paidCost, 18)).toBe('2,412.00');
 
     const empty = summarizeBatchMints([]);
     expect(empty).toMatchObject({ batches: 0, mintedTotal: 0n, freeTotal: 0n, avgDiscountPercent: 0, firstTimestamp: null });

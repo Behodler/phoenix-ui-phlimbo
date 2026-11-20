@@ -8,8 +8,8 @@ export const HISTORY_PAGE_SIZE = 5;
 
 export const ANTIMATTER_DECIMALS = 18;
 export const PHUSD_DECIMALS = 18;
-/** The discount batch minter's pot is USDC. */
-export const BATCH_MINT_USDC_DECIMALS = 6;
+/** Batch mints are paid in USDS (18 dp); only the discount pot is USDC. */
+export const BATCH_MINT_PAYMENT_DECIMALS = 18;
 
 /** Antimatter purple, as used by the Forge Annihilate row metric. */
 export const ANTIMATTER_COLOR = '#C4AEEA';

@@ -129,7 +129,7 @@ describe('RecentBatchMints', () => {
 
     const cards = within(screen.getByTestId('history-cards')).getAllByTestId('history-card');
     expect(cards[0]).toHaveTextContent('30 NFTs · 12 free');
-    expect(cards[0]).toHaveTextContent('2,412.00 USDC');
+    expect(cards[0]).toHaveTextContent('2,412.00 USDS');
     expect(cards[0]).toHaveTextContent('6h ago · 40% off');
   });
 

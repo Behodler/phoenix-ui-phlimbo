@@ -12,7 +12,7 @@ import RecentHistorySection, {
   SummaryLine,
 } from './RecentHistorySection';
 import {
-  BATCH_MINT_USDC_DECIMALS,
+  BATCH_MINT_PAYMENT_DECIMALS,
   FREE_GREEN,
   discountPercent,
   formatCount,
@@ -74,7 +74,7 @@ export default function RecentBatchMints({ divider = true }: { divider?: boolean
             free: formatCount(free),
             paid: formatCount(paid),
             total: formatCount(free + paid),
-            cost: formatTokenAmount(r.paidCost, BATCH_MINT_USDC_DECIMALS),
+            cost: formatTokenAmount(r.paidCost, BATCH_MINT_PAYMENT_DECIMALS),
             disc: `${discountPercent(free, paid)}%`,
           };
         });
@@ -87,7 +87,7 @@ export default function RecentBatchMints({ divider = true }: { divider?: boolean
                 { label: 'Recipient' },
                 { label: 'Free', align: 'right' },
                 { label: 'Paid', align: 'right' },
-                { label: 'Cost · USDC', align: 'right' },
+                { label: 'Cost · USDS', align: 'right' },
                 { label: 'Disc.', align: 'right' },
               ]}
             >
@@ -116,7 +116,7 @@ export default function RecentBatchMints({ divider = true }: { divider?: boolean
                       <span style={{ color: FREE_GREEN }}>· {free} free</span>
                     </>
                   }
-                  line1Right={<span className="font-semibold">{cost} USDC</span>}
+                  line1Right={<span className="font-semibold">{cost} USDS</span>}
                   line2Left={<AddressLink address={r.recipient} />}
                   line2Right={
                     <AgeLink timestamp={r.timestamp} txHash={r.txHash} nowMs={nowMs} suffix={` · ${disc} off`} />

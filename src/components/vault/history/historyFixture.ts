@@ -45,8 +45,8 @@ export function makeHistoryFixture(overrides: Partial<EventHistory> = {}): Event
       { txHash: tx(12), logIndex: 7, blockNumber: 600, timestamp: NOW_S - 2 * HOUR, user: ALICE, source: 'forge', stable: USDS, amount: '75500000000000000000', stableAmount: '75530000000000000000', phUSDAmount: '151030000000000000000' },
     ],
     batchMints: [
-      { txHash: tx(20), logIndex: 0, blockNumber: 700, timestamp: NOW_S - DAY, recipient: BOB, payer: BOB, free: '15', paid: '15', paidCost: '1980500000', potReservedUSDC: '0', owedAdded: '0' },
-      { txHash: tx(21), logIndex: 0, blockNumber: 800, timestamp: NOW_S - 6 * HOUR, recipient: ALICE, payer: ALICE, free: '12', paid: '18', paidCost: '2412000000', potReservedUSDC: '0', owedAdded: '0' },
+      { txHash: tx(20), logIndex: 0, blockNumber: 700, timestamp: NOW_S - DAY, recipient: BOB, payer: BOB, free: '15', paid: '15', paidCost: '1980500000000000000000', potReservedUSDC: '0', owedAdded: '0' },
+      { txHash: tx(21), logIndex: 0, blockNumber: 800, timestamp: NOW_S - 6 * HOUR, recipient: ALICE, payer: ALICE, free: '12', paid: '18', paidCost: '2412000000000000000000', potReservedUSDC: '0', owedAdded: '0' },
     ],
     ...overrides,
   };

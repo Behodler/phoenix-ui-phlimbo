@@ -52,7 +52,7 @@ export interface BatchMintRow extends HistoryRowBase {
   payer: string;
   free: string;
   paid: string;
-  /** USDC, 6 dp. */
+  /** USDS (the payment token), 18 dp. */
   paidCost: string;
   potReservedUSDC: string;
   owedAdded: string;
