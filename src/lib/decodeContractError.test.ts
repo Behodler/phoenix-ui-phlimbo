@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { BaseError, ContractFunctionRevertedError, encodeErrorResult, zeroAddress } from 'viem';
 import { batchNftMinterNudgeDiscountAbi } from '@behodler/phase2-wagmi-hooks';
 import { decodeContractError } from './decodeContractError';
+import { BOOSTER_WRITE_ABI } from '../hooks/useForgeAnnihilateBoost';
 
 const abi = batchNftMinterNudgeDiscountAbi;
 
@@ -41,4 +42,35 @@ describe('decodeContractError — BatchNFTMinterNudgeDiscount', () => {
     const decoded = decodeContractError(revert('BatchMint__ZeroCap'));
     expect(decoded.message).toBe('Reverted with BatchMint__ZeroCap.');
   });
+});
+
+describe('decodeContractError — AntimatterBooster (merged with Antimatter errors)', () => {
+  function boosterRevert(errorName: string, args: readonly unknown[] = []): BaseError {
+    const data = encodeErrorResult({
+      abi: BOOSTER_WRITE_ABI,
+      errorName,
+      args,
+    } as unknown as Parameters<typeof encodeErrorResult>[0]);
+    const inner = new ContractFunctionRevertedError({ abi: BOOSTER_WRITE_ABI, data, functionName: 'boostedAnnihilate' });
+    return new BaseError('Execution reverted', { cause: inner });
+  }
+
+  const cases: [string, readonly unknown[], RegExp][] = [
+    ['AboveThreshold', [1n, 2n], /no longer low on protocol-owned liquidity/i],
+    ['NotTracked', [zeroAddress], /not tracked by the booster/i],
+    ['UnsupportedStable', [zeroAddress], /not supported by the booster/i],
+    ['BoostDisabled', [], /boost is switched off/i],
+    ['PhUSDMinterNotSet', [], /no phUSD minter configured/i],
+    ['InsufficientPhUSDOut', [5n, 4n], /exchange rate moved/i],
+    // Antimatter-internal: only decodable because Antimatter's errors are merged in.
+    ['AmountNotRepresentable', [1n, 6], /finer than the stablecoin/i],
+  ];
+
+  for (const [name, args, message] of cases) {
+    it(`maps ${name}`, () => {
+      const decoded = decodeContractError(boosterRevert(name, args));
+      expect(decoded.errorName).toBe(name);
+      expect(decoded.message).toMatch(message);
+    });
+  }
 });

@@ -18,6 +18,7 @@ import {
 } from '../../../data/forgeMockData';
 import { log } from '../../../utils/logger';
 import { useForgeAnnihilate } from '../../../hooks/useForgeAnnihilate';
+import { useForgeAnnihilateBoost } from '../../../hooks/useForgeAnnihilateBoost';
 import { useForgeHarvest } from '../../../hooks/useForgeHarvest';
 import { useForgeBonfire } from '../../../hooks/useForgeBonfire';
 import antimatterIcon from '../../../assets/antimatter.png';
@@ -92,10 +93,10 @@ export default function ForgeTab({ rows: rowsOverride, canSeeBoostMock = false }
       key: 'annihilateBoostMock',
       icon: <img src={antimatterIcon} alt="" aria-hidden="true" className="h-9 w-9 rounded-full" />,
       title: 'Annihilate Antimatter (boost preview) - only visible to admins',
-      tagline: 'Mock: opt-in phUSD boost when a stablecoin is low on POC',
+      tagline: 'Opt-in phUSD boost when a stablecoin is low on POC',
       metric: <span style={{ color: '#C4AEEA' }}>{fmt2(annihilate.walletAntimatter)}</span>,
       metricLabel: 'Your Antimatter',
-      pill: <ForgeStatusPill tone="neutral">Mock</ForgeStatusPill>,
+      pill: <ForgeStatusPill tone="neutral">Admin</ForgeStatusPill>,
       body: <AnnihilateBoostMockBody />,
     },
     {
@@ -216,13 +217,15 @@ function writeStoredOpenKey(key: string | null): void {
 }
 
 /**
- * The boost mock's own `useForgeAnnihilate` instance, so its pair and amount
- * are independent of the real row. Mounted only while the (admin-only) row is
- * open; the instance's writes are never called.
+ * The boost row's own `useForgeAnnihilate` instance (so its pair and amount are
+ * independent of the real row, and it drives the boost-off path), composed with
+ * `useForgeAnnihilateBoost` for the AntimatterBooster reads and writes. Mounted
+ * only while the (admin-only) row is open.
  */
 function AnnihilateBoostMockBody() {
   const state = useForgeAnnihilate();
-  return <AnnihilateBoostMockTool state={state} />;
+  const boost = useForgeAnnihilateBoost(state);
+  return <AnnihilateBoostMockTool state={state} boost={boost} />;
 }
 
 /** Live Bonfire pot for the row header; reads the same clock as the row body. */

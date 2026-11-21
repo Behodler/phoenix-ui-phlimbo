@@ -1,39 +1,38 @@
 import { useCallback, useState } from 'react';
 import AmountInput from '../../ui/AmountInput';
 import ActionButton from '../../ui/ActionButton';
-import { useToast } from '../../ui/ToastProvider';
 import ForgeTokenSelectorModal, { type ForgeTokenOption } from './ForgeTokenSelectorModal';
 import { Glyph, PreviewCell, PreviewRow } from './AnnihilateTool';
 import { ANTIMATTER_LAVENDER, STABLE_META } from './annihilateMeta';
 import { AMOUNT_INPUT_PATTERN, floorTo, fmt2, toInputString } from './forgeFormat';
-import { FORGE_BOOST_MOCK } from '../../../data/forgeMockData';
 import {
   ANNIHILATE_STABLE_ORDER,
   type AnnihilateStableSymbol,
   type ForgeAnnihilateState,
 } from '../../../hooks/useForgeAnnihilate';
+import type { ForgeAnnihilateBoostState } from '../../../hooks/useForgeAnnihilateBoost';
 
 const BOOST_GREEN = '#4ade80';
 const BOOST_TINT = { color: BOOST_GREEN, borderColor: 'rgba(74,222,128,.35)', background: 'rgba(74,222,128,.07)' };
 
-export const BOOST_MOCK_TOAST = 'Boosted annihilation is mocked on this page. Nothing was sent.';
-
 export interface AnnihilateBoostMockToolProps {
   /**
-   * Live balances, price, gate and quote from a `useForgeAnnihilate` instance of
-   * the mock row's own, so its pair and amount are independent of the real row.
-   * Its `approve` / `annihilate` writes are never called.
+   * The row's own `useForgeAnnihilate` instance, so its pair and amount are
+   * independent of the real row. Drives the boost-off path (approve the stable
+   * to Antimatter, then `Antimatter.annihilate`).
    */
   state: ForgeAnnihilateState;
+  /** `useForgeAnnihilateBoost(state)`: the AntimatterBooster reads and writes. */
+  boost: ForgeAnnihilateBoostState;
 }
 
 /**
  * Body of the admin-only "Annihilate Antimatter (boost preview)" Forge row.
- * MOCK: reproduces the real AnnihilateTool, plus an opt-in phUSD boost for
- * stables low in protocol-owned liquidity. Eligibility and percentage come from
- * `FORGE_BOOST_MOCK`; everything else is live. It never sends a transaction.
+ * Presentational. With the boost off it is a complete plain annihilate row; with
+ * it on it routes through `AntimatterBooster.boostedAnnihilate`. Eligibility,
+ * percentage and the boosted quote are all live `AntimatterBooster` reads.
  */
-export default function AnnihilateBoostMockTool({ state }: AnnihilateBoostMockToolProps) {
+export default function AnnihilateBoostMockTool({ state, boost }: AnnihilateBoostMockToolProps) {
   const {
     amount,
     setAmount,
@@ -46,16 +45,21 @@ export default function AnnihilateBoostMockTool({ state }: AnnihilateBoostMockTo
     priceGated,
     phusdOut: quotedOut,
     minPhusdOut,
+    needsApproval,
+    pendingAction: basePending,
   } = state;
-  const { addToast } = useToast();
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [boostOn, setBoostOn] = useState(false);
 
-  const { eligible, boostPct } = FORGE_BOOST_MOCK;
-  const isEligible = (s: AnnihilateStableSymbol) => eligible.includes(s);
+  const bps = boost.boostBps ?? 0;
+  const pctLabel = boost.boostPct !== null ? `+${boost.boostPct}%` : '+…%';
+  const isEligible = boost.isEligible;
   const selectedEligible = isEligible(stable);
-  const boostTarget = eligible[0];
-  const boostActive = selectedEligible && boostOn;
+  const boostTarget = boost.eligibleStables[0];
+  const unavailable = boost.unavailableReason;
+  // The toggle can always be switched OFF; it can only be switched ON while the boost is available.
+  const switchDisabled = !boostOn && unavailable !== null;
+  const boostActive = boostOn;
 
   const stableBalance = stableBalances[stable];
   const meta = STABLE_META[stable];
@@ -69,19 +73,21 @@ export default function AnnihilateBoostMockTool({ state }: AnnihilateBoostMockTo
   const over = overAntimatter || overStable;
 
   // Every displayed phUSD figure is floored: round in favour of the protocol.
-  const base = floorTo(amt > 0 ? (quotedOut ?? 2 * amt) : 0, 2);
-  const potentialBonus = floorTo((base * boostPct) / 100, 2);
+  const plainBase = amt > 0 ? (quotedOut ?? 2 * amt) : 0;
+  const base = floorTo(amt > 0 ? (boost.expectedBase ?? plainBase) : 0, 2);
+  const potentialBonus = floorTo(amt > 0 ? (boost.expectedBonus ?? (base * bps) / 10_000) : 0, 2);
   const bonus = boostActive ? potentialBonus : 0;
-  const out = floorTo(base + bonus, 2);
+  const out = boostActive ? floorTo(base + bonus, 2) : floorTo(plainBase, 2);
   const displayPrice = price ?? 1;
   const netValue = out * displayPrice - amt;
-  const realMin = amt > 0 && minPhusdOut !== null ? minPhusdOut : 0;
-  const minReceived = floorTo(boostActive ? realMin * (1 + boostPct / 100) : realMin, 2);
+  const plainMin = amt > 0 && minPhusdOut !== null ? minPhusdOut : 0;
+  const boostMin = amt > 0 && boost.minPhusdOut !== null ? boost.minPhusdOut : 0;
+  const minReceived = floorTo(boostActive ? boostMin : plainMin, 2);
 
-  // Hint: what the boost would add on this amount if the user paired with the target instead.
+  // Hint: a client-side estimate of what the boost would add on this amount if paired with the target.
   const hintBase =
     boostTarget !== undefined ? Math.min(amt, antimatterBalance, stableBalances[boostTarget]) : 0;
-  const hintBonus = floorTo((Math.max(0, hintBase) * 2 * boostPct) / 100, 2);
+  const hintBonus = floorTo((Math.max(0, hintBase) * 2 * bps) / 10_000, 2);
   const showHint = boostTarget !== undefined && !selectedEligible;
 
   const selectStable = (s: AnnihilateStableSymbol) => {
@@ -102,23 +108,68 @@ export default function AnnihilateBoostMockTool({ state }: AnnihilateBoostMockTo
   const fillMax = () => setAmount(maxAmount > 0 ? toInputString(maxAmount) : '');
   const closeSelector = useCallback(() => setSelectorOpen(false), []);
 
-  // MOCK: the CTA never touches approve/annihilate or any other write.
-  const mockAction = () =>
-    addToast({ type: 'info', title: 'Mock only', description: BOOST_MOCK_TOAST, duration: 8000 });
+  const busy = basePending !== null || boost.pendingAction !== null;
+  const noop = () => {};
 
-  let button: { label: string; disabled: boolean };
-  if (gated) button = { label: gateReason, disabled: true };
-  else if (amt <= 0) button = { label: 'Enter Amount', disabled: true };
-  else if (over) button = { label: 'Insufficient Balance', disabled: true };
-  else if (boostActive) button = { label: `Annihilate with +${boostPct}% boost`, disabled: false };
-  else button = { label: `Annihilate → receive ${fmt2(out)} phUSD`, disabled: false };
+  let button: { label: string; disabled: boolean; variant: 'primary' | 'approve'; onAction: () => void };
+  if (gated) button = { label: gateReason, disabled: true, variant: 'primary', onAction: noop };
+  else if (amt <= 0) button = { label: 'Enter Amount', disabled: true, variant: 'primary', onAction: noop };
+  else if (over) button = { label: 'Insufficient Balance', disabled: true, variant: 'primary', onAction: noop };
+  else if (boostActive) {
+    if (unavailable !== null) {
+      // No silent fallback to plain annihilation: the user switches the boost off themselves.
+      button = { label: `Boost unavailable: ${unavailable}`, disabled: true, variant: 'primary', onAction: noop };
+    } else if (boost.needsAmApproval) {
+      button = {
+        label: boost.pendingAction === 'approveAntimatter' ? 'Approving Antimatter…' : 'Approve Antimatter',
+        disabled: busy,
+        variant: 'approve',
+        onAction: () => void boost.approveAntimatter(),
+      };
+    } else if (boost.needsStableApproval) {
+      button = {
+        label: boost.pendingAction === 'approveStable' ? `Approving ${stable}…` : `Approve ${stable}`,
+        disabled: busy,
+        variant: 'approve',
+        onAction: () => void boost.approveStable(),
+      };
+    } else if (boost.quoteLoading || boost.minOutWei === undefined) {
+      button = { label: 'Fetching quote…', disabled: true, variant: 'primary', onAction: noop };
+    } else {
+      button = {
+        label:
+          boost.pendingAction === 'boostedAnnihilate'
+            ? 'Annihilating…'
+            : `Annihilate with ${pctLabel} boost → receive ${fmt2(out)} phUSD`,
+        disabled: busy,
+        variant: 'primary',
+        onAction: () => void boost.boostedAnnihilate(),
+      };
+    }
+  } else if (needsApproval) {
+    button = {
+      label: basePending === 'approve' ? `Approving ${stable}…` : `Approve ${stable}`,
+      disabled: busy,
+      variant: 'approve',
+      onAction: () => void state.approve(),
+    };
+  } else if (quotedOut === null) {
+    button = { label: 'Fetching quote…', disabled: true, variant: 'primary', onAction: noop };
+  } else {
+    button = {
+      label: basePending === 'annihilate' ? 'Annihilating…' : `Annihilate → receive ${fmt2(out)} phUSD`,
+      disabled: busy,
+      variant: 'primary',
+      onAction: () => void state.annihilate(),
+    };
+  }
 
   const tokenOptions: ForgeTokenOption<AnnihilateStableSymbol>[] = ANNIHILATE_STABLE_ORDER.map((symbol) => ({
     symbol,
     name: STABLE_META[symbol].name,
     icon: STABLE_META[symbol].icon,
     balance: stableBalances[symbol],
-    badge: isEligible(symbol) ? `+${boostPct}% boost` : undefined,
+    badge: isEligible(symbol) ? `${pctLabel} boost` : undefined,
   }));
 
   const fieldLabel = 'text-[12px] font-semibold uppercase tracking-[0.04em] text-muted-foreground';
@@ -164,7 +215,7 @@ export default function AnnihilateBoostMockTool({ state }: AnnihilateBoostMockTo
               style={{ borderColor: BOOST_TINT.borderColor, background: BOOST_TINT.background }}
             >
               <span>
-                {boostTarget} is boosted right now: pair with it for +{boostPct}% phUSD
+                {boostTarget} is boosted right now: pair with it for {pctLabel} phUSD
                 {hintBonus > 0 && ` (+${fmt2(hintBonus)} on this amount)`}
               </span>
               <span className="whitespace-nowrap font-semibold" style={{ color: BOOST_GREEN }}>
@@ -174,45 +225,51 @@ export default function AnnihilateBoostMockTool({ state }: AnnihilateBoostMockTo
           )}
         </div>
 
-        {selectedEligible && (
-          <div
-            data-testid="boost-card"
-            className="rounded-xl border p-3.5"
-            style={{ borderColor: BOOST_TINT.borderColor, background: BOOST_TINT.background }}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-foreground">phUSD boost</span>
-                <span
-                  className="whitespace-nowrap rounded-full border px-2 py-[1px] text-[10.5px] font-bold tracking-[0.04em]"
-                  style={BOOST_TINT}
-                >
-                  +{boostPct}%
-                </span>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={boostOn}
-                aria-label="Apply phUSD boost"
-                onClick={() => setBoostOn((on) => !on)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-phoenix-primary focus:ring-offset-2 focus:ring-offset-background ${
-                  boostOn ? 'bg-phoenix-primary' : 'bg-gray-600'
-                }`}
+        <div
+          data-testid="boost-card"
+          className="rounded-xl border p-3.5"
+          style={{ borderColor: BOOST_TINT.borderColor, background: BOOST_TINT.background }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">phUSD boost</span>
+              <span
+                className="whitespace-nowrap rounded-full border px-2 py-[1px] text-[10.5px] font-bold tracking-[0.04em]"
+                style={BOOST_TINT}
               >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out ${
-                    boostOn ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+                {pctLabel}
+              </span>
             </div>
-            <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-              {stable} is running low in protocol-owned liquidity. Pair with it now and receive {boostPct}% extra phUSD.
-              Optional: the boosted route uses more gas.
-            </p>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={boostOn}
+              aria-label="Apply phUSD boost"
+              disabled={switchDisabled}
+              onClick={() => setBoostOn((on) => !on)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-phoenix-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${
+                boostOn ? 'bg-phoenix-primary' : 'bg-gray-600'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out ${
+                  boostOn ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
           </div>
-        )}
+          {unavailable === null ? (
+            <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+              {stable} is running low in protocol-owned liquidity. Pair with it now and receive {boost.boostPct}% extra
+              phUSD. Optional: the boosted route uses more gas.
+            </p>
+          ) : (
+            <p data-testid="boost-unavailable" className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+              {unavailable}
+              {boostOn && '. Switch the boost off to annihilate without it.'}
+            </p>
+          )}
+        </div>
 
         <div className="flex items-center justify-between gap-2">
           <span className={fieldLabel}>Antimatter to annihilate</span>
@@ -282,7 +339,7 @@ export default function AnnihilateBoostMockTool({ state }: AnnihilateBoostMockTo
                   className="absolute right-2 top-2 whitespace-nowrap rounded-full border px-1.5 py-[1px] text-[10px] font-bold"
                   style={BOOST_TINT}
                 >
-                  +{boostPct}%
+                  {pctLabel}
                 </span>
               )}
             </div>
@@ -292,12 +349,12 @@ export default function AnnihilateBoostMockTool({ state }: AnnihilateBoostMockTo
             {boostActive && (
               <>
                 <PreviewRow label="Base (2×)">{fmt2(base)} phUSD</PreviewRow>
-                <PreviewRow label={`${stable} boost (+${boostPct}%)`}>
+                <PreviewRow label={`${stable} boost (${pctLabel})`}>
                   <span style={{ color: BOOST_GREEN }}>+{fmt2(bonus)} phUSD</span>
                 </PreviewRow>
               </>
             )}
-            {selectedEligible && !boostOn && amt > 0 && (
+            {unavailable === null && !boostOn && amt > 0 && (
               <div data-testid="boost-not-applied" className="flex items-center justify-between gap-3 opacity-60">
                 <span className="text-muted-foreground">Boost available, not applied</span>
                 <span className="text-right font-mono tabular-nums text-muted-foreground">
@@ -331,10 +388,15 @@ export default function AnnihilateBoostMockTool({ state }: AnnihilateBoostMockTo
           </div>
         )}
 
-        <ActionButton disabled={button.disabled} onAction={mockAction} label={button.label} variant="primary" />
+        <ActionButton
+          disabled={button.disabled}
+          onAction={button.onAction}
+          label={button.label}
+          variant={button.variant}
+        />
         <p className="mt-2 text-center text-[11.5px] text-muted-foreground">
           {boostActive
-            ? `Irreversible. Boosted route: higher gas, ${boostPct}% more phUSD.`
+            ? `Irreversible. Boosted route: higher gas, ${boost.boostPct ?? '…'}% more phUSD.`
             : 'Irreversible. Both halves are consumed in one transaction.'}
         </p>
       </div>

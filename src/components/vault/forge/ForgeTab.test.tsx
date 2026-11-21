@@ -5,6 +5,7 @@ import ForgeTab, { type ForgeRowDef } from './ForgeTab';
 import { FORGE_DEFAULT_OPEN, FORGE_OPEN_ROW_STORAGE_KEY } from '../../../data/forgeMockData';
 import type { ForgeAnnihilateState } from '../../../hooks/useForgeAnnihilate';
 import type { ForgeHarvestState } from '../../../hooks/useForgeHarvest';
+import type { ForgeAnnihilateBoostState } from '../../../hooks/useForgeAnnihilateBoost';
 import type { ForgeBonfireState } from '../../../hooks/useForgeBonfire';
 import { createBonfirePotClock } from './bonfirePotClock';
 
@@ -71,6 +72,31 @@ let harvest: ForgeHarvestState;
 let bonfire: ForgeBonfireState;
 vi.mock('../../../hooks/useForgeAnnihilate', () => ({ useForgeAnnihilate: () => annihilate, ANNIHILATE_STABLE_ORDER: ['USDC', 'USDe', 'DOLA'] }));
 vi.mock('../../../hooks/useForgeHarvest', () => ({ useForgeHarvest: () => harvest }));
+const boostState = (): ForgeAnnihilateBoostState => ({
+  live: true,
+  paused: false,
+  boostBps: 1000,
+  boostPct: 10,
+  eligibleStables: ['USDe'],
+  isEligible: (s) => s === 'USDe',
+  reasonFor: (s) => (s === 'USDe' ? null : 'Not low on protocol-owned liquidity'),
+  unavailableReason: 'Not low on protocol-owned liquidity',
+  quoteLoading: false,
+  expectedBaseWei: undefined,
+  expectedBonusWei: undefined,
+  minOutWei: undefined,
+  expectedBase: null,
+  expectedBonus: null,
+  minPhusdOut: null,
+  needsAmApproval: false,
+  needsStableApproval: false,
+  pendingAction: null,
+  approveAntimatter: vi.fn(),
+  approveStable: vi.fn(),
+  boostedAnnihilate: vi.fn(),
+});
+let boost: ForgeAnnihilateBoostState;
+vi.mock('../../../hooks/useForgeAnnihilateBoost', () => ({ useForgeAnnihilateBoost: () => boost }));
 vi.mock('../../../hooks/useForgeBonfire', () => ({ useForgeBonfire: () => bonfire }));
 // history.json failing to load: the Recent… sections show one muted line and the
 // tools above them must be unaffected.
@@ -84,6 +110,7 @@ beforeEach(() => {
   // The open row is remembered in localStorage; start every test as a first visit.
   localStorage.clear();
   annihilate = annihilateState();
+  boost = boostState();
   harvest = harvestState();
   bonfire = bonfireState();
 });
@@ -322,7 +349,7 @@ describe('ForgeTab — admin-only Annihilate boost mock row', () => {
   it('is hidden by default (non-admin)', () => {
     render(<ForgeTab />);
     expect(screen.queryByRole('button', { name: BOOST_TITLE })).not.toBeInTheDocument();
-    expect(screen.queryByText('Mock: opt-in phUSD boost when a stablecoin is low on POC')).not.toBeInTheDocument();
+    expect(screen.queryByText('Opt-in phUSD boost when a stablecoin is low on POC')).not.toBeInTheDocument();
   });
 
   it('is hidden when canSeeBoostMock is false', () => {
@@ -336,20 +363,21 @@ describe('ForgeTab — admin-only Annihilate boost mock row', () => {
       b.getAttribute('aria-label'),
     );
     expect(titles).toEqual(['Annihilate Antimatter', BOOST_TITLE, 'Harvest Yield', BONFIRE]);
-    expect(screen.getByText('Mock: opt-in phUSD boost when a stablecoin is low on POC')).toBeInTheDocument();
+    expect(screen.getByText('Opt-in phUSD boost when a stablecoin is low on POC')).toBeInTheDocument();
   });
 
-  it('opens to the mock tool with no Recent annihilations section of its own', async () => {
+  it('opens to the boost tool with no Recent annihilations section of its own', async () => {
     const user = userEvent.setup();
     render(<ForgeTab canSeeBoostMock />);
     await user.click(screen.getByRole('button', { name: BOOST_TITLE }));
     expect(screen.getByTestId('boost-mock-preview')).toBeInTheDocument();
     expect(screen.queryByTestId('history-annihilations')).not.toBeInTheDocument();
-    // Clicking its hint never reaches the hook's writes (the CTA no-write case is covered in
-    // AnnihilateBoostMockTool.test.tsx).
+    // Clicking its hint only switches the pair; it never reaches a write (the CTA paths are
+    // covered in AnnihilateBoostMockTool.test.tsx).
     await user.click(screen.getByTestId('boost-hint'));
     expect(annihilate.approve).not.toHaveBeenCalled();
     expect(annihilate.annihilate).not.toHaveBeenCalled();
+    expect(boost.boostedAnnihilate).not.toHaveBeenCalled();
   });
 
   it('a remembered boost-row key falls back to the default row for non-admins', () => {

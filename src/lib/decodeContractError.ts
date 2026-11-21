@@ -97,7 +97,16 @@ const ERROR_MESSAGES: Record<string, (args: readonly unknown[]) => string> = {
   AmountNotRepresentable: () => 'That amount is finer than the stablecoin can express. Use fewer decimals.',
   StablecoinNotRegistered: () => 'That stablecoin is not registered with the phUSD minter.',
 
-  // --- NFTBonfire (Forge tab) ---------------------------------------------
+  // --- AntimatterBooster (Forge tab, boosted annihilate) -------------------
+  AboveThreshold: () =>
+    'This stablecoin is no longer low on protocol-owned liquidity, so the boost no longer applies. Nothing was annihilated. Switch the boost off to annihilate without it.',
+  NotTracked: (args) => `Stablecoin ${String(args[0] ?? '')} is not tracked by the booster, so it cannot be boosted.`,
+  UnsupportedStable: (args) => `Stablecoin ${String(args[0] ?? '')} is not supported by the booster.`,
+  BoostDisabled: () => 'The boost is switched off right now. Switch the boost off to annihilate without it.',
+  PhUSDMinterNotSet: () =>
+    'Antimatter has no phUSD minter configured. This is a deployment issue, not something you can retry.',
+
+  // --- NFTBonfire (Forge tab)---------------------------------------------
   NFTBonfire__PayoutBelowMinimum: () =>
     'Someone burned before you and took the pot. Your burn was cancelled and your NFT was kept.',
   NFTBonfire__BurningDisabled: () => 'Burning is switched off right now. Your NFT was kept.',

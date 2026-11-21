@@ -1,11 +1,9 @@
 /**
  * Forge tab STATIC CONFIG ONLY. Despite the filename, nothing here is a
  * simulated on-chain value: every Forge row is live (`useForgeAnnihilate`,
- * `useForgeHarvest`, `useForgeBonfire`), and only their tuning constants live here.
- * The one exception is `FORGE_BOOST_MOCK`, below.
+ * `useForgeHarvest`, `useForgeBonfire`, `useForgeAnnihilateBoost`), and only their
+ * tuning constants live here.
  */
-
-import type { AnnihilateStableSymbol } from '../hooks/useForgeAnnihilate';
 
 /** Slippage applied to `minPhUSDOut` on `Antimatter.annihilate`. */
 export const FORGE_ANNIHILATE_SLIPPAGE_BPS = 50;
@@ -29,14 +27,3 @@ export const FORGE_DEFAULT_OPEN: ForgeToolKey = 'annihilate';
 export const FORGE_OPEN_ROW_STORAGE_KEY = 'forge.openRow';
 export const FORGE_ALL_COLLAPSED = 'none';
 
-/**
- * MOCK values for the admin-only "Annihilate Antimatter (boost preview)" row.
- * Stand-ins for an `AntimatterBooster.previewBoost` read (antimatter:005, not
- * yet deployed): which stables are low on protocol-owned liquidity, and the
- * percentage of extra phUSD the boosted route pays. The live story swaps this
- * constant for that read.
- */
-export const FORGE_BOOST_MOCK: { eligible: readonly AnnihilateStableSymbol[]; boostPct: number } = {
-  eligible: ['USDe'],
-  boostPct: 20,
-};
