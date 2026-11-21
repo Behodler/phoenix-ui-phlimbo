@@ -345,7 +345,8 @@ describe('ForgeTab — admin-only Annihilate boost mock row', () => {
     await user.click(screen.getByRole('button', { name: BOOST_TITLE }));
     expect(screen.getByTestId('boost-mock-preview')).toBeInTheDocument();
     expect(screen.queryByTestId('history-annihilations')).not.toBeInTheDocument();
-    // Its CTA never reaches the hook's writes.
+    // Clicking its hint never reaches the hook's writes (the CTA no-write case is covered in
+    // AnnihilateBoostMockTool.test.tsx).
     await user.click(screen.getByTestId('boost-hint'));
     expect(annihilate.approve).not.toHaveBeenCalled();
     expect(annihilate.annihilate).not.toHaveBeenCalled();
