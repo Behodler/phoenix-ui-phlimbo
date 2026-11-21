@@ -89,7 +89,7 @@ export default function ForgeTokenSelectorModal<S extends string>({
                         <span
                           data-testid={`token-badge-${token.symbol}`}
                           className="whitespace-nowrap rounded-full border px-2 py-[1px] text-[10.5px] font-bold uppercase tracking-[0.04em]"
-                          style={{ color: '#4ade80', borderColor: 'rgba(74,222,128,.35)', background: 'rgba(74,222,128,.07)' }}
+                          style={{ color: '#fbbf24', borderColor: 'rgba(245,158,11,.4)', background: 'rgba(245,158,11,.14)' }}
                         >
                           {token.badge}
                         </span>

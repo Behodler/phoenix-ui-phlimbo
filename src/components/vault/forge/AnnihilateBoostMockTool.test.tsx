@@ -125,11 +125,13 @@ describe('AnnihilateBoostMockTool (live)', () => {
     expect(screen.getByTestId('token-badge-USDe')).toHaveTextContent('+12.5% boost');
   });
 
-  it('boost card: switch enabled for an eligible stable, disabled with the reason otherwise', async () => {
+  it('boost card: hidden for a non-boostable stable, shown with an enabled switch for a boostable one', async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    expect(boostSwitch()).toBeDisabled();
-    expect(screen.getByTestId('boost-unavailable')).toHaveTextContent('Not low on protocol-owned liquidity');
+    expect(screen.queryByTestId('boost-card')).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('boost-unavailable')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Not low on protocol-owned liquidity/)).not.toBeInTheDocument();
     await pick(user, 'USDC', 'USDe');
     const card = screen.getByTestId('boost-card');
     expect(card).toHaveTextContent('+10%');
@@ -138,19 +140,20 @@ describe('AnnihilateBoostMockTool (live)', () => {
     );
     expect(boostSwitch()).toBeEnabled();
     expect(boostSwitch()).toHaveAttribute('aria-checked', 'false');
+    await pick(user, 'USDe', 'DOLA');
+    expect(screen.queryByTestId('boost-card')).not.toBeInTheDocument();
   });
 
-  it('booster not live → switch disabled, "Boost not live on this network", no hint', () => {
+  it('booster not live → no boost card, no hint', () => {
     render(<Harness live={false} />);
-    expect(boostSwitch()).toBeDisabled();
-    expect(screen.getByTestId('boost-unavailable')).toHaveTextContent('Boost not live on this network');
+    expect(screen.queryByTestId('boost-card')).not.toBeInTheDocument();
     expect(screen.queryByTestId('boost-hint')).not.toBeInTheDocument();
   });
 
-  it('booster paused → switch disabled, "Boost paused"', () => {
+  it('booster paused → no boost card, no hint', () => {
     render(<Harness boostPaused />);
-    expect(boostSwitch()).toBeDisabled();
-    expect(screen.getByTestId('boost-unavailable')).toHaveTextContent('Boost paused');
+    expect(screen.queryByTestId('boost-card')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('boost-hint')).not.toBeInTheDocument();
   });
 
   it('switch toggles the preview: 10 Antimatter → 20 phUSD, boosted 22 from the live quote', async () => {
@@ -208,9 +211,11 @@ describe('AnnihilateBoostMockTool (live)', () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByTestId('boost-hint'));
+    expect(boostSwitch()).toHaveAttribute('aria-checked', 'true');
     await pick(user, 'USDe', 'DOLA');
+    expect(screen.queryByTestId('boost-card')).not.toBeInTheDocument();
+    await pick(user, 'DOLA', 'USDe');
     expect(boostSwitch()).toHaveAttribute('aria-checked', 'false');
-    expect(boostSwitch()).toBeDisabled();
   });
 
   it('boost on: approval steps run Antimatter first, then the stable', async () => {

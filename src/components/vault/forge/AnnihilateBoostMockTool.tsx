@@ -12,8 +12,28 @@ import {
 } from '../../../hooks/useForgeAnnihilate';
 import type { ForgeAnnihilateBoostState } from '../../../hooks/useForgeAnnihilateBoost';
 
-const BOOST_GREEN = '#4ade80';
-const BOOST_TINT = { color: BOOST_GREEN, borderColor: 'rgba(74,222,128,.35)', background: 'rgba(74,222,128,.07)' };
+// Boost accents are amber, as in the approved design. Inline rgba: Tailwind opacity modifiers on hex tokens emit no CSS.
+const BOOST_AMBER = '#fbbf24';
+const BOOST_TINT = { color: BOOST_AMBER, borderColor: 'rgba(245,158,11,.4)', background: 'rgba(245,158,11,.14)' };
+
+function BoltIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={BOOST_AMBER}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="flex-shrink-0"
+      aria-hidden="true"
+    >
+      <path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" />
+    </svg>
+  );
+}
 
 export interface AnnihilateBoostMockToolProps {
   /**
@@ -89,6 +109,9 @@ export default function AnnihilateBoostMockTool({ state, boost }: AnnihilateBoos
     boostTarget !== undefined ? Math.min(amt, antimatterBalance, stableBalances[boostTarget]) : 0;
   const hintBonus = floorTo((Math.max(0, hintBase) * 2 * bps) / 10_000, 2);
   const showHint = boostTarget !== undefined && !selectedEligible;
+  // As in the approved design, the boost card exists only for a boostable pair. It also stays while the
+  // switch is on, so a user whose pair lost eligibility mid-session can still switch the boost off.
+  const showBoostCard = selectedEligible || boostOn;
 
   const selectStable = (s: AnnihilateStableSymbol) => {
     setStable(s);
@@ -211,63 +234,21 @@ export default function AnnihilateBoostMockTool({ state, boost }: AnnihilateBoos
               type="button"
               data-testid="boost-hint"
               onClick={acceptHint}
-              className="flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-left text-[12.5px] leading-[1.45] text-foreground transition-colors"
-              style={{ borderColor: BOOST_TINT.borderColor, background: BOOST_TINT.background }}
+              className="flex items-center gap-2.5 rounded-xl border border-dashed px-3 py-2.5 text-left text-[13px] leading-[1.45] text-foreground transition-colors"
+              style={{ borderColor: 'rgba(245,158,11,.55)', background: 'rgba(245,158,11,.07)' }}
             >
-              <span>
-                {boostTarget} is boosted right now: pair with it for {pctLabel} phUSD
+              <BoltIcon />
+              <span className="flex-grow">
+                <span className="font-bold" style={{ color: BOOST_AMBER }}>
+                  {boostTarget} is boosted right now:
+                </span>{' '}
+                pair with it for {pctLabel} phUSD
                 {hintBonus > 0 && ` (+${fmt2(hintBonus)} on this amount)`}
               </span>
-              <span className="whitespace-nowrap font-semibold" style={{ color: BOOST_GREEN }}>
+              <span className="whitespace-nowrap font-bold" style={{ color: BOOST_AMBER }}>
                 Switch →
               </span>
             </button>
-          )}
-        </div>
-
-        <div
-          data-testid="boost-card"
-          className="rounded-xl border p-3.5"
-          style={{ borderColor: BOOST_TINT.borderColor, background: BOOST_TINT.background }}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">phUSD boost</span>
-              <span
-                className="whitespace-nowrap rounded-full border px-2 py-[1px] text-[10.5px] font-bold tracking-[0.04em]"
-                style={BOOST_TINT}
-              >
-                {pctLabel}
-              </span>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={boostOn}
-              aria-label="Apply phUSD boost"
-              disabled={switchDisabled}
-              onClick={() => setBoostOn((on) => !on)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-phoenix-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${
-                boostOn ? 'bg-phoenix-primary' : 'bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out ${
-                  boostOn ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-          {unavailable === null ? (
-            <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-              {stable} is running low in protocol-owned liquidity. Pair with it now and receive {boost.boostPct}% extra
-              phUSD. Optional: the boosted route uses more gas.
-            </p>
-          ) : (
-            <p data-testid="boost-unavailable" className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-              {unavailable}
-              {boostOn && '. Switch the boost off to annihilate without it.'}
-            </p>
           )}
         </div>
 
@@ -309,6 +290,62 @@ export default function AnnihilateBoostMockTool({ state, boost }: AnnihilateBoos
             <span className="font-mono tabular-nums text-pxusd-white">{fmt2(stableBalance)}</span>
           </div>
         </div>
+
+        {showBoostCard && (
+          <div
+            data-testid="boost-card"
+            className="rounded-xl border p-3.5 transition-colors"
+            style={
+              boostOn
+                ? { borderColor: '#d97706', background: 'rgba(245,158,11,.10)' }
+                : { borderColor: '#2a4356', background: '#0f2029' }
+            }
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <BoltIcon size={18} />
+                <span className="text-sm font-bold text-foreground">phUSD boost</span>
+                <span
+                  className="whitespace-nowrap rounded-full border px-2 py-[1px] text-[10.5px] font-bold tracking-[0.04em]"
+                  style={BOOST_TINT}
+                >
+                  {pctLabel}
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={boostOn}
+                aria-label="Apply phUSD boost"
+                disabled={switchDisabled}
+                onClick={() => setBoostOn((on) => !on)}
+                className="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                style={
+                  boostOn
+                    ? { background: '#d97706', borderColor: '#f59e0b' }
+                    : { background: '#1b2e3a', borderColor: '#3a5468' }
+                }
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full shadow-md transition-transform duration-200 ease-in-out ${
+                    boostOn ? 'translate-x-6 bg-white' : 'translate-x-1 bg-slate-400'
+                  }`}
+                />
+              </button>
+            </div>
+            {unavailable === null ? (
+              <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+                {stable} is running low in protocol-owned liquidity. Pair with it now and receive {boost.boostPct ?? '…'}% extra
+                phUSD. Optional: the boosted route uses more gas.
+              </p>
+            ) : (
+              <p data-testid="boost-unavailable" className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+                {unavailable}
+                {boostOn && '. Switch the boost off to annihilate without it.'}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Right column: preview + action */}
@@ -336,8 +373,8 @@ export default function AnnihilateBoostMockTool({ state, boost }: AnnihilateBoos
               {boostActive && (
                 <span
                   data-testid="boost-out-badge"
-                  className="absolute right-2 top-2 whitespace-nowrap rounded-full border px-1.5 py-[1px] text-[10px] font-bold"
-                  style={BOOST_TINT}
+                  className="absolute right-2 top-2 whitespace-nowrap rounded-full px-1.5 py-[1px] text-[10px] font-bold"
+                  style={{ background: BOOST_AMBER, color: '#0b161d' }}
                 >
                   {pctLabel}
                 </span>
@@ -350,7 +387,7 @@ export default function AnnihilateBoostMockTool({ state, boost }: AnnihilateBoos
               <>
                 <PreviewRow label="Base (2×)">{fmt2(base)} phUSD</PreviewRow>
                 <PreviewRow label={`${stable} boost (${pctLabel})`}>
-                  <span style={{ color: BOOST_GREEN }}>+{fmt2(bonus)} phUSD</span>
+                  <span style={{ color: BOOST_AMBER }}>+{fmt2(bonus)} phUSD</span>
                 </PreviewRow>
               </>
             )}
