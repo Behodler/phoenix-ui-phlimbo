@@ -78,6 +78,7 @@ export async function fetchLocalAddresses(): Promise<ContractAddresses> {
       AntimatterSusdsPair: data.AntimatterSusdsPair || '0x0000000000000000000000000000000000000000',
       SYAHarvester: data.SYAHarvester || '0x0000000000000000000000000000000000000000',
       NFTBonfire: data.NFTBonfire || '0x0000000000000000000000000000000000000000',
+      AntimatterBooster: data.AntimatterBooster || '0x0000000000000000000000000000000000000000',
       BalancerLPMigrator: data.BalancerLPMigrator || '0x0000000000000000000000000000000000000000',
       SUSDS: data.SUSDS || '0x0000000000000000000000000000000000000000',
 

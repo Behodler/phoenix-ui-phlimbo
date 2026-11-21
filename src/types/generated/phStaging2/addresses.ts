@@ -1,5 +1,5 @@
-// Copied from phStaging2 server/deployments/addresses.ts @ 16ec5369b36046a896c264a42817358c69dd8b8f. Do not edit locally; re-sync by re-copying.
-// Generated interface from local.json on 2026-11-16T04:01:09.462Z
+// Copied from phStaging2 server/deployments/addresses.ts @ 3c52e101617c8b77b32847ba0f435558cb9fcd4e. Do not edit locally; re-sync by re-copying.
+// Generated interface from local.json on 2026-11-21T21:26:27.995Z
 // Chain ID: 31337 (anvil)
 // This interface can be copied directly into UI projects
 
@@ -66,5 +66,6 @@ export interface ContractAddresses {
   SYAHarvester: string;
   NFTBonfire: string;
   NudgeDiscountBatchMinter: string;
+  AntimatterBooster: string;
   BalancerLPMigrator: string;
 }

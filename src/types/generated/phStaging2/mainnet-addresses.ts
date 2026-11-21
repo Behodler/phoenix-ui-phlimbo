@@ -58,6 +58,7 @@
 // Updated 2026-11-12: NudgeDiscountBatchMinter added as a ZERO placeholder (story 118) so the key-set matches
 // ContractAddresses; the phStaging2:119 cutover deploys BatchNFTMinterNudgeDiscount and its patcher fills it.
 // Updated 2026-11-18: nudge-discount minter cutover (story 119) — NudgeDiscountBatchMinter FILLED from progress.nudge-discount.1.json; BatchNFTMinter (old, paused) kept.
+// Updated 2026-11-21: AntimatterBooster added as a ZERO placeholder (story 138) so the key-set matches ContractAddresses.
 import type { ContractAddresses } from './addresses';
 
 
@@ -233,6 +234,9 @@ export const mainnetAddresses: ContractAddresses = {
   // Dedicated BatchNFTMinter for the NudgeRatchet NFT (UI batch-mint entrypoint; pays USDC,
   // rewards USDS) — not yet deployed on mainnet (story 068). Patch by hand when it ships.
   RatchetBatchNFTMinter: "0x81896f48a95abea255cd38a3010e985b6051a1c7",
+  // Story 138: AntimatterBooster — not yet deployed on mainnet. Zero placeholder so this file
+  // satisfies the ContractAddresses interface; patch when it ships.
+  AntimatterBooster: "0x0000000000000000000000000000000000000000",
 };
 
 export type MainnetContractName = keyof ContractAddresses;
