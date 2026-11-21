@@ -6,6 +6,8 @@ export interface ForgeTokenOption<S extends string = string> {
   name: string;
   icon: string;
   balance: number;
+  /** Optional short badge beside the symbol, e.g. "+20% boost". */
+  badge?: string;
 }
 
 interface ForgeTokenSelectorModalProps<S extends string> {
@@ -81,7 +83,18 @@ export default function ForgeTokenSelectorModal<S extends string>({
                     className="h-10 w-10 rounded-full flex-shrink-0 object-cover"
                   />
                   <div className="flex flex-col items-start min-w-0">
-                    <span className="text-base font-semibold text-foreground truncate">{token.symbol}</span>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="text-base font-semibold text-foreground truncate">{token.symbol}</span>
+                      {token.badge && (
+                        <span
+                          data-testid={`token-badge-${token.symbol}`}
+                          className="whitespace-nowrap rounded-full border px-2 py-[1px] text-[10.5px] font-bold uppercase tracking-[0.04em]"
+                          style={{ color: '#4ade80', borderColor: 'rgba(74,222,128,.35)', background: 'rgba(74,222,128,.07)' }}
+                        >
+                          {token.badge}
+                        </span>
+                      )}
+                    </span>
                     <span className="text-xs text-muted-foreground truncate">{token.name}</span>
                   </div>
                 </div>

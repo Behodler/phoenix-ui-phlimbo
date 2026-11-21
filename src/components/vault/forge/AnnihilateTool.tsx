@@ -8,19 +8,9 @@ import {
   type AnnihilateStableSymbol,
   type ForgeAnnihilateState,
 } from '../../../hooks/useForgeAnnihilate';
-import usdcIcon from '../../../assets/usdc-logo.svg';
-import usdeIcon from '../../../assets/USDe.png';
-import dolaIcon from '../../../assets/sDOLA.png';
+import { ANTIMATTER_LAVENDER, STABLE_META } from './annihilateMeta';
 
 export type { AnnihilateStableSymbol };
-
-const ANTIMATTER_LAVENDER = '#C4AEEA';
-
-const STABLE_META: Record<AnnihilateStableSymbol, { name: string; icon: string }> = {
-  USDC: { name: 'USD Coin', icon: usdcIcon },
-  USDe: { name: 'Ethena USDe', icon: usdeIcon },
-  DOLA: { name: 'DOLA', icon: dolaIcon },
-};
 
 export interface AnnihilateToolProps {
   /** Live state from `useForgeAnnihilate`, owned by ForgeTab so the row header can share it. */
@@ -255,7 +245,7 @@ export default function AnnihilateTool({ state }: AnnihilateToolProps) {
   );
 }
 
-function PreviewCell({
+export function PreviewCell({
   label,
   labelColor,
   value,
@@ -286,7 +276,7 @@ function PreviewCell({
   );
 }
 
-function Glyph({ children }: { children: string }) {
+export function Glyph({ children }: { children: string }) {
   return (
     <span aria-hidden="true" className="text-center font-mono text-lg text-muted-foreground">
       {children}
@@ -294,7 +284,7 @@ function Glyph({ children }: { children: string }) {
   );
 }
 
-function PreviewRow({ label, children }: { label: string; children: ReactNode }) {
+export function PreviewRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-muted-foreground">{label}</span>

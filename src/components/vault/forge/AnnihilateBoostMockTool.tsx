@@ -1,0 +1,352 @@
+import { useCallback, useState } from 'react';
+import AmountInput from '../../ui/AmountInput';
+import ActionButton from '../../ui/ActionButton';
+import { useToast } from '../../ui/ToastProvider';
+import ForgeTokenSelectorModal, { type ForgeTokenOption } from './ForgeTokenSelectorModal';
+import { Glyph, PreviewCell, PreviewRow } from './AnnihilateTool';
+import { ANTIMATTER_LAVENDER, STABLE_META } from './annihilateMeta';
+import { AMOUNT_INPUT_PATTERN, floorTo, fmt2, toInputString } from './forgeFormat';
+import { FORGE_BOOST_MOCK } from '../../../data/forgeMockData';
+import {
+  ANNIHILATE_STABLE_ORDER,
+  type AnnihilateStableSymbol,
+  type ForgeAnnihilateState,
+} from '../../../hooks/useForgeAnnihilate';
+
+const BOOST_GREEN = '#4ade80';
+const BOOST_TINT = { color: BOOST_GREEN, borderColor: 'rgba(74,222,128,.35)', background: 'rgba(74,222,128,.07)' };
+
+export const BOOST_MOCK_TOAST = 'Boosted annihilation is mocked on this page. Nothing was sent.';
+
+export interface AnnihilateBoostMockToolProps {
+  /**
+   * Live balances, price, gate and quote from a `useForgeAnnihilate` instance of
+   * the mock row's own, so its pair and amount are independent of the real row.
+   * Its `approve` / `annihilate` writes are never called.
+   */
+  state: ForgeAnnihilateState;
+}
+
+/**
+ * Body of the admin-only "Annihilate Antimatter (boost preview)" Forge row.
+ * MOCK: reproduces the real AnnihilateTool, plus an opt-in phUSD boost for
+ * stables low in protocol-owned liquidity. Eligibility and percentage come from
+ * `FORGE_BOOST_MOCK`; everything else is live. It never sends a transaction.
+ */
+export default function AnnihilateBoostMockTool({ state }: AnnihilateBoostMockToolProps) {
+  const {
+    amount,
+    setAmount,
+    stable,
+    setStable,
+    walletAntimatter: antimatterBalance,
+    stableBalances,
+    price,
+    gateReason,
+    priceGated,
+    phusdOut: quotedOut,
+    minPhusdOut,
+  } = state;
+  const { addToast } = useToast();
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [boostOn, setBoostOn] = useState(false);
+
+  const { eligible, boostPct } = FORGE_BOOST_MOCK;
+  const isEligible = (s: AnnihilateStableSymbol) => eligible.includes(s);
+  const selectedEligible = isEligible(stable);
+  const boostTarget = eligible[0];
+  const boostActive = selectedEligible && boostOn;
+
+  const stableBalance = stableBalances[stable];
+  const meta = STABLE_META[stable];
+  const gated = gateReason !== null;
+
+  const parsed = Number.parseFloat(amount);
+  const amt = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  const maxAmount = floorTo(Math.min(antimatterBalance, stableBalance), 4);
+  const overAntimatter = amt > antimatterBalance;
+  const overStable = amt > stableBalance;
+  const over = overAntimatter || overStable;
+
+  // Every displayed phUSD figure is floored: round in favour of the protocol.
+  const base = floorTo(amt > 0 ? (quotedOut ?? 2 * amt) : 0, 2);
+  const potentialBonus = floorTo((base * boostPct) / 100, 2);
+  const bonus = boostActive ? potentialBonus : 0;
+  const out = floorTo(base + bonus, 2);
+  const displayPrice = price ?? 1;
+  const netValue = out * displayPrice - amt;
+  const realMin = amt > 0 && minPhusdOut !== null ? minPhusdOut : 0;
+  const minReceived = floorTo(boostActive ? realMin * (1 + boostPct / 100) : realMin, 2);
+
+  // Hint: what the boost would add on this amount if the user paired with the target instead.
+  const hintBase =
+    boostTarget !== undefined ? Math.min(amt, antimatterBalance, stableBalances[boostTarget]) : 0;
+  const hintBonus = floorTo((Math.max(0, hintBase) * 2 * boostPct) / 100, 2);
+  const showHint = boostTarget !== undefined && !selectedEligible;
+
+  const selectStable = (s: AnnihilateStableSymbol) => {
+    setStable(s);
+    // The boost is opt-in per selection: leaving an eligible stable turns it off.
+    if (!isEligible(s)) setBoostOn(false);
+  };
+  const acceptHint = () => {
+    if (boostTarget === undefined) return;
+    setStable(boostTarget);
+    setBoostOn(true);
+  };
+
+  const handleAmountChange = (value: string) => {
+    const trimmed = value.trim();
+    if (AMOUNT_INPUT_PATTERN.test(trimmed)) setAmount(trimmed);
+  };
+  const fillMax = () => setAmount(maxAmount > 0 ? toInputString(maxAmount) : '');
+  const closeSelector = useCallback(() => setSelectorOpen(false), []);
+
+  // MOCK: the CTA never touches approve/annihilate or any other write.
+  const mockAction = () =>
+    addToast({ type: 'info', title: 'Mock only', description: BOOST_MOCK_TOAST, duration: 8000 });
+
+  let button: { label: string; disabled: boolean };
+  if (gated) button = { label: gateReason, disabled: true };
+  else if (amt <= 0) button = { label: 'Enter Amount', disabled: true };
+  else if (over) button = { label: 'Insufficient Balance', disabled: true };
+  else if (boostActive) button = { label: `Annihilate with +${boostPct}% boost`, disabled: false };
+  else button = { label: `Annihilate → receive ${fmt2(out)} phUSD`, disabled: false };
+
+  const tokenOptions: ForgeTokenOption<AnnihilateStableSymbol>[] = ANNIHILATE_STABLE_ORDER.map((symbol) => ({
+    symbol,
+    name: STABLE_META[symbol].name,
+    icon: STABLE_META[symbol].icon,
+    balance: stableBalances[symbol],
+    badge: isEligible(symbol) ? `+${boostPct}% boost` : undefined,
+  }));
+
+  const fieldLabel = 'text-[12px] font-semibold uppercase tracking-[0.04em] text-muted-foreground';
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
+      {/* Left column: inputs */}
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex flex-col gap-2">
+          <span className={fieldLabel}>Pair with</span>
+          <div>
+            <button
+              type="button"
+              onClick={() => setSelectorOpen(true)}
+              aria-label={`Pair with ${stable}`}
+              className="flex items-center gap-3 px-4 py-2 bg-card border border-border rounded-xl hover:bg-pxusd-teal-700 transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <img src={meta.icon} alt={`${stable} icon`} className="h-8 w-8 rounded-full flex-shrink-0 object-cover" />
+              <span className="text-base font-semibold text-foreground">{stable}</span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 text-muted-foreground"
+                aria-hidden="true"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </div>
+
+          {showHint && (
+            <button
+              type="button"
+              data-testid="boost-hint"
+              onClick={acceptHint}
+              className="flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-left text-[12.5px] leading-[1.45] text-foreground transition-colors"
+              style={{ borderColor: BOOST_TINT.borderColor, background: BOOST_TINT.background }}
+            >
+              <span>
+                {boostTarget} is boosted right now: pair with it for +{boostPct}% phUSD
+                {hintBonus > 0 && ` (+${fmt2(hintBonus)} on this amount)`}
+              </span>
+              <span className="whitespace-nowrap font-semibold" style={{ color: BOOST_GREEN }}>
+                Switch →
+              </span>
+            </button>
+          )}
+        </div>
+
+        {selectedEligible && (
+          <div
+            data-testid="boost-card"
+            className="rounded-xl border p-3.5"
+            style={{ borderColor: BOOST_TINT.borderColor, background: BOOST_TINT.background }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-foreground">phUSD boost</span>
+                <span
+                  className="whitespace-nowrap rounded-full border px-2 py-[1px] text-[10.5px] font-bold tracking-[0.04em]"
+                  style={BOOST_TINT}
+                >
+                  +{boostPct}%
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={boostOn}
+                aria-label="Apply phUSD boost"
+                onClick={() => setBoostOn((on) => !on)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-phoenix-primary focus:ring-offset-2 focus:ring-offset-background ${
+                  boostOn ? 'bg-phoenix-primary' : 'bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out ${
+                    boostOn ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+              {stable} is running low in protocol-owned liquidity. Pair with it now and receive {boostPct}% extra phUSD.
+              Optional: the boosted route uses more gas.
+            </p>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-2">
+          <span className={fieldLabel}>Antimatter to annihilate</span>
+          <button
+            type="button"
+            onClick={fillMax}
+            className="whitespace-nowrap text-xs font-semibold text-muted-foreground hover:text-foreground"
+          >
+            Max: {fmt2(maxAmount)}
+          </button>
+        </div>
+
+        <div>
+          <AmountInput amount={amount} onAmountChange={handleAmountChange} onMaxClick={fillMax} isInvalid={over} />
+          <p className="-mt-3 text-xs text-muted-foreground">
+            ≈ ${fmt2(amt)} of {stable} leaves your wallet
+            {over && (
+              <>
+                {' · '}
+                <span className="text-pxusd-pink-400">
+                  {overAntimatter ? 'Insufficient Antimatter' : `Insufficient ${stable}`}
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5 text-sm">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Your Antimatter</span>
+            <span className="font-mono tabular-nums" style={{ color: ANTIMATTER_LAVENDER }}>
+              {fmt2(antimatterBalance)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Your {stable}</span>
+            <span className="font-mono tabular-nums text-pxusd-white">{fmt2(stableBalance)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Right column: preview + action */}
+      <div className="flex min-w-0 flex-col">
+        <div
+          className="rounded-[14px] border p-4"
+          style={{
+            borderColor: 'rgba(196,174,234,.28)',
+            background: 'linear-gradient(180deg, rgba(196,174,234,.09), rgba(10,28,40,0) 85%)',
+          }}
+        >
+          <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-pxusd-purple-300">
+            Annihilation preview
+          </div>
+          <div
+            data-testid="boost-mock-preview"
+            className="grid grid-cols-1 items-center gap-2.5 sm:grid-cols-[1fr_auto_1fr_auto_1fr]"
+          >
+            <PreviewCell label="Antimatter" labelColor={ANTIMATTER_LAVENDER} value={fmt2(amt)} />
+            <Glyph>+</Glyph>
+            <PreviewCell label={stable} labelColor="rgba(240,245,248,.72)" value={fmt2(amt)} />
+            <Glyph>=</Glyph>
+            <div className="relative min-w-0">
+              <PreviewCell label="phUSD" labelColor="#FFB566" value={fmt2(out)} emphasised />
+              {boostActive && (
+                <span
+                  data-testid="boost-out-badge"
+                  className="absolute right-2 top-2 whitespace-nowrap rounded-full border px-1.5 py-[1px] text-[10px] font-bold"
+                  style={BOOST_TINT}
+                >
+                  +{boostPct}%
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-2.5 text-sm">
+            {boostActive && (
+              <>
+                <PreviewRow label="Base (2×)">{fmt2(base)} phUSD</PreviewRow>
+                <PreviewRow label={`${stable} boost (+${boostPct}%)`}>
+                  <span style={{ color: BOOST_GREEN }}>+{fmt2(bonus)} phUSD</span>
+                </PreviewRow>
+              </>
+            )}
+            {selectedEligible && !boostOn && amt > 0 && (
+              <div data-testid="boost-not-applied" className="flex items-center justify-between gap-3 opacity-60">
+                <span className="text-muted-foreground">Boost available, not applied</span>
+                <span className="text-right font-mono tabular-nums text-muted-foreground">
+                  +{fmt2(potentialBonus)} phUSD
+                </span>
+              </div>
+            )}
+            <PreviewRow label="phUSD price">
+              <span className={priceGated ? 'text-pxusd-pink-400' : undefined}>
+                {price === null ? '—' : `$${fmt2(price)}`}
+              </span>
+            </PreviewRow>
+            <PreviewRow label="Net value change">
+              <span className={netValue >= 0 ? 'text-green-400' : 'text-pxusd-pink-400'}>
+                {/* Real minus sign (U+2212), not a hyphen. */}
+                {netValue >= 0 ? '+' : '−'}${fmt2(Math.abs(netValue))}
+              </span>
+            </PreviewRow>
+            <PreviewRow label="Minimum received">{fmt2(minReceived)} phUSD</PreviewRow>
+          </div>
+        </div>
+
+        {priceGated && (
+          <div
+            role="alert"
+            className="mt-4 rounded-xl border p-3.5 text-[12.5px] leading-[1.5] text-muted-foreground"
+            style={{ borderColor: 'rgba(255,77,109,.35)', background: 'rgba(255,77,109,.07)' }}
+          >
+            <strong className="text-pxusd-pink-400">Annihilation disabled.</strong> phUSD is at ${fmt2(displayPrice)}. At
+            $0.50 or less, the phUSD you receive is worth less than the {stable} you put in.
+          </div>
+        )}
+
+        <ActionButton disabled={button.disabled} onAction={mockAction} label={button.label} variant="primary" />
+        <p className="mt-2 text-center text-[11.5px] text-muted-foreground">
+          {boostActive
+            ? `Irreversible. Boosted route: higher gas, ${boostPct}% more phUSD.`
+            : 'Irreversible. Both halves are consumed in one transaction.'}
+        </p>
+      </div>
+
+      <ForgeTokenSelectorModal
+        isOpen={selectorOpen}
+        onClose={closeSelector}
+        tokens={tokenOptions}
+        activeSymbol={stable}
+        onSelect={selectStable}
+        footerNote="Only stablecoins registered with the phUSD minter can be annihilated."
+      />
+    </div>
+  );
+}

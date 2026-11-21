@@ -796,7 +796,7 @@ export default function VaultPage() {
               </ErrorBoundary>
             ) : activeTab === "Forge" ? (
               <ErrorBoundary>
-                <ForgeTab />
+                <ForgeTab canSeeBoostMock={hasAdminAccess} />
               </ErrorBoundary>
             ) : null}
           </div>
