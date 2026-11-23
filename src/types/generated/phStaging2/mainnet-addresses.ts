@@ -1,4 +1,4 @@
-// Copied from phStaging2 server/deployments/mainnet-addresses.ts @ 9c49d4e676016a7ccfa61b25ddea3ca1bc303e70. Do not edit locally; re-sync by re-copying.
+// Copied from phStaging2 server/deployments/mainnet-addresses.ts @ 9b9c337aa8d59e2f66f10f761b25e326559d8192 + story-139 AntimatterBooster broadcast patch (2026-11-23). Do not edit locally; re-sync by re-copying.
 // Generated from mainnet.json on 2026-01-29
 // Updated 2026-03-20 for NFT infrastructure redeployment (WBTC address fix)
 // Chain ID: 1 (mainnet)
@@ -58,7 +58,9 @@
 // Updated 2026-11-12: NudgeDiscountBatchMinter added as a ZERO placeholder (story 118) so the key-set matches
 // ContractAddresses; the phStaging2:119 cutover deploys BatchNFTMinterNudgeDiscount and its patcher fills it.
 // Updated 2026-11-18: nudge-discount minter cutover (story 119) — NudgeDiscountBatchMinter FILLED from progress.nudge-discount.1.json; BatchNFTMinter (old, paused) kept.
-// Updated 2026-11-21: AntimatterBooster added as a ZERO placeholder (story 138) so the key-set matches ContractAddresses.
+// Updated 2026-11-21: AntimatterBooster added as a ZERO placeholder (story 138) so the key-set matches
+// ContractAddresses; fill it by hand after the human's mainnet AntimatterBooster broadcast.
+// Updated 2026-11-23: AntimatterBooster deployed (story 139) — AntimatterBooster FILLED from progress.antimatter-booster.1.json; OWNER phUSD mint revoked.
 import type { ContractAddresses } from './addresses';
 
 
@@ -207,7 +209,7 @@ export const mainnetAddresses: ContractAddresses = {
   BatchNFTMinter: "0x068395556b8c43eDf257DC54D109EA5910aE15c7",
   // Story 118/119: BatchNFTMinterNudgeDiscount (nft-staking:033-035), the index-4 nudge sink. Deployed
   // by DeployMainnetNudgeDiscount (story 119), registered with PauserV2, patched from progress.nudge-discount.1.json.
-  // BatchNFTMinter above is the OLD minter, paused by the same cutover (kept for the UI until phlimbo-ui:091).
+  // BatchNFTMinter above is the OLD minter: frozen by that cutover, revived 2026-11-19 (nudge off, no whale discount); LIVE on PauserV2, serving UI batch mints (story 140).
   NudgeDiscountBatchMinter: "0xD41235bC400BAEDD23aA416Db1F62c944981C42a",
   // Stable Staking. Story 080 RETIRED the `StableStaker` key and replaced it with
   // `StableStakerV2`, deliberately dropping the live V1 address
@@ -224,6 +226,10 @@ export const mainnetAddresses: ContractAddresses = {
   StableStakerV2: "0xA6d3fc83C91B8319D219cEB12B46e3dfF064B58F",
   // The Antimatter reward token StableStakerV2 pays instead of phUSD.
   Antimatter: "0x9CA92B527012DfC6Fdca7B7493C722D5901FF151",
+  // Story 138/139: AntimatterBooster (antimatter:005) - phUSD bonus (15%) on annihilations of
+  // under-represented stables. Deployed + wired by DeployAntimatterBoosterMainnet (story 139),
+  // registered with PauserV2, and patched from progress.antimatter-booster.1.json.
+  AntimatterBooster: "0xbb8bF9C05160bB45A2ef920AfD09Bc4ab0258a2C",
   // NudgeRatchet dispatcher + its mint-debt hook — not yet deployed on mainnet (story 068).
   // Zero placeholders so this file still satisfies the ContractAddresses interface once the
   // local deploy added these fields. Patch by hand when they ship to mainnet.
@@ -234,9 +240,6 @@ export const mainnetAddresses: ContractAddresses = {
   // Dedicated BatchNFTMinter for the NudgeRatchet NFT (UI batch-mint entrypoint; pays USDC,
   // rewards USDS) — not yet deployed on mainnet (story 068). Patch by hand when it ships.
   RatchetBatchNFTMinter: "0x81896f48a95abea255cd38a3010e985b6051a1c7",
-  // Story 138: AntimatterBooster — not yet deployed on mainnet. Zero placeholder so this file
-  // satisfies the ContractAddresses interface; patch when it ships.
-  AntimatterBooster: "0x0000000000000000000000000000000000000000",
 };
 
 export type MainnetContractName = keyof ContractAddresses;
