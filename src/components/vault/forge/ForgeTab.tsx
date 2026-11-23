@@ -2,7 +2,6 @@ import { useState, type ReactNode } from 'react';
 import ForgeAccordionRow from './ForgeAccordionRow';
 import ForgeStatusPill from './ForgeStatusPill';
 import AnnihilateTool from './AnnihilateTool';
-import AnnihilateBoostMockTool from './AnnihilateBoostMockTool';
 import HarvestTool from './HarvestTool';
 import BonfireTool from './BonfireTool';
 import BonfireFlameIcon from './BonfireFlameIcon';
@@ -17,7 +16,7 @@ import {
   type ForgeToolKey,
 } from '../../../data/forgeMockData';
 import { log } from '../../../utils/logger';
-import { useForgeAnnihilate } from '../../../hooks/useForgeAnnihilate';
+import { useForgeAnnihilate, type ForgeAnnihilateState } from '../../../hooks/useForgeAnnihilate';
 import { useForgeAnnihilateBoost } from '../../../hooks/useForgeAnnihilateBoost';
 import { useForgeHarvest } from '../../../hooks/useForgeHarvest';
 import { useForgeBonfire } from '../../../hooks/useForgeBonfire';
@@ -43,12 +42,6 @@ export interface ForgeTabProps {
    * built-in rows.
    */
   rows?: ForgeRowDef[];
-  /**
-   * Show the admin-only MOCK "Annihilate Antimatter (boost preview)" row. The
-   * caller decides (VaultPage passes `hasAdminAccess`); ForgeTab never checks
-   * admin status itself. Defaults to hidden.
-   */
-  canSeeBoostMock?: boolean;
 }
 
 /**
@@ -58,7 +51,7 @@ export interface ForgeTabProps {
  * Every row is live: `useForgeAnnihilate`, `useForgeHarvest` and
  * `useForgeBonfire` own the reads and writes; the row bodies are presentational.
  */
-export default function ForgeTab({ rows: rowsOverride, canSeeBoostMock = false }: ForgeTabProps = {}) {
+export default function ForgeTab({ rows: rowsOverride }: ForgeTabProps = {}) {
   const [openKey, setOpenKey] = useState<string | null>(readStoredOpenKey);
   const annihilate = useForgeAnnihilate();
   const harvest = useForgeHarvest();
@@ -83,21 +76,11 @@ export default function ForgeTab({ rows: rowsOverride, canSeeBoostMock = false }
       ),
       body: (
         <>
-          <AnnihilateTool state={annihilate} />
+          <AnnihilateBody state={annihilate} />
           {/* Mainnet history from /history.json; independent of the tool's own reads. */}
           <RecentAnnihilations />
         </>
       ),
-    },
-    {
-      key: 'annihilateBoostMock',
-      icon: <img src={antimatterIcon} alt="" aria-hidden="true" className="h-9 w-9 rounded-full" />,
-      title: 'Annihilate Antimatter (boost preview) - only visible to admins',
-      tagline: 'Opt-in phUSD boost when a stablecoin is low on POC',
-      metric: <span style={{ color: '#C4AEEA' }}>{fmt2(annihilate.walletAntimatter)}</span>,
-      metricLabel: 'Your Antimatter',
-      pill: <ForgeStatusPill tone="neutral">Admin</ForgeStatusPill>,
-      body: <AnnihilateBoostMockBody />,
     },
     {
       key: 'harvest',
@@ -151,8 +134,7 @@ export default function ForgeTab({ rows: rowsOverride, canSeeBoostMock = false }
       ),
     },
   ];
-  const rows =
-    rowsOverride ?? builtInRows.filter((row) => row.key !== 'annihilateBoostMock' || canSeeBoostMock);
+  const rows = rowsOverride ?? builtInRows;
   // A remembered key that no longer names a row (a renamed or removed tool)
   // falls back to the default rather than leaving every row shut.
   const effectiveOpenKey =
@@ -217,15 +199,12 @@ function writeStoredOpenKey(key: string | null): void {
 }
 
 /**
- * The boost row's own `useForgeAnnihilate` instance (so its pair and amount are
- * independent of the real row, and it drives the boost-off path), composed with
- * `useForgeAnnihilateBoost` for the AntimatterBooster reads and writes. Mounted
- * only while the (admin-only) row is open.
+ * Composes `useForgeAnnihilateBoost` (the AntimatterBooster reads and writes) over
+ * ForgeTab's shared `useForgeAnnihilate` state. Mounted only while the row is open.
  */
-function AnnihilateBoostMockBody() {
-  const state = useForgeAnnihilate();
+function AnnihilateBody({ state }: { state: ForgeAnnihilateState }) {
   const boost = useForgeAnnihilateBoost(state);
-  return <AnnihilateBoostMockTool state={state} boost={boost} />;
+  return <AnnihilateTool state={state} boost={boost} />;
 }
 
 /** Live Bonfire pot for the row header; reads the same clock as the row body. */

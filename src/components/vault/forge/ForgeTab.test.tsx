@@ -342,54 +342,35 @@ describe('ForgeTab', () => {
   });
 });
 
-describe('ForgeTab — admin-only Annihilate boost mock row', () => {
-  const BOOST_TITLE = 'Annihilate Antimatter (boost preview) - only visible to admins';
+describe('ForgeTab — Annihilate row is the boost tool', () => {
   const OWNER_EOA = '0xCad1a7864a108DBFF67F4b8af71fAB0C7A86D0B6';
 
-  it('is hidden by default (non-admin)', () => {
+  it('renders one Annihilate row with the boost tool and Recent annihilations under it', async () => {
+    const user = userEvent.setup();
     render(<ForgeTab />);
-    expect(screen.queryByRole('button', { name: BOOST_TITLE })).not.toBeInTheDocument();
-    expect(screen.queryByText('Opt-in phUSD boost when a stablecoin is low on POC')).not.toBeInTheDocument();
-  });
-
-  it('is hidden when canSeeBoostMock is false', () => {
-    render(<ForgeTab canSeeBoostMock={false} />);
-    expect(screen.queryByRole('button', { name: BOOST_TITLE })).not.toBeInTheDocument();
-  });
-
-  it('renders directly after the real Annihilate row when canSeeBoostMock', () => {
-    render(<ForgeTab canSeeBoostMock />);
     const titles = Array.from(document.querySelectorAll('button[aria-expanded]')).map((b) =>
       b.getAttribute('aria-label'),
     );
-    expect(titles).toEqual(['Annihilate Antimatter', BOOST_TITLE, 'Harvest Yield', BONFIRE]);
-    expect(screen.getByText('Opt-in phUSD boost when a stablecoin is low on POC')).toBeInTheDocument();
-  });
-
-  it('opens to the boost tool with no Recent annihilations section of its own', async () => {
-    const user = userEvent.setup();
-    render(<ForgeTab canSeeBoostMock />);
-    await user.click(screen.getByRole('button', { name: BOOST_TITLE }));
+    expect(titles).toEqual(['Annihilate Antimatter', 'Harvest Yield', BONFIRE]);
+    expect(screen.getByText('Antimatter + a stablecoin → twice the phUSD')).toBeInTheDocument();
     expect(screen.getByTestId('boost-mock-preview')).toBeInTheDocument();
-    expect(screen.queryByTestId('history-annihilations')).not.toBeInTheDocument();
+    expect(screen.getByTestId('history-annihilations')).toBeInTheDocument();
     // Clicking its hint only switches the pair; it never reaches a write (the CTA paths are
-    // covered in AnnihilateBoostMockTool.test.tsx).
+    // covered in AnnihilateTool.test.tsx).
     await user.click(screen.getByTestId('boost-hint'));
     expect(annihilate.approve).not.toHaveBeenCalled();
     expect(annihilate.annihilate).not.toHaveBeenCalled();
     expect(boost.boostedAnnihilate).not.toHaveBeenCalled();
   });
 
-  it('a remembered boost-row key falls back to the default row for non-admins', () => {
+  it('a remembered key from the retired boost row falls back to Annihilate', () => {
     localStorage.setItem(FORGE_OPEN_ROW_STORAGE_KEY, 'annihilateBoostMock');
     render(<ForgeTab />);
-    expect(screen.getByText('Annihilation preview')).toBeInTheDocument();
-    expect(screen.queryByTestId('boost-mock-preview')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Annihilate Antimatter' })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('never renders the owner address', () => {
-    localStorage.setItem(FORGE_OPEN_ROW_STORAGE_KEY, 'annihilateBoostMock');
-    const { container } = render(<ForgeTab canSeeBoostMock />);
+    const { container } = render(<ForgeTab />);
     expect(container.textContent?.toLowerCase()).not.toContain(OWNER_EOA.toLowerCase());
   });
 });

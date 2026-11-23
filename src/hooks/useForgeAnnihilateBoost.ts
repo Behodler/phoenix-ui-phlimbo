@@ -118,10 +118,10 @@ const safeParse = (amount: string, decimals: number): bigint => {
 const toNum = (wei: bigint | undefined) => (wei === undefined ? null : Number(formatUnits(wei, 18)));
 
 /**
- * Live wiring for the admin-only "Annihilate Antimatter (boost preview)" Forge
- * row: `AntimatterBooster.boostedAnnihilate(stable, recipient, amount, minPhUSDOut)`.
+ * Live wiring for the "Annihilate Antimatter" Forge row:
+ * `AntimatterBooster.boostedAnnihilate(stable, recipient, amount, minPhUSDOut)`.
  *
- * Takes the pair and amount from the row's own `useForgeAnnihilate` instance
+ * Takes the pair and amount from the row's `useForgeAnnihilate` state
  * (which still drives the boost-off path) and adds the booster's reads,
  * approvals of BOTH Antimatter and the stable to the booster, a pre-sign
  * eligibility re-check, and the boosted write. There is no fallback to plain

@@ -17,7 +17,7 @@ export const FORGE_BONFIRE_MIN_PAYOUT_BPS = 9800;
 export const FORGE_BONFIRE_DEFAULT_NFT_ID = 1; // EYE ignition
 
 /** Keys of the Forge accordion rows. */
-export type ForgeToolKey = 'annihilate' | 'annihilateBoostMock' | 'harvest' | 'bonfire';
+export type ForgeToolKey = 'annihilate' | 'harvest' | 'bonfire';
 /** Row opened on a first visit, before the user has made a choice. */
 export const FORGE_DEFAULT_OPEN: ForgeToolKey = 'annihilate';
 /**

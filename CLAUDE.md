@@ -303,6 +303,9 @@ so the row headers can share them.
   Stake tab's `autoAnnihilate`. The stablecoin is pulled from the wallet, so it needs an ERC20
   approval to **Antimatter**. `minPhUSDOut` = `(amount + PhusdStableMinter.calculateMintAmount)`
   less 50 bps. Never assume 2×. It uses the same price gate as the Stake tab.
+  The row body is the boost tool (`AnnihilateTool` + `useForgeAnnihilateBoost`): with the
+  opt-in boost on, it routes through `AntimatterBooster.boostedAnnihilate` instead. There is
+  no separate boost row any more.
 - **Harvest Yield** (`useForgeHarvest`) targets `SYAHarvester`. The ABI is hand-written in
   `src/lib/syaHarvesterAbi.ts` because the hooks package does not ship it. There is no view
   quote: `ethOut` and gas units come from `estimateContractGas` + `simulateContract` of
