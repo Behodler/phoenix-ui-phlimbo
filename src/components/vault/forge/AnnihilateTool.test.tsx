@@ -136,7 +136,7 @@ describe('AnnihilateTool (live)', () => {
     const card = screen.getByTestId('boost-card');
     expect(card).toHaveTextContent('+10%');
     expect(card).toHaveTextContent(
-      'USDe is running low in protocol-owned liquidity. Pair with it now and receive 10% extra phUSD. Optional: the boosted route uses more gas.',
+      'The protocol is building up its USDe liquidity. Pair with USDe now and receive 10% extra phUSD.',
     );
     expect(boostSwitch()).toBeEnabled();
     expect(boostSwitch()).toHaveAttribute('aria-checked', 'false');
@@ -176,7 +176,7 @@ describe('AnnihilateTool (live)', () => {
     // Minimum from the booster's minOutWei: 22 × 0.995 = 21.89.
     expect(screen.getByText('21.89 phUSD')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Annihilate with +10% boost → receive 22.00 phUSD' })).toBeEnabled();
-    expect(screen.getByText('Irreversible. Boosted route: higher gas, 10% more phUSD.')).toBeInTheDocument();
+    expect(screen.getByText('Irreversible. Boosted route: 10% more phUSD.')).toBeInTheDocument();
   });
 
   it('floors the bonus in favour of the protocol', async () => {

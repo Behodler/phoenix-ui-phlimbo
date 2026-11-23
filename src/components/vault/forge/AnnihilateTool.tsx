@@ -335,8 +335,8 @@ export default function AnnihilateTool({ state, boost }: AnnihilateToolProps) {
             </div>
             {unavailable === null ? (
               <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-                {stable} is running low in protocol-owned liquidity. Pair with it now and receive {boost.boostPct ?? '…'}% extra
-                phUSD. Optional: the boosted route uses more gas.
+                The protocol is building up its {stable} liquidity. Pair with {stable} now and receive{' '}
+                {boost.boostPct ?? '…'}% extra phUSD.
               </p>
             ) : (
               <p data-testid="boost-unavailable" className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
@@ -433,7 +433,7 @@ export default function AnnihilateTool({ state, boost }: AnnihilateToolProps) {
         />
         <p className="mt-2 text-center text-[11.5px] text-muted-foreground">
           {boostActive
-            ? `Irreversible. Boosted route: higher gas, ${boost.boostPct ?? '…'}% more phUSD.`
+            ? `Irreversible. Boosted route: ${boost.boostPct ?? '…'}% more phUSD.`
             : 'Irreversible. Both halves are consumed in one transaction.'}
         </p>
       </div>
