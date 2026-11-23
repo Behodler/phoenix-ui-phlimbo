@@ -104,19 +104,32 @@ export function tokenMetaFor(
 
 export interface AnnihilationSummary {
   count: number;
+  /** Rows that are neither Stake nor Boost. */
   viaForge: number;
   viaStake: number;
+  viaBoost: number;
   antimatterRaw: bigint;
+  /** Total phUSD received: base `phUSDAmount` plus any boost `bonusPhUSD`. */
   phUSDRaw: bigint;
+  /** Sum of boost `bonusPhUSD` (a missing value counts as 0). */
+  bonusRaw: bigint;
+}
+
+/** phUSD a row's recipient received: base plus any boost bonus, raw 18 dp. */
+export function annihilationPhUSDOut(row: Pick<AnnihilationRow, 'phUSDAmount' | 'bonusPhUSD'>): bigint {
+  return sumRaw([row.phUSDAmount, row.bonusPhUSD]);
 }
 
 export function summarizeAnnihilations(rows: readonly AnnihilationRow[]): AnnihilationSummary {
+  const bonusRaw = sumRaw(rows.map((r) => r.bonusPhUSD));
   return {
     count: rows.length,
-    viaForge: rows.filter((r) => r.source !== 'stake').length,
+    viaForge: rows.filter((r) => r.source !== 'stake' && r.source !== 'boost').length,
     viaStake: rows.filter((r) => r.source === 'stake').length,
+    viaBoost: rows.filter((r) => r.source === 'boost').length,
     antimatterRaw: sumRaw(rows.map((r) => r.amount)),
-    phUSDRaw: sumRaw(rows.map((r) => r.phUSDAmount)),
+    phUSDRaw: sumRaw(rows.map((r) => r.phUSDAmount)) + bonusRaw,
+    bonusRaw,
   };
 }
 

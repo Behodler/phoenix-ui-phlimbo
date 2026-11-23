@@ -7,6 +7,7 @@ import {
   burnRow,
   emptyDoc,
   mergeRows,
+  replaceRows,
   stringifyDoc,
   toDecString,
 } from '../lib/history.mjs';
@@ -37,6 +38,22 @@ const autoLog = ({ tx, logIndex, user }) => ({
   blockNumber: 100n,
   args: { token: USDC, user },
 });
+const boostLog = ({ tx, logIndex, user, base = 10n * 10n ** 18n, bonus = 15n * 10n ** 17n }) => ({
+  transactionHash: tx,
+  logIndex,
+  blockNumber: 100n,
+  args: {
+    user,
+    recipient: user,
+    stable: USDC,
+    amount: 5n * 10n ** 18n,
+    stableAmount: 5_000_000n,
+    basePhUSD: base,
+    bonusPhUSD: bonus,
+  },
+});
+const BOOSTER = '0xbb8bF9C05160bB45A2ef920AfD09Bc4ab0258a2C';
+const ZERO = '0x0000000000000000000000000000000000000000';
 const ts = new Map([[100, 1_700_000_000]]);
 
 describe('bigint serialization', () => {
@@ -137,6 +154,118 @@ describe('annihilation re-attribution', () => {
     const [row] = annihilationRows([annLog({ tx: TX1, logIndex: 4, annihilator: STAKER })], [], STAKER, ts, warn);
     expect(row).toMatchObject({ source: 'stake', user: STAKER });
     expect(warn).toHaveBeenCalledOnce();
+  });
+});
+
+describe('booster annihilation re-attribution', () => {
+  const TX3 = '0x' + 'c'.repeat(64);
+  const opts = (boostedLogs) => ({ boostedLogs, booster: BOOSTER });
+
+  it('re-attributes a booster annihilation to BoostedAnnihilation.user with source boost and bonusPhUSD', () => {
+    const warn = vi.fn();
+    const [row] = annihilationRows(
+      [annLog({ tx: TX1, logIndex: 4, annihilator: BOOSTER.toLowerCase() })],
+      [],
+      STAKER,
+      ts,
+      warn,
+      opts([boostLog({ tx: TX1, logIndex: 8, user: ALICE })]),
+    );
+    expect(row).toEqual({
+      txHash: TX1,
+      logIndex: 4,
+      blockNumber: 100,
+      timestamp: 1_700_000_000,
+      user: ALICE,
+      source: 'boost',
+      stable: USDC,
+      amount: '5000000000000000000',
+      stableAmount: '5000000',
+      phUSDAmount: '10000000000000000000',
+      bonusPhUSD: '1500000000000000000',
+    });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('pairs multiple boosts in one tx by logIndex order', () => {
+    const rows = annihilationRows(
+      [annLog({ tx: TX1, logIndex: 10, annihilator: BOOSTER }), annLog({ tx: TX1, logIndex: 2, annihilator: BOOSTER })],
+      [],
+      STAKER,
+      ts,
+      undefined,
+      opts([boostLog({ tx: TX1, logIndex: 14, user: BOB, bonus: 2n }), boostLog({ tx: TX1, logIndex: 5, user: ALICE, bonus: 1n })]),
+    );
+    expect(rows.map((x) => [x.logIndex, x.user, x.bonusPhUSD])).toEqual([
+      [2, ALICE, '1'],
+      [10, BOB, '2'],
+    ]);
+  });
+
+  it('keeps user = booster, source boost, no bonusPhUSD and warns when BoostedAnnihilation is missing', () => {
+    const warn = vi.fn();
+    const [row] = annihilationRows([annLog({ tx: TX1, logIndex: 4, annihilator: BOOSTER })], [], STAKER, ts, warn, opts([]));
+    expect(row).toMatchObject({ source: 'boost', user: BOOSTER });
+    expect(row).not.toHaveProperty('bonusPhUSD');
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it('warns on a basePhUSD mismatch but keeps the Annihilated phUSDAmount', () => {
+    const warn = vi.fn();
+    const [row] = annihilationRows(
+      [annLog({ tx: TX1, logIndex: 4, annihilator: BOOSTER })],
+      [],
+      STAKER,
+      ts,
+      warn,
+      opts([boostLog({ tx: TX1, logIndex: 8, user: ALICE, base: 9n * 10n ** 18n })]),
+    );
+    expect(row).toMatchObject({ source: 'boost', user: ALICE, phUSDAmount: '10000000000000000000', bonusPhUSD: '1500000000000000000' });
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toMatch(/basePhUSD/);
+  });
+
+  it('handles forge, stake and boost rows mixed in one batch', () => {
+    const warn = vi.fn();
+    const rows = annihilationRows(
+      [
+        annLog({ tx: TX1, logIndex: 1, annihilator: ALICE }),
+        annLog({ tx: TX2, logIndex: 1, annihilator: STAKER }),
+        annLog({ tx: TX3, logIndex: 1, annihilator: BOOSTER }),
+      ],
+      [autoLog({ tx: TX2, logIndex: 3, user: BOB })],
+      STAKER,
+      ts,
+      warn,
+      opts([boostLog({ tx: TX3, logIndex: 3, user: BOB, bonus: 7n })]),
+    );
+    const byTx = Object.fromEntries(rows.map((x) => [x.txHash, x]));
+    expect(byTx[TX1]).toMatchObject({ source: 'forge', user: ALICE });
+    expect(byTx[TX1]).not.toHaveProperty('bonusPhUSD');
+    expect(byTx[TX2]).toMatchObject({ source: 'stake', user: BOB });
+    expect(byTx[TX2]).not.toHaveProperty('bonusPhUSD');
+    expect(byTx[TX3]).toMatchObject({ source: 'boost', user: BOB, bonusPhUSD: '7' });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('with a zero (or absent) booster address, output is identical to the legacy call', () => {
+    const anns = [annLog({ tx: TX1, logIndex: 4, annihilator: BOOSTER }), annLog({ tx: TX2, logIndex: 1, annihilator: STAKER })];
+    const autos = [autoLog({ tx: TX2, logIndex: 3, user: BOB })];
+    const legacy = annihilationRows(anns, autos, STAKER, ts);
+    const zero = annihilationRows(anns, autos, STAKER, ts, undefined, { boostedLogs: [boostLog({ tx: TX1, logIndex: 8, user: ALICE })], booster: ZERO });
+    expect(zero).toEqual(legacy);
+    expect(legacy.find((x) => x.txHash === TX1)).toMatchObject({ source: 'forge', user: BOOSTER });
+  });
+});
+
+describe('replaceRows', () => {
+  const r = (tx, logIndex, extra = {}) => ({ txHash: tx, logIndex, blockNumber: 1, ...extra });
+
+  it('replaces matching keys in place, counts only real changes, never adds or removes', () => {
+    const existing = [r(TX1, 0, { user: 'a' }), r(TX2, 0, { user: 'b' })];
+    const { rows, replaced } = replaceRows(existing, [r(TX1, 0, { user: 'z' }), r(TX2, 0, { user: 'b' }), r(TX2, 9, { user: 'new' })]);
+    expect(replaced).toBe(1);
+    expect(rows).toEqual([r(TX1, 0, { user: 'z' }), r(TX2, 0, { user: 'b' })]);
   });
 });
 

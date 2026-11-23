@@ -10,6 +10,7 @@ import {
   newestFirst,
   shortAddress,
   summarizeAnnihilations,
+  annihilationPhUSDOut,
   summarizeBatchMints,
   summarizeBurns,
   sumRaw,
@@ -17,7 +18,16 @@ import {
   etherscanAddressUrl,
   etherscanTxUrl,
 } from './historyFormat';
-import { DOLA, FIXTURE_NOW_MS, UNKNOWN_STABLE, USDC, USDS, makeHistoryFixture } from './historyFixture';
+import {
+  BOOST_ANNIHILATION,
+  DOLA,
+  FIXTURE_NOW_MS,
+  UNKNOWN_STABLE,
+  USDC,
+  USDS,
+  makeHistoryFixture,
+  makeHistoryFixtureWithBoost,
+} from './historyFixture';
 
 const fixture = makeHistoryFixture();
 
@@ -99,6 +109,30 @@ describe('summaries', () => {
     expect(s.viaStake).toBe(1);
     expect(formatTokenAmount(s.antimatterRaw, 18)).toBe('1,087.52'); // 12.0152 + 1000 + 75.5
     expect(formatTokenAmount(s.phUSDRaw, 18)).toBe('2,175.54'); // 24.0304 + 2000.48 + 151.03
+    expect(s.viaBoost).toBe(0);
+    expect(s.bonusRaw).toBe(0n);
+  });
+
+  it('summarises a source:"boost" row separately and adds its bonus to phUSD delivered', () => {
+    const s = summarizeAnnihilations(makeHistoryFixtureWithBoost().annihilations);
+    expect(s.count).toBe(4);
+    expect(s.viaForge).toBe(2); // boost excluded
+    expect(s.viaStake).toBe(1);
+    expect(s.viaBoost).toBe(1);
+    expect(s.bonusRaw).toBe(30n * 10n ** 18n);
+    expect(formatTokenAmount(s.antimatterRaw, 18)).toBe('1,187.52'); // + 100
+    expect(formatTokenAmount(s.phUSDRaw, 18)).toBe('2,405.54'); // + 200 base + 30 bonus
+  });
+
+  it('counts a boost row without bonusPhUSD as zero bonus', () => {
+    const unpaired = { ...BOOST_ANNIHILATION, bonusPhUSD: undefined };
+    const s = summarizeAnnihilations([unpaired]);
+    expect(s.viaBoost).toBe(1);
+    expect(s.viaForge).toBe(0);
+    expect(s.bonusRaw).toBe(0n);
+    expect(formatTokenAmount(s.phUSDRaw, 18)).toBe('200.00');
+    expect(annihilationPhUSDOut(unpaired)).toBe(200n * 10n ** 18n);
+    expect(annihilationPhUSDOut(BOOST_ANNIHILATION)).toBe(230n * 10n ** 18n);
   });
 
   it('summarises burns: 7d count, latest payout, total', () => {

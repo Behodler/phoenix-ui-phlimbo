@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import RecentAnnihilations from './RecentAnnihilations';
 import RecentBurns from './RecentBurns';
 import RecentBatchMints from './RecentBatchMints';
-import { ALICE, FIXTURE_NOW_MS, jsonResponse, makeHistoryFixture } from './historyFixture';
+import { ALICE, BOB, FIXTURE_NOW_MS, jsonResponse, makeHistoryFixture, makeHistoryFixtureWithBoost } from './historyFixture';
 import type { EventHistory } from '../../../hooks/useEventHistory';
 
 function renderWithHistory(ui: ReactElement, history: EventHistory | 'error' = makeHistoryFixture()) {
@@ -74,6 +74,43 @@ describe('RecentAnnihilations', () => {
     expect(cards[1]).toHaveTextContent('1,000.00 → 2,000.48 phUSD');
     expect(cards[1]).toHaveTextContent('Stake');
     expect(cards[1]).toHaveTextContent('9h ago · with DOLA');
+  });
+
+  it('has no Boost tile or "via Boost" text when there are no boost rows', async () => {
+    renderWithHistory(<RecentAnnihilations />);
+    const section = await screen.findByTestId('history-annihilations');
+    expect(await within(section).findByText('phUSD delivered')).toBeInTheDocument();
+    expect(within(section).queryByText('Boost bonus')).not.toBeInTheDocument();
+    expect(within(section).queryByText(/via Boost/)).not.toBeInTheDocument();
+  });
+
+  it('shows the Boost pill, base + bonus phUSD out, the Boost bonus tile and "via Boost"', async () => {
+    renderWithHistory(<RecentAnnihilations />, makeHistoryFixtureWithBoost());
+    const section = await screen.findByTestId('history-annihilations');
+
+    expect(await within(section).findByText('Boost bonus')).toBeInTheDocument();
+    expect(within(section).getByText('30.00')).toBeInTheDocument();
+    // phUSD delivered includes the bonus: 2,175.54 + 200 + 30.
+    expect(within(section).getByText('2,405.54')).toBeInTheDocument();
+    expect(within(section).getByText('4 annihilations · 2 via Forge, 1 via Stake, 1 via Boost')).toBeInTheDocument();
+
+    await expand(/Recent annihilations/);
+    const rows = within(within(section).getByTestId('history-table')).getAllByTestId('history-table-row');
+    expect(rows).toHaveLength(4);
+    // Newest first: the boost row (1h ago).
+    expect(rows[0]).toHaveTextContent('1h ago');
+    expect(rows[0]).toHaveTextContent('100.00USDC');
+    expect(rows[0]).toHaveTextContent('230.00');
+    expect(rows[0]).toHaveTextContent('Boost');
+    expect(within(rows[0]).getByRole('link', { name: '0x91bd…07e4' })).toHaveAttribute(
+      'href',
+      `https://etherscan.io/address/${BOB}`
+    );
+    expect(rows[1]).toHaveTextContent('Forge');
+
+    const cards = within(screen.getByTestId('history-cards')).getAllByTestId('history-card');
+    expect(cards[0]).toHaveTextContent('100.00 → 230.00 phUSD');
+    expect(cards[0]).toHaveTextContent('Boost');
   });
 
   it('shows the unavailable line when the fetch fails', async () => {

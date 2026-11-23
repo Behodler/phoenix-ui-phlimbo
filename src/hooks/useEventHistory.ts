@@ -37,14 +37,17 @@ export interface BonfireBurnRow extends HistoryRowBase {
 
 export interface AnnihilationRow extends HistoryRowBase {
   user: string;
-  source: 'forge' | 'stake';
+  /** 'boost' = via AntimatterBooster; `user` is the booster's caller, not the booster. */
+  source: 'forge' | 'stake' | 'boost';
   stable: string;
   /** Antimatter burned, 18 dp. */
   amount: string;
   /** In the stable's own decimals (see `tokens`). */
   stableAmount: string;
-  /** phUSD delivered, 18 dp. */
+  /** phUSD delivered by Antimatter, 18 dp. For boost rows this is the base, excluding `bonusPhUSD`. */
   phUSDAmount: string;
+  /** Boost rows only: extra phUSD minted by AntimatterBooster, 18 dp. Absent if unpaired. */
+  bonusPhUSD?: string;
 }
 
 export interface BatchMintRow extends HistoryRowBase {

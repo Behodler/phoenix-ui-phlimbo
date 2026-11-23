@@ -17,6 +17,7 @@ import {
   ANTIMATTER_COLOR,
   ANTIMATTER_DECIMALS,
   PHUSD_DECIMALS,
+  annihilationPhUSDOut,
   formatCount,
   formatStable,
   formatTokenAmount,
@@ -26,9 +27,9 @@ import {
 
 const TEMPLATE = '64px minmax(0,1fr) 90px 130px 100px 56px';
 
-const viaLabel = (source: string) => (source === 'stake' ? 'Stake' : 'Forge');
+const viaLabel = (source: string) => (source === 'stake' ? 'Stake' : source === 'boost' ? 'Boost' : 'Forge');
 
-/** "Recent annihilations" under the Forge › Annihilate row (Forge and Stake-tab annihilations). */
+/** "Recent annihilations" under the Forge › Annihilate row (Forge, Boost and Stake-tab annihilations). */
 export default function RecentAnnihilations() {
   const { history, isLoading } = useEventHistory();
   const rows = useMemo(() => newestFirst(history?.annihilations ?? []), [history]);
@@ -54,12 +55,17 @@ export default function RecentAnnihilations() {
                 color: ANTIMATTER_COLOR,
               },
               { label: 'phUSD delivered', value: formatTokenAmount(summary.phUSDRaw, PHUSD_DECIMALS) },
+              // Only once a boost has happened, so the section is unchanged before then.
+              ...(summary.bonusRaw > 0n
+                ? [{ label: 'Boost bonus', value: formatTokenAmount(summary.bonusRaw, PHUSD_DECIMALS) }]
+                : []),
             ]}
           />
           {summary.count > 0 && (
             <SummaryLine>
               {formatCount(summary.count)} annihilation{summary.count === 1 ? '' : 's'} ·{' '}
               {formatCount(summary.viaForge)} via Forge, {formatCount(summary.viaStake)} via Stake
+              {summary.viaBoost > 0 && `, ${formatCount(summary.viaBoost)} via Boost`}
             </SummaryLine>
           )}
         </>
@@ -94,7 +100,7 @@ export default function RecentAnnihilations() {
                       {stable.amount}
                       <TokenTag>{stable.symbol}</TokenTag>
                     </span>
-                    <span className="text-right">{formatTokenAmount(r.phUSDAmount, PHUSD_DECIMALS)}</span>
+                    <span className="text-right">{formatTokenAmount(annihilationPhUSDOut(r), PHUSD_DECIMALS)}</span>
                     <span className="text-right">
                       <HistoryPill>{viaLabel(r.source)}</HistoryPill>
                     </span>
@@ -114,7 +120,7 @@ export default function RecentAnnihilations() {
                           {formatTokenAmount(r.amount, ANTIMATTER_DECIMALS)}
                         </span>{' '}
                         <span className="text-muted-foreground">→</span>{' '}
-                        {formatTokenAmount(r.phUSDAmount, PHUSD_DECIMALS)} phUSD
+                        {formatTokenAmount(annihilationPhUSDOut(r), PHUSD_DECIMALS)} phUSD
                       </>
                     }
                     line1Right={<HistoryPill>{viaLabel(r.source)}</HistoryPill>}

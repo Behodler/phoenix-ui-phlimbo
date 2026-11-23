@@ -52,6 +52,31 @@ export function makeHistoryFixture(overrides: Partial<EventHistory> = {}): Event
   };
 }
 
+/**
+ * A paired AntimatterBooster annihilation (source 'boost'): 100 AM + 100 USDC →
+ * 200 phUSD base + 30 phUSD bonus (15%). Not in the default fixture, so existing
+ * no-boost expectations stay valid; use `makeHistoryFixtureWithBoost()`.
+ */
+export const BOOST_ANNIHILATION: EventHistory['annihilations'][number] = {
+  txHash: tx(13),
+  logIndex: 4,
+  blockNumber: 650,
+  timestamp: NOW_S - HOUR,
+  user: BOB,
+  source: 'boost',
+  stable: USDC,
+  amount: (100n * E18).toString(),
+  stableAmount: '100000000',
+  phUSDAmount: (200n * E18).toString(),
+  bonusPhUSD: (30n * E18).toString(),
+};
+
+/** The default fixture plus `BOOST_ANNIHILATION` (newest annihilation). */
+export function makeHistoryFixtureWithBoost(overrides: Partial<EventHistory> = {}): EventHistory {
+  const base = makeHistoryFixture();
+  return makeHistoryFixture({ annihilations: [...base.annihilations, BOOST_ANNIHILATION], ...overrides });
+}
+
 /** A `fetch` stub that answers every call with `body` as JSON. */
 export function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {

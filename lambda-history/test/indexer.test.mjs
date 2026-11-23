@@ -10,7 +10,8 @@ const tx = (c) => '0x' + c.repeat(64);
 const FINAL = BATCH_MINTER_DISCOUNT.deployBlock + 100;
 
 // Fake chain: a fixed set of logs per address, filtered by block range.
-function fakeChain() {
+// `extra` adds logs per address (appended to the defaults).
+function fakeChain(extra = {}) {
   const logs = {
     [NFT_BONFIRE.address]: [
       { transactionHash: tx('1'), logIndex: 0, blockNumber: BigInt(NFT_BONFIRE.deployBlock + 5), args: { burner: ALICE, tokenId: 1n, payout: 7n } },
@@ -26,6 +27,7 @@ function fakeChain() {
       { transactionHash: tx('4'), logIndex: 1, blockNumber: BigInt(BATCH_MINTER_DISCOUNT.deployBlock + 1), args: { recipient: ALICE, free: 1n, paid: 3n, paidCost: 300n, potReservedUSDC: 0n, owedAdded: 0n } },
     ],
   };
+  for (const [addr, ls] of Object.entries(extra)) logs[addr] = [...(logs[addr] ?? []), ...ls];
   return {
     finalizedBlock: vi.fn(async () => FINAL),
     getLogs: vi.fn(async ({ address, fromBlock, toBlock }) =>
@@ -48,7 +50,26 @@ function memStore(initial = null) {
   };
 }
 
-const run = (store, chain) => runIndexer({ store, chain, remainingMs: () => 600_000, log: () => {} });
+const ZERO = '0x0000000000000000000000000000000000000000';
+const run = (store, chain, booster) =>
+  runIndexer({ store, chain, remainingMs: () => 600_000, log: () => {}, ...(booster ? { booster } : {}) });
+
+// A non-zero test booster deployed between the existing fixtures, so the scan
+// has chunks entirely before its deploy block.
+const BOOSTER = { address: '0x3333333333333333333333333333333333333333', deployBlock: ANTIMATTER.deployBlock + 150_000 };
+const BOOST_BLOCK = BigInt(ANTIMATTER.deployBlock + 250_000);
+function boostFixtures(boosterAddress = BOOSTER.address) {
+  return {
+    [ANTIMATTER.address]: [
+      { transactionHash: tx('5'), logIndex: 2, blockNumber: BOOST_BLOCK, args: { stable: USDC, annihilator: boosterAddress, recipient: ALICE, amount: 4n, stableAmount: 4n, phUSDAmount: 100n } },
+    ],
+    [boosterAddress]: [
+      { transactionHash: tx('5'), logIndex: 6, blockNumber: BOOST_BLOCK, args: { user: ALICE, recipient: ALICE, stable: USDC, amount: 4n, stableAmount: 4n, basePhUSD: 100n, bonusPhUSD: 15n } },
+    ],
+  };
+}
+const boosterCalls = (chain, address = BOOSTER.address) =>
+  chain.getLogs.mock.calls.map(([a]) => a).filter((a) => a.address.toLowerCase() === address.toLowerCase());
 
 describe('runIndexer', () => {
   it('backfills from an empty bucket, re-attributes stake rows, and advances every cursor to finalized', async () => {
@@ -116,5 +137,101 @@ describe('runIndexer', () => {
     await run(store, chain);
     expect(store.get().cursors.bonfire).toBe(NFT_BONFIRE.deployBlock - 1);
     expect(store.get().cursors.batchMint).toBe(FINAL);
+  });
+});
+
+describe('runIndexer — AntimatterBooster attribution', () => {
+  it('scans BoostedAnnihilation in lockstep and attributes boost rows to the real user', async () => {
+    const store = memStore();
+    const chain = fakeChain(boostFixtures());
+    await run(store, chain, BOOSTER);
+    const doc = store.get();
+    expect(doc.cursors).toEqual({ bonfire: FINAL, antimatter: FINAL, stableStaker: FINAL, batchMint: FINAL });
+    expect(doc.annihilations.map((r) => [r.source, r.user, r.bonusPhUSD])).toEqual([
+      ['forge', ALICE, undefined],
+      ['stake', BOB, undefined],
+      ['boost', ALICE, '15'],
+    ]);
+    expect(doc.annihilations[2].phUSDAmount).toBe('100');
+  });
+
+  it('never queries the booster when its address is zero, and output matches the pre-booster indexer', async () => {
+    const store = memStore();
+    const chain = fakeChain();
+    await run(store, chain, { address: ZERO, deployBlock: 0 });
+    expect(boosterCalls(chain, ZERO)).toHaveLength(0);
+    const baseline = memStore();
+    await run(baseline, fakeChain(), { address: ZERO, deployBlock: 0 });
+    expect(store.get().annihilations).toEqual(baseline.get().annihilations);
+    expect(store.get().annihilations.every((r) => r.source !== 'boost' && r.bonusPhUSD === undefined)).toBe(true);
+  });
+
+  it('clamps booster queries to its deploy block and skips chunks entirely before it', async () => {
+    const early = {
+      transactionHash: tx('6'),
+      logIndex: 1,
+      blockNumber: BigInt(BOOSTER.deployBlock - 1),
+      args: { user: BOB, recipient: BOB, stable: USDC, amount: 1n, stableAmount: 1n, basePhUSD: 1n, bonusPhUSD: 1n },
+    };
+    const fixtures = boostFixtures();
+    fixtures[BOOSTER.address].push(early);
+    const store = memStore();
+    const chain = fakeChain(fixtures);
+    await run(store, chain, BOOSTER);
+    const calls = boosterCalls(chain);
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) {
+      expect(c.fromBlock).toBeGreaterThanOrEqual(BOOSTER.deployBlock);
+      expect(c.toBlock).toBeGreaterThanOrEqual(BOOSTER.deployBlock);
+    }
+    // the annihilations scan itself starts well before the booster deploy block
+    const annCalls = chain.getLogs.mock.calls.map(([a]) => a).filter((a) => a.address === ANTIMATTER.address);
+    expect(annCalls.length).toBeGreaterThan(calls.length);
+  });
+
+  it('repairs rows stored with user = booster before the address was configured, and is idempotent', async () => {
+    // Run 1: booster unknown (zero) — the boosted annihilation is stored as forge / user = booster.
+    const store = memStore();
+    const chain = fakeChain(boostFixtures());
+    await run(store, chain, { address: ZERO, deployBlock: 0 });
+    const stale = store.get().annihilations.find((r) => r.txHash === tx('5'));
+    expect(stale).toMatchObject({ source: 'forge', user: BOOSTER.address });
+    const before = store.get();
+
+    // Run 2: address filled in; cursors are already at finalized, so only the repair can fix it.
+    chain.getLogs.mockClear();
+    const s2 = await run(store, chain, BOOSTER);
+    const fixed = store.get().annihilations.find((r) => r.txHash === tx('5'));
+    expect(fixed).toEqual({ ...stale, source: 'boost', user: ALICE, bonusPhUSD: '15' });
+    expect(s2).toMatchObject({ wrote: true, added: 0, replaced: 1 });
+    expect(store.get().annihilations).toHaveLength(before.annihilations.length);
+    expect(store.get().cursors).toEqual(before.cursors);
+    expect(boosterCalls(chain)).toEqual([
+      expect.objectContaining({ fromBlock: Number(BOOST_BLOCK), toBlock: Number(BOOST_BLOCK) }),
+    ]);
+
+    // Run 3: nothing left to repair — no booster query, no write.
+    chain.getLogs.mockClear();
+    const s3 = await run(store, chain, BOOSTER);
+    expect(s3).toMatchObject({ wrote: false, added: 0, replaced: 0 });
+    expect(boosterCalls(chain)).toHaveLength(0);
+    expect(store.write).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failing repair query only warns and leaves the rows untouched', async () => {
+    const store = memStore();
+    const chain = fakeChain(boostFixtures());
+    await run(store, chain, { address: ZERO, deployBlock: 0 });
+    const before = store.get();
+    const realGetLogs = chain.getLogs.getMockImplementation();
+    chain.getLogs.mockImplementation(async (args) => {
+      if (args.address === BOOSTER.address) throw new Error('rpc down');
+      return realGetLogs(args);
+    });
+    const logs = [];
+    const summary = await runIndexer({ store, chain, remainingMs: () => 600_000, log: (m) => logs.push(m), booster: BOOSTER });
+    expect(summary).toMatchObject({ wrote: false, replaced: 0 });
+    expect(store.get()).toEqual(before);
+    expect(logs.some((m) => /WARN \[repair\].*rpc down/.test(m))).toBe(true);
   });
 });

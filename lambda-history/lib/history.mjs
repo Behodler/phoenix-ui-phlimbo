@@ -1,5 +1,5 @@
 // Pure helpers for the history.json document: construction, serialization,
-// merge/dedupe, and Stake-tab annihilation re-attribution. No network, no AWS.
+// merge/dedupe, and Stake/Boost annihilation re-attribution. No network, no AWS.
 import { getAddress } from 'viem';
 
 export const ARRAY_KEYS = ['bonfireBurns', 'annihilations', 'batchMints'];
@@ -112,7 +112,7 @@ export function batchMintRow(log, timestamp, payer) {
 }
 
 /**
- * Builds annihilation rows, re-attributing Stake-tab annihilations.
+ * Builds annihilation rows, re-attributing Stake-tab and Boost annihilations.
  *
  * StableStakerV2.autoAnnihilate calls antimatter.annihilate(token, address(this), …),
  * so its Annihilated log has annihilator == StableStakerV2 and the real user
@@ -121,25 +121,32 @@ export function batchMintRow(log, timestamp, payer) {
  * found in the tx, the row keeps user = annihilator (source still "stake") and
  * a warning is emitted — never a failure.
  *
- * Within a tx, the k-th Annihilated-from-staker is paired with the k-th
- * AutoAnnihilated by logIndex order (one autoAnnihilate emits exactly one of
- * each; this keeps a hypothetical multi-call tx correct).
+ * AntimatterBooster.boostedAnnihilate does the same from the booster and emits
+ * BoostedAnnihilation(user, recipient, stable, amount, stableAmount, basePhUSD,
+ * bonusPhUSD) after the Annihilated log. Such rows become source "boost" with
+ * user = BoostedAnnihilation.user and bonusPhUSD. phUSDAmount stays the
+ * Annihilated value (base); a differing basePhUSD only warns. Unpaired: source
+ * "boost", user = booster, no bonusPhUSD, and a warning.
+ *
+ * Within a tx, the k-th Annihilated-from-staker (or -booster) is paired with
+ * the k-th AutoAnnihilated (or BoostedAnnihilation) by logIndex order.
  *
  * @param annihilatedLogs  decoded Annihilated logs
  * @param autoLogs         decoded AutoAnnihilated logs covering the same range
  * @param stableStaker     StableStakerV2 address
  * @param timestamps       Map<blockNumber, unixSeconds>
  * @param warn             (msg) => void
+ * @param options          { boostedLogs: decoded BoostedAnnihilation logs covering the same range,
+ *                           booster: AntimatterBooster address (zero/absent disables boost pairing) }
  */
-export function annihilationRows(annihilatedLogs, autoLogs, stableStaker, timestamps, warn = () => {}) {
+export function annihilationRows(annihilatedLogs, autoLogs, stableStaker, timestamps, warn = () => {}, options = {}) {
+  const { boostedLogs = [], booster } = options;
   const staker = stableStaker.toLowerCase();
-  const autoByTx = new Map();
-  for (const l of [...autoLogs].sort((a, b) => Number(a.logIndex) - Number(b.logIndex))) {
-    const tx = l.transactionHash.toLowerCase();
-    if (!autoByTx.has(tx)) autoByTx.set(tx, []);
-    autoByTx.get(tx).push(l);
-  }
+  const boosterLc = isZeroAddress(booster) ? null : booster.toLowerCase();
+  const autoByTx = groupByTx(autoLogs);
+  const boostByTx = groupByTx(boostedLogs);
   const usedPerTx = new Map();
+  const usedBoostPerTx = new Map();
   const sorted = [...annihilatedLogs].sort(
     (a, b) => Number(a.blockNumber) - Number(b.blockNumber) || Number(a.logIndex) - Number(b.logIndex),
   );
@@ -148,6 +155,7 @@ export function annihilationRows(annihilatedLogs, autoLogs, stableStaker, timest
     const annihilator = getAddress(a.annihilator);
     let user = annihilator;
     let source = 'forge';
+    let bonusPhUSD;
     if (annihilator.toLowerCase() === staker) {
       source = 'stake';
       const tx = log.transactionHash.toLowerCase();
@@ -159,8 +167,25 @@ export function annihilationRows(annihilatedLogs, autoLogs, stableStaker, timest
       } else {
         warn(`No AutoAnnihilated found for stake annihilation ${log.transactionHash}:${log.logIndex}; keeping user = StableStakerV2`);
       }
+    } else if (boosterLc && annihilator.toLowerCase() === boosterLc) {
+      source = 'boost';
+      const tx = log.transactionHash.toLowerCase();
+      const idx = usedBoostPerTx.get(tx) ?? 0;
+      const match = boostByTx.get(tx)?.[idx];
+      usedBoostPerTx.set(tx, idx + 1);
+      if (match) {
+        user = getAddress(match.args.user);
+        bonusPhUSD = toDecString(match.args.bonusPhUSD);
+        if (BigInt(match.args.basePhUSD) !== BigInt(a.phUSDAmount)) {
+          warn(
+            `BoostedAnnihilation basePhUSD ${toDecString(match.args.basePhUSD)} != Annihilated phUSDAmount ${toDecString(a.phUSDAmount)} for ${log.transactionHash}:${log.logIndex}; keeping the Annihilated value`,
+          );
+        }
+      } else {
+        warn(`No BoostedAnnihilation found for boost annihilation ${log.transactionHash}:${log.logIndex}; keeping user = AntimatterBooster`);
+      }
     }
-    return {
+    const row = {
       ...base(log, timestamps.get(Number(log.blockNumber))),
       user,
       source,
@@ -169,7 +194,62 @@ export function annihilationRows(annihilatedLogs, autoLogs, stableStaker, timest
       stableAmount: toDecString(a.stableAmount),
       phUSDAmount: toDecString(a.phUSDAmount),
     };
+    if (bonusPhUSD !== undefined) row.bonusPhUSD = bonusPhUSD;
+    return row;
   });
+}
+
+/** True for a missing, empty or all-zero address. */
+export function isZeroAddress(address) {
+  return !address || /^0x0{40}$/i.test(address);
+}
+
+function groupByTx(logs) {
+  const byTx = new Map();
+  for (const l of [...logs].sort((a, b) => Number(a.logIndex) - Number(b.logIndex))) {
+    const tx = l.transactionHash.toLowerCase();
+    if (!byTx.has(tx)) byTx.set(tx, []);
+    byTx.get(tx).push(l);
+  }
+  return byTx;
+}
+
+/**
+ * Rebuilds a decoded-Annihilated-shaped log from a stored annihilation row
+ * whose annihilator was `annihilator`, so stored rows can be re-run through
+ * annihilationRows (stale-row repair). Timestamps come from the row itself.
+ */
+export function annihilatedLogFromRow(row, annihilator) {
+  return {
+    transactionHash: row.txHash,
+    logIndex: row.logIndex,
+    blockNumber: BigInt(row.blockNumber),
+    args: {
+      stable: row.stable,
+      annihilator,
+      recipient: annihilator,
+      amount: BigInt(row.amount),
+      stableAmount: BigInt(row.stableAmount),
+      phUSDAmount: BigInt(row.phUSDAmount),
+    },
+  };
+}
+
+/**
+ * Replaces existing rows in place by txHash:logIndex. Never adds or removes a
+ * row: a replacement with no matching key is ignored. A replacement counts
+ * only when it differs from the stored row. Returns { rows, replaced }.
+ */
+export function replaceRows(existing, replacements) {
+  const byKey = new Map(replacements.map((r) => [rowKey(r), r]));
+  let replaced = 0;
+  const rows = existing.map((r) => {
+    const next = byKey.get(rowKey(r));
+    if (!next || JSON.stringify(next) === JSON.stringify(r)) return r;
+    replaced++;
+    return next;
+  });
+  return { rows, replaced };
 }
 
 /** Total row count across the three arrays. */

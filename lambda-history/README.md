@@ -10,6 +10,7 @@ there is no API, no API key and no subgraph.
 | NFT Bonfire burns | NFTBonfire `0xE5983721f009AB57d464e611C9A06B148cEC3Acc` | `Burned(burner, tokenId, payout)` |
 | Antimatter annihilations | Antimatter `0x9CA92B527012DfC6Fdca7B7493C722D5901FF151` | `Annihilated(stable, annihilator, recipient, amount, stableAmount, phUSDAmount)` |
 | (Stake-tab attribution) | StableStakerV2 `0xA6d3fc83C91B8319D219cEB12B46e3dfF064B58F` | `AutoAnnihilated(token, user, …)` |
+| (Boost attribution) | AntimatterBooster `0xbb8bF9C05160bB45A2ef920AfD09Bc4ab0258a2C` | `BoostedAnnihilation(user, recipient, stable, amount, stableAmount, basePhUSD, bonusPhUSD)` |
 | Discount batch mints | BatchNFTMinterNudgeDiscount `0xD41235bC400BAEDD23aA416Db1F62c944981C42a` | `BatchMinted(recipient, free, paid, paidCost, potReservedUSDC, owedAdded)` |
 
 Addresses, deploy blocks and event signatures live in `lib/config.mjs`, with their provenance
@@ -38,7 +39,7 @@ Addresses, deploy blocks and event signatures live in `lib/config.mjs`, with the
   "cursors": { "bonfire": <lastScannedBlock>, "antimatter": <n>, "stableStaker": <n>, "batchMint": <n> },
   "tokens": { "<lowercased stable address>": { "symbol": "USDC", "decimals": 6 } },
   "bonfireBurns":  [ { "txHash", "logIndex", "blockNumber", "timestamp", "burner", "tokenId", "payout" } ],
-  "annihilations": [ { "txHash", "logIndex", "blockNumber", "timestamp", "user", "source": "forge"|"stake", "stable", "amount", "stableAmount", "phUSDAmount" } ],
+  "annihilations": [ { "txHash", "logIndex", "blockNumber", "timestamp", "user", "source": "forge"|"stake"|"boost", "stable", "amount", "stableAmount", "phUSDAmount", "bonusPhUSD"? } ],
   "batchMints":    [ { "txHash", "logIndex", "blockNumber", "timestamp", "recipient", "payer", "free", "paid", "paidCost", "potReservedUSDC", "owedAdded" } ]
 }
 ```
@@ -49,10 +50,20 @@ Addresses, deploy blocks and event signatures live in `lib/config.mjs`, with the
 - `bonfireBurns[].tokenId` is the NFTMinterV2 dispatcher index (the NFT *type*), not a unique
   token; `payout` is Antimatter minted (18 dp). Each burn is one unit.
 - `annihilations[].amount` is Antimatter burned (18 dp), `stableAmount` is in the stable's own
-  decimals (see `tokens`), `phUSDAmount` is total phUSD delivered (18 dp).
+  decimals (see `tokens`), `phUSDAmount` is the phUSD Antimatter delivered (18 dp). For a boost
+  row that is the base amount only; the booster's extra mint is in `bonusPhUSD`, so the recipient
+  received `phUSDAmount + bonusPhUSD`.
 - `source: "stake"` rows come from `StableStakerV2.autoAnnihilate`, whose `Annihilated` log
   names the staker as annihilator. `user` is taken from the `AutoAnnihilated` log in the same tx.
   If that log were ever missing, `user` stays the staker address and a warning is logged.
+- `source: "boost"` rows come from `AntimatterBooster.boostedAnnihilate`, whose `Annihilated` log
+  names the booster as annihilator. `user` is the `BoostedAnnihilation.user` (msg.sender) in the same
+  tx, and `bonusPhUSD` (decimal string, 18 dp) is its `bonusPhUSD`. `bonusPhUSD` is present only
+  on paired boost rows. If `basePhUSD` differs from `Annihilated.phUSDAmount` a warning is logged
+  and the `Annihilated` value is kept. If the `BoostedAnnihilation` is missing, the row is still
+  `source: "boost"`, but `user` stays the booster address, `bonusPhUSD` is absent and a warning is
+  logged. The recipient is not stored, matching the other rows. These fields are additive, so the
+  schema stays v1 and the booster has no cursor of its own.
 - `batchMints[].payer` is the tx sender (the event carries only `recipient`). Effective
   discount ≈ `free / (free + paid)`.
 
@@ -64,15 +75,23 @@ Addresses, deploy blocks and event signatures live in `lib/config.mjs`, with the
 2. Upper bound is the `finalized` block, so indexed rows are reorg-safe.
 3. Each source is scanned over `(cursor, finalized]` with `eth_getLogs`, starting at 50,000-block
    chunks. On an RPC error the chunk halves (floor 500) and retries; after a success it doubles
-   back. Annihilated and AutoAnnihilated are scanned over the same chunks, so their two cursors
-   move in lockstep and the tx-hash join always sees both sides.
+   back. Annihilated, AutoAnnihilated and BoostedAnnihilation are scanned over the same chunks, so
+   the `antimatter`/`stableStaker` cursors move in lockstep and the tx-hash joins always see both
+   sides. The booster query is clamped to the booster's deploy block, and it is skipped entirely
+   while its configured address is zero.
 4. Timestamps come from one `getBlock` per unique block. New stables get `symbol()`/`decimals()`
    once. Batch mints get one `getTransaction` each for `payer`.
 5. Rows merge with dedupe. Each cursor advances only to the last block fully scanned.
+   Then the **booster stale-row repair** runs (booster address non-zero only). Any stored
+   annihilation with `user` = booster and no `bonusPhUSD` was indexed before the booster address was
+   configured. For each of those blocks it queries `BoostedAnnihilation` for that single block,
+   re-derives the rows and replaces them in place under the same `txHash:logIndex`. Arrays never
+   shrink. A replaced row counts as a change and triggers the write. A repair failure is logged as
+   a warning and the rows are left as they were.
 6. Time budget: with < 30 s left the scan stops and writes what is done. Every run is resumable
    and idempotent, so the first backfill may take several invocations on throttled public RPCs.
 7. The object is written (`application/json`, `Cache-Control: public, max-age=300`) only when
-   rows were added or a cursor moved, and never when any array would shrink.
+   rows were added or repaired or a cursor moved, and never when any array would shrink.
 
 ## Configuration
 
@@ -109,6 +128,22 @@ updates only `phusd-history-*` resources:
 - `phusd-history-indexer-12h` — EventBridge Scheduler, `rate(12 hours)`, no retries.
 
 No API Gateway, no Function URL, no CloudFront invalidation (max-age=300 suffices).
+
+## AntimatterBooster address and deploy block
+
+`ANTIMATTER_BOOSTER` in `lib/config.mjs` holds `{ address, deployBlock }`. To fill or change it:
+
+1. Take `address` from phase-2-staging `server/deployments/mainnet-addresses.ts`, key
+   `AntimatterBooster`.
+2. Take `deployBlock` from phase-2-staging
+   `broadcast/DeployAntimatterBoosterMainnet.s.sol/1/run-latest.json`. Find the AntimatterBooster
+   CREATE receipt and convert its `blockNumber` from hex. Check that its `contractAddress` equals the
+   address-book entry.
+3. Update the provenance comment, run `yarn test:run`, then redeploy with `./deploy.sh`.
+
+No cursor needs resetting. The next run's stale-row repair re-attributes any boosted annihilation
+indexed before the address was configured, so those rows stop showing `user` = booster.
+Set the address to `0x000…000` to disable booster scanning and repair altogether.
 
 ## Invoke / test
 
