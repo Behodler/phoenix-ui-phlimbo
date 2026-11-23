@@ -155,7 +155,7 @@ describe('runIndexer — AntimatterBooster attribution', () => {
     expect(doc.annihilations[2].phUSDAmount).toBe('100');
   });
 
-  it('never queries the booster when its address is zero, and output matches the pre-booster indexer', async () => {
+  it('never queries the booster when its address is zero, and two zero-address runs produce identical boost-free output', async () => {
     const store = memStore();
     const chain = fakeChain();
     await run(store, chain, { address: ZERO, deployBlock: 0 });
