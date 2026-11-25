@@ -99,6 +99,19 @@ export DEPLOYMENT_SERVER_PATH=~/code/reflax-mint/deployment-staging
 
 This points to the deployment server that manages contract deployments and address serving.
 
+### Never import endpoints from other repos without asking
+
+**Do NOT copy RPC URLs, API endpoints, API keys or transport configuration from any other
+repository into this one without asking the user first.** That covers `src/wagmiConfig.tsx`
+transports, `VITE_*` URLs in `.env` / `.envrc`, and any hard-coded `https://…` service URL.
+Copying between worktrees of this same repo (phlimbo) is fine.
+
+Every endpoint here is called from visitors' browsers, so it is public once built, and a paid
+one is billed per request. Changes that send more traffic to an endpoint need the same check,
+for example changing chain order, polling intervals or the order of the mainnet `fallback`
+list. The story-101 chain-order change (2026-11-19) made every unconnected production visitor
+poll mainnet and drove the paid Alchemy fallback into its usage limit.
+
 ## Architecture Notes
 
 ### Contract Address Loading
