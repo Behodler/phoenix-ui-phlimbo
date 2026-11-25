@@ -7,6 +7,7 @@ import {
   normaliseEntryUsd,
   parseClaimMintedLogs,
   serialiseSnapshot,
+  isSnapshotPopulated,
   snapshotMatches,
   stripRecipient,
 } from '../nftMintPrices';
@@ -130,6 +131,13 @@ describe('snapshot serialisation', () => {
     expect(parsed.users[BOB.toLowerCase()].map((e: { pricePaid: string }) => e.pricePaid)).toEqual(['1', '2']);
     expect(parsed.users[BOB.toLowerCase()][0]).toEqual({ index: 4, token: 'u', pricePaid: '1' });
     expect(parsed.minter).toBe(USDC.toLowerCase());
+  });
+
+  it('isSnapshotPopulated rejects the empty bootstrap blob', () => {
+    expect(isSnapshotPopulated({ fromBlock: 24_923_934, snapshotBlock: 24_923_933 })).toBe(false);
+    expect(isSnapshotPopulated({ fromBlock: 24_923_934, snapshotBlock: 24_923_934 })).toBe(true);
+    expect(isSnapshotPopulated({ fromBlock: 24_923_934, snapshotBlock: 25_000_000 })).toBe(true);
+    expect(isSnapshotPopulated(null)).toBe(false);
   });
 
   it('snapshotMatches checks chain and minter (case-insensitive)', () => {

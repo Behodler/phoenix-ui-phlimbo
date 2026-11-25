@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAccount, useChainId, usePublicClient } from 'wagmi';
 import { getAbiItem } from 'viem';
 import { nftMinterV2Abi } from '@behodler/phase2-wagmi-hooks';
@@ -9,6 +9,7 @@ import {
   CONFIRMATION_BLOCKS,
   MAINNET_NFT_MINTER_DEPLOY_BLOCK,
   buildStableTokenDecimals,
+  isSnapshotPopulated,
   groupPricesByIndex,
   mergeMintEntries,
   parseClaimMintedLogs,
@@ -107,6 +108,14 @@ export interface UseUserMintPricesReturn {
  *    unconfirmed tip is refetched every run and kept in memory, so a reorg can
  *    never poison the cache.
  *
+ * **Unpopulated blob guard**: a blob that matches the network but covers no
+ * blocks (`snapshotBlock < fromBlock`, the bootstrap committed before the real
+ * snapshot is generated) makes NO RPC call at all. Every held unit then prices
+ * at the marginal price (the conservative direction) and `isUnavailable` is
+ * true. Without this, each wallet's first visit would send one unchunked
+ * `getLogs` from the deploy block (~1M+ blocks), which many providers reject,
+ * and the failure would retry on every page load since nothing gets cached.
+ *
  * Runs on mount, on wallet / chain / minter change and on `refresh()` only. It
  * is deliberately NOT on the 12 s contract-read poll: each run costs one
  * `getBlockNumber` + one `getLogs` against a visitor-facing RPC.
@@ -139,6 +148,16 @@ export function useUserMintPrices(): UseUserMintPricesReturn {
     let cancelled = false;
 
     const blob = SNAPSHOTS.find((s) => snapshotMatches(s, chainId, minter)) ?? null;
+    if (blob && !isSnapshotPopulated(blob)) {
+      // Bootstrap blob for this exact minter: refuse the deploy-block-wide scan.
+      log.warn(
+        'NFT mint price snapshot for this minter is unpopulated; skipping the log scan (run yarn snapshot:mint-prices)',
+      );
+      setEntries([]);
+      setIsLoading(false);
+      setIsUnavailable(true);
+      return;
+    }
     const blobEntries = blob?.users[wallet] ?? [];
     // Last block already covered before the cache / tail take over.
     const baseBlock = blob
@@ -213,10 +232,7 @@ export function useUserMintPrices(): UseUserMintPricesReturn {
     [entries, usdc, usds],
   );
 
-  return {
-    pricesByIndex,
-    isLoading,
-    isUnavailable,
-    refresh: () => setNonce((n) => n + 1),
-  };
+  const refresh = useCallback(() => setNonce((n) => n + 1), []);
+
+  return { pricesByIndex, isLoading, isUnavailable, refresh };
 }

@@ -22,21 +22,21 @@ const fns = vi.hoisted(() => ({
   getBlockNumber: vi.fn(),
 }));
 
-vi.mock('../data/nftMintPriceSnapshot.mainnet.json', () => ({
-  default: {
-    chainId: 1,
-    minter: '0x39af088408e815844c567037c157b31d48d2e10f',
-    fromBlock: 900,
-    snapshotBlock: 1_000,
-    users: {
-      '0x00000000000000000000000000000000000000a1': [
-        // $10 in USDC, $20 in USDS.
-        { index: 4, token: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', pricePaid: '10000000' },
-        { index: 7, token: '0xdc035d45d973e3ec169d2276ddab16f1e407384f', pricePaid: '20000000000000000000' },
-      ],
-    },
-  },
+const snapshot = vi.hoisted(() => ({
+  chainId: 1,
+  minter: '0x39af088408e815844c567037c157b31d48d2e10f',
+  fromBlock: 900,
+  snapshotBlock: 1_000,
+  users: {
+    '0x00000000000000000000000000000000000000a1': [
+      // $10 in USDC, $20 in USDS.
+      { index: 4, token: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', pricePaid: '10000000' },
+      { index: 7, token: '0xdc035d45d973e3ec169d2276ddab16f1e407384f', pricePaid: '20000000000000000000' },
+    ],
+  } as Record<string, { index: number; token: string; pricePaid: string }[]>,
 }));
+
+vi.mock('../data/nftMintPriceSnapshot.mainnet.json', () => ({ default: snapshot }));
 
 vi.mock('wagmi', () => ({
   useAccount: () => ({ address: state.wallet }),
@@ -75,6 +75,8 @@ beforeEach(() => {
   state.chainId = 1;
   state.minter = MINTER;
   state.latest = 1_100n;
+  snapshot.fromBlock = 900;
+  snapshot.snapshotBlock = SNAPSHOT_BLOCK;
   fns.getBlockNumber.mockImplementation(async () => state.latest);
   fns.getLogs.mockResolvedValue([]);
 });
@@ -201,6 +203,28 @@ describe('useUserMintPrices', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('unpopulated (bootstrap) blob for this minter → no RPC call at all, isUnavailable, empty prices', async () => {
+    // The shape committed before the real snapshot exists: snapshotBlock = fromBlock − 1.
+    snapshot.fromBlock = 24_923_934;
+    snapshot.snapshotBlock = 24_923_933;
+    state.latest = 30_000_000n;
+    const { result } = renderHook(() => useUserMintPrices());
+    await waitFor(() => expect(result.current.isUnavailable).toBe(true));
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.pricesByIndex.size).toBe(0);
+    expect(fns.getLogs).not.toHaveBeenCalled();
+    expect(fns.getBlockNumber).not.toHaveBeenCalled();
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('refresh keeps a stable identity across renders', async () => {
+    const { result, rerender } = renderHook(() => useUserMintPrices());
+    await settle(result);
+    const first = result.current.refresh;
+    rerender();
+    expect(result.current.refresh).toBe(first);
   });
 
   it('does nothing without a wallet', async () => {
