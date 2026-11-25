@@ -82,8 +82,8 @@ export function computeMinApy(
   return (annualRewardDollars / denom) * 100;
 }
 
-/** Inputs for {@link computeApyRange}, all pre-derived by `useStakingPageData`. */
-export interface ApyRangeInputs {
+/** Inputs for {@link computePerUnitAnnualRewardUsd}, all pre-derived by `useStakingPageData`. */
+export interface PerUnitRewardInputs {
   /** Global annual phUSD reward stream in USD (rate × seconds × phUSD/USD). */
   annualRewardDollars: number;
   /**
@@ -98,62 +98,66 @@ export interface ApyRangeInputs {
   totalStaked: number;
   /** The connected wallet's owned (unstaked) units. */
   ownedUnits: number;
-  /** Latest / highest historical mint price in USD — the floor-APY anchor. */
+  /** Latest / highest historical mint price in USD — the per-unit anchor. */
   highestPriceUsd: number;
   /**
    * Pre-computed min APY from {@link computeMinApy}. Used verbatim as the
-   * fixed-staker floor (correct for both the live pool and the empty
-   * `targetAPY` starting-APY path), so the fixed-staker math is not duplicated.
+   * fixed-staker APY at the latest price (correct for both the live pool and
+   * the empty `targetAPY` starting-APY path), so the fixed-staker math is not
+   * duplicated.
    */
   minApy: number;
   /**
    * True for fixed stakers (targetAPY auto-scaled rate), false for depletion
-   * (fixed-budget) stakers — selects the empty-pool APY path.
+   * (fixed-budget) stakers — selects the empty-pool path.
    */
   hasTargetApy: boolean;
   /**
-   * Earliest / initial mint price in USD — the ceil-APY anchor. Protocol
-   * convention pins this at 10 ($10, since USDS ≈ USDC = $1).
+   * Fallback price in USD when `highestPriceUsd` is unknown (≤ 0). Protocol
+   * convention pins the initial mint price at 10 ($10, since USDS ≈ USDC = $1).
    */
   initialPriceUsd?: number;
 }
 
 /**
- * Compute a row's `floor → ceil` APY band (percentages, low → high).
+ * Annual phUSD reward earned by ONE staked unit of an NFT type, in USD.
  *
- * ⚠️ Direction is counter-intuitive: **earliest mint = cheapest = HIGHEST APY =
- * ceil**; **latest mint = priciest = LOWEST APY = floor**. NFTs are
- * interchangeable and every staked unit earns an equal per-unit reward, so
- * APY = reward ÷ cost-basis: an early (cheap) mint earns more, a late (expensive)
- * mint earns less. `floor` is anchored at the latest/highest price
- * (`highestPriceUsd`); `ceil` at the fixed initial price (`initialPriceUsd`, 10).
+ * NFTs within a type are interchangeable and every staked unit earns an equal
+ * per-unit reward, so a holder's APY is this figure ÷ what THEY paid per unit
+ * (see {@link computeUserNftApy}). It is derived as the APY at the latest
+ * (highest) mint price × that price, which is the same per-unit reward the old
+ * `floor → ceil` range was anchored on.
+ *
+ * ⚠️ Direction reminder: **earliest mint = cheapest = HIGHEST APY**; **latest
+ * mint = priciest = LOWEST APY**. APY = reward ÷ cost-basis.
  *
  * Fixed stakers (`hasTargetApy`): the reward rate auto-scales to hit `targetAPY`
  * and reads 0 until someone stakes, so the wallet-projection below would be
- * wrong. The floor comes straight from `computeMinApy` (which already handles the
- * empty pool via the `targetAPY` starting-APY, where the mint price cancels — so
- * on an empty pool a sole staker earns `targetAPY` regardless of price, i.e.
- * floor == ceil, no range).
+ * wrong. The APY at the latest price comes straight from `computeMinApy` (which
+ * already handles the empty pool via the `targetAPY` starting-APY, where the
+ * mint price cancels).
  *
  * Depletion stakers (`!hasTargetApy`): a fixed budget emits over a depletion
  * window, so a **conservative, wallet-based denominator** (mirroring the
  * stable-staker empty-pool precedent, `useStableStakerPools.ts` /
  * `usePhUsdStakePool.ts`) keeps the displayed APY representative instead of
  * spiking:
- *   - pool has stake → real APY off the live total (numerator = live
- *     `annualRewardDollars`, from the running `currentRewardRate`);
+ *   - pool has stake → real per-unit reward off the live total (numerator =
+ *     live `annualRewardDollars`, from the running `currentRewardRate`);
  *   - empty, wallet has NFTs → as if all their wallet NFTs were the sole stake;
- *   - empty, no NFTs → as if 1 NFT were staked (at the latest price).
+ *   - empty, no NFTs → as if 1 NFT were staked.
  * This floors expectations so a user's own commit can't make the number collapse.
  *
  * ⚠️ Empty-pool numerator: on an empty depletion pool the live
  * `currentRewardRate` reads **0** (the on-chain rate is `rewardBudget /
  * windowSeconds` and the schedule only re-arms on stake/claim/mint), so
- * `annualRewardDollars` is 0 and would collapse the band to 0–0%. The funded
+ * `annualRewardDollars` is 0 and would collapse the APY to 0%. The funded
  * emission (`annualBudgetDollars`, from `totalBudget / depletionWindow`) is the
  * correct stake-independent numerator for that state.
+ *
+ * Returns 0 when nothing is known or any intermediate is non-finite.
  */
-export function computeApyRange({
+export function computePerUnitAnnualRewardUsd({
   annualRewardDollars,
   annualBudgetDollars = 0,
   totalStaked,
@@ -162,20 +166,13 @@ export function computeApyRange({
   minApy,
   hasTargetApy,
   initialPriceUsd = 10,
-}: ApyRangeInputs): { floorApy: number; ceilApy: number } {
+}: PerUnitRewardInputs): number {
   const latestPrice = highestPriceUsd > 0 ? highestPriceUsd : initialPriceUsd;
 
-  let floorApy: number;
-  let ceilApy: number;
-
+  let perUnit: number;
   if (hasTargetApy) {
-    // Fixed staker — reuse computeMinApy's result for the floor.
-    floorApy = minApy;
-    // On a live pool, ceil = floor scaled from the latest price up to the
-    // (cheaper) initial price. On an empty pool the sole-staker APY equals
-    // targetAPY regardless of mint price, so there is no range.
-    ceilApy =
-      totalStaked > 0 ? floorApy * (latestPrice / initialPriceUsd) : floorApy;
+    // Fixed staker — APY at the latest price × that price.
+    perUnit = (minApy / 100) * latestPrice;
   } else {
     // Depletion staker — conservative wallet-based denominator. Live pool uses
     // the running emission; empty pool uses the funded-budget emission (the
@@ -184,28 +181,61 @@ export function computeApyRange({
       totalStaked > 0 ? annualRewardDollars : annualBudgetDollars;
     const effectiveUnits =
       totalStaked > 0 ? totalStaked : ownedUnits > 0 ? ownedUnits : 1;
-    floorApy =
-      annualReward > 0 && latestPrice > 0
-        ? (annualReward / (effectiveUnits * latestPrice)) * 100
-        : 0;
-    ceilApy =
-      annualReward > 0 && initialPriceUsd > 0
-        ? (annualReward / (effectiveUnits * initialPriceUsd)) * 100
-        : 0;
+    perUnit = annualReward > 0 ? annualReward / effectiveUnits : 0;
   }
 
-  // Guard against any residual NaN / Infinity from divide-by-zero.
-  if (!Number.isFinite(floorApy)) floorApy = 0;
-  if (!Number.isFinite(ceilApy)) ceilApy = 0;
+  return Number.isFinite(perUnit) && perUnit > 0 ? perUnit : 0;
+}
 
-  // Clamp floor ≤ ceil (swap if a sub-initial latest price ever inverts them).
-  if (ceilApy < floorApy) {
-    const tmp = floorApy;
-    floorApy = ceilApy;
-    ceilApy = tmp;
-  }
+/**
+ * Average USD price the connected wallet paid per unit it currently holds
+ * (wallet + staked), from its `ClaimMinted` history.
+ *
+ * 1. `heldUnits == 0` → the marginal (next-mint) price: what a new holder pays.
+ * 2. Paid prices are sorted descending and the first `k = min(paidCount,
+ *    heldUnits)` are used — if the user minted more than they hold, assume
+ *    they kept the **most expensive** units (conservative: lowest APY).
+ * 3. The remaining `heldUnits − k` units (secondary buys, inbound transfers,
+ *    free `mintFor` units, unpriceable pre-075 payments) are counted at the
+ *    marginal price — the highest current price, so again conservative.
+ * 4. `avg = sum / heldUnits`.
+ *
+ * Non-finite / non-positive paid prices are ignored (they fall into rule 3).
+ */
+export function selectCostBasisAvgUsd(
+  paidPricesUsd: readonly number[],
+  heldUnits: number,
+  marginalPriceUsd: number,
+): number {
+  const held = Math.max(0, Math.floor(heldUnits));
+  if (held === 0) return marginalPriceUsd;
 
-  return { floorApy, ceilApy };
+  const paid = paidPricesUsd
+    .filter((p) => Number.isFinite(p) && p > 0)
+    .sort((a, b) => b - a);
+  const k = Math.min(paid.length, held);
+
+  let sum = 0;
+  for (let i = 0; i < k; i++) sum += paid[i];
+  sum += (held - k) * marginalPriceUsd;
+
+  return sum / held;
+}
+
+/**
+ * The connected wallet's personal APY (percent) for one NFT type:
+ * `perUnitAnnualRewardUsd / avgPriceUsd × 100`.
+ *
+ * Returns `null` — rendered as an em dash, never `0` — when the result is
+ * non-finite or ≤ 0 (unknown price, unfunded staker, disconnected wallet).
+ */
+export function computeUserNftApy(
+  perUnitAnnualRewardUsd: number,
+  avgPriceUsd: number,
+): number | null {
+  if (!Number.isFinite(avgPriceUsd) || avgPriceUsd <= 0) return null;
+  const apy = (perUnitAnnualRewardUsd / avgPriceUsd) * 100;
+  return Number.isFinite(apy) && apy > 0 ? apy : null;
 }
 
 /**

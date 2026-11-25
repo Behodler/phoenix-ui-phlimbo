@@ -9,7 +9,12 @@ import {
 import { useStakingPageData } from '../../../hooks/useStakingPageData';
 import type { StakingPageData } from '../../../hooks/useStakingPageData';
 import { useContractAddresses } from '../../../contexts/ContractAddressContext';
-import { computeApyRange } from '../../../utils/stakingMath';
+import { useUserMintPrices } from '../../../hooks/useUserMintPrices';
+import {
+  computePerUnitAnnualRewardUsd,
+  computeUserNftApy,
+  selectCostBasisAvgUsd,
+} from '../../../utils/stakingMath';
 import EarningPanel from '../staking/EarningPanel';
 import NftStakerAccordionRow from './NftStakerAccordionRow';
 
@@ -20,12 +25,16 @@ export interface StakingSurfaceMockProps {
   addToast: AddToast;
 }
 
-/** A wiring descriptor bound to its live per-staker hook state + derived APY band. */
+/** A wiring descriptor bound to its live per-staker hook state + the user's APY. */
 interface StakerRow {
   wiring: StakerWiring;
   state: StakingPageData;
-  floorApy: number;
-  ceilApy: number;
+  /** Connected wallet's personal APY (%), or null when unknown (renders "—"). */
+  apy: number | null;
+  /** USD cost basis the APY divides by: the user's avg. mint price, or the current price. */
+  basisPriceUsd: number;
+  /** Whether the wallet holds any units (wallet + staked) of this NFT. */
+  holdsUnits: boolean;
 }
 
 /**
@@ -36,8 +45,13 @@ interface StakerRow {
  * call (never in a `.map`, per the Rules of Hooks); the generic hook reads
  * staked/owned units, live pending phUSD, rate-per-second and APY, and executes
  * the real `setApprovalForAll` / `stake` / `unstake` / `claim` writes. Rows are
- * bound to their static `STAKER_WIRINGS` descriptor by id and the `floor → ceil`
- * APY band is derived here via `computeApyRange` from values the hook returns.
+ * bound to their static `STAKER_WIRINGS` descriptor by id.
+ *
+ * APY is ONE number per row, personalised to the connected wallet (story 105):
+ * the per-unit annual reward (`computePerUnitAnnualRewardUsd`) ÷ the price the
+ * wallet actually paid per held unit (`selectCostBasisAvgUsd`, fed by the
+ * `ClaimMinted` history from `useUserMintPrices`). That hook runs once for the
+ * whole surface, on mount / wallet change only — never on the 12 s poll.
  */
 export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps) {
   const { addresses } = useContractAddresses();
@@ -79,11 +93,14 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
 
   const states: Record<StakerId, StakingPageData> = { lsp, ratchet, eye, scx, flx };
 
-  // Bind each descriptor to its hook state + derived APY band (pure map — the
+  // The wallet's ClaimMinted history, one scan for every NFT type.
+  const { pricesByIndex } = useUserMintPrices();
+
+  // Bind each descriptor to its hook state + the user's APY (pure map — the
   // hooks above are what must stay out of a loop, not this presentational map).
   const rows: StakerRow[] = STAKER_WIRINGS.map((wiring) => {
     const state = states[wiring.id];
-    const { floorApy, ceilApy } = computeApyRange({
+    const perUnitAnnualRewardUsd = computePerUnitAnnualRewardUsd({
       annualRewardDollars: state.annualRewardDollars,
       annualBudgetDollars: state.annualBudgetDollars,
       totalStaked: state.totalStaked,
@@ -92,7 +109,12 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
       minApy: state.minApy,
       hasTargetApy: wiring.hasTargetApy,
     });
-    return { wiring, state, floorApy, ceilApy };
+    const paidPricesUsd =
+      state.dispatcherIndex === null ? [] : pricesByIndex.get(state.dispatcherIndex) ?? [];
+    const heldUnits = state.ownedUnits + state.stakedUnits;
+    const basisPriceUsd = selectCostBasisAvgUsd(paidPricesUsd, heldUnits, state.marginalPrice);
+    const apy = computeUserNftApy(perUnitAnnualRewardUsd, basisPriceUsd);
+    return { wiring, state, apy, basisPriceUsd, holdsUnits: heldUnits > 0 };
   });
 
   const fixedRows = rows.filter((r) => r.wiring.kind === 'fixed');
@@ -115,8 +137,9 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
         sub={wiring.sub}
         image={wiring.image}
         kind={wiring.kind}
-        floorApy={row.floorApy}
-        ceilApy={row.ceilApy}
+        apy={row.apy}
+        basisPriceUsd={row.basisPriceUsd}
+        holdsUnits={row.holdsUnits}
         stakedUnits={state.stakedUnits}
         ownedUnits={state.ownedUnits}
         pendingYield={state.pendingYield}
@@ -193,41 +216,6 @@ export default function StakingSurfaceMock({ addToast }: StakingSurfaceMockProps
         </p>
         {mcRows.map(renderRow)}
       </section>
-
-      {/* Why is APY a range? */}
-      <div
-        className="mt-1 flex items-start gap-3.5 rounded-[14px] border px-4 py-4"
-        style={{
-          background: 'linear-gradient(180deg, rgba(31,90,115,.14), rgba(10,28,40,0))',
-          borderColor: 'rgba(166,219,239,0.22)',
-        }}
-      >
-        <div
-          className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg border font-mono text-sm font-extrabold"
-          style={{
-            color: '#a6dbef',
-            background: 'rgba(166,219,239,0.14)',
-            borderColor: 'rgba(166,219,239,0.34)',
-          }}
-        >
-          ?
-        </div>
-        <div>
-          <div className="mb-1.5 mt-px text-[12.5px] font-extrabold text-pxusd-white">
-            Why is APY a range?
-          </div>
-          <div className="text-[11.5px] leading-relaxed text-muted-foreground">
-            NFTs were minted at many different prices, but once minted they're
-            interchangeable — so there's no way to know what any single NFT
-            originally cost.{' '}
-            <b className="font-semibold text-pxusd-white/80">
-              NFTs minted earlier cost less and earn a higher APY; those minted
-              later cost more and earn a lower one.
-            </b>{' '}
-            Your actual return lands somewhere inside the range shown.
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

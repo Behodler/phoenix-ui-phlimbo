@@ -37,7 +37,7 @@ export type OwnedRowKey = 'USDS' | 'USDC' | 'EYE' | 'SCX' | 'Flax';
  * descriptor list. It carries only presentational identity (id/name/sub/image/
  * kind) plus the bindings the orchestrator needs to resolve a live per-staker
  * `useStakingPageData` call. No live values live here — staked/owned units,
- * pending phUSD, rate-per-second and the APY band all come from the chain.
+ * pending phUSD, rate-per-second and the APY inputs all come from the chain.
  */
 export interface StakerWiring {
   /** Stable row id. */
@@ -58,7 +58,7 @@ export interface StakerWiring {
    * Whether the staker exposes `targetAPY()`. True for the fixed stakers
    * (LSP/Ratchet); false for the Uniboost depletion stakers (EYE/SCX/FLX),
    * which drives both the conditional `targetAPY` read and the empty-pool
-   * APY path in `computeApyRange`.
+   * per-unit reward path in `computePerUnitAnnualRewardUsd`.
    */
   hasTargetApy: boolean;
 }

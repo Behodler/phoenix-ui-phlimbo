@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "snapshot:mint-prices": "tsx scripts/snapshot-mint-prices.ts"
   },
   "dependencies": {
     "@behodler/phase2-wagmi-hooks": "0.26.0",
@@ -54,6 +55,7 @@
     "tailwindcss": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
     "ts-node": "^10.9.2",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.39.1",
     "vite": "^7.1.2",

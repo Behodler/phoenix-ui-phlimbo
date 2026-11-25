@@ -58,6 +58,18 @@ export interface StakingPageData {
   minApy: number;
   /** Highest USD price any staked unit could have been minted at. */
   highestPrice: number;
+  /**
+   * Marginal mint price in USD: what the NEXT mint pays (`priceRaw /
+   * 10**decimals`, NOT backed out a growth step). The per-user cost basis
+   * prices unpriced held units, and a non-holder's APY, at this.
+   */
+  marginalPrice: number;
+  /**
+   * On-chain dispatcher index (== ERC1155 tokenId) of this NFT type, from
+   * MintPageView. `null` until the view resolves. Keys the user's
+   * `ClaimMinted` history in `useUserMintPrices`.
+   */
+  dispatcherIndex: number | null;
   /** Annual phUSD reward stream in USD (rate × seconds × phUSD/USD). */
   annualRewardDollars: number;
   /**
@@ -341,6 +353,11 @@ export function useStakingPageData(
   const highestPrice =
     Number(backOutGrowthStep(priceRaw, growthBasisPoints)) / 10 ** priceDecimals;
 
+  // Next-mint price, exact via formatUnits (an 18-dp USDS price never passes
+  // through an unsafe Number(raw)).
+  const marginalPrice = Number(formatUnits(priceRaw, priceDecimals));
+  const dispatcherIndex = ownedRow ? ownedRow.dispatcherIndex : null;
+
   const minApy = computeMinApy(
     currentRewardRate,
     totalStakedRaw,
@@ -611,6 +628,8 @@ export function useStakingPageData(
     ratePerSec,
     minApy,
     highestPrice,
+    marginalPrice,
+    dispatcherIndex,
     annualRewardDollars,
     annualBudgetDollars,
     isApprovedForAll,

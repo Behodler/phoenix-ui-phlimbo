@@ -4,7 +4,7 @@ import SegmentedControl from '../../ui/SegmentedControl';
 import ActionButton, { LoadingSpinner } from '../../ui/ActionButton';
 import LiveYieldCounter from '../staking/LiveYieldCounter';
 import PhUsdCoin from '../staking/PhUsdCoin';
-import ApyRangePill from './ApyRangePill';
+import { fmtAPY } from '../stake/formatStake';
 
 /** Which in-row action panel is active. */
 type RowAction = 'stake' | 'unstake' | 'claim';
@@ -15,8 +15,15 @@ export interface NftStakerAccordionRowProps {
   sub: string;
   image: string;
   kind: StakerKind;
-  floorApy: number;
-  ceilApy: number;
+  /** The connected wallet's personal APY (%); `null` renders "—", never 0. */
+  apy: number | null;
+  /**
+   * USD price the APY divides by: the wallet's average mint price per held
+   * unit, or the current (next-mint) price when it holds none.
+   */
+  basisPriceUsd: number;
+  /** Whether the wallet holds any units (wallet + staked) of this NFT. */
+  holdsUnits: boolean;
   stakedUnits: number;
   /** Wallet units available to stake. */
   ownedUnits: number;
@@ -53,12 +60,31 @@ function unitLabel(n: number): string {
 }
 
 /**
+ * APY accent per staker kind: teal for fixed, orange for MasterChef.
+ *
+ * Applied as an inline literal colour rather than a `pxusd-*` opacity class:
+ * those tokens are defined as full hex (`var(--pxusd-teal-400)` -> `#1f5a73`),
+ * so a Tailwind opacity modifier compiles to the invalid `rgb(#1f5a73 / 0.24)`
+ * and the declaration silently drops. (Carried over from the deleted
+ * `ApyRangePill`.)
+ */
+function apyAccent(kind: StakerKind): { color: string } {
+  return { color: kind === 'mc' ? 'rgba(255,181,102,1)' : 'rgba(166,219,239,1)' };
+}
+
+function fmtUsd(n: number): string {
+  return Number.isFinite(n) && n > 0 ? `$${n.toFixed(2)}` : '—';
+}
+
+/**
  * A single NFT staker accordion row.
  *
  * Presentational — plain props only, no mock-data import. Header shows the
- * thumbnail, name + `Earn phUSD · {sub}`, an APY-range pill, staked units, a
- * live-ticking pending value, and a chevron. When open, the expanded panel
- * renders the APY-range explainer, a Stake/Unstake/Claim segmented control, a
+ * thumbnail, name + `Earn phUSD · {sub}`, the wallet's personal APY (its own
+ * column from `sm` up, inline under the name below that, like
+ * `StakeAccordionRow`), staked units, a live-ticking pending value, and a
+ * chevron. When open, the expanded panel shows the APY with its cost basis
+ * (average mint price), a Stake/Unstake/Claim segmented control, a
  * clamped unit slider + action button (stake / red unstake), and a Claim box
  * with the live claimable amount.
  */
@@ -67,8 +93,9 @@ export default function NftStakerAccordionRow({
   sub,
   image,
   kind,
-  floorApy,
-  ceilApy,
+  apy,
+  basisPriceUsd,
+  holdsUnits,
   stakedUnits,
   ownedUnits,
   pendingYield,
@@ -115,6 +142,8 @@ export default function NftStakerAccordionRow({
   // Pending "—" when there is nothing accruing and nothing pending.
   const hasPending = pendingYield > 0.0000001 || ratePerSec > 0;
   const hasStaked = stakedUnits > 0;
+  const apyLabel = apy === null ? '—' : fmtAPY(apy);
+  const accent = apyAccent(kind);
 
   return (
     <div
@@ -125,7 +154,7 @@ export default function NftStakerAccordionRow({
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
-        className="grid w-full cursor-pointer grid-cols-[1.7fr_0.92fr_0.92fr_auto] items-center gap-3 border-none bg-transparent px-3.5 py-3 text-left text-inherit sm:grid-cols-[1.7fr_0.92fr_0.62fr_0.92fr_auto]"
+        className="grid w-full cursor-pointer grid-cols-[1.7fr_0.92fr_auto] items-center gap-3 border-none bg-transparent px-3.5 py-3 text-left text-inherit sm:grid-cols-[1.7fr_0.92fr_0.62fr_0.92fr_auto]"
       >
         {/* Name + sub */}
         <div className="flex min-w-0 items-center gap-3">
@@ -146,6 +175,13 @@ export default function NftStakerAccordionRow({
             <div className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground">
               Earn phUSD · {sub}
             </div>
+            {/* APY lives in its own header column from sm up; below that the
+                column is hidden, so surface it inline here instead. */}
+            <div className="mt-0.5 whitespace-nowrap text-[11px] sm:hidden">
+              <span className="font-mono font-semibold" style={accent}>
+                {apyLabel} APY
+              </span>
+            </div>
             {!isStakerDeployed && (
               <span className="mt-1 inline-block rounded-full border border-pxusd-orange-500/40 bg-pxusd-orange-900/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-pxusd-orange-300">
                 Not live yet
@@ -154,12 +190,14 @@ export default function NftStakerAccordionRow({
           </div>
         </div>
 
-        {/* APY range pill + caption */}
-        <div>
-          <ApyRangePill floor={floorApy} ceil={ceilApy} variant={kind} />
-          <div className="mt-1 hidden text-[8.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground sm:block">
-            APY range
-          </div>
+        {/* APY (desktop column) */}
+        <div className="hidden flex-col gap-0.5 sm:flex">
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+            APY
+          </span>
+          <span className="font-mono text-[18px] font-bold tabular-nums" style={accent}>
+            {apyLabel}
+          </span>
         </div>
 
         {/* Staked */}
@@ -220,33 +258,34 @@ export default function NftStakerAccordionRow({
 
       {isOpen && (
         <div className="border-t border-border px-4 pb-4 pt-3.5">
-          {/* APY range explainer */}
+          {/* Your APY + its cost basis */}
           <div className="mb-3.5 rounded-[12px] border border-border bg-white/[0.02] px-4 py-3">
-            <div className="text-center text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-              APY range
-            </div>
-            <div className="mt-2.5 flex items-center justify-center gap-5">
+            <div className="flex items-start justify-center gap-8">
               <div className="text-center">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  Your APY
+                </div>
                 <div
-                  className="font-mono text-[26px] font-bold leading-none tabular-nums"
-                  style={{ color: '#a6dbef' }}
+                  className="mt-1.5 font-mono text-[26px] font-bold leading-none tabular-nums"
+                  style={accent}
                 >
-                  {floorApy.toFixed(1)}%
-                </div>
-                <div className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-                  Latest mint
+                  {apyLabel}
                 </div>
               </div>
-              <span className="-mt-3 text-xl text-muted-foreground">→</span>
               <div className="text-center">
-                <div className="font-mono text-[26px] font-bold leading-none tabular-nums text-pxusd-orange-300">
-                  {ceilApy.toFixed(1)}%
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  {holdsUnits ? 'Your avg. mint price' : 'Current mint price'}
                 </div>
-                <div className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-                  Earliest mint
+                <div className="mt-1.5 font-mono text-[26px] font-bold leading-none tabular-nums text-pxusd-white">
+                  {fmtUsd(basisPriceUsd)}
                 </div>
               </div>
             </div>
+            <p className="m-0 mt-2.5 text-center text-[11px] leading-relaxed text-muted-foreground">
+              {holdsUnits
+                ? "Based on what you paid per NFT. Units you didn't mint yourself count at the current price."
+                : 'What a newly minted NFT earns at the current mint price.'}
+            </p>
           </div>
 
           {/* Stake / Unstake / Claim selector */}
